@@ -1,5 +1,7 @@
-import Ajv, { JSONSchemaType, ValidateFunction } from "ajv";
+import AjvModule from "ajv";
+import type { JSONSchemaType, ValidateFunction } from "ajv";
 
+const Ajv = AjvModule.default || AjvModule;
 const ajv = new Ajv();
 
 export function convertCompletionToJSON<T>(completionContent: string): T | null {

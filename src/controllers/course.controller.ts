@@ -7,6 +7,7 @@ import {
   deleteCourse,
   regenerateSection,
 } from "../services/course.service.js";
+import { exportCourseToPdf } from "../services/pdf.service.js";
 
 const createCourseSchema = z.object({
   topic: z.string().min(1),
@@ -51,7 +52,7 @@ export async function handleGetCourse(
   next: NextFunction
 ): Promise<void> {
   try {
-    const course = await getCourse(req.params.id);
+    const course = await getCourse(req.params.id as string);
     if (!course) {
       res.status(404).json({ error: "Course not found" });
       return;
@@ -81,7 +82,7 @@ export async function handleDeleteCourse(
   next: NextFunction
 ): Promise<void> {
   try {
-    const deleted = await deleteCourse(req.params.id);
+    const deleted = await deleteCourse(req.params.id as string);
     if (!deleted) {
       res.status(404).json({ error: "Course not found" });
       return;
@@ -98,7 +99,7 @@ export async function handleGetCourseStatus(
   next: NextFunction
 ): Promise<void> {
   try {
-    const course = await getCourse(req.params.id);
+    const course = await getCourse(req.params.id as string);
     if (!course) {
       res.status(404).json({ error: "Course not found" });
       return;
@@ -128,7 +129,7 @@ export async function handleRegenerateCourse(
     }
 
     const course = await regenerateSection(
-      req.params.id,
+      req.params.id as string,
       parsed.data.moduleIndex,
       parsed.data.context,
       parsed.data.provider
@@ -139,6 +140,36 @@ export async function handleRegenerateCourse(
       return;
     }
     res.json(course);
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function handleExportPdf(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const course = await getCourse(req.params.id as string);
+    if (!course) {
+      res.status(404).json({ error: "Course not found" });
+      return;
+    }
+
+    if (course.status !== "ready") {
+      res.status(400).json({ error: "Course is not ready for export" });
+      return;
+    }
+
+    const pdfBuffer = await exportCourseToPdf(course);
+    
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${course.syllabus?.title || "course"}.pdf"`
+    );
+    res.send(pdfBuffer);
   } catch (error) {
     next(error);
   }

@@ -1,8 +1,9 @@
-import Ajv from "ajv";
+import AjvModule from "ajv";
 import { getAIClient, getModel } from "./client.js";
 import { AIProvider } from "../../models/course.model.js";
 import { syllabusSchema, Syllabus } from "../../models/schemas/syllabus.schema.js";
 
+const Ajv = AjvModule.default || AjvModule;
 const ajv = new Ajv();
 
 export interface SyllabusGenerationResult {
@@ -69,7 +70,7 @@ export async function generateSyllabus(
       };
     }
 
-    return { success: true, syllabus: parsed as Syllabus };
+    return { success: true, syllabus: parsed as unknown as Syllabus };
   } catch (error) {
     return {
       success: false,
