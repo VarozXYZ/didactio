@@ -48,10 +48,13 @@ function createModulePrompt(
       ? `**Prerequisites (from previous modules):**
 ${previousModules.map((mod, index) => `${index + 1}. ${mod.title}: ${mod.overview || ""}`).join("\n")}
 
-**Key concepts already covered:**
-${previousSummaries.map((s, i) => `- Module ${i + 1}: ${s}`).join("\n")}
+**Key concepts ALREADY covered (DO NOT RE-EXPLAIN THESE):**
+${previousSummaries.map((s, i) => `### Module ${i + 1} Concepts:\n${s}`).join("\n\n")}
 
-Build upon their existing knowledge without re-explaining basic concepts.`
+Instructions:
+- Assume the student has mastered the concepts listed above.
+- Do not define terms that were already defined in previous modules.
+- Build upon this existing knowledge foundation.`
       : `**Prerequisites:**
 This is the first module, so assume students are starting fresh with the topic.`;
 
@@ -197,7 +200,7 @@ async function extractModuleSummary(content: string, provider: AIProvider): Prom
         {
           role: "system",
           content:
-            "Extract the key concepts and topics covered in this educational content. Return a brief summary (2-3 sentences) that can be used as context for generating subsequent modules. Return ONLY the summary text, nothing else.",
+            "Analyze the content and extract a concise, schematic list of key concepts, definitions, and techniques covered. Return a markdown bullet list (max 10 items). Do not use full sentences. Focus on what was explicitly taught. Return ONLY the list.",
         },
         {
           role: "user",
