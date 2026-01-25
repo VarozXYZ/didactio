@@ -132,7 +132,6 @@ export async function generateModuleContent(
       ],
       model,
       temperature: 0.7,
-      max_tokens: 4000,
     });
 
     const content = completion.choices[0].message.content;
@@ -169,7 +168,6 @@ async function extractModuleSummary(content: string, provider: AIProvider): Prom
         },
       ],
       model,
-      max_tokens: 200,
     });
 
     return completion.choices[0].message.content || "Summary not available";
