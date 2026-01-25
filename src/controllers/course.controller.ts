@@ -174,10 +174,14 @@ export async function handleExportPdf(
 
     const pdfBuffer = await exportCourseToPdf(course);
     
+    const filename = (course.syllabus?.title || "course")
+      .replace(/[^a-z0-9]/gi, "_")
+      .toLowerCase();
+
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="${course.syllabus?.title || "course"}.pdf"`
+      `attachment; filename="${filename}.pdf"`
     );
     res.send(pdfBuffer);
   } catch (error) {
