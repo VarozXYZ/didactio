@@ -110,7 +110,8 @@ export async function generateModuleContent(
   syllabusData: Syllabus,
   level: string,
   previousSummaries: string[],
-  provider: AIProvider
+  provider: AIProvider,
+  maxTokens?: number
 ): Promise<ModuleGenerationResult> {
   const client = getAIClient(provider);
   const model = getModel(provider);
@@ -122,6 +123,7 @@ export async function generateModuleContent(
       messages: Array<{ role: "system" | "user"; content: string }>;
       model: string;
       temperature?: number;
+      max_tokens?: number;
     } = {
       messages: [
         {
@@ -139,6 +141,10 @@ export async function generateModuleContent(
 
     if (provider === "deepseek") {
       options.temperature = 0.7;
+    }
+
+    if (maxTokens) {
+      options.max_tokens = maxTokens;
     }
 
     const completion = await client.chat.completions.create(options);

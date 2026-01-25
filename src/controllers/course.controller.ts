@@ -14,6 +14,7 @@ const createCourseSchema = z.object({
   topic: z.string().min(1),
   level: z.enum(["beginner", "intermediate", "advanced"]),
   provider: z.enum(["deepseek", "openai"]).optional(),
+  contentLength: z.enum(["intro", "summary", "lesson", "course", "textbook"]).optional(),
   options: z
     .object({
       numLessons: z.number().optional(),
@@ -40,7 +41,10 @@ export async function handleCreateCourse(
       return;
     }
 
-    const course = await createCourse(parsed.data);
+    const course = await createCourse({
+      ...parsed.data,
+      contentLength: parsed.data.contentLength || "lesson",
+    });
     res.status(201).json(course);
   } catch (error) {
     next(error);

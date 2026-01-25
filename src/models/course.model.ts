@@ -11,9 +11,28 @@ export type CourseStatus =
 
 export type AIProvider = "deepseek" | "openai";
 
+export type ContentLength = "intro" | "summary" | "lesson" | "course" | "textbook";
+
+export const CONTENT_LENGTH_TOKENS: Record<ContentLength, number> = {
+  intro: 2000,
+  summary: 6000,
+  lesson: 12000,
+  course: 20000,
+  textbook: 32000,
+};
+
+export const CONTENT_LENGTH_LABELS: Record<ContentLength, string> = {
+  intro: "Texto introductorio",
+  summary: "Resumen detallado",
+  lesson: "Lección completa",
+  course: "Curso extenso",
+  textbook: "Libro de texto",
+};
+
 export interface ICourse extends Document {
   status: CourseStatus;
   provider: AIProvider;
+  contentLength: ContentLength;
   originalPrompt: string;
   improvedPrompt?: string;
   level: string;
@@ -67,6 +86,11 @@ const courseSchema = new Schema<ICourse>(
       type: String,
       enum: ["deepseek", "openai"],
       default: "deepseek",
+    },
+    contentLength: {
+      type: String,
+      enum: ["intro", "summary", "lesson", "course", "textbook"],
+      default: "lesson",
     },
     originalPrompt: { type: String, required: true },
     improvedPrompt: { type: String },

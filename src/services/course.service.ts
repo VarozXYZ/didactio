@@ -1,4 +1,4 @@
-import { Course, ICourse, AIProvider } from "../models/course.model.js";
+import { Course, ICourse, AIProvider, ContentLength, CONTENT_LENGTH_TOKENS } from "../models/course.model.js";
 import { Module } from "../models/schemas/syllabus.schema.js";
 import { filterAndImprovePrompt } from "./ai/prompt.service.js";
 import { generateSyllabus } from "./ai/syllabus.service.js";
@@ -8,6 +8,7 @@ export interface CreateCourseInput {
   topic: string;
   level: string;
   provider?: AIProvider;
+  contentLength: ContentLength;
   options?: { numLessons?: number; maxMinutes?: number };
 }
 
@@ -17,6 +18,7 @@ export async function createCourse(input: CreateCourseInput): Promise<ICourse> {
   const course = new Course({
     status: "filtering_prompt",
     provider,
+    contentLength: input.contentLength,
     originalPrompt: input.topic,
     level: input.level,
     modules: [],
@@ -81,13 +83,15 @@ async function processCourseAsync(
       console.log(`[Course ${courseId}] Generating module ${i + 1}/${syllabusResult.syllabus!.modules.length}: ${module.title}`);
 
       try {
+        const maxTokens = CONTENT_LENGTH_TOKENS[input.contentLength];
         const contentResult = await generateModuleContent(
           module,
           i,
           syllabusResult.syllabus!,
           input.level,
           summaries,
-          provider
+          provider,
+          maxTokens
         );
 
         if (contentResult.success) {
@@ -172,13 +176,15 @@ export async function regenerateSection(
     description: `${course.syllabus.description}\n\nAdditional context for regeneration: ${userContext}`,
   };
 
+  const maxTokens = CONTENT_LENGTH_TOKENS[course.contentLength];
   const contentResult = await generateModuleContent(
     module,
     moduleIndex,
     syllabusWithContext,
     course.level,
     previousSummaries,
-    useProvider
+    useProvider,
+    maxTokens
   );
 
   if (contentResult.success) {
@@ -251,13 +257,15 @@ async function resumeCourseAsync(
       const previousSummaries = course.iterationSummaries.slice(0, index);
 
       try {
+        const maxTokens = CONTENT_LENGTH_TOKENS[course.contentLength];
         const contentResult = await generateModuleContent(
           module as Module,
           index,
           course.syllabus,
           course.level,
           previousSummaries,
-          provider
+          provider,
+          maxTokens
         );
 
         if (contentResult.success) {
