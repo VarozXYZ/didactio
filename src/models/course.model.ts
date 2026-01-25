@@ -11,26 +11,24 @@ export type CourseStatus =
 
 export type AIProvider = "deepseek" | "openai";
 
-export type ContentLength = "intro" | "summary" | "lesson" | "course" | "textbook";
+export type ContentLength = "intro" | "short" | "long" | "textbook";
 
 export type Tone = "friendly" | "neutral" | "professional";
 
 export type Technicality = "basic" | "intermediate" | "technical";
 
 export const CONTENT_LENGTH_TOKENS: Record<ContentLength, number> = {
-  intro: 2000,
-  summary: 6000,
-  lesson: 12000,
-  course: 20000,
+  intro: 1000,
+  short: 6000,
+  long: 15000,
   textbook: 32000,
 };
 
 export const CONTENT_LENGTH_LABELS: Record<ContentLength, string> = {
-  intro: "Texto introductorio",
-  summary: "Resumen detallado",
-  lesson: "Lección completa",
-  course: "Curso extenso",
-  textbook: "Libro de texto",
+  intro: "Introduction",
+  short: "Short course",
+  long: "Long course",
+  textbook: "Textbook",
 };
 
 export const TONE_INSTRUCTIONS: Record<Tone, string> = {
@@ -108,8 +106,8 @@ const courseSchema = new Schema<ICourse>(
     },
     contentLength: {
       type: String,
-      enum: ["intro", "summary", "lesson", "course", "textbook"],
-      default: "lesson",
+      enum: ["intro", "short", "long", "textbook"],
+      default: "short",
     },
     tone: {
       type: String,
