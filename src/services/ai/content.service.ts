@@ -1,5 +1,5 @@
 import { getAIClient, getModel } from "./client.js";
-import { AIProvider } from "../../models/course.model.js";
+import { AIProvider, Tone, Technicality, TONE_INSTRUCTIONS, TECHNICALITY_INSTRUCTIONS } from "../../models/course.model.js";
 import { Syllabus, Module } from "../../models/schemas/syllabus.schema.js";
 
 export interface ModuleGenerationResult {
@@ -9,12 +9,20 @@ export interface ModuleGenerationResult {
   error?: string;
 }
 
+export interface ContentGenerationOptions {
+  tone: Tone;
+  technicality: Technicality;
+  additionalContext?: string;
+  maxTokens?: number;
+}
+
 function createModulePrompt(
   module: Module,
   moduleIndex: number,
   syllabusData: Syllabus,
   level: string,
-  previousSummaries: string[]
+  previousSummaries: string[],
+  options: ContentGenerationOptions
 ): string {
   const courseContext = syllabusData.modules
     .map((mod, index) => {
@@ -57,6 +65,13 @@ Introduce concepts that will be expanded in later modules. Avoid covering topics
       : `**Course completion:**
 This is the final module. Focus on synthesis, application, and mastery of the entire topic.`;
 
+  const toneInstruction = TONE_INSTRUCTIONS[options.tone];
+  const technicalityInstruction = TECHNICALITY_INSTRUCTIONS[options.technicality];
+  
+  const additionalContextSection = options.additionalContext 
+    ? `\n**Student additional context:**\n${options.additionalContext}\n\nTailor the content to address these specific needs and goals.`
+    : "";
+
   return `You are an expert curriculum designer.
 
 **Course Overview:**
@@ -64,6 +79,7 @@ This is the final module. Focus on synthesis, application, and mastery of the en
 - Student Level: ${level}
 - Total Course Duration: ${syllabusData.total_duration_minutes} minutes
 - Course Description: ${syllabusData.description}
+${additionalContextSection}
 
 **Complete Course Structure:**
 ${courseContext}
@@ -78,8 +94,9 @@ ${prerequisiteContext}
 
 ${forwardContext}
 
-**Goals**
-Write comprehensive, engaging, expert-level educational content for this module.
+**Writing Style Requirements:**
+- Tone: ${toneInstruction}
+- Technical Level: ${technicalityInstruction}
 
 **Pedagogical Requirements**
 - Each lesson must be written as a cohesive mini-chapter, not a list of tips.
@@ -93,7 +110,6 @@ Write comprehensive, engaging, expert-level educational content for this module.
   6. A final section called "Why It Works" that explains the underlying principles
 
 - Use clear markdown formatting for hierarchy.
-- Keep tone professional, slightly conversational.
 
 **Output Format**
 Return ONLY markdown-formatted educational content.
@@ -111,15 +127,15 @@ export async function generateModuleContent(
   level: string,
   previousSummaries: string[],
   provider: AIProvider,
-  maxTokens?: number
+  options: ContentGenerationOptions
 ): Promise<ModuleGenerationResult> {
   const client = getAIClient(provider);
   const model = getModel(provider);
 
   try {
-    const prompt = createModulePrompt(module, moduleIndex, syllabusData, level, previousSummaries);
+    const prompt = createModulePrompt(module, moduleIndex, syllabusData, level, previousSummaries, options);
 
-    const options: {
+    const apiOptions: {
       messages: Array<{ role: "system" | "user"; content: string }>;
       model: string;
       temperature?: number;
@@ -140,14 +156,14 @@ export async function generateModuleContent(
     };
 
     if (provider === "deepseek") {
-      options.temperature = 0.7;
+      apiOptions.temperature = 0.7;
     }
 
-    if (maxTokens) {
-      options.max_tokens = maxTokens;
+    if (options.maxTokens) {
+      apiOptions.max_tokens = options.maxTokens;
     }
 
-    const completion = await client.chat.completions.create(options);
+    const completion = await client.chat.completions.create(apiOptions);
 
     const content = completion.choices[0].message.content;
     if (!content) {
@@ -170,7 +186,7 @@ async function extractModuleSummary(content: string, provider: AIProvider): Prom
   const model = getModel(provider);
 
   try {
-    const options: {
+    const apiOptions: {
       messages: Array<{ role: "system" | "user"; content: string }>;
       model: string;
       temperature?: number;
@@ -190,10 +206,10 @@ async function extractModuleSummary(content: string, provider: AIProvider): Prom
     };
 
     if (provider === "deepseek") {
-      options.temperature = 0.7;
+      apiOptions.temperature = 0.7;
     }
 
-    const completion = await client.chat.completions.create(options);
+    const completion = await client.chat.completions.create(apiOptions);
 
     return completion.choices[0].message.content || "Summary not available";
   } catch {

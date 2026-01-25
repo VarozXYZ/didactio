@@ -1,4 +1,4 @@
-import { Course, ICourse, AIProvider, ContentLength, CONTENT_LENGTH_TOKENS } from "../models/course.model.js";
+import { Course, ICourse, AIProvider, ContentLength, Tone, Technicality, CONTENT_LENGTH_TOKENS, TONE_INSTRUCTIONS, TECHNICALITY_INSTRUCTIONS } from "../models/course.model.js";
 import { Module } from "../models/schemas/syllabus.schema.js";
 import { filterAndImprovePrompt } from "./ai/prompt.service.js";
 import { generateSyllabus } from "./ai/syllabus.service.js";
@@ -9,6 +9,9 @@ export interface CreateCourseInput {
   level: string;
   provider?: AIProvider;
   contentLength: ContentLength;
+  tone: Tone;
+  technicality: Technicality;
+  additionalContext?: string;
   options?: { numLessons?: number; maxMinutes?: number };
 }
 
@@ -19,6 +22,9 @@ export async function createCourse(input: CreateCourseInput): Promise<ICourse> {
     status: "filtering_prompt",
     provider,
     contentLength: input.contentLength,
+    tone: input.tone,
+    technicality: input.technicality,
+    additionalContext: input.additionalContext,
     originalPrompt: input.topic,
     level: input.level,
     modules: [],
@@ -83,7 +89,6 @@ async function processCourseAsync(
       console.log(`[Course ${courseId}] Generating module ${i + 1}/${syllabusResult.syllabus!.modules.length}: ${module.title}`);
 
       try {
-        const maxTokens = CONTENT_LENGTH_TOKENS[input.contentLength];
         const contentResult = await generateModuleContent(
           module,
           i,
@@ -91,7 +96,12 @@ async function processCourseAsync(
           input.level,
           summaries,
           provider,
-          maxTokens
+          {
+            tone: input.tone,
+            technicality: input.technicality,
+            additionalContext: input.additionalContext,
+            maxTokens: CONTENT_LENGTH_TOKENS[input.contentLength],
+          }
         );
 
         if (contentResult.success) {
@@ -176,7 +186,6 @@ export async function regenerateSection(
     description: `${course.syllabus.description}\n\nAdditional context for regeneration: ${userContext}`,
   };
 
-  const maxTokens = CONTENT_LENGTH_TOKENS[course.contentLength];
   const contentResult = await generateModuleContent(
     module,
     moduleIndex,
@@ -184,7 +193,12 @@ export async function regenerateSection(
     course.level,
     previousSummaries,
     useProvider,
-    maxTokens
+    {
+      tone: course.tone,
+      technicality: course.technicality,
+      additionalContext: userContext || course.additionalContext,
+      maxTokens: CONTENT_LENGTH_TOKENS[course.contentLength],
+    }
   );
 
   if (contentResult.success) {
@@ -257,7 +271,6 @@ async function resumeCourseAsync(
       const previousSummaries = course.iterationSummaries.slice(0, index);
 
       try {
-        const maxTokens = CONTENT_LENGTH_TOKENS[course.contentLength];
         const contentResult = await generateModuleContent(
           module as Module,
           index,
@@ -265,7 +278,12 @@ async function resumeCourseAsync(
           course.level,
           previousSummaries,
           provider,
-          maxTokens
+          {
+            tone: course.tone,
+            technicality: course.technicality,
+            additionalContext: course.additionalContext,
+            maxTokens: CONTENT_LENGTH_TOKENS[course.contentLength],
+          }
         );
 
         if (contentResult.success) {

@@ -13,6 +13,10 @@ export type AIProvider = "deepseek" | "openai";
 
 export type ContentLength = "intro" | "summary" | "lesson" | "course" | "textbook";
 
+export type Tone = "friendly" | "neutral" | "professional";
+
+export type Technicality = "basic" | "intermediate" | "technical";
+
 export const CONTENT_LENGTH_TOKENS: Record<ContentLength, number> = {
   intro: 2000,
   summary: 6000,
@@ -29,10 +33,25 @@ export const CONTENT_LENGTH_LABELS: Record<ContentLength, string> = {
   textbook: "Libro de texto",
 };
 
+export const TONE_INSTRUCTIONS: Record<Tone, string> = {
+  friendly: "Use a warm, conversational tone. Include occasional light humor and relatable everyday examples. Make the reader feel like they're learning from a knowledgeable friend.",
+  neutral: "Use standard educational language. Be clear, factual, and balanced. Focus on delivering information effectively without strong stylistic flourishes.",
+  professional: "Use formal academic language. Be precise and authoritative. Maintain a scholarly tone appropriate for professional or academic contexts.",
+};
+
+export const TECHNICALITY_INSTRUCTIONS: Record<Technicality, string> = {
+  basic: "Avoid technical jargon entirely. When technical terms are unavoidable, immediately provide a simple explanation. Use many analogies to everyday situations. Break down complex concepts into very simple parts. Assume no prior knowledge.",
+  intermediate: "Technical terminology is acceptable but should be accompanied by brief explanations or analogies for complex concepts. Balance depth with accessibility. Assume basic familiarity with the field.",
+  technical: "Use full technical vocabulary and in-depth explanations. Assume the reader has solid domain knowledge. Focus on precision and completeness over simplicity.",
+};
+
 export interface ICourse extends Document {
   status: CourseStatus;
   provider: AIProvider;
   contentLength: ContentLength;
+  tone: Tone;
+  technicality: Technicality;
+  additionalContext?: string;
   originalPrompt: string;
   improvedPrompt?: string;
   level: string;
@@ -92,6 +111,17 @@ const courseSchema = new Schema<ICourse>(
       enum: ["intro", "summary", "lesson", "course", "textbook"],
       default: "lesson",
     },
+    tone: {
+      type: String,
+      enum: ["friendly", "neutral", "professional"],
+      default: "neutral",
+    },
+    technicality: {
+      type: String,
+      enum: ["basic", "intermediate", "technical"],
+      default: "intermediate",
+    },
+    additionalContext: { type: String },
     originalPrompt: { type: String, required: true },
     improvedPrompt: { type: String },
     level: { type: String, required: true },
