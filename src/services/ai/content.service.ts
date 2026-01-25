@@ -117,6 +117,9 @@ ${forwardContext}
 
 **Output Format**
 Return ONLY markdown-formatted educational content.
+- **Do NOT** include the module title (e.g., "# Module 1...")
+- **Do NOT** include the "Module Overview" at the beginning.
+- Start directly with the content.
 
 **Current Module Lessons to Cover:**
 ${module.lessons.map((lesson, index) => `${index + 1}. ${lesson.title}`).join("\n")}
