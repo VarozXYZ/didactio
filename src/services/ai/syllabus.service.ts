@@ -16,6 +16,7 @@ export async function generateSyllabus(
   improvedPrompt: string,
   level: string,
   provider: AIProvider,
+  language: string,
   options?: { numLessons?: number; maxMinutes?: number }
 ): Promise<SyllabusGenerationResult> {
   const client = getAIClient(provider);
@@ -46,7 +47,8 @@ export async function generateSyllabus(
           `The syllabus must have at least ${numLessons} lessons and the maximum duration must be less than ${maxMinutes} minutes. ` +
           `Ensure that each module logically builds upon the previous one and ends with a summary or applied project. ` +
           `Modules should progress from conceptual understanding → practical application → independent creation. ` +
-          `For each lesson, include action verbs aligned with Bloom's taxonomy (e.g., define, explain, apply, analyze, create).`,
+          `For each lesson, include action verbs aligned with Bloom's taxonomy (e.g., define, explain, apply, analyze, create). \n\n` +
+          `IMPORTANT: Generate the entire syllabus (titles, descriptions, keywords) in ${language}.`,
       },
     ],
     model,

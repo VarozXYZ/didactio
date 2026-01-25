@@ -11,6 +11,7 @@ export interface CreateCourseInput {
   contentLength: ContentLength;
   tone: Tone;
   technicality: Technicality;
+  language: string;
   additionalContext?: string;
   options?: { numLessons?: number; maxMinutes?: number };
 }
@@ -24,6 +25,7 @@ export async function createCourse(input: CreateCourseInput): Promise<ICourse> {
     contentLength: input.contentLength,
     tone: input.tone,
     technicality: input.technicality,
+    language: input.language,
     additionalContext: input.additionalContext,
     originalPrompt: input.topic,
     level: input.level,
@@ -65,6 +67,7 @@ async function processCourseAsync(
       filterResult.improvedPrompt!,
       input.level,
       provider,
+      input.language,
       input.options
     );
 
@@ -99,6 +102,7 @@ async function processCourseAsync(
           {
             tone: input.tone,
             technicality: input.technicality,
+            language: input.language,
             additionalContext: input.additionalContext,
             maxTokens: CONTENT_LENGTH_TOKENS[input.contentLength],
           }
@@ -196,6 +200,7 @@ export async function regenerateSection(
     {
       tone: course.tone,
       technicality: course.technicality,
+      language: course.language,
       additionalContext: userContext || course.additionalContext,
       maxTokens: CONTENT_LENGTH_TOKENS[course.contentLength],
     }
@@ -281,6 +286,7 @@ async function resumeCourseAsync(
           {
             tone: course.tone,
             technicality: course.technicality,
+            language: course.language,
             additionalContext: course.additionalContext,
             maxTokens: CONTENT_LENGTH_TOKENS[course.contentLength],
           }

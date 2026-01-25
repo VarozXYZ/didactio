@@ -49,6 +49,7 @@ export interface ICourse extends Document {
   contentLength: ContentLength;
   tone: Tone;
   technicality: Technicality;
+  language: string;
   additionalContext?: string;
   originalPrompt: string;
   improvedPrompt?: string;
@@ -118,6 +119,10 @@ const courseSchema = new Schema<ICourse>(
       type: String,
       enum: ["basic", "intermediate", "technical"],
       default: "intermediate",
+    },
+    language: {
+      type: String,
+      default: "Spanish",
     },
     additionalContext: { type: String },
     originalPrompt: { type: String, required: true },

@@ -17,6 +17,7 @@ const createCourseSchema = z.object({
   contentLength: z.enum(["intro", "short", "long", "textbook"]).optional(),
   tone: z.enum(["friendly", "neutral", "professional"]).optional(),
   technicality: z.enum(["basic", "intermediate", "technical"]).optional(),
+  language: z.string().optional(),
   additionalContext: z.string().optional(),
   options: z
     .object({
@@ -49,6 +50,7 @@ export async function handleCreateCourse(
       contentLength: parsed.data.contentLength || "short",
       tone: parsed.data.tone || "neutral",
       technicality: parsed.data.technicality || "intermediate",
+      language: parsed.data.language || "Spanish",
     });
     res.status(201).json(course);
   } catch (error) {
