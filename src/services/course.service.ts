@@ -263,11 +263,15 @@ async function resumeCourseAsync(
         if (contentResult.success) {
           const existingModuleIndex = course.modules.findIndex(m => m.title === module.title);
           
+          const syllabusModule = course.syllabus!.modules[index];
           const newModule = {
-            ...module,
+            title: syllabusModule.title,
+            overview: syllabusModule.overview,
+            estimated_duration_minutes: syllabusModule.estimated_duration_minutes,
+            lessons: syllabusModule.lessons,
             generatedContent: contentResult.content,
             summary: contentResult.summary,
-          } as Module & { generatedContent?: string; summary?: string };
+          };
 
           if (existingModuleIndex >= 0) {
             course.modules[existingModuleIndex] = newModule;
