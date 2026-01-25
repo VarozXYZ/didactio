@@ -68,9 +68,11 @@ function generateCourseHtml(course: ICourse): string {
     .module {
       margin-bottom: 60px;
       page-break-before: always;
+      break-before: page;
     }
     .module:first-of-type {
       page-break-before: avoid;
+      break-before: avoid-page;
     }
     .overview {
       background: #f5f5f5;
