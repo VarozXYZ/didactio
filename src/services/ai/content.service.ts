@@ -101,18 +101,19 @@ ${forwardContext}
 - Tone: ${toneInstruction}
 - Technical Level: ${technicalityInstruction}
 
-**Pedagogical Requirements**
-- Each lesson must be written as a cohesive mini-chapter, not a list of tips.
-- Use a 70/30 balance of conceptual depth and applied practice.
-- Include:
-  1. A detailed conceptual explanation (at least 3 paragraphs)
-  2. A realistic example drawn from relevant domains
-  3. A contrastive analysis (ineffective vs effective approaches)
-  4. A "Common Mistakes" section
-  5. A short, meaningful activity or reflection task
-  6. A final section called "Why It Works" that explains the underlying principles
+**Pedagogical Requirements (Dynamic Structure)**
+- **Do NOT use generic headings** like "Concept Explanation", "Practical Example", or "Common Mistakes" repeatedly.
+- Instead, **weave these elements naturally** into the narrative using headings specific to the topic (e.g., instead of "Example", use "Real-world Scenario: Scaling a Node.js API").
+- Ensure all these components are present but integrated organically:
+  1. Deep conceptual explanation
+  2. Realistic, industry-relevant examples
+  3. Comparison of approaches (ineffective vs effective)
+  4. Warnings about common pitfalls
+  5. Practical application or reflection
+  6. Underlying principles ("Why it works")
 
-- Use clear markdown formatting for hierarchy.
+- The structure should flow logically as a chapter, not a checklist.
+- Use clear markdown hierarchy.
 
 **Output Format**
 Return ONLY markdown-formatted educational content.

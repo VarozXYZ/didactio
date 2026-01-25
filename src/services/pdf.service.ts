@@ -158,32 +158,26 @@ function generateCourseHtml(course: ICourse): string {
 export async function exportCourseToPdf(course: ICourse): Promise<Buffer> {
   const html = generateCourseHtml(course);
 
-  console.log("Starting PDF generation...");
   try {
     const browser = await puppeteer.launch({
       headless: true,
       args: ["--no-sandbox", "--disable-setuid-sandbox"],
     });
-    console.log("Browser launched");
 
     try {
       const page = await browser.newPage();
-      console.log("Page created");
       
       await page.setContent(html, { waitUntil: "networkidle0" });
-      console.log("Content set");
 
       const pdfBuffer = await page.pdf({
         format: "A4",
         margin: { top: "20mm", right: "20mm", bottom: "20mm", left: "20mm" },
         printBackground: true,
       });
-      console.log("PDF generated");
 
       return Buffer.from(pdfBuffer);
     } finally {
       await browser.close();
-      console.log("Browser closed");
     }
   } catch (error) {
     console.error("PDF Generation failed:", error);
