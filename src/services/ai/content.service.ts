@@ -140,6 +140,7 @@ export async function generateModuleContent(
       model: string;
       temperature?: number;
       max_tokens?: number;
+      max_completion_tokens?: number;
     } = {
       messages: [
         {
@@ -157,10 +158,11 @@ export async function generateModuleContent(
 
     if (provider === "deepseek") {
       apiOptions.temperature = 0.7;
-    }
-
-    if (options.maxTokens) {
-      apiOptions.max_tokens = options.maxTokens;
+      if (options.maxTokens) {
+        apiOptions.max_tokens = options.maxTokens;
+      }
+    } else if (provider === "openai" && options.maxTokens) {
+      apiOptions.max_completion_tokens = options.maxTokens;
     }
 
     const completion = await client.chat.completions.create(apiOptions);
