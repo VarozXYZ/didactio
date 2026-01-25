@@ -38,7 +38,7 @@ async function processCourseAsync(
     if (!course) return;
 
     console.log(`[Course ${courseId}] Starting prompt filtering...`);
-    const filterResult = await filterAndImprovePrompt(input.topic, provider);
+    const filterResult = await filterAndImprovePrompt(input.topic, input.level, provider);
     if (!filterResult.isValid) {
       course.status = "error";
       course.errorMessage = filterResult.rejectionReason;

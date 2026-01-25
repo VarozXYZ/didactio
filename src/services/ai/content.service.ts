@@ -118,7 +118,11 @@ export async function generateModuleContent(
   try {
     const prompt = createModulePrompt(module, moduleIndex, syllabusData, level, previousSummaries);
 
-    const completion = await client.chat.completions.create({
+    const options: {
+      messages: Array<{ role: "system" | "user"; content: string }>;
+      model: string;
+      temperature?: number;
+    } = {
       messages: [
         {
           role: "system",
@@ -131,8 +135,13 @@ export async function generateModuleContent(
         },
       ],
       model,
-      temperature: 0.7,
-    });
+    };
+
+    if (provider === "deepseek") {
+      options.temperature = 0.7;
+    }
+
+    const completion = await client.chat.completions.create(options);
 
     const content = completion.choices[0].message.content;
     if (!content) {
@@ -155,7 +164,11 @@ async function extractModuleSummary(content: string, provider: AIProvider): Prom
   const model = getModel(provider);
 
   try {
-    const completion = await client.chat.completions.create({
+    const options: {
+      messages: Array<{ role: "system" | "user"; content: string }>;
+      model: string;
+      temperature?: number;
+    } = {
       messages: [
         {
           role: "system",
@@ -168,7 +181,13 @@ async function extractModuleSummary(content: string, provider: AIProvider): Prom
         },
       ],
       model,
-    });
+    };
+
+    if (provider === "deepseek") {
+      options.temperature = 0.7;
+    }
+
+    const completion = await client.chat.completions.create(options);
 
     return completion.choices[0].message.content || "Summary not available";
   } catch {
