@@ -6,6 +6,7 @@ import {
   listCourses,
   deleteCourse,
   regenerateSection,
+  resumeCourse,
 } from "../services/course.service.js";
 import { exportCourseToPdf } from "../services/pdf.service.js";
 
@@ -170,6 +171,44 @@ export async function handleExportPdf(
       `attachment; filename="${course.syllabus?.title || "course"}.pdf"`
     );
     res.send(pdfBuffer);
+  } catch (error) {
+    next(error);
+  }
+}
+
+const resumeSchema = z.object({
+  provider: z.enum(["deepseek", "openai"]).optional(),
+});
+
+export async function handleResumeCourse(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const parsed = resumeSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.flatten() });
+      return;
+    }
+
+    const course = await resumeCourse(
+      req.params.id as string,
+      parsed.data.provider
+    );
+
+    if (!course) {
+      res.status(404).json({ error: "Course not found or has no syllabus" });
+      return;
+    }
+
+    res.json({
+      message: "Resume started",
+      courseId: course._id,
+      status: course.status,
+      modulesGenerated: course.modules.length,
+      totalModules: course.syllabus?.modules.length || 0,
+    });
   } catch (error) {
     next(error);
   }

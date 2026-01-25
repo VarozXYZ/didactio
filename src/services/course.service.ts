@@ -1,4 +1,5 @@
 import { Course, ICourse, AIProvider } from "../models/course.model.js";
+import { Module } from "../models/schemas/syllabus.schema.js";
 import { filterAndImprovePrompt } from "./ai/prompt.service.js";
 import { generateSyllabus } from "./ai/syllabus.service.js";
 import { generateModuleContent } from "./ai/content.service.js";
@@ -196,3 +197,128 @@ export async function regenerateSection(
 
   return course;
 }
+
+export async function resumeCourse(
+  courseId: string,
+  provider?: AIProvider
+): Promise<ICourse | null> {
+  const course = await Course.findById(courseId);
+  if (!course || !course.syllabus) return null;
+
+  const useProvider = provider || course.provider;
+  const totalModules = course.syllabus.modules.length;
+  const generatedModulesTitles = new Set(course.modules.map(m => m.title));
+
+  const missingModules: { index: number; module: typeof course.syllabus.modules[0] }[] = [];
+  for (let i = 0; i < totalModules; i++) {
+    const syllabusModule = course.syllabus.modules[i];
+    if (!generatedModulesTitles.has(syllabusModule.title)) {
+      missingModules.push({ index: i, module: syllabusModule });
+    }
+  }
+
+  if (missingModules.length === 0) {
+    course.status = "ready";
+    course.errorMessage = undefined;
+    await course.save();
+    return course;
+  }
+
+  console.log(`[Course ${courseId}] Resuming generation. Missing ${missingModules.length} modules.`);
+  course.status = "generating_content";
+  course.errorMessage = undefined;
+  await course.save();
+
+  resumeCourseAsync(courseId, missingModules, useProvider);
+
+  return course;
+}
+
+async function resumeCourseAsync(
+  courseId: string,
+  missingModules: { index: number; module: Module }[],
+  provider: AIProvider
+): Promise<void> {
+  try {
+    const course = await Course.findById(courseId);
+    if (!course || !course.syllabus) return;
+
+    const failedModules: string[] = [];
+
+    for (const { index, module } of missingModules) {
+      console.log(`[Course ${courseId}] Resuming module ${index + 1}/${course.syllabus.modules.length}: ${module.title}`);
+
+      const previousSummaries = course.iterationSummaries.slice(0, index);
+
+      try {
+        const contentResult = await generateModuleContent(
+          module as Module,
+          index,
+          course.syllabus,
+          course.level,
+          previousSummaries,
+          provider
+        );
+
+        if (contentResult.success) {
+          const existingModuleIndex = course.modules.findIndex(m => m.title === module.title);
+          
+          const newModule = {
+            ...module,
+            generatedContent: contentResult.content,
+            summary: contentResult.summary,
+          } as Module & { generatedContent?: string; summary?: string };
+
+          if (existingModuleIndex >= 0) {
+            course.modules[existingModuleIndex] = newModule;
+          } else {
+            course.modules.push(newModule);
+          }
+
+          if (contentResult.summary) {
+            course.iterationSummaries[index] = contentResult.summary;
+          }
+
+          await course.save();
+          console.log(`[Course ${courseId}] Module ${index + 1} completed (${contentResult.content?.length || 0} chars)`);
+        } else {
+          console.log(`[Course ${courseId}] Module ${index + 1} failed: ${contentResult.error}`);
+          failedModules.push(`Module ${index + 1} (${module.title}): ${contentResult.error}`);
+        }
+      } catch (moduleError) {
+        const errorMsg = moduleError instanceof Error ? moduleError.message : "Unknown error";
+        console.log(`[Course ${courseId}] Module ${index + 1} exception: ${errorMsg}`);
+        failedModules.push(`Module ${index + 1} (${module.title}): ${errorMsg}`);
+      }
+    }
+
+    course.modules.sort((a, b) => {
+      const indexA = course.syllabus!.modules.findIndex(m => m.title === a.title);
+      const indexB = course.syllabus!.modules.findIndex(m => m.title === b.title);
+      return indexA - indexB;
+    });
+
+    if (course.modules.length === course.syllabus.modules.length) {
+      course.status = "ready";
+      course.errorMessage = failedModules.length > 0 
+        ? `Completed with some issues: ${failedModules.join("; ")}` 
+        : undefined;
+    } else if (failedModules.length > 0) {
+      course.status = "error";
+      course.errorMessage = `Resume failed for some modules: ${failedModules.join("; ")}`;
+    }
+
+    await course.save();
+    console.log(`[Course ${courseId}] Resume finished. Status: ${course.status}, Modules: ${course.modules.length}/${course.syllabus.modules.length}`);
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : "Unknown error";
+    console.error(`[Course ${courseId}] Resume fatal error: ${errorMsg}`);
+    const course = await Course.findById(courseId);
+    if (course) {
+      course.status = "error";
+      course.errorMessage = errorMsg;
+      await course.save();
+    }
+  }
+}
+
