@@ -9,8 +9,11 @@ import {
   handleExportPdf,
   handleResumeCourse,
 } from "../controllers/course.controller.js";
+import { requireAuth, requireRoles } from "../middleware/auth.middleware.js";
 
 const router = Router();
+
+router.use(requireAuth);
 
 router.post("/", handleCreateCourse);
 router.get("/", handleListCourses);
@@ -19,6 +22,6 @@ router.get("/:id/status", handleGetCourseStatus);
 router.get("/:id/export/pdf", handleExportPdf);
 router.post("/:id/regenerate", handleRegenerateCourse);
 router.post("/:id/resume", handleResumeCourse);
-router.delete("/:id", handleDeleteCourse);
+router.delete("/:id", requireRoles("admin"), handleDeleteCourse);
 
 export default router;
