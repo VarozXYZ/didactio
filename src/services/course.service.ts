@@ -5,6 +5,7 @@ import { generateSyllabus } from "./ai/syllabus.service.js";
 import { generateModuleContent } from "./ai/content.service.js";
 
 export interface CreateCourseInput {
+  ownerId: string;
   topic: string;
   level: string;
   provider?: AIProvider;
@@ -20,6 +21,7 @@ export async function createCourse(input: CreateCourseInput): Promise<ICourse> {
   const provider = input.provider || "deepseek";
 
   const course = new Course({
+    owner: input.ownerId,
     status: "filtering_prompt",
     provider,
     contentLength: input.contentLength,
@@ -163,6 +165,10 @@ export async function getCourse(courseId: string): Promise<ICourse | null> {
 
 export async function listCourses(): Promise<ICourse[]> {
   return Course.find().sort({ createdAt: -1 });
+}
+
+export async function listCoursesByOwner(ownerId: string): Promise<ICourse[]> {
+  return Course.find({ owner: ownerId }).sort({ createdAt: -1 });
 }
 
 export async function deleteCourse(courseId: string): Promise<boolean> {

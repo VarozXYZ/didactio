@@ -1,14 +1,17 @@
-import { Request, Response, NextFunction } from "express";
+import { Response, NextFunction } from "express";
 import { z } from "zod";
 import {
   createCourse,
   getCourse,
   listCourses,
+  listCoursesByOwner,
   deleteCourse,
   regenerateSection,
   resumeCourse,
 } from "../services/course.service.js";
 import { exportCourseToPdf } from "../services/pdf.service.js";
+import { AuthenticatedRequest } from "../middleware/auth.middleware.js";
+import { ICourse } from "../models/course.model.js";
 
 const createCourseSchema = z.object({
   topic: z.string().min(1),
@@ -34,11 +37,16 @@ const regenerateSchema = z.object({
 });
 
 export async function handleCreateCourse(
-  req: Request,
+  req: AuthenticatedRequest,
   res: Response,
   next: NextFunction
 ): Promise<void> {
   try {
+    if (!req.user) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+
     const parsed = createCourseSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: parsed.error.flatten() });
@@ -46,6 +54,7 @@ export async function handleCreateCourse(
     }
 
     const course = await createCourse({
+      ownerId: req.user.sub,
       ...parsed.data,
       contentLength: parsed.data.contentLength || "short",
       tone: parsed.data.tone || "neutral",
@@ -59,16 +68,16 @@ export async function handleCreateCourse(
 }
 
 export async function handleGetCourse(
-  req: Request,
+  req: AuthenticatedRequest,
   res: Response,
   next: NextFunction
 ): Promise<void> {
   try {
-    const course = await getCourse(req.params.id as string);
+    const course = await getAccessibleCourse(req, res, req.params.id as string);
     if (!course) {
-      res.status(404).json({ error: "Course not found" });
       return;
     }
+
     res.json(course);
   } catch (error) {
     next(error);
@@ -76,12 +85,21 @@ export async function handleGetCourse(
 }
 
 export async function handleListCourses(
-  _req: Request,
+  req: AuthenticatedRequest,
   res: Response,
   next: NextFunction
 ): Promise<void> {
   try {
-    const courses = await listCourses();
+    if (!req.user) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+
+    const courses =
+      req.user.role === "admin"
+        ? await listCourses()
+        : await listCoursesByOwner(req.user.sub);
+
     res.json(courses);
   } catch (error) {
     next(error);
@@ -89,11 +107,16 @@ export async function handleListCourses(
 }
 
 export async function handleDeleteCourse(
-  req: Request,
+  req: AuthenticatedRequest,
   res: Response,
   next: NextFunction
 ): Promise<void> {
   try {
+    if (!req.user) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+
     const deleted = await deleteCourse(req.params.id as string);
     if (!deleted) {
       res.status(404).json({ error: "Course not found" });
@@ -106,16 +129,16 @@ export async function handleDeleteCourse(
 }
 
 export async function handleGetCourseStatus(
-  req: Request,
+  req: AuthenticatedRequest,
   res: Response,
   next: NextFunction
 ): Promise<void> {
   try {
-    const course = await getCourse(req.params.id as string);
+    const course = await getAccessibleCourse(req, res, req.params.id as string);
     if (!course) {
-      res.status(404).json({ error: "Course not found" });
       return;
     }
+
     res.json({
       id: course._id,
       status: course.status,
@@ -129,19 +152,33 @@ export async function handleGetCourseStatus(
 }
 
 export async function handleRegenerateCourse(
-  req: Request,
+  req: AuthenticatedRequest,
   res: Response,
   next: NextFunction
 ): Promise<void> {
   try {
+    if (!req.user) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+
     const parsed = regenerateSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: parsed.error.flatten() });
       return;
     }
 
+    const existingCourse = await getAccessibleCourse(
+      req,
+      res,
+      req.params.id as string
+    );
+    if (!existingCourse) {
+      return;
+    }
+
     const course = await regenerateSection(
-      req.params.id as string,
+      existingCourse.id,
       parsed.data.moduleIndex,
       parsed.data.context,
       parsed.data.provider
@@ -158,14 +195,13 @@ export async function handleRegenerateCourse(
 }
 
 export async function handleExportPdf(
-  req: Request,
+  req: AuthenticatedRequest,
   res: Response,
   next: NextFunction
 ): Promise<void> {
   try {
-    const course = await getCourse(req.params.id as string);
+    const course = await getAccessibleCourse(req, res, req.params.id as string);
     if (!course) {
-      res.status(404).json({ error: "Course not found" });
       return;
     }
 
@@ -196,19 +232,33 @@ const resumeSchema = z.object({
 });
 
 export async function handleResumeCourse(
-  req: Request,
+  req: AuthenticatedRequest,
   res: Response,
   next: NextFunction
 ): Promise<void> {
   try {
+    if (!req.user) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+
     const parsed = resumeSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: parsed.error.flatten() });
       return;
     }
 
+    const existingCourse = await getAccessibleCourse(
+      req,
+      res,
+      req.params.id as string
+    );
+    if (!existingCourse) {
+      return;
+    }
+
     const course = await resumeCourse(
-      req.params.id as string,
+      existingCourse.id,
       parsed.data.provider
     );
 
@@ -227,4 +277,32 @@ export async function handleResumeCourse(
   } catch (error) {
     next(error);
   }
+}
+
+async function getAccessibleCourse(
+  req: AuthenticatedRequest,
+  res: Response,
+  courseId: string
+): Promise<ICourse | null> {
+  if (!req.user) {
+    res.status(401).json({ error: "Authentication required" });
+    return null;
+  }
+
+  const course = await getCourse(courseId);
+  if (!course) {
+    res.status(404).json({ error: "Course not found" });
+    return null;
+  }
+
+  if (req.user.role === "admin") {
+    return course;
+  }
+
+  if (String(course.owner) !== req.user.sub) {
+    res.status(403).json({ error: "You do not have access to this course" });
+    return null;
+  }
+
+  return course;
 }

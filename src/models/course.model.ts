@@ -44,6 +44,7 @@ export const TECHNICALITY_INSTRUCTIONS: Record<Technicality, string> = {
 };
 
 export interface ICourse extends Document {
+  owner: mongoose.Types.ObjectId;
   status: CourseStatus;
   provider: AIProvider;
   contentLength: ContentLength;
@@ -88,6 +89,12 @@ const syllabusSchema = new Schema({
 
 const courseSchema = new Schema<ICourse>(
   {
+    owner: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      index: true,
+    },
     status: {
       type: String,
       enum: [
