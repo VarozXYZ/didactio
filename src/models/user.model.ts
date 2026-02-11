@@ -7,6 +7,7 @@ export interface IUser extends Document {
   email: string;
   passwordHash: string;
   role: UserRole;
+  tokenVersion: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -35,6 +36,11 @@ const userSchema = new Schema<IUser>(
       enum: ["standard", "premium", "admin"],
       default: "standard",
     },
+    tokenVersion: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
   },
   { timestamps: true }
 );
@@ -42,4 +48,3 @@ const userSchema = new Schema<IUser>(
 userSchema.index({ email: 1 }, { unique: true });
 
 export const User = mongoose.model<IUser>("User", userSchema);
-

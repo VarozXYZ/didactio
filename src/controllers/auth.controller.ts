@@ -5,6 +5,8 @@ import {
   getUserById,
   listUsers,
   loginUser,
+  logoutCurrentUser,
+  refreshAuthSession,
   registerUser,
   updateUserRole,
 } from "../services/auth.service.js";
@@ -26,6 +28,10 @@ const loginSchema = z.object({
 
 const updateRoleSchema = z.object({
   role: roleSchema,
+});
+
+const refreshSchema = z.object({
+  refreshToken: z.string().min(1),
 });
 
 export async function handleRegister(
@@ -74,6 +80,25 @@ export async function handleLogin(
     }
 
     const authResponse = await loginUser(parsed.data);
+    res.json(authResponse);
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function handleRefreshToken(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const parsed = refreshSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.flatten() });
+      return;
+    }
+
+    const authResponse = await refreshAuthSession(parsed.data.refreshToken);
     res.json(authResponse);
   } catch (error) {
     next(error);
@@ -144,3 +169,20 @@ export async function handleUpdateUserRole(
   }
 }
 
+export async function handleLogout(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+
+    await logoutCurrentUser(req.user.sub);
+    res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+}

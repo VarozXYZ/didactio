@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { UserRole } from "../models/user.model.js";
+import { User, UserRole } from "../models/user.model.js";
 import { AuthTokenPayload, verifyAccessToken } from "../services/jwt.service.js";
 
 export interface AuthenticatedRequest extends Request {
@@ -28,8 +28,31 @@ export function requireAuth(
   }
 
   try {
-    req.user = verifyAccessToken(token);
-    next();
+    const payload = verifyAccessToken(token);
+
+    User.findById(payload.sub)
+      .select("email role tokenVersion")
+      .then((user) => {
+        if (!user) {
+          res.status(401).json({ error: "Authentication required" });
+          return;
+        }
+
+        if (user.tokenVersion !== payload.ver) {
+          res.status(401).json({ error: "Session has been invalidated" });
+          return;
+        }
+
+        req.user = {
+          ...payload,
+          email: user.email,
+          role: user.role,
+          ver: user.tokenVersion,
+        };
+
+        next();
+      })
+      .catch(next);
   } catch (error) {
     next(error);
   }
@@ -54,4 +77,3 @@ export function requireRoles(...roles: UserRole[]) {
     next();
   };
 }
-

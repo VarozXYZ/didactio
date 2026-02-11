@@ -3,6 +3,8 @@ import {
   handleGetCurrentUser,
   handleListUsers,
   handleLogin,
+  handleLogout,
+  handleRefreshToken,
   handleRegister,
   handleUpdateUserRole,
 } from "../controllers/auth.controller.js";
@@ -12,6 +14,8 @@ const router = Router();
 
 router.post("/register", handleRegister);
 router.post("/login", handleLogin);
+router.post("/refresh", handleRefreshToken);
+router.post("/logout", requireAuth, handleLogout);
 router.get("/me", requireAuth, handleGetCurrentUser);
 router.get("/users", requireAuth, requireRoles("admin"), handleListUsers);
 router.patch(
@@ -22,4 +26,3 @@ router.patch(
 );
 
 export default router;
-

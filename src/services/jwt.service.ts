@@ -12,14 +12,19 @@ export interface AuthTokenPayload {
   sub: string;
   email: string;
   role: UserRole;
+  ver: number;
+  typ: TokenType;
   iat: number;
   exp: number;
 }
 
-interface CreateAccessTokenInput {
+type TokenType = "access" | "refresh";
+
+interface CreateTokenInput {
   sub: string;
   email: string;
   role: UserRole;
+  tokenVersion: number;
 }
 
 function encodeBase64Url(value: string | Buffer): string {
@@ -46,15 +51,25 @@ function isValidRole(role: unknown): role is UserRole {
   return role === "standard" || role === "premium" || role === "admin";
 }
 
-export function createAccessToken(input: CreateAccessTokenInput): string {
+function isValidTokenType(value: unknown): value is TokenType {
+  return value === "access" || value === "refresh";
+}
+
+function createToken(
+  input: CreateTokenInput,
+  tokenType: TokenType,
+  expiresInSeconds: number
+): string {
   const header: JwtHeader = { alg: "HS256", typ: "JWT" };
   const issuedAt = Math.floor(Date.now() / 1000);
-  const expiresAt = issuedAt + env.JWT_EXPIRES_IN_SECONDS;
+  const expiresAt = issuedAt + expiresInSeconds;
 
   const payload: AuthTokenPayload = {
     sub: input.sub,
     email: input.email,
     role: input.role,
+    ver: input.tokenVersion,
+    typ: tokenType,
     iat: issuedAt,
     exp: expiresAt,
   };
@@ -67,7 +82,15 @@ export function createAccessToken(input: CreateAccessTokenInput): string {
   return `${data}.${signature}`;
 }
 
-export function verifyAccessToken(token: string): AuthTokenPayload {
+export function createAccessToken(input: CreateTokenInput): string {
+  return createToken(input, "access", env.JWT_EXPIRES_IN_SECONDS);
+}
+
+export function createRefreshToken(input: CreateTokenInput): string {
+  return createToken(input, "refresh", env.JWT_REFRESH_EXPIRES_IN_SECONDS);
+}
+
+function verifyToken(token: string, expectedType: TokenType): AuthTokenPayload {
   const [headerPart, payloadPart, signaturePart] = token.split(".");
 
   if (!headerPart || !payloadPart || !signaturePart) {
@@ -102,6 +125,10 @@ export function verifyAccessToken(token: string): AuthTokenPayload {
     typeof (rawPayload as { sub?: unknown }).sub !== "string" ||
     typeof (rawPayload as { email?: unknown }).email !== "string" ||
     !isValidRole((rawPayload as { role?: unknown }).role) ||
+    typeof (rawPayload as { ver?: unknown }).ver !== "number" ||
+    !Number.isInteger((rawPayload as { ver?: number }).ver) ||
+    (rawPayload as { ver?: number }).ver! < 0 ||
+    !isValidTokenType((rawPayload as { typ?: unknown }).typ) ||
     typeof (rawPayload as { iat?: unknown }).iat !== "number" ||
     typeof (rawPayload as { exp?: unknown }).exp !== "number"
   ) {
@@ -109,6 +136,10 @@ export function verifyAccessToken(token: string): AuthTokenPayload {
   }
 
   const payload = rawPayload as AuthTokenPayload;
+  if (payload.typ !== expectedType) {
+    throw createHttpError("Invalid token type", 401);
+  }
+
   const now = Math.floor(Date.now() / 1000);
   if (payload.exp <= now) {
     throw createHttpError("Token expired", 401);
@@ -117,9 +148,16 @@ export function verifyAccessToken(token: string): AuthTokenPayload {
   return payload;
 }
 
+export function verifyAccessToken(token: string): AuthTokenPayload {
+  return verifyToken(token, "access");
+}
+
+export function verifyRefreshToken(token: string): AuthTokenPayload {
+  return verifyToken(token, "refresh");
+}
+
 function decodeBase64UrlToBase64(value: string): string {
   const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
   const padLength = (4 - (base64.length % 4)) % 4;
   return base64 + "=".repeat(padLength);
 }
-

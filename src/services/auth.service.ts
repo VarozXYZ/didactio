@@ -1,5 +1,5 @@
 import { User, UserRole } from "../models/user.model.js";
-import { createAccessToken } from "./jwt.service.js";
+import { createAccessToken, createRefreshToken, verifyRefreshToken } from "./jwt.service.js";
 import { hashPassword, verifyPassword } from "../utils/password.utils.js";
 import { createHttpError } from "../utils/error.utils.js";
 
@@ -25,7 +25,8 @@ export interface PublicUser {
 }
 
 export interface AuthResponse {
-  token: string;
+  accessToken: string;
+  refreshToken: string;
   user: PublicUser;
 }
 
@@ -51,12 +52,19 @@ function toPublicUser(user: {
   };
 }
 
-function buildAuthResponse(user: PublicUser): AuthResponse {
+function buildAuthResponse(user: PublicUser, tokenVersion: number): AuthResponse {
   return {
-    token: createAccessToken({
+    accessToken: createAccessToken({
       sub: user.id,
       email: user.email,
       role: user.role,
+      tokenVersion,
+    }),
+    refreshToken: createRefreshToken({
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+      tokenVersion,
     }),
     user,
   };
@@ -85,7 +93,7 @@ export async function registerUser(input: RegisterInput): Promise<AuthResponse> 
     updatedAt: createdUser.updatedAt,
   });
 
-  return buildAuthResponse(publicUser);
+  return buildAuthResponse(publicUser, createdUser.tokenVersion);
 }
 
 export async function loginUser(input: LoginInput): Promise<AuthResponse> {
@@ -105,7 +113,40 @@ export async function loginUser(input: LoginInput): Promise<AuthResponse> {
     updatedAt: user.updatedAt,
   });
 
-  return buildAuthResponse(publicUser);
+  return buildAuthResponse(publicUser, user.tokenVersion);
+}
+
+export async function refreshAuthSession(
+  refreshToken: string
+): Promise<AuthResponse> {
+  const payload = verifyRefreshToken(refreshToken);
+  const user = await User.findById(payload.sub);
+
+  if (!user) {
+    throw createHttpError("User not found", 401);
+  }
+
+  if (user.tokenVersion !== payload.ver) {
+    throw createHttpError("Session has been invalidated", 401);
+  }
+
+  const publicUser = toPublicUser({
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+  });
+
+  return buildAuthResponse(publicUser, user.tokenVersion);
+}
+
+export async function logoutCurrentUser(userId: string): Promise<boolean> {
+  const result = await User.findByIdAndUpdate(userId, {
+    $inc: { tokenVersion: 1 },
+  });
+  return result !== null;
 }
 
 export async function getUserById(userId: string): Promise<PublicUser | null> {
@@ -143,7 +184,10 @@ export async function updateUserRole(
 ): Promise<PublicUser | null> {
   const updatedUser = await User.findByIdAndUpdate(
     userId,
-    { role },
+    {
+      $set: { role },
+      $inc: { tokenVersion: 1 },
+    },
     { new: true }
   );
 
@@ -158,4 +202,3 @@ export async function updateUserRole(
     updatedAt: updatedUser.updatedAt,
   });
 }
-
