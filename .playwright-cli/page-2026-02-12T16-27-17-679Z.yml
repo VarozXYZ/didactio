@@ -1,0 +1,32 @@
+- main [ref=e4]:
+  - generic [ref=e5]:
+    - complementary [ref=e6]:
+      - generic [ref=e9]:
+        - img "Didactio" [ref=e11]
+        - heading "Design smarter curricula in seconds" [level=1] [ref=e12]
+    - generic [ref=e14]:
+      - generic [ref=e15]:
+        - heading "Welcome back" [level=2] [ref=e16]
+        - paragraph [ref=e17]: Sign in to access the dashboard.
+      - generic [ref=e18]:
+        - button "Google" [ref=e19] [cursor=pointer]
+        - button "Microsoft" [ref=e21] [cursor=pointer]
+      - generic [ref=e25]: Or continue with
+      - generic [ref=e27]:
+        - generic [ref=e28]:
+          - text: Email address
+          - textbox "Email address" [ref=e29]:
+            - /placeholder: name@example.com
+        - generic [ref=e30]:
+          - text: Password
+          - generic [ref=e31]:
+            - textbox "Password Show password" [ref=e32]:
+              - /placeholder: Enter your password
+            - button "Show password" [ref=e33] [cursor=pointer]: Show
+        - link "Forgot password?" [ref=e35] [cursor=pointer]:
+          - /url: "#"
+        - button "Log In" [ref=e36] [cursor=pointer]
+      - paragraph [ref=e37]:
+        - text: Don't have an account?
+        - link "Register" [ref=e38] [cursor=pointer]:
+          - /url: /register

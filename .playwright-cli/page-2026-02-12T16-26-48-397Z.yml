@@ -1,0 +1,18 @@
+- generic [ref=e3]:
+  - generic [ref=e6]:
+    - heading "No se puede acceder a este sitio web" [level=1] [ref=e7]
+    - paragraph [ref=e8]:
+      - text: La página
+      - strong [ref=e9]: 127.0.0.1
+      - text: ha rechazado la conexión.
+    - generic [ref=e10]:
+      - paragraph [ref=e11]: "Prueba a:"
+      - list [ref=e12]:
+        - listitem [ref=e13]: Comprobar la conexión
+        - listitem [ref=e14]:
+          - link "Comprobar el proxy y el cortafuegos" [ref=e15] [cursor=pointer]:
+            - /url: "#buttons"
+    - generic [ref=e16]: ERR_CONNECTION_REFUSED
+  - generic [ref=e17]:
+    - button "Volver a cargar" [ref=e19] [cursor=pointer]
+    - button "Detalles" [ref=e20] [cursor=pointer]

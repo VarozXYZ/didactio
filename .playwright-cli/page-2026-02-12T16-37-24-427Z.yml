@@ -1,0 +1,80 @@
+- main [ref=e4]:
+  - generic [ref=e466]:
+    - complementary [ref=e467]:
+      - img "Didactio" [ref=e468]
+      - button "New course" [active] [ref=e469]
+      - paragraph [ref=e470]: Recent
+      - paragraph [ref=e472]: No courses yet.
+      - generic [ref=e474]:
+        - generic [ref=e475]: P
+        - generic [ref=e476]: Playwright User
+    - generic [ref=e477]:
+      - generic [ref=e478]:
+        - heading "Dashboard" [level=1] [ref=e480]
+        - generic [ref=e481]:
+          - button "Share" [disabled] [ref=e482]
+          - button "Export" [disabled] [ref=e483]
+      - generic [ref=e485]:
+        - heading "No course selected" [level=2] [ref=e486]
+        - paragraph [ref=e487]: Choose one from the sidebar or create a new course.
+      - generic [ref=e488]:
+        - generic [ref=e489]:
+          - textbox "Ask the AI to modify, improve or add anything..." [ref=e490]
+          - button [disabled] [ref=e491]
+        - paragraph [ref=e492]: Select a module first, then send instructions to regenerate it.
+    - generic [ref=e494]:
+      - generic [ref=e495]:
+        - heading "Create a new course" [level=2] [ref=e496]
+        - button "×" [ref=e497]
+      - generic [ref=e498]:
+        - generic [ref=e499]:
+          - text: Course topic
+          - textbox "Course topic" [ref=e500]:
+            - /placeholder: Introduction to Python programming
+        - generic [ref=e501]:
+          - generic [ref=e502]:
+            - text: Level
+            - combobox "Level" [ref=e503]:
+              - option "Beginner" [selected]
+              - option "Intermediate"
+              - option "Advanced"
+          - generic [ref=e504]:
+            - text: Provider
+            - combobox "Provider" [ref=e505]:
+              - option "DeepSeek" [selected]
+              - option "OpenAI"
+          - generic [ref=e506]:
+            - text: Content length
+            - combobox "Content length" [ref=e507]:
+              - option "Intro"
+              - option "Short" [selected]
+              - option "Long"
+              - option "Textbook"
+          - generic [ref=e508]:
+            - text: Language
+            - textbox "Language" [ref=e509]: English
+          - generic [ref=e510]:
+            - text: Tone
+            - combobox "Tone" [ref=e511]:
+              - option "Friendly"
+              - option "Neutral" [selected]
+              - option "Professional"
+          - generic [ref=e512]:
+            - text: Technicality
+            - combobox "Technicality" [ref=e513]:
+              - option "Basic"
+              - option "Intermediate" [selected]
+              - option "Technical"
+          - generic [ref=e514]:
+            - text: Min lessons
+            - spinbutton "Min lessons" [ref=e515]: "4"
+          - generic [ref=e516]:
+            - text: Max minutes
+            - spinbutton "Max minutes" [ref=e517]: "600"
+        - generic [ref=e518]:
+          - text: Additional context
+          - textbox "Additional context" [ref=e519]:
+            - /placeholder: Add classroom constraints, student profile, or emphasis areas...
+        - generic [ref=e520]:
+          - button "Cancel" [ref=e521]
+          - button "Create course" [ref=e522]
