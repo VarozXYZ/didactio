@@ -17,6 +17,26 @@ export interface ContentGenerationOptions {
   maxTokens?: number;
 }
 
+type ChatMessageContent = string | Array<{ text?: string; type?: string }> | null | undefined;
+
+function extractMessageContent(content: ChatMessageContent): string | null {
+  if (typeof content === "string") {
+    const trimmed = content.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
+  if (!Array.isArray(content)) {
+    return null;
+  }
+
+  const text = content
+    .map((part) => (typeof part?.text === "string" ? part.text : ""))
+    .join("")
+    .trim();
+
+  return text.length > 0 ? text : null;
+}
+
 function createModulePrompt(
   module: Module,
   moduleIndex: number,
@@ -171,14 +191,32 @@ export async function generateModuleContent(
         apiOptions.max_tokens = options.maxTokens;
       }
     } else if (provider === "openai" && options.maxTokens) {
-      apiOptions.max_completion_tokens = options.maxTokens;
+      // Keep a sane lower bound for GPT-5 responses; very small caps can consume
+      // budget in reasoning and return no visible text.
+      apiOptions.max_completion_tokens = Math.max(options.maxTokens, 3000);
     }
 
-    const completion = await client.chat.completions.create(apiOptions);
+    let completion = await client.chat.completions.create(apiOptions);
+    let content = extractMessageContent(
+      completion.choices[0]?.message?.content as ChatMessageContent
+    );
 
-    const content = completion.choices[0].message.content;
+    if (!content && provider === "openai" && apiOptions.max_completion_tokens) {
+      // Retry once without completion cap for OpenAI when the first response is empty.
+      const retryOptions = { ...apiOptions };
+      delete retryOptions.max_completion_tokens;
+      completion = await client.chat.completions.create(retryOptions);
+      content = extractMessageContent(
+        completion.choices[0]?.message?.content as ChatMessageContent
+      );
+    }
+
     if (!content) {
-      return { success: false, error: "No response from AI" };
+      const finishReason = completion.choices[0]?.finish_reason || "unknown";
+      return {
+        success: false,
+        error: `No response from AI (finish reason: ${finishReason})`,
+      };
     }
 
     const summary = await extractModuleSummary(content, provider);

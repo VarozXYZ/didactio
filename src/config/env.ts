@@ -5,6 +5,7 @@ const envSchema = z.object({
   MONGODB_URI: z.string().url(),
   DEEPSEEK_API_KEY: z.string().min(1),
   OPENAI_API_KEY: z.string().optional(),
+  OPENAI_MODEL: z.string().default("gpt-4o-mini"),
   JWT_SECRET: z.string().min(32),
   JWT_EXPIRES_IN_SECONDS: z.coerce.number().int().positive().default(604800),
   JWT_REFRESH_EXPIRES_IN_SECONDS: z.coerce

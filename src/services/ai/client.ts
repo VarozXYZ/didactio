@@ -22,5 +22,5 @@ export function getAIClient(provider: AIProvider): OpenAI {
 }
 
 export function getModel(provider: AIProvider): string {
-  return provider === "deepseek" ? "deepseek-reasoner" : "gpt-5-mini";
+  return provider === "deepseek" ? "deepseek-reasoner" : env.OPENAI_MODEL;
 }
