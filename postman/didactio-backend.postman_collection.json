@@ -70,6 +70,26 @@
       "response": []
     },
     {
+      "name": "Get Chapter List",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/unit-init/{{unitInitId}}/chapters",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "unit-init",
+            "{{unitInitId}}",
+            "chapters"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
       "name": "Get Generated Chapter",
       "request": {
         "method": "GET",

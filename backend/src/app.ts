@@ -14,6 +14,7 @@ import { generateChapterContent } from './unit-init/generate-chapter-content.js'
 import { generateQuestionnaire } from './unit-init/generate-questionnaire.js'
 import { generateSyllabus } from './unit-init/generate-syllabus.js'
 import { generateSyllabusPrompt } from './unit-init/generate-syllabus-prompt.js'
+import { listChapters } from './unit-init/list-chapters.js'
 import {
     parseUpdateChapterContentInput,
     updateChapterContent,
@@ -90,6 +91,32 @@ export function createApp(options: CreateAppOptions = {}) {
         }
 
         response.json(unitInit)
+    })
+
+    app.get('/api/unit-init/:id/chapters', (request, response) => {
+        const requestWithMockOwner = asRequestWithMockOwner(request)
+        const unitInit = unitInitStore.getById(
+            requestWithMockOwner.mockOwner.id,
+            request.params.id
+        )
+
+        if (!unitInit) {
+            response.status(404).json({
+                error: 'Unit init not found.',
+            })
+            return
+        }
+
+        try {
+            response.json({
+                chapters: listChapters(unitInit),
+            })
+        } catch (error) {
+            response.status(409).json({
+                error:
+                    error instanceof Error ? error.message : 'Unit init chapter list failed.',
+            })
+        }
     })
 
     app.get('/api/unit-init/:id/chapters/:chapterIndex', (request, response) => {
