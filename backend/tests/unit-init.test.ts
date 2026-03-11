@@ -779,6 +779,54 @@ describe('POST /api/unit-init/:id/syllabus/generate', () => {
         expect(Number.isNaN(Date.parse(response.body.syllabusGeneratedAt))).toBe(false)
     })
 
+    it('uses the selected fake provider strategy for deepseek unit-inits', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const createdResponse = await request(app)
+            .post('/api/unit-init')
+            .send({ topic: 'next.js framework', provider: 'deepseek' })
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/moderate`)
+            .send({})
+
+        const questionnaireResponse = await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/questionnaire/generate`)
+            .send({})
+
+        await request(app)
+            .patch(`/api/unit-init/${createdResponse.body.id}/questionnaire/answers`)
+            .send({
+                answers: questionnaireResponse.body.questionnaire.questions.map(
+                    (question: { id: string }) => ({
+                        questionId: question.id,
+                        value: `answer-for-${question.id}`,
+                    })
+                ),
+            })
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/syllabus-prompt/generate`)
+            .send({})
+
+        const response = await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/syllabus/generate`)
+            .send({})
+
+        expect(response.status).toBe(200)
+        expect(response.body.provider).toBe('deepseek')
+        expect(response.body.syllabus.overview).toContain(
+            'organized around practical reasoning'
+        )
+        expect(response.body.syllabus.learningGoals[0]).toBe(
+            'Map the core reasoning model behind next.js framework'
+        )
+        expect(response.body.syllabus.chapters[0].title).toBe(
+            'next.js framework mental model'
+        )
+    })
+
     it('returns 404 when the unit-init does not exist', async () => {
         const store = new InMemoryUnitInitStore()
         const app = createApp({ unitInitStore: store })

@@ -1,5 +1,9 @@
 import express from 'express'
 import { attachMockOwner, type RequestWithMockOwner } from './middleware/mock-owner.js'
+import {
+    ProviderBackedFakeSyllabusGenerator,
+    type SyllabusGenerator,
+} from './providers/syllabus-generator.js'
 import { approveSyllabus } from './unit-init/approve-syllabus.js'
 import {
     answerQuestionnaire,
@@ -27,6 +31,7 @@ import { InMemoryUnitInitStore, type UnitInitStore } from './unit-init/unit-init
 
 interface CreateAppOptions {
     unitInitStore?: UnitInitStore
+    syllabusGenerator?: SyllabusGenerator
 }
 
 function asRequestWithMockOwner(request: express.Request): RequestWithMockOwner {
@@ -46,6 +51,8 @@ function parseChapterIndex(value: string): number {
 export function createApp(options: CreateAppOptions = {}) {
     const app = express()
     const unitInitStore = options.unitInitStore ?? new InMemoryUnitInitStore()
+    const syllabusGenerator =
+        options.syllabusGenerator ?? new ProviderBackedFakeSyllabusGenerator()
 
     app.use(express.json())
     app.use(attachMockOwner)
@@ -348,7 +355,7 @@ export function createApp(options: CreateAppOptions = {}) {
         }
 
         try {
-            const updatedUnitInit = generateSyllabus(unitInit)
+            const updatedUnitInit = generateSyllabus(unitInit, syllabusGenerator)
             unitInitStore.save(updatedUnitInit)
             response.json(updatedUnitInit)
         } catch (error) {
