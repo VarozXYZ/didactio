@@ -275,6 +275,37 @@
         }
       },
       "response": []
+    },
+    {
+      "name": "Generate Chapter Content",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/unit-init/{{unitInitId}}/chapters/{{chapterIndex}}/generate",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "unit-init",
+            "{{unitInitId}}",
+            "chapters",
+            "{{chapterIndex}}",
+            "generate"
+          ]
+        }
+      },
+      "response": []
     }
   ],
   "variable": [
@@ -285,6 +316,10 @@
     {
       "key": "unitInitId",
       "value": ""
+    },
+    {
+      "key": "chapterIndex",
+      "value": "0"
     }
   ]
 }

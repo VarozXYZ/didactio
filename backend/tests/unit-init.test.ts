@@ -718,3 +718,169 @@ describe('POST /api/unit-init/:id/approve-syllabus', () => {
         })
     })
 })
+
+describe('POST /api/unit-init/:id/chapters/:chapterIndex/generate', () => {
+    it('generates content for one approved syllabus chapter', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const createdResponse = await request(app)
+            .post('/api/unit-init')
+            .send({ topic: 'next.js framework' })
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/moderate`)
+            .send({})
+
+        const questionnaireResponse = await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/questionnaire/generate`)
+            .send({})
+
+        await request(app)
+            .patch(`/api/unit-init/${createdResponse.body.id}/questionnaire/answers`)
+            .send({
+                answers: questionnaireResponse.body.questionnaire.questions.map(
+                    (question: { id: string }) => ({
+                        questionId: question.id,
+                        value: `answer-for-${question.id}`,
+                    })
+                ),
+            })
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/syllabus-prompt/generate`)
+            .send({})
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/syllabus/generate`)
+            .send({})
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/approve-syllabus`)
+            .send({})
+
+        const response = await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/chapters/0/generate`)
+            .send({})
+
+        expect(response.status).toBe(200)
+        expect(response.body.status).toBe('syllabus_approved')
+        expect(response.body.nextAction).toBe('generate_unit_content')
+        expect(Array.isArray(response.body.generatedChapters)).toBe(true)
+        expect(response.body.generatedChapters).toHaveLength(1)
+        expect(response.body.generatedChapters[0]).toMatchObject({
+            chapterIndex: 0,
+            title: 'Foundations of next.js framework',
+            overview:
+                'Introduce the core concepts and shared vocabulary required to understand next.js framework.',
+        })
+        expect(typeof response.body.generatedChapters[0].content).toBe('string')
+        expect(response.body.generatedChapters[0].content).toContain(
+            'The purpose is to help the learner move closer to answer-for-learning_goal.'
+        )
+        expect(response.body.generatedChapters[0].keyTakeaways).toHaveLength(3)
+        expect(typeof response.body.generatedChapters[0].generatedAt).toBe('string')
+        expect(
+            Number.isNaN(Date.parse(response.body.generatedChapters[0].generatedAt))
+        ).toBe(false)
+    })
+
+    it('returns 404 when the unit-init does not exist', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const response = await request(app)
+            .post('/api/unit-init/missing-id/chapters/0/generate')
+            .send({})
+
+        expect(response.status).toBe(404)
+        expect(response.body).toEqual({
+            error: 'Unit init not found.',
+        })
+    })
+
+    it('returns 400 for an invalid chapter index', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const createdResponse = await request(app)
+            .post('/api/unit-init')
+            .send({ topic: 'next.js framework' })
+
+        const response = await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/chapters/not-a-number/generate`)
+            .send({})
+
+        expect(response.status).toBe(400)
+        expect(response.body).toEqual({
+            error: 'chapterIndex must be a non-negative integer.',
+        })
+    })
+
+    it('returns 400 when the chapter index is out of range', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const createdResponse = await request(app)
+            .post('/api/unit-init')
+            .send({ topic: 'next.js framework' })
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/moderate`)
+            .send({})
+
+        const questionnaireResponse = await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/questionnaire/generate`)
+            .send({})
+
+        await request(app)
+            .patch(`/api/unit-init/${createdResponse.body.id}/questionnaire/answers`)
+            .send({
+                answers: questionnaireResponse.body.questionnaire.questions.map(
+                    (question: { id: string }) => ({
+                        questionId: question.id,
+                        value: `answer-for-${question.id}`,
+                    })
+                ),
+            })
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/syllabus-prompt/generate`)
+            .send({})
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/syllabus/generate`)
+            .send({})
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/approve-syllabus`)
+            .send({})
+
+        const response = await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/chapters/99/generate`)
+            .send({})
+
+        expect(response.status).toBe(400)
+        expect(response.body).toEqual({
+            error: 'Chapter index is out of range for the approved syllabus.',
+        })
+    })
+
+    it('returns 409 when the syllabus has not been approved yet', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const createdResponse = await request(app)
+            .post('/api/unit-init')
+            .send({ topic: 'next.js framework' })
+
+        const response = await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/chapters/0/generate`)
+            .send({})
+
+        expect(response.status).toBe(409)
+        expect(response.body).toEqual({
+            error: 'Chapter content cannot be generated from the current unit-init state.',
+        })
+    })
+})

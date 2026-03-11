@@ -10,6 +10,7 @@ import {
     moderateUnitInit,
     parseCreateUnitInitInput,
 } from './unit-init/create-unit-init.js'
+import { generateChapterContent } from './unit-init/generate-chapter-content.js'
 import { generateQuestionnaire } from './unit-init/generate-questionnaire.js'
 import { generateSyllabus } from './unit-init/generate-syllabus.js'
 import { generateSyllabusPrompt } from './unit-init/generate-syllabus-prompt.js'
@@ -25,6 +26,16 @@ interface CreateAppOptions {
 
 function asRequestWithMockOwner(request: express.Request): RequestWithMockOwner {
     return request as unknown as RequestWithMockOwner
+}
+
+function parseChapterIndex(value: string): number {
+    const chapterIndex = Number.parseInt(value, 10)
+
+    if (!Number.isInteger(chapterIndex) || chapterIndex < 0) {
+        throw new Error('chapterIndex must be a non-negative integer.')
+    }
+
+    return chapterIndex
 }
 
 export function createApp(options: CreateAppOptions = {}) {
@@ -289,6 +300,53 @@ export function createApp(options: CreateAppOptions = {}) {
                     error instanceof Error
                         ? error.message
                         : 'Unit init syllabus approval failed.',
+            })
+        }
+    })
+
+    app.post('/api/unit-init/:id/chapters/:chapterIndex/generate', (request, response) => {
+        const requestWithMockOwner = asRequestWithMockOwner(request)
+        const unitInit = unitInitStore.getById(
+            requestWithMockOwner.mockOwner.id,
+            request.params.id
+        )
+
+        if (!unitInit) {
+            response.status(404).json({
+                error: 'Unit init not found.',
+            })
+            return
+        }
+
+        let chapterIndex
+        try {
+            chapterIndex = parseChapterIndex(request.params.chapterIndex)
+        } catch (error) {
+            response.status(400).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : 'Invalid chapter generation request.',
+            })
+            return
+        }
+
+        try {
+            const updatedUnitInit = generateChapterContent(unitInit, chapterIndex)
+            unitInitStore.save(updatedUnitInit)
+            response.json(updatedUnitInit)
+        } catch (error) {
+            const message =
+                error instanceof Error
+                    ? error.message
+                    : 'Unit init chapter generation failed.'
+
+            response.status(
+                message === 'Chapter index is out of range for the approved syllabus.'
+                    ? 400
+                    : 409
+            ).json({
+                error: message,
             })
         }
     })

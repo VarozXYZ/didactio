@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import type { UnitInitGeneratedChapter } from './generate-chapter-content.js'
 import type { UnitInitQuestionAnswer } from './answer-questionnaire.js'
 import type { UnitInitQuestionnaire } from './generate-questionnaire.js'
 import type { UnitInitSyllabus } from './generate-syllabus.js'
@@ -46,6 +47,7 @@ export interface CreatedUnitInit {
     syllabusGeneratedAt?: string
     syllabusUpdatedAt?: string
     syllabusApprovedAt?: string
+    generatedChapters?: UnitInitGeneratedChapter[]
 }
 
 function isSupportedProvider(value: unknown): value is UnitInitProvider {
