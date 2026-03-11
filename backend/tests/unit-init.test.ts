@@ -305,3 +305,78 @@ describe('PATCH /api/unit-init/:id/questionnaire/answers', () => {
         })
     })
 })
+
+describe('POST /api/unit-init/:id/syllabus-prompt/generate', () => {
+    it('generates a syllabus prompt from the answered questionnaire', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const createdResponse = await request(app)
+            .post('/api/unit-init')
+            .send({ topic: 'next.js framework' })
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/moderate`)
+            .send({})
+
+        const questionnaireResponse = await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/questionnaire/generate`)
+            .send({})
+
+        await request(app)
+            .patch(`/api/unit-init/${createdResponse.body.id}/questionnaire/answers`)
+            .send({
+                answers: questionnaireResponse.body.questionnaire.questions.map(
+                    (question: { id: string }) => ({
+                        questionId: question.id,
+                        value: `answer-for-${question.id}`,
+                    })
+                ),
+            })
+
+        const response = await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/syllabus-prompt/generate`)
+            .send({})
+
+        expect(response.status).toBe(200)
+        expect(response.body.status).toBe('syllabus_prompt_ready')
+        expect(response.body.nextAction).toBe('review_syllabus_prompt')
+        expect(typeof response.body.syllabusPrompt).toBe('string')
+        expect(response.body.syllabusPrompt).toContain('Create a didactic unit about next.js framework.')
+        expect(response.body.syllabusPrompt).toContain('answer-for-learning_goal')
+        expect(typeof response.body.syllabusPromptGeneratedAt).toBe('string')
+        expect(Number.isNaN(Date.parse(response.body.syllabusPromptGeneratedAt))).toBe(false)
+    })
+
+    it('returns 404 when the unit-init does not exist', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const response = await request(app)
+            .post('/api/unit-init/missing-id/syllabus-prompt/generate')
+            .send({})
+
+        expect(response.status).toBe(404)
+        expect(response.body).toEqual({
+            error: 'Unit init not found.',
+        })
+    })
+
+    it('returns 409 when the questionnaire has not been answered yet', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const createdResponse = await request(app)
+            .post('/api/unit-init')
+            .send({ topic: 'next.js framework' })
+
+        const response = await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/syllabus-prompt/generate`)
+            .send({})
+
+        expect(response.status).toBe(409)
+        expect(response.body).toEqual({
+            error: 'Syllabus prompt cannot be generated from the current unit-init state.',
+        })
+    })
+})

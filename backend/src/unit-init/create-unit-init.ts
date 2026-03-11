@@ -8,11 +8,13 @@ export type UnitInitStatus =
     | 'moderation_completed'
     | 'questionnaire_ready'
     | 'questionnaire_answered'
+    | 'syllabus_prompt_ready'
 export type UnitInitNextAction =
     | 'moderate_topic'
     | 'generate_questionnaire'
     | 'answer_questionnaire'
     | 'generate_syllabus_prompt'
+    | 'review_syllabus_prompt'
 
 export interface CreateUnitInitInput {
     topic: string
@@ -32,6 +34,8 @@ export interface CreatedUnitInit {
     questionnaireGeneratedAt?: string
     questionnaireAnswers?: UnitInitQuestionAnswer[]
     questionnaireAnsweredAt?: string
+    syllabusPrompt?: string
+    syllabusPromptGeneratedAt?: string
 }
 
 function isSupportedProvider(value: unknown): value is UnitInitProvider {

@@ -157,6 +157,36 @@
         }
       },
       "response": []
+    },
+    {
+      "name": "Generate Syllabus Prompt",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/unit-init/{{unitInitId}}/syllabus-prompt/generate",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "unit-init",
+            "{{unitInitId}}",
+            "syllabus-prompt",
+            "generate"
+          ]
+        }
+      },
+      "response": []
     }
   ],
   "variable": [
