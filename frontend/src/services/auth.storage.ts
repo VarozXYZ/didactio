@@ -1,4 +1,4 @@
-import type { AuthResponse } from './auth.api'
+import type { AuthResponse } from './auth'
 
 const AUTH_SESSION_STORAGE_KEY = 'didactio.auth.session'
 
@@ -37,4 +37,3 @@ export function loadAuthSession(): AuthSession | null {
 export function clearAuthSession(): void {
     localStorage.removeItem(AUTH_SESSION_STORAGE_KEY)
 }
-

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { login, register } from '../services/auth.api'
+import { login, register } from '../services/auth'
 import { saveAuthSession } from '../services/auth.storage'
 
 type AuthMode = 'login' | 'register'
@@ -83,7 +83,7 @@ function AuthScreen({ mode }: AuthScreenProps) {
                 })
 
             saveAuthSession(authResponse)
-            navigate('/', { replace: true })
+            navigate('/dashboard', { replace: true })
         } catch (error) {
             setErrorMessage(
                 error instanceof Error ? error.message : 'Unable to authenticate right now.'

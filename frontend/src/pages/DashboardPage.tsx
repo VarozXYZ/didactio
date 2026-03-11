@@ -4,12 +4,12 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { loadAuthSession } from '../services/auth.storage'
 import {
     createCourse,
-    exportCoursePdf,
+    downloadCourseDocument,
     getCourse,
     listCourses,
     regenerateCourse,
     resumeCourse,
-} from '../services/course.api'
+} from '../services/course.store'
 import type {
     AIProvider,
     ContentLength,
@@ -17,7 +17,7 @@ import type {
     CourseLevel,
     Tone,
     Technicality,
-} from '../services/course.api'
+} from '../services/course.store'
 
 type CreateCourseFormState = {
     topic: string
@@ -345,7 +345,7 @@ function DashboardPage() {
         if (!activeCourseId) return
         setIsExporting(true)
         try {
-            const { blob, filename } = await exportCoursePdf(activeCourseId)
+            const { blob, filename } = await downloadCourseDocument(activeCourseId)
             const url = URL.createObjectURL(blob)
             const a = document.createElement('a')
             a.href = url
