@@ -5,3 +5,4 @@ frontend/*.local
 backend/node_modules
 backend/dist
 app-spec.md
+DEVELOPMENT_WORKFLOW.md
