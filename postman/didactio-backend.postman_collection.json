@@ -1,0 +1,83 @@
+{
+  "info": {
+    "_postman_id": "8c0f3cf2-1d6b-4f4b-a090-14c65f3a0ad5",
+    "name": "Didactio Backend",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/health",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "health"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Create Unit Init",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"topic\": \"next.js framework\",\n  \"provider\": \"openai\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/unit-init",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "unit-init"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Unit Init By Id",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/unit-init/{{unitInitId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "unit-init",
+            "{{unitInitId}}"
+          ]
+        }
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "unitInitId",
+      "value": ""
+    }
+  ]
+}

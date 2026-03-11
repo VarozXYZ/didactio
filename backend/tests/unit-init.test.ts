@@ -1,6 +1,7 @@
 import request from 'supertest'
 import { describe, expect, it } from 'vitest'
 import { createApp } from '../src/app.js'
+import { InMemoryUnitInitStore } from '../src/unit-init/unit-init-store.js'
 
 describe('POST /api/unit-init', () => {
     it('creates a unit-init with the default provider', async () => {
@@ -54,6 +55,34 @@ describe('POST /api/unit-init', () => {
         expect(response.status).toBe(400)
         expect(response.body).toEqual({
             error: 'Provider must be either "openai" or "deepseek".',
+        })
+    })
+})
+
+describe('GET /api/unit-init/:id', () => {
+    it('returns a previously created unit-init for the same mock owner', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const createdResponse = await request(app)
+            .post('/api/unit-init')
+            .send({ topic: 'next.js framework' })
+
+        const response = await request(app).get(`/api/unit-init/${createdResponse.body.id}`)
+
+        expect(response.status).toBe(200)
+        expect(response.body).toEqual(createdResponse.body)
+    })
+
+    it('returns 404 when the unit-init does not exist', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const response = await request(app).get('/api/unit-init/missing-id')
+
+        expect(response.status).toBe(404)
+        expect(response.body).toEqual({
+            error: 'Unit init not found.',
         })
     })
 })
