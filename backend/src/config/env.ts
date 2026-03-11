@@ -6,6 +6,7 @@ export interface AppEnv {
     port: number
     openAiApiKey: string | null
     openAiSyllabusModel: string
+    openAiChapterModel: string
 }
 
 function parsePort(value: string | undefined): number {
@@ -41,5 +42,6 @@ export function getAppEnv(): AppEnv {
         port: parsePort(process.env.PORT),
         openAiApiKey: parseOptionalString(process.env.OPENAI_API_KEY),
         openAiSyllabusModel: parseOptionalString(process.env.OPENAI_SYLLABUS_MODEL) ?? 'gpt-4o-mini',
+        openAiChapterModel: parseOptionalString(process.env.OPENAI_CHAPTER_MODEL) ?? 'gpt-4o-mini',
     }
 }

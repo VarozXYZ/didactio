@@ -1,8 +1,13 @@
+import { getAppEnv } from '../config/env.js'
 import type { CreatedUnitInit, UnitInitProvider } from '../unit-init/create-unit-init.js'
 import type { UnitInitGeneratedChapter } from '../unit-init/generate-chapter-content.js'
+import { OpenAiChapterGenerator } from './openai-chapter-generator.js'
 
 export interface ChapterGenerator {
-    generate(unitInit: CreatedUnitInit, chapterIndex: number): UnitInitGeneratedChapter
+    generate(
+        unitInit: CreatedUnitInit,
+        chapterIndex: number
+    ): Promise<UnitInitGeneratedChapter>
 }
 
 function findAnswerValue(unitInit: CreatedUnitInit, questionId: string): string {
@@ -23,7 +28,10 @@ function getSyllabusChapter(unitInit: CreatedUnitInit, chapterIndex: number) {
 }
 
 class OpenAiFakeChapterGenerator implements ChapterGenerator {
-    generate(unitInit: CreatedUnitInit, chapterIndex: number): UnitInitGeneratedChapter {
+    async generate(
+        unitInit: CreatedUnitInit,
+        chapterIndex: number
+    ): Promise<UnitInitGeneratedChapter> {
         const chapter = getSyllabusChapter(unitInit, chapterIndex)
         const learningGoal = findAnswerValue(unitInit, 'learning_goal')
         const preferredDepth = findAnswerValue(unitInit, 'preferred_depth')
@@ -50,7 +58,10 @@ class OpenAiFakeChapterGenerator implements ChapterGenerator {
 }
 
 class DeepSeekFakeChapterGenerator implements ChapterGenerator {
-    generate(unitInit: CreatedUnitInit, chapterIndex: number): UnitInitGeneratedChapter {
+    async generate(
+        unitInit: CreatedUnitInit,
+        chapterIndex: number
+    ): Promise<UnitInitGeneratedChapter> {
         const chapter = getSyllabusChapter(unitInit, chapterIndex)
         const learningGoal = findAnswerValue(unitInit, 'learning_goal')
         const relatedKnowledge = findAnswerValue(unitInit, 'related_knowledge_level')
@@ -77,12 +88,26 @@ class DeepSeekFakeChapterGenerator implements ChapterGenerator {
 }
 
 export class ProviderBackedFakeChapterGenerator implements ChapterGenerator {
-    private readonly generators: Record<UnitInitProvider, ChapterGenerator> = {
-        openai: new OpenAiFakeChapterGenerator(),
-        deepseek: new DeepSeekFakeChapterGenerator(),
+    private readonly generators: Record<UnitInitProvider, ChapterGenerator>
+
+    constructor() {
+        const env = getAppEnv()
+
+        this.generators = {
+            openai: env.openAiApiKey
+                ? new OpenAiChapterGenerator({
+                      apiKey: env.openAiApiKey,
+                      model: env.openAiChapterModel,
+                  })
+                : new OpenAiFakeChapterGenerator(),
+            deepseek: new DeepSeekFakeChapterGenerator(),
+        }
     }
 
-    generate(unitInit: CreatedUnitInit, chapterIndex: number): UnitInitGeneratedChapter {
+    async generate(
+        unitInit: CreatedUnitInit,
+        chapterIndex: number
+    ): Promise<UnitInitGeneratedChapter> {
         return this.generators[unitInit.provider].generate(unitInit, chapterIndex)
     }
 }

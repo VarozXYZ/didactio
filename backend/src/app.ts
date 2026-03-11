@@ -441,7 +441,7 @@ export function createApp(options: CreateAppOptions = {}) {
         }
     })
 
-    app.post('/api/unit-init/:id/chapters/:chapterIndex/generate', (request, response) => {
+    app.post('/api/unit-init/:id/chapters/:chapterIndex/generate', async (request, response) => {
         const requestWithMockOwner = asRequestWithMockOwner(request)
         const unitInit = unitInitStore.getById(
             requestWithMockOwner.mockOwner.id,
@@ -469,7 +469,7 @@ export function createApp(options: CreateAppOptions = {}) {
         }
 
         try {
-            const updatedUnitInit = generateChapterContent(
+            const updatedUnitInit = await generateChapterContent(
                 unitInit,
                 chapterIndex,
                 chapterGenerator

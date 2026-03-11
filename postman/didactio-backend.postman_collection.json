@@ -48,7 +48,21 @@
           ]
         }
       },
-      "response": []
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const response = pm.response.json();",
+              "if (response && response.id) {",
+              "  pm.collectionVariables.set('unitInitId', response.id);",
+              "}"
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "Get Unit Init By Id",

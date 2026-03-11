@@ -16,16 +16,16 @@ export interface UnitInitGeneratedChapter {
 
 const defaultChapterGenerator = new ProviderBackedFakeChapterGenerator()
 
-export function generateChapterContent(
+export async function generateChapterContent(
     unitInit: CreatedUnitInit,
     chapterIndex: number,
     chapterGenerator: ChapterGenerator = defaultChapterGenerator
-): CreatedUnitInit {
+): Promise<CreatedUnitInit> {
     if (unitInit.status !== 'syllabus_approved' || !unitInit.syllabus) {
         throw new Error('Chapter content cannot be generated from the current unit-init state.')
     }
 
-    const generatedChapter = chapterGenerator.generate(unitInit, chapterIndex)
+    const generatedChapter = await chapterGenerator.generate(unitInit, chapterIndex)
     const generatedChapters = unitInit.generatedChapters ?? []
     const existingChapterIndex = generatedChapters.findIndex(
         (chapter) => chapter.chapterIndex === chapterIndex
