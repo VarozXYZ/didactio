@@ -91,6 +91,36 @@
       "response": []
     },
     {
+      "name": "Update Generated Chapter",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"chapter\": {\n    \"title\": \"Edited Foundations\",\n    \"overview\": \"A rewritten overview for the chapter.\",\n    \"content\": \"A rewritten body of content for manual editing.\",\n    \"keyTakeaways\": [\n      \"Edited takeaway one\",\n      \"Edited takeaway two\"\n    ]\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/unit-init/{{unitInitId}}/chapters/{{chapterIndex}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "unit-init",
+            "{{unitInitId}}",
+            "chapters",
+            "{{chapterIndex}}"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
       "name": "Moderate Unit Init",
       "request": {
         "method": "POST",

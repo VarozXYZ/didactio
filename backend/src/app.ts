@@ -15,6 +15,10 @@ import { generateQuestionnaire } from './unit-init/generate-questionnaire.js'
 import { generateSyllabus } from './unit-init/generate-syllabus.js'
 import { generateSyllabusPrompt } from './unit-init/generate-syllabus-prompt.js'
 import {
+    parseUpdateChapterContentInput,
+    updateChapterContent,
+} from './unit-init/update-chapter-content.js'
+import {
     parseUpdateSyllabusInput,
     updateSyllabus,
 } from './unit-init/update-syllabus.js'
@@ -124,6 +128,60 @@ export function createApp(options: CreateAppOptions = {}) {
         }
 
         response.json(generatedChapter)
+    })
+
+    app.patch('/api/unit-init/:id/chapters/:chapterIndex', (request, response) => {
+        const requestWithMockOwner = asRequestWithMockOwner(request)
+        const unitInit = unitInitStore.getById(
+            requestWithMockOwner.mockOwner.id,
+            request.params.id
+        )
+
+        if (!unitInit) {
+            response.status(404).json({
+                error: 'Unit init not found.',
+            })
+            return
+        }
+
+        let chapterIndex
+        try {
+            chapterIndex = parseChapterIndex(request.params.chapterIndex)
+        } catch (error) {
+            response.status(400).json({
+                error:
+                    error instanceof Error ? error.message : 'Invalid chapter update request.',
+            })
+            return
+        }
+
+        let parsedInput
+        try {
+            parsedInput = parseUpdateChapterContentInput(request.body)
+        } catch (error) {
+            response.status(400).json({
+                error:
+                    error instanceof Error ? error.message : 'Invalid chapter update request.',
+            })
+            return
+        }
+
+        try {
+            const updatedUnitInit = updateChapterContent(unitInit, chapterIndex, parsedInput)
+            unitInitStore.save(updatedUnitInit)
+            const updatedChapter = updatedUnitInit.generatedChapters?.find(
+                (chapter) => chapter.chapterIndex === chapterIndex
+            )
+
+            response.json(updatedChapter)
+        } catch (error) {
+            const message =
+                error instanceof Error ? error.message : 'Unit init chapter update failed.'
+
+            response.status(message === 'Generated chapter not found.' ? 404 : 409).json({
+                error: message,
+            })
+        }
     })
 
     app.post('/api/unit-init/:id/moderate', (request, response) => {

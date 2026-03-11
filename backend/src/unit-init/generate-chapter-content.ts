@@ -7,6 +7,7 @@ export interface UnitInitGeneratedChapter {
     content: string
     keyTakeaways: string[]
     generatedAt: string
+    updatedAt?: string
 }
 
 function buildChapterContent(unitInit: CreatedUnitInit, chapterIndex: number): UnitInitGeneratedChapter {
