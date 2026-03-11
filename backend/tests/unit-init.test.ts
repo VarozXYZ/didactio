@@ -466,3 +466,175 @@ describe('POST /api/unit-init/:id/syllabus/generate', () => {
         })
     })
 })
+
+describe('PATCH /api/unit-init/:id/syllabus', () => {
+    it('replaces the generated syllabus and advances the next action', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const createdResponse = await request(app)
+            .post('/api/unit-init')
+            .send({ topic: 'next.js framework' })
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/moderate`)
+            .send({})
+
+        const questionnaireResponse = await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/questionnaire/generate`)
+            .send({})
+
+        await request(app)
+            .patch(`/api/unit-init/${createdResponse.body.id}/questionnaire/answers`)
+            .send({
+                answers: questionnaireResponse.body.questionnaire.questions.map(
+                    (question: { id: string }) => ({
+                        questionId: question.id,
+                        value: `answer-for-${question.id}`,
+                    })
+                ),
+            })
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/syllabus-prompt/generate`)
+            .send({})
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/syllabus/generate`)
+            .send({})
+
+        const response = await request(app)
+            .patch(`/api/unit-init/${createdResponse.body.id}/syllabus`)
+            .send({
+                syllabus: {
+                    title: 'Advanced Next.js Delivery Plan',
+                    overview: 'A custom syllabus focused on shipping production-ready Next.js systems.',
+                    learningGoals: [
+                        'Understand the framework architecture',
+                        'Build production features confidently',
+                        'Choose appropriate rendering strategies',
+                    ],
+                    chapters: [
+                        {
+                            title: 'Runtime Fundamentals',
+                            overview: 'Review the core runtime model and framework primitives.',
+                            keyPoints: [
+                                'Routing model',
+                                'Rendering modes',
+                                'Server and client boundaries',
+                            ],
+                        },
+                        {
+                            title: 'Delivery Workflow',
+                            overview: 'Move from local development to production delivery.',
+                            keyPoints: [
+                                'Project structure',
+                                'Deployment pipeline',
+                                'Operational checks',
+                            ],
+                        },
+                    ],
+                },
+            })
+
+        expect(response.status).toBe(200)
+        expect(response.body.nextAction).toBe('approve_syllabus')
+        expect(response.body.syllabus).toMatchObject({
+            title: 'Advanced Next.js Delivery Plan',
+            overview: 'A custom syllabus focused on shipping production-ready Next.js systems.',
+        })
+        expect(response.body.syllabus.learningGoals).toHaveLength(3)
+        expect(response.body.syllabus.chapters).toHaveLength(2)
+        expect(typeof response.body.syllabusUpdatedAt).toBe('string')
+        expect(Number.isNaN(Date.parse(response.body.syllabusUpdatedAt))).toBe(false)
+    })
+
+    it('returns 404 when the unit-init does not exist', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const response = await request(app)
+            .patch('/api/unit-init/missing-id/syllabus')
+            .send({
+                syllabus: {
+                    title: 'Example',
+                    overview: 'Example overview',
+                    learningGoals: ['One'],
+                    chapters: [
+                        {
+                            title: 'Chapter 1',
+                            overview: 'Overview',
+                            keyPoints: ['Point 1'],
+                        },
+                    ],
+                },
+            })
+
+        expect(response.status).toBe(404)
+        expect(response.body).toEqual({
+            error: 'Unit init not found.',
+        })
+    })
+
+    it('returns 400 for an invalid syllabus payload', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const createdResponse = await request(app)
+            .post('/api/unit-init')
+            .send({ topic: 'next.js framework' })
+
+        const response = await request(app)
+            .patch(`/api/unit-init/${createdResponse.body.id}/syllabus`)
+            .send({
+                syllabus: {
+                    title: '',
+                    overview: 'Example overview',
+                    learningGoals: ['One'],
+                    chapters: [
+                        {
+                            title: 'Chapter 1',
+                            overview: 'Overview',
+                            keyPoints: ['Point 1'],
+                        },
+                    ],
+                },
+            })
+
+        expect(response.status).toBe(400)
+        expect(response.body).toEqual({
+            error: 'syllabus.title is required.',
+        })
+    })
+
+    it('returns 409 when the syllabus has not been generated yet', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const createdResponse = await request(app)
+            .post('/api/unit-init')
+            .send({ topic: 'next.js framework' })
+
+        const response = await request(app)
+            .patch(`/api/unit-init/${createdResponse.body.id}/syllabus`)
+            .send({
+                syllabus: {
+                    title: 'Example',
+                    overview: 'Example overview',
+                    learningGoals: ['One'],
+                    chapters: [
+                        {
+                            title: 'Chapter 1',
+                            overview: 'Overview',
+                            keyPoints: ['Point 1'],
+                        },
+                    ],
+                },
+            })
+
+        expect(response.status).toBe(409)
+        expect(response.body).toEqual({
+            error: 'Syllabus cannot be updated from the current unit-init state.',
+        })
+    })
+})

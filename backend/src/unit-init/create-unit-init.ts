@@ -18,6 +18,7 @@ export type UnitInitNextAction =
     | 'generate_syllabus_prompt'
     | 'review_syllabus_prompt'
     | 'review_syllabus'
+    | 'approve_syllabus'
 
 export interface CreateUnitInitInput {
     topic: string
@@ -41,6 +42,7 @@ export interface CreatedUnitInit {
     syllabusPromptGeneratedAt?: string
     syllabus?: UnitInitSyllabus
     syllabusGeneratedAt?: string
+    syllabusUpdatedAt?: string
 }
 
 function isSupportedProvider(value: unknown): value is UnitInitProvider {

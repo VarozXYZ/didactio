@@ -12,6 +12,10 @@ import {
 import { generateQuestionnaire } from './unit-init/generate-questionnaire.js'
 import { generateSyllabus } from './unit-init/generate-syllabus.js'
 import { generateSyllabusPrompt } from './unit-init/generate-syllabus-prompt.js'
+import {
+    parseUpdateSyllabusInput,
+    updateSyllabus,
+} from './unit-init/update-syllabus.js'
 import { InMemoryUnitInitStore, type UnitInitStore } from './unit-init/unit-init-store.js'
 
 interface CreateAppOptions {
@@ -218,6 +222,44 @@ export function createApp(options: CreateAppOptions = {}) {
                     error instanceof Error
                         ? error.message
                         : 'Unit init syllabus generation failed.',
+            })
+        }
+    })
+
+    app.patch('/api/unit-init/:id/syllabus', (request, response) => {
+        const requestWithMockOwner = asRequestWithMockOwner(request)
+        const unitInit = unitInitStore.getById(
+            requestWithMockOwner.mockOwner.id,
+            request.params.id
+        )
+
+        if (!unitInit) {
+            response.status(404).json({
+                error: 'Unit init not found.',
+            })
+            return
+        }
+
+        let parsedInput
+        try {
+            parsedInput = parseUpdateSyllabusInput(request.body)
+        } catch (error) {
+            response.status(400).json({
+                error: error instanceof Error ? error.message : 'Invalid syllabus update request.',
+            })
+            return
+        }
+
+        try {
+            const updatedUnitInit = updateSyllabus(unitInit, parsedInput)
+            unitInitStore.save(updatedUnitInit)
+            response.json(updatedUnitInit)
+        } catch (error) {
+            response.status(409).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : 'Unit init syllabus update failed.',
             })
         }
     })

@@ -217,6 +217,35 @@
         }
       },
       "response": []
+    },
+    {
+      "name": "Update Syllabus",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"syllabus\": {\n    \"title\": \"Advanced Next.js Delivery Plan\",\n    \"overview\": \"A custom syllabus focused on shipping production-ready Next.js systems.\",\n    \"learningGoals\": [\n      \"Understand the framework architecture\",\n      \"Build production features confidently\",\n      \"Choose appropriate rendering strategies\"\n    ],\n    \"chapters\": [\n      {\n        \"title\": \"Runtime Fundamentals\",\n        \"overview\": \"Review the core runtime model and framework primitives.\",\n        \"keyPoints\": [\n          \"Routing model\",\n          \"Rendering modes\",\n          \"Server and client boundaries\"\n        ]\n      },\n      {\n        \"title\": \"Delivery Workflow\",\n        \"overview\": \"Move from local development to production delivery.\",\n        \"keyPoints\": [\n          \"Project structure\",\n          \"Deployment pipeline\",\n          \"Operational checks\"\n        ]\n      }\n    ]\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/unit-init/{{unitInitId}}/syllabus",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "unit-init",
+            "{{unitInitId}}",
+            "syllabus"
+          ]
+        }
+      },
+      "response": []
     }
   ],
   "variable": [
