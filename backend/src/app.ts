@@ -1,6 +1,10 @@
 import express from 'express'
 import { attachMockOwner, type RequestWithMockOwner } from './middleware/mock-owner.js'
-import { createUnitInit, parseCreateUnitInitInput } from './unit-init/create-unit-init.js'
+import {
+    createUnitInit,
+    moderateUnitInit,
+    parseCreateUnitInitInput,
+} from './unit-init/create-unit-init.js'
 import { InMemoryUnitInitStore, type UnitInitStore } from './unit-init/unit-init-store.js'
 
 interface CreateAppOptions {
@@ -59,6 +63,31 @@ export function createApp(options: CreateAppOptions = {}) {
         }
 
         response.json(unitInit)
+    })
+
+    app.post('/api/unit-init/:id/moderate', (request, response) => {
+        const requestWithMockOwner = asRequestWithMockOwner(request)
+        const unitInit = unitInitStore.getById(
+            requestWithMockOwner.mockOwner.id,
+            request.params.id
+        )
+
+        if (!unitInit) {
+            response.status(404).json({
+                error: 'Unit init not found.',
+            })
+            return
+        }
+
+        try {
+            const moderatedUnitInit = moderateUnitInit(unitInit)
+            unitInitStore.save(moderatedUnitInit)
+            response.json(moderatedUnitInit)
+        } catch (error) {
+            response.status(409).json({
+                error: error instanceof Error ? error.message : 'Unit init moderation failed.',
+            })
+        }
     })
 
     return app

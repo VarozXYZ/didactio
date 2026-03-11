@@ -68,6 +68,35 @@
         }
       },
       "response": []
+    },
+    {
+      "name": "Moderate Unit Init",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/unit-init/{{unitInitId}}/moderate",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "unit-init",
+            "{{unitInitId}}",
+            "moderate"
+          ]
+        }
+      },
+      "response": []
     }
   ],
   "variable": [

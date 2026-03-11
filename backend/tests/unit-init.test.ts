@@ -89,3 +89,63 @@ describe('GET /api/unit-init/:id', () => {
         })
     })
 })
+
+describe('POST /api/unit-init/:id/moderate', () => {
+    it('transitions a submitted unit-init into moderation completed', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const createdResponse = await request(app)
+            .post('/api/unit-init')
+            .send({ topic: 'next.js framework' })
+
+        const response = await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/moderate`)
+            .send({})
+
+        expect(response.status).toBe(200)
+        expect(response.body).toMatchObject({
+            ...createdResponse.body,
+            status: 'moderation_completed',
+            nextAction: 'generate_questionnaire',
+        })
+        expect(typeof response.body.moderatedAt).toBe('string')
+        expect(Number.isNaN(Date.parse(response.body.moderatedAt))).toBe(false)
+    })
+
+    it('returns 404 when the unit-init does not exist', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const response = await request(app)
+            .post('/api/unit-init/missing-id/moderate')
+            .send({})
+
+        expect(response.status).toBe(404)
+        expect(response.body).toEqual({
+            error: 'Unit init not found.',
+        })
+    })
+
+    it('returns 409 when moderation is requested twice', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const createdResponse = await request(app)
+            .post('/api/unit-init')
+            .send({ topic: 'next.js framework' })
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/moderate`)
+            .send({})
+
+        const secondResponse = await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/moderate`)
+            .send({})
+
+        expect(secondResponse.status).toBe(409)
+        expect(secondResponse.body).toEqual({
+            error: 'Unit init cannot be moderated from its current state.',
+        })
+    })
+})

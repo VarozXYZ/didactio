@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto'
 
 export type UnitInitProvider = 'openai' | 'deepseek'
-export type UnitInitStatus = 'submitted'
-export type UnitInitNextAction = 'moderate_topic'
+export type UnitInitStatus = 'submitted' | 'moderation_completed'
+export type UnitInitNextAction = 'moderate_topic' | 'generate_questionnaire'
 
 export interface CreateUnitInitInput {
     topic: string
@@ -17,6 +17,7 @@ export interface CreatedUnitInit {
     status: UnitInitStatus
     nextAction: UnitInitNextAction
     createdAt: string
+    moderatedAt?: string
 }
 
 function isSupportedProvider(value: unknown): value is UnitInitProvider {
@@ -59,5 +60,18 @@ export function createUnitInit(
         status: 'submitted',
         nextAction: 'moderate_topic',
         createdAt,
+    }
+}
+
+export function moderateUnitInit(unitInit: CreatedUnitInit): CreatedUnitInit {
+    if (unitInit.status !== 'submitted') {
+        throw new Error('Unit init cannot be moderated from its current state.')
+    }
+
+    return {
+        ...unitInit,
+        status: 'moderation_completed',
+        nextAction: 'generate_questionnaire',
+        moderatedAt: new Date().toISOString(),
     }
 }
