@@ -1,4 +1,8 @@
 import express from 'express'
+import {
+    ProviderBackedFakeChapterGenerator,
+    type ChapterGenerator,
+} from './providers/chapter-generator.js'
 import { attachMockOwner, type RequestWithMockOwner } from './middleware/mock-owner.js'
 import {
     ProviderBackedFakeSyllabusGenerator,
@@ -32,6 +36,7 @@ import { InMemoryUnitInitStore, type UnitInitStore } from './unit-init/unit-init
 interface CreateAppOptions {
     unitInitStore?: UnitInitStore
     syllabusGenerator?: SyllabusGenerator
+    chapterGenerator?: ChapterGenerator
 }
 
 function asRequestWithMockOwner(request: express.Request): RequestWithMockOwner {
@@ -53,6 +58,8 @@ export function createApp(options: CreateAppOptions = {}) {
     const unitInitStore = options.unitInitStore ?? new InMemoryUnitInitStore()
     const syllabusGenerator =
         options.syllabusGenerator ?? new ProviderBackedFakeSyllabusGenerator()
+    const chapterGenerator =
+        options.chapterGenerator ?? new ProviderBackedFakeChapterGenerator()
 
     app.use(express.json())
     app.use(attachMockOwner)
@@ -462,7 +469,11 @@ export function createApp(options: CreateAppOptions = {}) {
         }
 
         try {
-            const updatedUnitInit = generateChapterContent(unitInit, chapterIndex)
+            const updatedUnitInit = generateChapterContent(
+                unitInit,
+                chapterIndex,
+                chapterGenerator
+            )
             unitInitStore.save(updatedUnitInit)
             response.json(updatedUnitInit)
         } catch (error) {

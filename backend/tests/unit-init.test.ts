@@ -1178,6 +1178,62 @@ describe('POST /api/unit-init/:id/chapters/:chapterIndex/generate', () => {
         ).toBe(false)
     })
 
+    it('uses the selected fake provider strategy for deepseek chapter generation', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const createdResponse = await request(app)
+            .post('/api/unit-init')
+            .send({ topic: 'next.js framework', provider: 'deepseek' })
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/moderate`)
+            .send({})
+
+        const questionnaireResponse = await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/questionnaire/generate`)
+            .send({})
+
+        await request(app)
+            .patch(`/api/unit-init/${createdResponse.body.id}/questionnaire/answers`)
+            .send({
+                answers: questionnaireResponse.body.questionnaire.questions.map(
+                    (question: { id: string }) => ({
+                        questionId: question.id,
+                        value: `answer-for-${question.id}`,
+                    })
+                ),
+            })
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/syllabus-prompt/generate`)
+            .send({})
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/syllabus/generate`)
+            .send({})
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/approve-syllabus`)
+            .send({})
+
+        const response = await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/chapters/0/generate`)
+            .send({})
+
+        expect(response.status).toBe(200)
+        expect(response.body.provider).toBe('deepseek')
+        expect(response.body.generatedChapters[0].content).toContain(
+            'builds a practical reasoning model'
+        )
+        expect(response.body.generatedChapters[0].content).toContain(
+            'related knowledge level (answer-for-related_knowledge_level)'
+        )
+        expect(response.body.generatedChapters[0].keyTakeaways[0]).toBe(
+            'Recognize the chapter reasoning model: next.js framework mental model'
+        )
+    })
+
     it('returns 404 when the unit-init does not exist', async () => {
         const store = new InMemoryUnitInitStore()
         const app = createApp({ unitInitStore: store })
