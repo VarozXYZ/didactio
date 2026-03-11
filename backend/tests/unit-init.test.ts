@@ -17,8 +17,11 @@ describe('POST /api/unit-init', () => {
             topic: 'next.js framework',
             provider: 'openai',
             status: 'submitted',
+            nextAction: 'moderate_topic',
         })
         expect(typeof response.body.id).toBe('string')
+        expect(typeof response.body.createdAt).toBe('string')
+        expect(Number.isNaN(Date.parse(response.body.createdAt))).toBe(false)
     })
 
     it('creates a unit-init with an explicit supported provider', async () => {

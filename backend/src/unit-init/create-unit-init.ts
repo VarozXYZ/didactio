@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 
 export type UnitInitProvider = 'openai' | 'deepseek'
 export type UnitInitStatus = 'submitted'
+export type UnitInitNextAction = 'moderate_topic'
 
 export interface CreateUnitInitInput {
     topic: string
@@ -14,6 +15,8 @@ export interface CreatedUnitInit {
     topic: string
     provider: UnitInitProvider
     status: UnitInitStatus
+    nextAction: UnitInitNextAction
+    createdAt: string
 }
 
 function isSupportedProvider(value: unknown): value is UnitInitProvider {
@@ -46,11 +49,15 @@ export function createUnitInit(
     input: CreateUnitInitInput,
     ownerId: string
 ): CreatedUnitInit {
+    const createdAt = new Date().toISOString()
+
     return {
         id: randomUUID(),
         ownerId,
         topic: input.topic,
         provider: input.provider,
         status: 'submitted',
+        nextAction: 'moderate_topic',
+        createdAt,
     }
 }
