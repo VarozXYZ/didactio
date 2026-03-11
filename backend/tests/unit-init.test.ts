@@ -638,3 +638,83 @@ describe('PATCH /api/unit-init/:id/syllabus', () => {
         })
     })
 })
+
+describe('POST /api/unit-init/:id/approve-syllabus', () => {
+    it('approves a generated syllabus and marks the unit-init ready for content generation', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const createdResponse = await request(app)
+            .post('/api/unit-init')
+            .send({ topic: 'next.js framework' })
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/moderate`)
+            .send({})
+
+        const questionnaireResponse = await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/questionnaire/generate`)
+            .send({})
+
+        await request(app)
+            .patch(`/api/unit-init/${createdResponse.body.id}/questionnaire/answers`)
+            .send({
+                answers: questionnaireResponse.body.questionnaire.questions.map(
+                    (question: { id: string }) => ({
+                        questionId: question.id,
+                        value: `answer-for-${question.id}`,
+                    })
+                ),
+            })
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/syllabus-prompt/generate`)
+            .send({})
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/syllabus/generate`)
+            .send({})
+
+        const response = await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/approve-syllabus`)
+            .send({})
+
+        expect(response.status).toBe(200)
+        expect(response.body.status).toBe('syllabus_approved')
+        expect(response.body.nextAction).toBe('generate_unit_content')
+        expect(typeof response.body.syllabusApprovedAt).toBe('string')
+        expect(Number.isNaN(Date.parse(response.body.syllabusApprovedAt))).toBe(false)
+    })
+
+    it('returns 404 when the unit-init does not exist', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const response = await request(app)
+            .post('/api/unit-init/missing-id/approve-syllabus')
+            .send({})
+
+        expect(response.status).toBe(404)
+        expect(response.body).toEqual({
+            error: 'Unit init not found.',
+        })
+    })
+
+    it('returns 409 when the syllabus has not been generated yet', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const createdResponse = await request(app)
+            .post('/api/unit-init')
+            .send({ topic: 'next.js framework' })
+
+        const response = await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/approve-syllabus`)
+            .send({})
+
+        expect(response.status).toBe(409)
+        expect(response.body).toEqual({
+            error: 'Syllabus cannot be approved from the current unit-init state.',
+        })
+    })
+})

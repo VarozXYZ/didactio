@@ -11,6 +11,7 @@ export type UnitInitStatus =
     | 'questionnaire_answered'
     | 'syllabus_prompt_ready'
     | 'syllabus_ready'
+    | 'syllabus_approved'
 export type UnitInitNextAction =
     | 'moderate_topic'
     | 'generate_questionnaire'
@@ -19,6 +20,7 @@ export type UnitInitNextAction =
     | 'review_syllabus_prompt'
     | 'review_syllabus'
     | 'approve_syllabus'
+    | 'generate_unit_content'
 
 export interface CreateUnitInitInput {
     topic: string
@@ -43,6 +45,7 @@ export interface CreatedUnitInit {
     syllabus?: UnitInitSyllabus
     syllabusGeneratedAt?: string
     syllabusUpdatedAt?: string
+    syllabusApprovedAt?: string
 }
 
 function isSupportedProvider(value: unknown): value is UnitInitProvider {

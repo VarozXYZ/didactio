@@ -246,6 +246,35 @@
         }
       },
       "response": []
+    },
+    {
+      "name": "Approve Syllabus",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/unit-init/{{unitInitId}}/approve-syllabus",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "unit-init",
+            "{{unitInitId}}",
+            "approve-syllabus"
+          ]
+        }
+      },
+      "response": []
     }
   ],
   "variable": [
