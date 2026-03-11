@@ -10,6 +10,7 @@
     "test": "vitest.cmd run"
   },
   "dependencies": {
+    "dotenv": "^17.3.1",
     "express": "^5.1.0"
   },
   "devDependencies": {

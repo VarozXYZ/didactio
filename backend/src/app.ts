@@ -347,7 +347,7 @@ export function createApp(options: CreateAppOptions = {}) {
         }
     })
 
-    app.post('/api/unit-init/:id/syllabus/generate', (request, response) => {
+    app.post('/api/unit-init/:id/syllabus/generate', async (request, response) => {
         const requestWithMockOwner = asRequestWithMockOwner(request)
         const unitInit = unitInitStore.getById(
             requestWithMockOwner.mockOwner.id,
@@ -362,7 +362,7 @@ export function createApp(options: CreateAppOptions = {}) {
         }
 
         try {
-            const updatedUnitInit = generateSyllabus(unitInit, syllabusGenerator)
+            const updatedUnitInit = await generateSyllabus(unitInit, syllabusGenerator)
             unitInitStore.save(updatedUnitInit)
             response.json(updatedUnitInit)
         } catch (error) {

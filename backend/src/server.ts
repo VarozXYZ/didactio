@@ -1,6 +1,9 @@
+import { getAppEnv, loadEnv } from './config/env.js'
 import { createApp } from './app.js'
 
-const port = Number(process.env.PORT || 3000)
+loadEnv()
+
+const { port } = getAppEnv()
 const app = createApp()
 
 app.listen(port, () => {

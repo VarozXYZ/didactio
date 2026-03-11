@@ -19,10 +19,10 @@ export interface UnitInitSyllabus {
 
 const defaultSyllabusGenerator = new ProviderBackedFakeSyllabusGenerator()
 
-export function generateSyllabus(
+export async function generateSyllabus(
     unitInit: CreatedUnitInit,
     syllabusGenerator: SyllabusGenerator = defaultSyllabusGenerator
-): CreatedUnitInit {
+): Promise<CreatedUnitInit> {
     if (unitInit.status !== 'syllabus_prompt_ready' || !unitInit.syllabusPrompt) {
         throw new Error('Syllabus cannot be generated from the current unit-init state.')
     }
@@ -31,7 +31,7 @@ export function generateSyllabus(
         ...unitInit,
         status: 'syllabus_ready',
         nextAction: 'review_syllabus',
-        syllabus: syllabusGenerator.generate(unitInit),
+        syllabus: await syllabusGenerator.generate(unitInit),
         syllabusGeneratedAt: new Date().toISOString(),
     }
 }

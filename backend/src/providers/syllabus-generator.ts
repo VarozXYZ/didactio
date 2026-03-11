@@ -1,11 +1,13 @@
+import { getAppEnv } from '../config/env.js'
 import type { CreatedUnitInit, UnitInitProvider } from '../unit-init/create-unit-init.js'
+import { OpenAiSyllabusGenerator } from './openai-syllabus-generator.js'
 import type {
     UnitInitSyllabus,
     UnitInitSyllabusChapter,
 } from '../unit-init/generate-syllabus.js'
 
 export interface SyllabusGenerator {
-    generate(unitInit: CreatedUnitInit): UnitInitSyllabus
+    generate(unitInit: CreatedUnitInit): Promise<UnitInitSyllabus>
 }
 
 function findAnswerValue(unitInit: CreatedUnitInit, questionId: string): string {
@@ -102,7 +104,7 @@ function buildDeepSeekChapters(unitInit: CreatedUnitInit): UnitInitSyllabusChapt
 }
 
 class OpenAiFakeSyllabusGenerator implements SyllabusGenerator {
-    generate(unitInit: CreatedUnitInit): UnitInitSyllabus {
+    async generate(unitInit: CreatedUnitInit): Promise<UnitInitSyllabus> {
         const preferredLength = findAnswerValue(unitInit, 'preferred_length')
         const learningGoal = findAnswerValue(unitInit, 'learning_goal')
 
@@ -116,7 +118,7 @@ class OpenAiFakeSyllabusGenerator implements SyllabusGenerator {
 }
 
 class DeepSeekFakeSyllabusGenerator implements SyllabusGenerator {
-    generate(unitInit: CreatedUnitInit): UnitInitSyllabus {
+    async generate(unitInit: CreatedUnitInit): Promise<UnitInitSyllabus> {
         const preferredLength = findAnswerValue(unitInit, 'preferred_length')
         const learningGoal = findAnswerValue(unitInit, 'learning_goal')
 
@@ -130,12 +132,23 @@ class DeepSeekFakeSyllabusGenerator implements SyllabusGenerator {
 }
 
 export class ProviderBackedFakeSyllabusGenerator implements SyllabusGenerator {
-    private readonly generators: Record<UnitInitProvider, SyllabusGenerator> = {
-        openai: new OpenAiFakeSyllabusGenerator(),
-        deepseek: new DeepSeekFakeSyllabusGenerator(),
+    private readonly generators: Record<UnitInitProvider, SyllabusGenerator>
+
+    constructor() {
+        const env = getAppEnv()
+
+        this.generators = {
+            openai: env.openAiApiKey
+                ? new OpenAiSyllabusGenerator({
+                      apiKey: env.openAiApiKey,
+                      model: env.openAiSyllabusModel,
+                  })
+                : new OpenAiFakeSyllabusGenerator(),
+            deepseek: new DeepSeekFakeSyllabusGenerator(),
+        }
     }
 
-    generate(unitInit: CreatedUnitInit): UnitInitSyllabus {
+    async generate(unitInit: CreatedUnitInit): Promise<UnitInitSyllabus> {
         return this.generators[unitInit.provider].generate(unitInit)
     }
 }
