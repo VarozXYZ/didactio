@@ -1,6 +1,10 @@
 import express from 'express'
 import { attachMockOwner, type RequestWithMockOwner } from './middleware/mock-owner.js'
 import {
+    answerQuestionnaire,
+    parseQuestionnaireAnswersInput,
+} from './unit-init/answer-questionnaire.js'
+import {
     createUnitInit,
     moderateUnitInit,
     parseCreateUnitInitInput,
@@ -115,6 +119,47 @@ export function createApp(options: CreateAppOptions = {}) {
                     error instanceof Error
                         ? error.message
                         : 'Unit init questionnaire generation failed.',
+            })
+        }
+    })
+
+    app.patch('/api/unit-init/:id/questionnaire/answers', (request, response) => {
+        const requestWithMockOwner = asRequestWithMockOwner(request)
+        const unitInit = unitInitStore.getById(
+            requestWithMockOwner.mockOwner.id,
+            request.params.id
+        )
+
+        if (!unitInit) {
+            response.status(404).json({
+                error: 'Unit init not found.',
+            })
+            return
+        }
+
+        let parsedInput
+        try {
+            parsedInput = parseQuestionnaireAnswersInput(request.body)
+        } catch (error) {
+            response.status(400).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : 'Invalid questionnaire answers request.',
+            })
+            return
+        }
+
+        try {
+            const updatedUnitInit = answerQuestionnaire(unitInit, parsedInput)
+            unitInitStore.save(updatedUnitInit)
+            response.json(updatedUnitInit)
+        } catch (error) {
+            response.status(409).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : 'Unit init questionnaire answer submission failed.',
             })
         }
     })

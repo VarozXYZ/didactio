@@ -1,16 +1,18 @@
 import { randomUUID } from 'node:crypto'
+import type { UnitInitQuestionAnswer } from './answer-questionnaire.js'
+import type { UnitInitQuestionnaire } from './generate-questionnaire.js'
 
 export type UnitInitProvider = 'openai' | 'deepseek'
 export type UnitInitStatus =
     | 'submitted'
     | 'moderation_completed'
     | 'questionnaire_ready'
+    | 'questionnaire_answered'
 export type UnitInitNextAction =
     | 'moderate_topic'
     | 'generate_questionnaire'
     | 'answer_questionnaire'
-
-import type { UnitInitQuestionnaire } from './generate-questionnaire.js'
+    | 'generate_syllabus_prompt'
 
 export interface CreateUnitInitInput {
     topic: string
@@ -28,6 +30,8 @@ export interface CreatedUnitInit {
     moderatedAt?: string
     questionnaire?: UnitInitQuestionnaire
     questionnaireGeneratedAt?: string
+    questionnaireAnswers?: UnitInitQuestionAnswer[]
+    questionnaireAnsweredAt?: string
 }
 
 function isSupportedProvider(value: unknown): value is UnitInitProvider {

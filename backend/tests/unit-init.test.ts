@@ -212,3 +212,96 @@ describe('POST /api/unit-init/:id/questionnaire/generate', () => {
         })
     })
 })
+
+describe('PATCH /api/unit-init/:id/questionnaire/answers', () => {
+    it('stores questionnaire answers and advances the next action', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const createdResponse = await request(app)
+            .post('/api/unit-init')
+            .send({ topic: 'next.js framework' })
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/moderate`)
+            .send({})
+
+        const questionnaireResponse = await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/questionnaire/generate`)
+            .send({})
+
+        const response = await request(app)
+            .patch(`/api/unit-init/${createdResponse.body.id}/questionnaire/answers`)
+            .send({
+                answers: questionnaireResponse.body.questionnaire.questions.map(
+                    (question: { id: string }) => ({
+                        questionId: question.id,
+                        value: `answer-for-${question.id}`,
+                    })
+                ),
+            })
+
+        expect(response.status).toBe(200)
+        expect(response.body.status).toBe('questionnaire_answered')
+        expect(response.body.nextAction).toBe('generate_syllabus_prompt')
+        expect(response.body.questionnaireAnswers).toHaveLength(5)
+        expect(typeof response.body.questionnaireAnsweredAt).toBe('string')
+        expect(Number.isNaN(Date.parse(response.body.questionnaireAnsweredAt))).toBe(false)
+    })
+
+    it('returns 404 when the unit-init does not exist', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const response = await request(app)
+            .patch('/api/unit-init/missing-id/questionnaire/answers')
+            .send({
+                answers: [{ questionId: 'topic_knowledge_level', value: 'basic' }],
+            })
+
+        expect(response.status).toBe(404)
+        expect(response.body).toEqual({
+            error: 'Unit init not found.',
+        })
+    })
+
+    it('returns 400 for invalid answer payloads', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const createdResponse = await request(app)
+            .post('/api/unit-init')
+            .send({ topic: 'next.js framework' })
+
+        const response = await request(app)
+            .patch(`/api/unit-init/${createdResponse.body.id}/questionnaire/answers`)
+            .send({
+                answers: [],
+            })
+
+        expect(response.status).toBe(400)
+        expect(response.body).toEqual({
+            error: 'Answers must be a non-empty array.',
+        })
+    })
+
+    it('returns 409 when answers are submitted before the questionnaire is ready', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const createdResponse = await request(app)
+            .post('/api/unit-init')
+            .send({ topic: 'next.js framework' })
+
+        const response = await request(app)
+            .patch(`/api/unit-init/${createdResponse.body.id}/questionnaire/answers`)
+            .send({
+                answers: [{ questionId: 'topic_knowledge_level', value: 'basic' }],
+            })
+
+        expect(response.status).toBe(409)
+        expect(response.body).toEqual({
+            error: 'Questionnaire cannot be answered from the current unit-init state.',
+        })
+    })
+})

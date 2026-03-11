@@ -127,6 +127,36 @@
         }
       },
       "response": []
+    },
+    {
+      "name": "Answer Questionnaire",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"answers\": [\n    {\n      \"questionId\": \"topic_knowledge_level\",\n      \"value\": \"basic\"\n    },\n    {\n      \"questionId\": \"related_knowledge_level\",\n      \"value\": \"basic\"\n    },\n    {\n      \"questionId\": \"learning_goal\",\n      \"value\": \"I want to build production-ready applications with Next.js\"\n    },\n    {\n      \"questionId\": \"preferred_depth\",\n      \"value\": \"balanced\"\n    },\n    {\n      \"questionId\": \"preferred_length\",\n      \"value\": \"medium\"\n    }\n  ]\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/unit-init/{{unitInitId}}/questionnaire/answers",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "unit-init",
+            "{{unitInitId}}",
+            "questionnaire",
+            "answers"
+          ]
+        }
+      },
+      "response": []
     }
   ],
   "variable": [
