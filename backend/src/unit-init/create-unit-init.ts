@@ -1,8 +1,16 @@
 import { randomUUID } from 'node:crypto'
 
 export type UnitInitProvider = 'openai' | 'deepseek'
-export type UnitInitStatus = 'submitted' | 'moderation_completed'
-export type UnitInitNextAction = 'moderate_topic' | 'generate_questionnaire'
+export type UnitInitStatus =
+    | 'submitted'
+    | 'moderation_completed'
+    | 'questionnaire_ready'
+export type UnitInitNextAction =
+    | 'moderate_topic'
+    | 'generate_questionnaire'
+    | 'answer_questionnaire'
+
+import type { UnitInitQuestionnaire } from './generate-questionnaire.js'
 
 export interface CreateUnitInitInput {
     topic: string
@@ -18,6 +26,8 @@ export interface CreatedUnitInit {
     nextAction: UnitInitNextAction
     createdAt: string
     moderatedAt?: string
+    questionnaire?: UnitInitQuestionnaire
+    questionnaireGeneratedAt?: string
 }
 
 function isSupportedProvider(value: unknown): value is UnitInitProvider {

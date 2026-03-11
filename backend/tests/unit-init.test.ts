@@ -149,3 +149,66 @@ describe('POST /api/unit-init/:id/moderate', () => {
         })
     })
 })
+
+describe('POST /api/unit-init/:id/questionnaire/generate', () => {
+    it('generates the questionnaire after moderation', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const createdResponse = await request(app)
+            .post('/api/unit-init')
+            .send({ topic: 'next.js framework' })
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/moderate`)
+            .send({})
+
+        const response = await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/questionnaire/generate`)
+            .send({})
+
+        expect(response.status).toBe(200)
+        expect(response.body.status).toBe('questionnaire_ready')
+        expect(response.body.nextAction).toBe('answer_questionnaire')
+        expect(Array.isArray(response.body.questionnaire.questions)).toBe(true)
+        expect(response.body.questionnaire.questions).toHaveLength(5)
+        expect(response.body.questionnaire.questions[0]).toMatchObject({
+            id: 'topic_knowledge_level',
+            type: 'single_select',
+        })
+        expect(typeof response.body.questionnaireGeneratedAt).toBe('string')
+        expect(Number.isNaN(Date.parse(response.body.questionnaireGeneratedAt))).toBe(false)
+    })
+
+    it('returns 404 when the unit-init does not exist', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const response = await request(app)
+            .post('/api/unit-init/missing-id/questionnaire/generate')
+            .send({})
+
+        expect(response.status).toBe(404)
+        expect(response.body).toEqual({
+            error: 'Unit init not found.',
+        })
+    })
+
+    it('returns 409 when the questionnaire is requested before moderation', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const createdResponse = await request(app)
+            .post('/api/unit-init')
+            .send({ topic: 'next.js framework' })
+
+        const response = await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/questionnaire/generate`)
+            .send({})
+
+        expect(response.status).toBe(409)
+        expect(response.body).toEqual({
+            error: 'Questionnaire cannot be generated from the current unit-init state.',
+        })
+    })
+})

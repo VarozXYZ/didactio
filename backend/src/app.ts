@@ -5,6 +5,7 @@ import {
     moderateUnitInit,
     parseCreateUnitInitInput,
 } from './unit-init/create-unit-init.js'
+import { generateQuestionnaire } from './unit-init/generate-questionnaire.js'
 import { InMemoryUnitInitStore, type UnitInitStore } from './unit-init/unit-init-store.js'
 
 interface CreateAppOptions {
@@ -86,6 +87,34 @@ export function createApp(options: CreateAppOptions = {}) {
         } catch (error) {
             response.status(409).json({
                 error: error instanceof Error ? error.message : 'Unit init moderation failed.',
+            })
+        }
+    })
+
+    app.post('/api/unit-init/:id/questionnaire/generate', (request, response) => {
+        const requestWithMockOwner = asRequestWithMockOwner(request)
+        const unitInit = unitInitStore.getById(
+            requestWithMockOwner.mockOwner.id,
+            request.params.id
+        )
+
+        if (!unitInit) {
+            response.status(404).json({
+                error: 'Unit init not found.',
+            })
+            return
+        }
+
+        try {
+            const updatedUnitInit = generateQuestionnaire(unitInit)
+            unitInitStore.save(updatedUnitInit)
+            response.json(updatedUnitInit)
+        } catch (error) {
+            response.status(409).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : 'Unit init questionnaire generation failed.',
             })
         }
     })

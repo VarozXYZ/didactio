@@ -97,6 +97,36 @@
         }
       },
       "response": []
+    },
+    {
+      "name": "Generate Questionnaire",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/unit-init/{{unitInitId}}/questionnaire/generate",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "unit-init",
+            "{{unitInitId}}",
+            "questionnaire",
+            "generate"
+          ]
+        }
+      },
+      "response": []
     }
   ],
   "variable": [
