@@ -187,6 +187,36 @@
         }
       },
       "response": []
+    },
+    {
+      "name": "Generate Syllabus",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/unit-init/{{unitInitId}}/syllabus/generate",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "unit-init",
+            "{{unitInitId}}",
+            "syllabus",
+            "generate"
+          ]
+        }
+      },
+      "response": []
     }
   ],
   "variable": [
