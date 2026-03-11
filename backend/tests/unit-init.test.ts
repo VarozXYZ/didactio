@@ -90,6 +90,115 @@ describe('GET /api/unit-init/:id', () => {
     })
 })
 
+describe('GET /api/unit-init/:id/chapters/:chapterIndex', () => {
+    it('returns one generated chapter by index', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const createdResponse = await request(app)
+            .post('/api/unit-init')
+            .send({ topic: 'next.js framework' })
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/moderate`)
+            .send({})
+
+        const questionnaireResponse = await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/questionnaire/generate`)
+            .send({})
+
+        await request(app)
+            .patch(`/api/unit-init/${createdResponse.body.id}/questionnaire/answers`)
+            .send({
+                answers: questionnaireResponse.body.questionnaire.questions.map(
+                    (question: { id: string }) => ({
+                        questionId: question.id,
+                        value: `answer-for-${question.id}`,
+                    })
+                ),
+            })
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/syllabus-prompt/generate`)
+            .send({})
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/syllabus/generate`)
+            .send({})
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/approve-syllabus`)
+            .send({})
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/chapters/0/generate`)
+            .send({})
+
+        const response = await request(app).get(
+            `/api/unit-init/${createdResponse.body.id}/chapters/0`
+        )
+
+        expect(response.status).toBe(200)
+        expect(response.body).toMatchObject({
+            chapterIndex: 0,
+            title: 'Foundations of next.js framework',
+            overview:
+                'Introduce the core concepts and shared vocabulary required to understand next.js framework.',
+        })
+        expect(typeof response.body.content).toBe('string')
+        expect(Array.isArray(response.body.keyTakeaways)).toBe(true)
+        expect(typeof response.body.generatedAt).toBe('string')
+    })
+
+    it('returns 404 when the unit-init does not exist', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const response = await request(app).get('/api/unit-init/missing-id/chapters/0')
+
+        expect(response.status).toBe(404)
+        expect(response.body).toEqual({
+            error: 'Unit init not found.',
+        })
+    })
+
+    it('returns 400 for an invalid chapter index', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const createdResponse = await request(app)
+            .post('/api/unit-init')
+            .send({ topic: 'next.js framework' })
+
+        const response = await request(app).get(
+            `/api/unit-init/${createdResponse.body.id}/chapters/not-a-number`
+        )
+
+        expect(response.status).toBe(400)
+        expect(response.body).toEqual({
+            error: 'chapterIndex must be a non-negative integer.',
+        })
+    })
+
+    it('returns 404 when the chapter has not been generated yet', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const createdResponse = await request(app)
+            .post('/api/unit-init')
+            .send({ topic: 'next.js framework' })
+
+        const response = await request(app).get(
+            `/api/unit-init/${createdResponse.body.id}/chapters/0`
+        )
+
+        expect(response.status).toBe(404)
+        expect(response.body).toEqual({
+            error: 'Generated chapter not found.',
+        })
+    })
+})
+
 describe('POST /api/unit-init/:id/moderate', () => {
     it('transitions a submitted unit-init into moderation completed', async () => {
         const store = new InMemoryUnitInitStore()

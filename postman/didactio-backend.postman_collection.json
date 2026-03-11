@@ -70,6 +70,27 @@
       "response": []
     },
     {
+      "name": "Get Generated Chapter",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/unit-init/{{unitInitId}}/chapters/{{chapterIndex}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "unit-init",
+            "{{unitInitId}}",
+            "chapters",
+            "{{chapterIndex}}"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
       "name": "Moderate Unit Init",
       "request": {
         "method": "POST",

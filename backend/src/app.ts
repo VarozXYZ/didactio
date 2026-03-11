@@ -88,6 +88,44 @@ export function createApp(options: CreateAppOptions = {}) {
         response.json(unitInit)
     })
 
+    app.get('/api/unit-init/:id/chapters/:chapterIndex', (request, response) => {
+        const requestWithMockOwner = asRequestWithMockOwner(request)
+        const unitInit = unitInitStore.getById(
+            requestWithMockOwner.mockOwner.id,
+            request.params.id
+        )
+
+        if (!unitInit) {
+            response.status(404).json({
+                error: 'Unit init not found.',
+            })
+            return
+        }
+
+        let chapterIndex
+        try {
+            chapterIndex = parseChapterIndex(request.params.chapterIndex)
+        } catch (error) {
+            response.status(400).json({
+                error: error instanceof Error ? error.message : 'Invalid chapter lookup request.',
+            })
+            return
+        }
+
+        const generatedChapter = unitInit.generatedChapters?.find(
+            (chapter) => chapter.chapterIndex === chapterIndex
+        )
+
+        if (!generatedChapter) {
+            response.status(404).json({
+                error: 'Generated chapter not found.',
+            })
+            return
+        }
+
+        response.json(generatedChapter)
+    })
+
     app.post('/api/unit-init/:id/moderate', (request, response) => {
         const requestWithMockOwner = asRequestWithMockOwner(request)
         const unitInit = unitInitStore.getById(
