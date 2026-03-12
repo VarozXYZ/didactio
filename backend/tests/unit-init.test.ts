@@ -902,6 +902,9 @@ describe('GET /api/unit-init/:id/chapters', () => {
             title: 'Practical workflow for next.js framework',
             hasGeneratedContent: false,
         })
+        expect(response.headers.deprecation).toBe('true')
+        expect(response.headers.sunset).toBe('2026-06-30')
+        expect(response.headers.link).toContain('/api/didactic-unit/:id/chapters')
     })
 
     it('returns 404 when the unit-init does not exist', async () => {
@@ -996,6 +999,8 @@ describe('GET /api/unit-init/:id/chapters/runs', () => {
             'Foundations of next.js framework'
         )
         expect(typeof response.body.runs[0].createdAt).toBe('string')
+        expect(response.headers.deprecation).toBe('true')
+        expect(response.headers.link).toContain('/api/didactic-unit/:id/runs')
     })
 
     it('returns 404 when the unit-init does not exist', async () => {
@@ -1149,6 +1154,8 @@ describe('GET /api/unit-init/:id/chapters/:chapterIndex', () => {
         expect(typeof response.body.content).toBe('string')
         expect(Array.isArray(response.body.keyTakeaways)).toBe(true)
         expect(typeof response.body.generatedAt).toBe('string')
+        expect(response.headers.deprecation).toBe('true')
+        expect(response.headers.link).toContain('/api/didactic-unit/:id/chapters/:chapterIndex')
     })
 
     it('returns 404 when the unit-init does not exist', async () => {
@@ -1271,6 +1278,8 @@ describe('PATCH /api/unit-init/:id/chapters/:chapterIndex', () => {
         ])
         expect(typeof response.body.updatedAt).toBe('string')
         expect(Number.isNaN(Date.parse(response.body.updatedAt))).toBe(false)
+        expect(response.headers.deprecation).toBe('true')
+        expect(response.headers.link).toContain('/api/didactic-unit/:id/chapters/:chapterIndex')
     })
 
     it('returns 404 when the unit-init does not exist', async () => {
@@ -2228,6 +2237,10 @@ describe('POST /api/unit-init/:id/chapters/:chapterIndex/generate', () => {
         expect(
             Number.isNaN(Date.parse(response.body.generatedChapters[0].generatedAt))
         ).toBe(false)
+        expect(response.headers.deprecation).toBe('true')
+        expect(response.headers.link).toContain(
+            '/api/didactic-unit/:id/chapters/:chapterIndex/generate'
+        )
     })
 
     it('uses the selected fake provider strategy for deepseek chapter generation', async () => {

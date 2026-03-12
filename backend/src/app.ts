@@ -83,6 +83,22 @@ function parseChapterIndex(value: string): number {
     return chapterIndex
 }
 
+function applyLegacyChapterEndpointHeaders(
+    response: express.Response,
+    replacementPath: string
+): void {
+    response.setHeader('Deprecation', 'true')
+    response.setHeader('Sunset', '2026-06-30')
+    response.setHeader(
+        'Link',
+        `<${replacementPath}>; rel="successor-version"`
+    )
+    response.setHeader(
+        'Warning',
+        `299 didactio-backend "This unit-init chapter endpoint is deprecated. Use ${replacementPath} instead."`
+    )
+}
+
 function canCreateSyllabusGenerationRun(unitInit: {
     status: string
     syllabusPrompt?: string
@@ -486,6 +502,10 @@ export function createApp(options: CreateAppOptions) {
     })
 
     app.get('/api/unit-init/:id/chapters', async (request, response) => {
+        applyLegacyChapterEndpointHeaders(
+            response,
+            '/api/didactic-unit/:id/chapters'
+        )
         const requestWithMockOwner = asRequestWithMockOwner(request)
         const unitInit = await unitInitStore.getById(
             requestWithMockOwner.mockOwner.id,
@@ -558,6 +578,10 @@ export function createApp(options: CreateAppOptions) {
     })
 
     app.get('/api/unit-init/:id/chapters/runs', async (request, response) => {
+        applyLegacyChapterEndpointHeaders(
+            response,
+            '/api/didactic-unit/:id/runs'
+        )
         const requestWithMockOwner = asRequestWithMockOwner(request)
         const unitInit = await unitInitStore.getById(
             requestWithMockOwner.mockOwner.id,
@@ -582,6 +606,10 @@ export function createApp(options: CreateAppOptions) {
     })
 
     app.get('/api/unit-init/:id/chapters/:chapterIndex', async (request, response) => {
+        applyLegacyChapterEndpointHeaders(
+            response,
+            '/api/didactic-unit/:id/chapters/:chapterIndex'
+        )
         const requestWithMockOwner = asRequestWithMockOwner(request)
         const unitInit = await unitInitStore.getById(
             requestWithMockOwner.mockOwner.id,
@@ -620,6 +648,10 @@ export function createApp(options: CreateAppOptions) {
     })
 
     app.patch('/api/unit-init/:id/chapters/:chapterIndex', async (request, response) => {
+        applyLegacyChapterEndpointHeaders(
+            response,
+            '/api/didactic-unit/:id/chapters/:chapterIndex'
+        )
         const requestWithMockOwner = asRequestWithMockOwner(request)
         const unitInit = await unitInitStore.getById(
             requestWithMockOwner.mockOwner.id,
@@ -925,6 +957,10 @@ export function createApp(options: CreateAppOptions) {
     })
 
     app.post('/api/unit-init/:id/chapters/:chapterIndex/generate', async (request, response) => {
+        applyLegacyChapterEndpointHeaders(
+            response,
+            '/api/didactic-unit/:id/chapters/:chapterIndex/generate'
+        )
         const requestWithMockOwner = asRequestWithMockOwner(request)
         const unitInit = await unitInitStore.getById(
             requestWithMockOwner.mockOwner.id,

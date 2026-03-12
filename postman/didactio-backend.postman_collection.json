@@ -683,7 +683,7 @@
       ]
     },
     {
-      "name": "11 AI GEN Generate Chapter Content",
+      "name": "90 LEGACY AI GEN Generate Unit-Init Chapter Content",
       "request": {
         "method": "POST",
         "header": [
@@ -723,7 +723,7 @@
               "pm.collectionVariables.set('latestChapterGenerationResponseCode', String(pm.response.code));",
               "if (pm.response.code === 200) {",
               "  pm.collectionVariables.set('latestChapterRunExpectedStatus', 'completed');",
-              "  pm.test('Generated chapter is structurally valid', function () { pm.expect(body.generatedChapters).to.be.an('array').that.is.not.empty; const chapter = body.generatedChapters.find((item) => item.chapterIndex === Number(pm.collectionVariables.get('chapterIndex') || '0')); pm.expect(chapter).to.be.an('object'); pm.expect(chapter.content).to.be.a('string').and.not.empty; pm.expect(chapter.keyTakeaways).to.be.an('array').that.is.not.empty; });",
+                "  pm.test('Generated chapter is structurally valid', function () { pm.expect(body.generatedChapters).to.be.an('array').that.is.not.empty; const chapter = body.generatedChapters.find((item) => item.chapterIndex === Number(pm.collectionVariables.get('chapterIndex') || '0')); pm.expect(chapter).to.be.an('object'); pm.expect(chapter.content).to.be.a('string').and.not.empty; pm.expect(chapter.keyTakeaways).to.be.an('array').that.is.not.empty; pm.expect(pm.response.headers.get('Deprecation')).to.eql('true'); });",
               "} else {",
               "  pm.collectionVariables.set('latestChapterRunExpectedStatus', 'failed');",
               "  pm.test('Chapter generation returns a useful AI error', function () { pm.expect(body.error).to.be.a('string').and.not.empty; });",
@@ -735,7 +735,7 @@
       ]
     },
     {
-      "name": "12 Get Chapter Generation Runs",
+      "name": "91 LEGACY Get Unit-Init Chapter Generation Runs",
       "request": {
         "method": "GET",
         "header": [],
@@ -764,14 +764,14 @@
               "const body = pm.response.json();",
               "pm.test('At least one chapter run is stored', function () { pm.expect(body.runs).to.be.an('array').that.is.not.empty; });",
               "const latestRun = body.runs[0];",
-              "pm.test('Latest chapter run is completed and inspectable', function () { pm.expect(latestRun.status).to.eql('completed'); pm.expect(latestRun.chapterIndex).to.eql(Number(pm.collectionVariables.get('chapterIndex') || '0')); pm.expect(latestRun.prompt).to.be.a('string').and.not.empty; pm.expect(latestRun.chapter).to.be.an('object'); pm.expect(latestRun.chapter.content).to.be.a('string').and.not.empty; });"
+                "pm.test('Latest chapter run is completed and inspectable', function () { pm.expect(latestRun.status).to.eql('completed'); pm.expect(latestRun.chapterIndex).to.eql(Number(pm.collectionVariables.get('chapterIndex') || '0')); pm.expect(latestRun.prompt).to.be.a('string').and.not.empty; pm.expect(latestRun.chapter).to.be.an('object'); pm.expect(latestRun.chapter.content).to.be.a('string').and.not.empty; pm.expect(pm.response.headers.get('Deprecation')).to.eql('true'); });"
             ]
           }
         }
       ]
     },
     {
-      "name": "12a Get All Generation Runs",
+      "name": "92 LEGACY Get All Unit-Init Generation Runs",
       "request": {
         "method": "GET",
         "header": [],
@@ -797,7 +797,7 @@
             "exec": [
               "pm.test('Get All Generation Runs returns 200', function () { pm.response.to.have.status(200); });",
               "const body = pm.response.json();",
-              "pm.test('All generation runs include syllabus and chapter stages', function () { pm.expect(body.runs).to.be.an('array').that.is.not.empty; const stages = body.runs.map((run) => run.stage); pm.expect(stages).to.include('syllabus'); pm.expect(stages).to.include('chapter'); });",
+                "pm.test('All generation runs include syllabus and chapter stages', function () { pm.expect(body.runs).to.be.an('array').that.is.not.empty; const stages = body.runs.map((run) => run.stage); pm.expect(stages).to.include('syllabus'); pm.expect(stages).to.include('chapter'); pm.expect(pm.response.headers.get('Deprecation')).to.eql('true'); });",
               "pm.test('Latest unified run is inspectable', function () { const latestRun = body.runs[0]; pm.expect(latestRun.provider).to.be.a('string').and.not.empty; pm.expect(latestRun.model).to.be.a('string').and.not.empty; pm.expect(latestRun.prompt).to.be.a('string').and.not.empty; pm.expect(latestRun.stage).to.be.oneOf(['syllabus', 'chapter']); });"
             ]
           }
@@ -805,7 +805,7 @@
       ]
     },
     {
-      "name": "13 Get Generated Chapter",
+      "name": "93 LEGACY Get Unit-Init Generated Chapter",
       "request": {
         "method": "GET",
         "header": [],
@@ -832,14 +832,14 @@
             "exec": [
               "pm.test('Get Generated Chapter returns 200', function () { pm.response.to.have.status(200); });",
               "const body = pm.response.json();",
-              "pm.test('Generated chapter payload is complete', function () { pm.expect(body.chapterIndex).to.eql(Number(pm.collectionVariables.get('chapterIndex') || '0')); pm.expect(body.title).to.be.a('string').and.not.empty; pm.expect(body.content).to.be.a('string').and.not.empty; pm.expect(body.keyTakeaways).to.be.an('array').that.is.not.empty; });"
+                "pm.test('Generated chapter payload is complete', function () { pm.expect(body.chapterIndex).to.eql(Number(pm.collectionVariables.get('chapterIndex') || '0')); pm.expect(body.title).to.be.a('string').and.not.empty; pm.expect(body.content).to.be.a('string').and.not.empty; pm.expect(body.keyTakeaways).to.be.an('array').that.is.not.empty; pm.expect(pm.response.headers.get('Deprecation')).to.eql('true'); });"
             ]
           }
         }
       ]
     },
     {
-      "name": "14 Get Chapter List",
+      "name": "94 LEGACY Get Unit-Init Chapter List",
       "request": {
         "method": "GET",
         "header": [],
@@ -865,14 +865,14 @@
             "exec": [
               "pm.test('Get Chapter List returns 200', function () { pm.response.to.have.status(200); });",
               "const body = pm.response.json();",
-              "pm.test('Chapter list exposes generation flags', function () { pm.expect(body.chapters).to.be.an('array').that.is.not.empty; const chapter = body.chapters.find((item) => item.chapterIndex === Number(pm.collectionVariables.get('chapterIndex') || '0')); pm.expect(chapter).to.be.an('object'); pm.expect(chapter.hasGeneratedContent).to.be.true; });"
+                "pm.test('Chapter list exposes generation flags', function () { pm.expect(body.chapters).to.be.an('array').that.is.not.empty; const chapter = body.chapters.find((item) => item.chapterIndex === Number(pm.collectionVariables.get('chapterIndex') || '0')); pm.expect(chapter).to.be.an('object'); pm.expect(chapter.hasGeneratedContent).to.be.true; pm.expect(pm.response.headers.get('Deprecation')).to.eql('true'); });"
             ]
           }
         }
       ]
     },
     {
-      "name": "15 Update Generated Chapter",
+      "name": "95 LEGACY Update Unit-Init Generated Chapter",
       "request": {
         "method": "PATCH",
         "header": [
@@ -908,7 +908,7 @@
             "exec": [
               "pm.test('Update Generated Chapter returns 200', function () { pm.response.to.have.status(200); });",
               "const body = pm.response.json();",
-              "pm.test('Updated chapter is stored', function () { pm.expect(body.title).to.eql('Edited Foundations'); pm.expect(body.updatedAt).to.be.a('string').and.not.empty; });"
+                "pm.test('Updated chapter is stored', function () { pm.expect(body.title).to.eql('Edited Foundations'); pm.expect(body.updatedAt).to.be.a('string').and.not.empty; pm.expect(pm.response.headers.get('Deprecation')).to.eql('true'); });"
             ]
           }
         }
