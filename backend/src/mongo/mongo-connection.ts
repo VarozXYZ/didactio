@@ -1,4 +1,4 @@
-import { MongoClient } from 'mongodb'
+import { Db, MongoClient } from 'mongodb'
 import type { AppEnv } from '../config/env.js'
 
 export interface MongoHealthStatus {
@@ -9,6 +9,7 @@ export interface MongoHealthStatus {
 
 export interface MongoConnection {
     client: MongoClient
+    database: Db
     databaseName: string
     health: MongoHealthStatus
 }
@@ -22,10 +23,12 @@ export async function connectMongoIfConfigured(
 
     const client = new MongoClient(env.mongoDbUri)
     await client.connect()
-    await client.db(env.mongoDbName).command({ ping: 1 })
+    const database = client.db(env.mongoDbName)
+    await database.command({ ping: 1 })
 
     return {
         client,
+        database,
         databaseName: env.mongoDbName,
         health: {
             configured: true,

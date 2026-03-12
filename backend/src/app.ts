@@ -82,13 +82,13 @@ export function createApp(options: CreateAppOptions = {}) {
         })
     })
 
-    app.post('/api/unit-init', (request, response) => {
+    app.post('/api/unit-init', async (request, response) => {
         const requestWithMockOwner = asRequestWithMockOwner(request)
 
         try {
             const input = parseCreateUnitInitInput(request.body)
             const unitInit = createUnitInit(input, requestWithMockOwner.mockOwner.id)
-            unitInitStore.save(unitInit)
+            await unitInitStore.save(unitInit)
 
             response.status(201).json(unitInit)
         } catch (error) {
@@ -98,17 +98,17 @@ export function createApp(options: CreateAppOptions = {}) {
         }
     })
 
-    app.get('/api/unit-init', (request, response) => {
+    app.get('/api/unit-init', async (request, response) => {
         const requestWithMockOwner = asRequestWithMockOwner(request)
 
         response.json({
-            unitInits: unitInitStore.listByOwner(requestWithMockOwner.mockOwner.id),
+            unitInits: await unitInitStore.listByOwner(requestWithMockOwner.mockOwner.id),
         })
     })
 
-    app.get('/api/unit-init/:id', (request, response) => {
+    app.get('/api/unit-init/:id', async (request, response) => {
         const requestWithMockOwner = asRequestWithMockOwner(request)
-        const unitInit = unitInitStore.getById(
+        const unitInit = await unitInitStore.getById(
             requestWithMockOwner.mockOwner.id,
             request.params.id
         )
@@ -123,9 +123,9 @@ export function createApp(options: CreateAppOptions = {}) {
         response.json(unitInit)
     })
 
-    app.get('/api/unit-init/:id/chapters', (request, response) => {
+    app.get('/api/unit-init/:id/chapters', async (request, response) => {
         const requestWithMockOwner = asRequestWithMockOwner(request)
-        const unitInit = unitInitStore.getById(
+        const unitInit = await unitInitStore.getById(
             requestWithMockOwner.mockOwner.id,
             request.params.id
         )
@@ -149,9 +149,9 @@ export function createApp(options: CreateAppOptions = {}) {
         }
     })
 
-    app.get('/api/unit-init/:id/chapters/:chapterIndex', (request, response) => {
+    app.get('/api/unit-init/:id/chapters/:chapterIndex', async (request, response) => {
         const requestWithMockOwner = asRequestWithMockOwner(request)
-        const unitInit = unitInitStore.getById(
+        const unitInit = await unitInitStore.getById(
             requestWithMockOwner.mockOwner.id,
             request.params.id
         )
@@ -187,9 +187,9 @@ export function createApp(options: CreateAppOptions = {}) {
         response.json(generatedChapter)
     })
 
-    app.patch('/api/unit-init/:id/chapters/:chapterIndex', (request, response) => {
+    app.patch('/api/unit-init/:id/chapters/:chapterIndex', async (request, response) => {
         const requestWithMockOwner = asRequestWithMockOwner(request)
-        const unitInit = unitInitStore.getById(
+        const unitInit = await unitInitStore.getById(
             requestWithMockOwner.mockOwner.id,
             request.params.id
         )
@@ -225,7 +225,7 @@ export function createApp(options: CreateAppOptions = {}) {
 
         try {
             const updatedUnitInit = updateChapterContent(unitInit, chapterIndex, parsedInput)
-            unitInitStore.save(updatedUnitInit)
+            await unitInitStore.save(updatedUnitInit)
             const updatedChapter = updatedUnitInit.generatedChapters?.find(
                 (chapter) => chapter.chapterIndex === chapterIndex
             )
@@ -241,9 +241,9 @@ export function createApp(options: CreateAppOptions = {}) {
         }
     })
 
-    app.post('/api/unit-init/:id/moderate', (request, response) => {
+    app.post('/api/unit-init/:id/moderate', async (request, response) => {
         const requestWithMockOwner = asRequestWithMockOwner(request)
-        const unitInit = unitInitStore.getById(
+        const unitInit = await unitInitStore.getById(
             requestWithMockOwner.mockOwner.id,
             request.params.id
         )
@@ -257,7 +257,7 @@ export function createApp(options: CreateAppOptions = {}) {
 
         try {
             const moderatedUnitInit = moderateUnitInit(unitInit)
-            unitInitStore.save(moderatedUnitInit)
+            await unitInitStore.save(moderatedUnitInit)
             response.json(moderatedUnitInit)
         } catch (error) {
             response.status(409).json({
@@ -266,9 +266,9 @@ export function createApp(options: CreateAppOptions = {}) {
         }
     })
 
-    app.post('/api/unit-init/:id/questionnaire/generate', (request, response) => {
+    app.post('/api/unit-init/:id/questionnaire/generate', async (request, response) => {
         const requestWithMockOwner = asRequestWithMockOwner(request)
-        const unitInit = unitInitStore.getById(
+        const unitInit = await unitInitStore.getById(
             requestWithMockOwner.mockOwner.id,
             request.params.id
         )
@@ -282,7 +282,7 @@ export function createApp(options: CreateAppOptions = {}) {
 
         try {
             const updatedUnitInit = generateQuestionnaire(unitInit)
-            unitInitStore.save(updatedUnitInit)
+            await unitInitStore.save(updatedUnitInit)
             response.json(updatedUnitInit)
         } catch (error) {
             response.status(409).json({
@@ -294,9 +294,9 @@ export function createApp(options: CreateAppOptions = {}) {
         }
     })
 
-    app.patch('/api/unit-init/:id/questionnaire/answers', (request, response) => {
+    app.patch('/api/unit-init/:id/questionnaire/answers', async (request, response) => {
         const requestWithMockOwner = asRequestWithMockOwner(request)
-        const unitInit = unitInitStore.getById(
+        const unitInit = await unitInitStore.getById(
             requestWithMockOwner.mockOwner.id,
             request.params.id
         )
@@ -323,7 +323,7 @@ export function createApp(options: CreateAppOptions = {}) {
 
         try {
             const updatedUnitInit = answerQuestionnaire(unitInit, parsedInput)
-            unitInitStore.save(updatedUnitInit)
+            await unitInitStore.save(updatedUnitInit)
             response.json(updatedUnitInit)
         } catch (error) {
             response.status(409).json({
@@ -335,9 +335,9 @@ export function createApp(options: CreateAppOptions = {}) {
         }
     })
 
-    app.post('/api/unit-init/:id/syllabus-prompt/generate', (request, response) => {
+    app.post('/api/unit-init/:id/syllabus-prompt/generate', async (request, response) => {
         const requestWithMockOwner = asRequestWithMockOwner(request)
-        const unitInit = unitInitStore.getById(
+        const unitInit = await unitInitStore.getById(
             requestWithMockOwner.mockOwner.id,
             request.params.id
         )
@@ -351,7 +351,7 @@ export function createApp(options: CreateAppOptions = {}) {
 
         try {
             const updatedUnitInit = generateSyllabusPrompt(unitInit)
-            unitInitStore.save(updatedUnitInit)
+            await unitInitStore.save(updatedUnitInit)
             response.json(updatedUnitInit)
         } catch (error) {
             response.status(409).json({
@@ -365,7 +365,7 @@ export function createApp(options: CreateAppOptions = {}) {
 
     app.post('/api/unit-init/:id/syllabus/generate', async (request, response) => {
         const requestWithMockOwner = asRequestWithMockOwner(request)
-        const unitInit = unitInitStore.getById(
+        const unitInit = await unitInitStore.getById(
             requestWithMockOwner.mockOwner.id,
             request.params.id
         )
@@ -379,7 +379,7 @@ export function createApp(options: CreateAppOptions = {}) {
 
         try {
             const updatedUnitInit = await generateSyllabus(unitInit, syllabusGenerator)
-            unitInitStore.save(updatedUnitInit)
+            await unitInitStore.save(updatedUnitInit)
             response.json(updatedUnitInit)
         } catch (error) {
             response.status(409).json({
@@ -391,9 +391,9 @@ export function createApp(options: CreateAppOptions = {}) {
         }
     })
 
-    app.patch('/api/unit-init/:id/syllabus', (request, response) => {
+    app.patch('/api/unit-init/:id/syllabus', async (request, response) => {
         const requestWithMockOwner = asRequestWithMockOwner(request)
-        const unitInit = unitInitStore.getById(
+        const unitInit = await unitInitStore.getById(
             requestWithMockOwner.mockOwner.id,
             request.params.id
         )
@@ -417,7 +417,7 @@ export function createApp(options: CreateAppOptions = {}) {
 
         try {
             const updatedUnitInit = updateSyllabus(unitInit, parsedInput)
-            unitInitStore.save(updatedUnitInit)
+            await unitInitStore.save(updatedUnitInit)
             response.json(updatedUnitInit)
         } catch (error) {
             response.status(409).json({
@@ -429,9 +429,9 @@ export function createApp(options: CreateAppOptions = {}) {
         }
     })
 
-    app.post('/api/unit-init/:id/approve-syllabus', (request, response) => {
+    app.post('/api/unit-init/:id/approve-syllabus', async (request, response) => {
         const requestWithMockOwner = asRequestWithMockOwner(request)
-        const unitInit = unitInitStore.getById(
+        const unitInit = await unitInitStore.getById(
             requestWithMockOwner.mockOwner.id,
             request.params.id
         )
@@ -445,7 +445,7 @@ export function createApp(options: CreateAppOptions = {}) {
 
         try {
             const updatedUnitInit = approveSyllabus(unitInit)
-            unitInitStore.save(updatedUnitInit)
+            await unitInitStore.save(updatedUnitInit)
             response.json(updatedUnitInit)
         } catch (error) {
             response.status(409).json({
@@ -459,7 +459,7 @@ export function createApp(options: CreateAppOptions = {}) {
 
     app.post('/api/unit-init/:id/chapters/:chapterIndex/generate', async (request, response) => {
         const requestWithMockOwner = asRequestWithMockOwner(request)
-        const unitInit = unitInitStore.getById(
+        const unitInit = await unitInitStore.getById(
             requestWithMockOwner.mockOwner.id,
             request.params.id
         )
@@ -490,7 +490,7 @@ export function createApp(options: CreateAppOptions = {}) {
                 chapterIndex,
                 chapterGenerator
             )
-            unitInitStore.save(updatedUnitInit)
+            await unitInitStore.save(updatedUnitInit)
             response.json(updatedUnitInit)
         } catch (error) {
             const message =

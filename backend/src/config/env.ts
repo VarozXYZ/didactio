@@ -9,8 +9,6 @@ export interface AppEnv {
     openAiChapterModel: string
     mongoDbUri: string | null
     mongoDbName: string
-    unitInitStoreKind: 'memory' | 'file'
-    unitInitStoreFilePath: string
 }
 
 function parsePort(value: string | undefined): number {
@@ -32,18 +30,6 @@ function parseOptionalString(value: string | undefined): string | null {
     return parsedValue ? parsedValue : null
 }
 
-function parseUnitInitStoreKind(value: string | undefined): 'memory' | 'file' {
-    if (!value) {
-        return 'file'
-    }
-
-    if (value === 'memory' || value === 'file') {
-        return value
-    }
-
-    throw new Error('UNIT_INIT_STORE_KIND must be either "memory" or "file".')
-}
-
 export function loadEnv(): void {
     if (envLoaded) {
         return
@@ -61,8 +47,5 @@ export function getAppEnv(): AppEnv {
         openAiChapterModel: parseOptionalString(process.env.OPENAI_CHAPTER_MODEL) ?? 'gpt-4o-mini',
         mongoDbUri: parseOptionalString(process.env.MONGODB_URI),
         mongoDbName: parseOptionalString(process.env.MONGODB_DB_NAME) ?? 'didactio',
-        unitInitStoreKind: parseUnitInitStoreKind(process.env.UNIT_INIT_STORE_KIND),
-        unitInitStoreFilePath:
-            parseOptionalString(process.env.UNIT_INIT_STORE_FILE_PATH) ?? '.data/unit-inits.json',
     }
 }
