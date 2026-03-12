@@ -454,7 +454,7 @@
             "exec": [
               "pm.test('List Didactic Units returns 200', function () { pm.response.to.have.status(200); });",
               "const body = pm.response.json();",
-              "pm.test('Approved syllabus creates a didactic unit record', function () { pm.expect(body.didacticUnits).to.be.an('array').that.is.not.empty; const linkedUnit = body.didacticUnits.find((unit) => unit.id === pm.collectionVariables.get('didacticUnitId')); pm.expect(linkedUnit).to.be.an('object'); pm.expect(linkedUnit.unitInitId).to.eql(pm.collectionVariables.get('unitInitId')); pm.expect(linkedUnit.status).to.eql('ready_for_content_generation'); pm.expect(linkedUnit.title).to.be.a('string').and.not.empty; pm.expect(linkedUnit.chapters).to.be.an('array').that.is.not.empty; });"
+              "pm.test('Didactic unit list returns dashboard summaries', function () { pm.expect(body.didacticUnits).to.be.an('array').that.is.not.empty; const linkedUnit = body.didacticUnits.find((unit) => unit.id === pm.collectionVariables.get('didacticUnitId')); pm.expect(linkedUnit).to.be.an('object'); pm.expect(linkedUnit.unitInitId).to.eql(pm.collectionVariables.get('unitInitId')); pm.expect(linkedUnit.status).to.eql('ready_for_content_generation'); pm.expect(linkedUnit.overview).to.be.a('string').and.not.empty; pm.expect(linkedUnit.chapterCount).to.be.a('number').and.to.be.above(0); pm.expect(linkedUnit.generatedChapterCount).to.be.a('number'); pm.expect(linkedUnit.progressPercent).to.be.a('number'); });"
             ]
           }
         }
@@ -740,7 +740,7 @@
             "exec": [
               "pm.test('List Unit Inits returns 200', function () { pm.response.to.have.status(200); });",
               "const body = pm.response.json();",
-              "pm.test('List Unit Inits returns an array', function () { pm.expect(body.unitInits).to.be.an('array'); });"
+              "pm.test('List Unit Inits returns only in-progress planning items', function () { pm.expect(body.unitInits).to.be.an('array'); body.unitInits.forEach((unitInit) => { pm.expect(unitInit.didacticUnitId).to.be.oneOf([undefined, null, '']); }); });"
             ]
           }
         }

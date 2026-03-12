@@ -5,6 +5,7 @@ import {
 import { parseUpdateDidacticUnitChapterInput } from './didactic-unit/didactic-unit-chapter.js'
 import { generateDidacticUnitChapter } from './didactic-unit/generate-didactic-unit-chapter.js'
 import { listDidacticUnitChapters } from './didactic-unit/list-didactic-unit-chapters.js'
+import { summarizeDidacticUnit } from './didactic-unit/summarize-didactic-unit.js'
 import { updateDidacticUnitChapter } from './didactic-unit/update-didactic-unit-chapter.js'
 import type { DidacticUnitStore } from './didactic-unit/didactic-unit-store.js'
 import {
@@ -106,6 +107,10 @@ function compareRunsByCreatedAtDesc(
     return right.createdAt.localeCompare(left.createdAt)
 }
 
+function isPlanningUnitInit(unitInit: { didacticUnitId?: string }): boolean {
+    return !unitInit.didacticUnitId
+}
+
 export function createApp(options: CreateAppOptions) {
     const app = express()
     const unitInitStore = options.unitInitStore
@@ -151,7 +156,9 @@ export function createApp(options: CreateAppOptions) {
         const requestWithMockOwner = asRequestWithMockOwner(request)
 
         response.json({
-            unitInits: await unitInitStore.listByOwner(requestWithMockOwner.mockOwner.id),
+            unitInits: (
+                await unitInitStore.listByOwner(requestWithMockOwner.mockOwner.id)
+            ).filter(isPlanningUnitInit),
         })
     })
 
@@ -159,9 +166,9 @@ export function createApp(options: CreateAppOptions) {
         const requestWithMockOwner = asRequestWithMockOwner(request)
 
         response.json({
-            didacticUnits: await didacticUnitStore.listByOwner(
-                requestWithMockOwner.mockOwner.id
-            ),
+            didacticUnits: (
+                await didacticUnitStore.listByOwner(requestWithMockOwner.mockOwner.id)
+            ).map(summarizeDidacticUnit),
         })
     })
 

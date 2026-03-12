@@ -66,7 +66,7 @@ describe('POST /api/unit-init', () => {
 })
 
 describe('GET /api/unit-init', () => {
-    it('returns all unit-inits for the current mock owner', async () => {
+    it('returns in-progress unit-inits for the current mock owner', async () => {
         const store = new InMemoryUnitInitStore()
         const app = createApp({ unitInitStore: store })
 
@@ -91,6 +91,53 @@ describe('GET /api/unit-init', () => {
             id: firstCreatedResponse.body.id,
             topic: 'next.js framework',
             provider: 'openai',
+        })
+    })
+
+    it('excludes approved unit-inits that already handed off to didactic units', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const createdResponse = await request(app)
+            .post('/api/unit-init')
+            .send({ topic: 'next.js framework' })
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/moderate`)
+            .send({})
+
+        const questionnaireResponse = await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/questionnaire/generate`)
+            .send({})
+
+        await request(app)
+            .patch(`/api/unit-init/${createdResponse.body.id}/questionnaire/answers`)
+            .send({
+                answers: questionnaireResponse.body.questionnaire.questions.map(
+                    (question: { id: string }) => ({
+                        questionId: question.id,
+                        value: `answer-for-${question.id}`,
+                    })
+                ),
+            })
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/syllabus-prompt/generate`)
+            .send({})
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/syllabus/generate`)
+            .send({})
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/approve-syllabus`)
+            .send({})
+
+        const response = await request(app).get('/api/unit-init')
+
+        expect(response.status).toBe(200)
+        expect(response.body).toEqual({
+            unitInits: [],
         })
     })
 
@@ -165,13 +212,16 @@ describe('GET /api/didactic-unit', () => {
         expect(response.body.didacticUnits).toHaveLength(1)
         expect(response.body.didacticUnits[0]).toMatchObject({
             unitInitId: createdResponse.body.id,
-            ownerId: 'mock-user',
             title: 'next.js framework Learning Path',
             topic: 'next.js framework',
             provider: 'openai',
             status: 'ready_for_content_generation',
+            chapterCount: 3,
+            generatedChapterCount: 0,
+            progressPercent: 0,
         })
-        expect(response.body.didacticUnits[0].chapters).toHaveLength(3)
+        expect(typeof response.body.didacticUnits[0].overview).toBe('string')
+        expect(response.body.didacticUnits[0].overview).not.toHaveLength(0)
         expect(typeof response.body.didacticUnits[0].id).toBe('string')
         expect(typeof response.body.didacticUnits[0].createdAt).toBe('string')
     })
