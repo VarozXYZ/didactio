@@ -1,5 +1,5 @@
 import type { CreatedUnitInit } from '../unit-init/create-unit-init.js'
-import type { UnitInitGeneratedChapter } from '../unit-init/generate-chapter-content.js'
+import type { DidacticUnitGeneratedChapter } from '../didactic-unit/didactic-unit-chapter.js'
 import { buildChapterGenerationPrompt } from './chapter-generator.js'
 
 type FetchImplementation = typeof fetch
@@ -69,7 +69,10 @@ function parseStringArray(value: unknown, fieldName: string): string[] {
     )
 }
 
-function parseChapterResponse(content: string, chapterIndex: number): UnitInitGeneratedChapter {
+function parseChapterResponse(
+    content: string,
+    chapterIndex: number
+): DidacticUnitGeneratedChapter {
     let parsedValue: unknown
 
     try {
@@ -113,7 +116,7 @@ export class OpenAiChapterGenerator {
     async generate(
         unitInit: CreatedUnitInit,
         chapterIndex: number
-    ): Promise<UnitInitGeneratedChapter> {
+    ): Promise<DidacticUnitGeneratedChapter> {
         getSyllabusChapter(unitInit, chapterIndex)
 
         const response = await this.fetchImplementation(

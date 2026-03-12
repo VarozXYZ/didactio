@@ -2,6 +2,7 @@ import express from 'express'
 import {
     createDidacticUnitFromApprovedUnitInit,
 } from './didactic-unit/create-didactic-unit.js'
+import { parseUpdateDidacticUnitChapterInput } from './didactic-unit/didactic-unit-chapter.js'
 import { generateDidacticUnitChapter } from './didactic-unit/generate-didactic-unit-chapter.js'
 import { listDidacticUnitChapters } from './didactic-unit/list-didactic-unit-chapters.js'
 import { updateDidacticUnitChapter } from './didactic-unit/update-didactic-unit-chapter.js'
@@ -45,15 +46,9 @@ import {
     moderateUnitInit,
     parseCreateUnitInitInput,
 } from './unit-init/create-unit-init.js'
-import { generateChapterContent } from './unit-init/generate-chapter-content.js'
 import { generateQuestionnaire } from './unit-init/generate-questionnaire.js'
 import { generateSyllabus } from './unit-init/generate-syllabus.js'
 import { generateSyllabusPrompt } from './unit-init/generate-syllabus-prompt.js'
-import { listChapters } from './unit-init/list-chapters.js'
-import {
-    parseUpdateChapterContentInput,
-    updateChapterContent,
-} from './unit-init/update-chapter-content.js'
 import {
     parseUpdateSyllabusInput,
     updateSyllabus,
@@ -83,31 +78,11 @@ function parseChapterIndex(value: string): number {
     return chapterIndex
 }
 
-function applyLegacyChapterEndpointHeaders(
-    response: express.Response,
-    replacementPath: string
-): void {
-    response.setHeader('Deprecation', 'true')
-    response.setHeader('Sunset', '2026-06-30')
-    response.setHeader(
-        'Link',
-        `<${replacementPath}>; rel="successor-version"`
-    )
-    response.setHeader(
-        'Warning',
-        `299 didactio-backend "This unit-init chapter endpoint is deprecated. Use ${replacementPath} instead."`
-    )
-}
-
 function canCreateSyllabusGenerationRun(unitInit: {
     status: string
     syllabusPrompt?: string
 }): boolean {
     return unitInit.status === 'syllabus_prompt_ready' && Boolean(unitInit.syllabusPrompt?.trim())
-}
-
-function canCreateChapterGenerationRun(unitInit: { status: string; syllabus?: unknown }): boolean {
-    return unitInit.status === 'syllabus_approved' && Boolean(unitInit.syllabus)
 }
 
 function canBuildChapterGenerationPrompt(
@@ -121,12 +96,6 @@ function isSyllabusGenerationRun(
     run: SyllabusGenerationRunRecord | ChapterGenerationRunRecord
 ): run is SyllabusGenerationRunRecord {
     return run.stage === 'syllabus'
-}
-
-function isChapterGenerationRun(
-    run: SyllabusGenerationRunRecord | ChapterGenerationRunRecord
-): run is ChapterGenerationRunRecord {
-    return run.stage === 'chapter'
 }
 
 export function createApp(options: CreateAppOptions) {
@@ -316,7 +285,7 @@ export function createApp(options: CreateAppOptions) {
 
         let parsedInput
         try {
-            parsedInput = parseUpdateChapterContentInput(request.body)
+            parsedInput = parseUpdateDidacticUnitChapterInput(request.body)
         } catch (error) {
             response.status(400).json({
                 error:
@@ -501,36 +470,6 @@ export function createApp(options: CreateAppOptions) {
         response.json(unitInit)
     })
 
-    app.get('/api/unit-init/:id/chapters', async (request, response) => {
-        applyLegacyChapterEndpointHeaders(
-            response,
-            '/api/didactic-unit/:id/chapters'
-        )
-        const requestWithMockOwner = asRequestWithMockOwner(request)
-        const unitInit = await unitInitStore.getById(
-            requestWithMockOwner.mockOwner.id,
-            request.params.id
-        )
-
-        if (!unitInit) {
-            response.status(404).json({
-                error: 'Unit init not found.',
-            })
-            return
-        }
-
-        try {
-            response.json({
-                chapters: listChapters(unitInit),
-            })
-        } catch (error) {
-            response.status(409).json({
-                error:
-                    error instanceof Error ? error.message : 'Unit init chapter list failed.',
-            })
-        }
-    })
-
     app.get('/api/unit-init/:id/syllabus/runs', async (request, response) => {
         const requestWithMockOwner = asRequestWithMockOwner(request)
         const unitInit = await unitInitStore.getById(
@@ -575,134 +514,6 @@ export function createApp(options: CreateAppOptions) {
                 request.params.id
             ),
         })
-    })
-
-    app.get('/api/unit-init/:id/chapters/runs', async (request, response) => {
-        applyLegacyChapterEndpointHeaders(
-            response,
-            '/api/didactic-unit/:id/runs'
-        )
-        const requestWithMockOwner = asRequestWithMockOwner(request)
-        const unitInit = await unitInitStore.getById(
-            requestWithMockOwner.mockOwner.id,
-            request.params.id
-        )
-
-        if (!unitInit) {
-            response.status(404).json({
-                error: 'Unit init not found.',
-            })
-            return
-        }
-
-        response.json({
-            runs: (
-                await generationRunStore.listByUnitInit(
-                    requestWithMockOwner.mockOwner.id,
-                    request.params.id
-                )
-            ).filter(isChapterGenerationRun),
-        })
-    })
-
-    app.get('/api/unit-init/:id/chapters/:chapterIndex', async (request, response) => {
-        applyLegacyChapterEndpointHeaders(
-            response,
-            '/api/didactic-unit/:id/chapters/:chapterIndex'
-        )
-        const requestWithMockOwner = asRequestWithMockOwner(request)
-        const unitInit = await unitInitStore.getById(
-            requestWithMockOwner.mockOwner.id,
-            request.params.id
-        )
-
-        if (!unitInit) {
-            response.status(404).json({
-                error: 'Unit init not found.',
-            })
-            return
-        }
-
-        let chapterIndex
-        try {
-            chapterIndex = parseChapterIndex(request.params.chapterIndex)
-        } catch (error) {
-            response.status(400).json({
-                error: error instanceof Error ? error.message : 'Invalid chapter lookup request.',
-            })
-            return
-        }
-
-        const generatedChapter = unitInit.generatedChapters?.find(
-            (chapter) => chapter.chapterIndex === chapterIndex
-        )
-
-        if (!generatedChapter) {
-            response.status(404).json({
-                error: 'Generated chapter not found.',
-            })
-            return
-        }
-
-        response.json(generatedChapter)
-    })
-
-    app.patch('/api/unit-init/:id/chapters/:chapterIndex', async (request, response) => {
-        applyLegacyChapterEndpointHeaders(
-            response,
-            '/api/didactic-unit/:id/chapters/:chapterIndex'
-        )
-        const requestWithMockOwner = asRequestWithMockOwner(request)
-        const unitInit = await unitInitStore.getById(
-            requestWithMockOwner.mockOwner.id,
-            request.params.id
-        )
-
-        if (!unitInit) {
-            response.status(404).json({
-                error: 'Unit init not found.',
-            })
-            return
-        }
-
-        let chapterIndex
-        try {
-            chapterIndex = parseChapterIndex(request.params.chapterIndex)
-        } catch (error) {
-            response.status(400).json({
-                error:
-                    error instanceof Error ? error.message : 'Invalid chapter update request.',
-            })
-            return
-        }
-
-        let parsedInput
-        try {
-            parsedInput = parseUpdateChapterContentInput(request.body)
-        } catch (error) {
-            response.status(400).json({
-                error:
-                    error instanceof Error ? error.message : 'Invalid chapter update request.',
-            })
-            return
-        }
-
-        try {
-            const updatedUnitInit = updateChapterContent(unitInit, chapterIndex, parsedInput)
-            await unitInitStore.save(updatedUnitInit)
-            const updatedChapter = updatedUnitInit.generatedChapters?.find(
-                (chapter) => chapter.chapterIndex === chapterIndex
-            )
-
-            response.json(updatedChapter)
-        } catch (error) {
-            const message =
-                error instanceof Error ? error.message : 'Unit init chapter update failed.'
-
-            response.status(message === 'Generated chapter not found.' ? 404 : 409).json({
-                error: message,
-            })
-        }
     })
 
     app.post('/api/unit-init/:id/moderate', async (request, response) => {
@@ -952,106 +763,6 @@ export function createApp(options: CreateAppOptions) {
                     error instanceof Error
                         ? error.message
                         : 'Unit init syllabus approval failed.',
-            })
-        }
-    })
-
-    app.post('/api/unit-init/:id/chapters/:chapterIndex/generate', async (request, response) => {
-        applyLegacyChapterEndpointHeaders(
-            response,
-            '/api/didactic-unit/:id/chapters/:chapterIndex/generate'
-        )
-        const requestWithMockOwner = asRequestWithMockOwner(request)
-        const unitInit = await unitInitStore.getById(
-            requestWithMockOwner.mockOwner.id,
-            request.params.id
-        )
-
-        if (!unitInit) {
-            response.status(404).json({
-                error: 'Unit init not found.',
-            })
-            return
-        }
-
-        let chapterIndex
-        try {
-            chapterIndex = parseChapterIndex(request.params.chapterIndex)
-        } catch (error) {
-            response.status(400).json({
-                error:
-                    error instanceof Error
-                        ? error.message
-                        : 'Invalid chapter generation request.',
-            })
-            return
-        }
-
-        try {
-            const updatedUnitInit = await generateChapterContent(
-                unitInit,
-                chapterIndex,
-                chapterGenerator
-            )
-            await unitInitStore.save(updatedUnitInit)
-            const generatedChapter = updatedUnitInit.generatedChapters?.find(
-                (chapter) => chapter.chapterIndex === chapterIndex
-            )
-
-            if (generatedChapter) {
-                await generationRunStore.save(
-                    createCompletedChapterGenerationRunRecord({
-                        unitInitId: updatedUnitInit.id,
-                        ownerId: updatedUnitInit.ownerId,
-                        chapterIndex,
-                        provider: updatedUnitInit.provider,
-                        model: resolveChapterGeneratorModel(updatedUnitInit.provider),
-                        prompt: buildChapterGenerationPrompt(updatedUnitInit, chapterIndex),
-                        chapter: generatedChapter,
-                        createdAt: generatedChapter.generatedAt,
-                    })
-                )
-            }
-
-            response.json(updatedUnitInit)
-        } catch (error) {
-            if (
-                canCreateChapterGenerationRun(unitInit) &&
-                canBuildChapterGenerationPrompt(unitInit, chapterIndex)
-            ) {
-                await generationRunStore.save(
-                    createFailedChapterGenerationRunRecord({
-                        unitInitId: unitInit.id,
-                        ownerId: unitInit.ownerId,
-                        chapterIndex,
-                        provider: unitInit.provider,
-                        model: resolveChapterGeneratorModel(unitInit.provider),
-                        prompt: buildChapterGenerationPrompt(unitInit, chapterIndex),
-                        rawOutput:
-                            error instanceof OpenAiChapterGenerationError ||
-                            error instanceof DeepSeekChapterGenerationError
-                                ? error.rawOutput
-                                : undefined,
-                        error:
-                            error instanceof Error
-                                ? error.message
-                                : 'Unit init chapter generation failed.',
-                        createdAt: new Date().toISOString(),
-                    })
-                )
-            }
-
-            const message =
-                error instanceof Error
-                    ? error.message
-                    : 'Unit init chapter generation failed.'
-
-            response.status(
-                message === 'Chapter index is out of range for the approved syllabus.'
-                    ? 400
-                    : 409
-            ).json({
-                error: message,
             })
         }
     })

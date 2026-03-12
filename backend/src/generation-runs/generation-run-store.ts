@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { UnitInitProvider } from '../unit-init/create-unit-init.js'
-import type { UnitInitGeneratedChapter } from '../unit-init/generate-chapter-content.js'
+import type { DidacticUnitGeneratedChapter } from '../didactic-unit/didactic-unit-chapter.js'
 import type { UnitInitSyllabus } from '../unit-init/generate-syllabus.js'
 
 export type GenerationRunStage = 'syllabus' | 'chapter'
@@ -27,7 +27,7 @@ export interface SyllabusGenerationRunRecord extends GenerationRunBase {
 export interface ChapterGenerationRunRecord extends GenerationRunBase {
     stage: 'chapter'
     chapterIndex: number
-    chapter?: UnitInitGeneratedChapter
+    chapter?: DidacticUnitGeneratedChapter
 }
 
 export type GenerationRun = SyllabusGenerationRunRecord | ChapterGenerationRunRecord
@@ -79,7 +79,7 @@ interface CreateCompletedChapterGenerationRunInput {
     provider: UnitInitProvider
     model: string
     prompt: string
-    chapter: UnitInitGeneratedChapter
+    chapter: DidacticUnitGeneratedChapter
     createdAt: string
 }
 

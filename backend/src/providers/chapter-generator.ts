@@ -1,6 +1,6 @@
 import { getAppEnv } from '../config/env.js'
 import type { CreatedUnitInit, UnitInitProvider } from '../unit-init/create-unit-init.js'
-import type { UnitInitGeneratedChapter } from '../unit-init/generate-chapter-content.js'
+import type { DidacticUnitGeneratedChapter } from '../didactic-unit/didactic-unit-chapter.js'
 import { DeepSeekChapterGenerator } from './deepseek-chapter-generator.js'
 import { OpenAiChapterGenerator } from './openai-chapter-generator.js'
 
@@ -8,7 +8,7 @@ export interface ChapterGenerator {
     generate(
         unitInit: CreatedUnitInit,
         chapterIndex: number
-    ): Promise<UnitInitGeneratedChapter>
+    ): Promise<DidacticUnitGeneratedChapter>
 }
 
 export function resolveChapterGeneratorModel(provider: UnitInitProvider): string {
@@ -72,7 +72,7 @@ class OpenAiFakeChapterGenerator implements ChapterGenerator {
     async generate(
         unitInit: CreatedUnitInit,
         chapterIndex: number
-    ): Promise<UnitInitGeneratedChapter> {
+    ): Promise<DidacticUnitGeneratedChapter> {
         const chapter = getSyllabusChapter(unitInit, chapterIndex)
         const learningGoal = findAnswerValue(unitInit, 'learning_goal')
         const preferredDepth = findAnswerValue(unitInit, 'preferred_depth')
@@ -102,7 +102,7 @@ class DeepSeekFakeChapterGenerator implements ChapterGenerator {
     async generate(
         unitInit: CreatedUnitInit,
         chapterIndex: number
-    ): Promise<UnitInitGeneratedChapter> {
+    ): Promise<DidacticUnitGeneratedChapter> {
         const chapter = getSyllabusChapter(unitInit, chapterIndex)
         const learningGoal = findAnswerValue(unitInit, 'learning_goal')
         const relatedKnowledge = findAnswerValue(unitInit, 'related_knowledge_level')
@@ -153,7 +153,7 @@ export class ProviderBackedFakeChapterGenerator implements ChapterGenerator {
     async generate(
         unitInit: CreatedUnitInit,
         chapterIndex: number
-    ): Promise<UnitInitGeneratedChapter> {
+    ): Promise<DidacticUnitGeneratedChapter> {
         return this.generators[unitInit.provider].generate(unitInit, chapterIndex)
     }
 }

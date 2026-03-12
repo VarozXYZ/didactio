@@ -1,7 +1,14 @@
-import type { CreatedUnitInit } from './create-unit-init.js'
-import type { UnitInitGeneratedChapter } from './generate-chapter-content.js'
+export interface DidacticUnitGeneratedChapter {
+    chapterIndex: number
+    title: string
+    overview: string
+    content: string
+    keyTakeaways: string[]
+    generatedAt: string
+    updatedAt?: string
+}
 
-export interface UpdateChapterContentInput {
+export interface UpdateDidacticUnitChapterInput {
     chapter: {
         title: string
         overview: string
@@ -30,7 +37,9 @@ function parseStringArray(value: unknown, fieldName: string): string[] {
     )
 }
 
-export function parseUpdateChapterContentInput(body: unknown): UpdateChapterContentInput {
+export function parseUpdateDidacticUnitChapterInput(
+    body: unknown
+): UpdateDidacticUnitChapterInput {
     if (!body || typeof body !== 'object') {
         throw new Error('Request body must be a JSON object.')
     }
@@ -58,38 +67,5 @@ export function parseUpdateChapterContentInput(body: unknown): UpdateChapterCont
                 'chapter.keyTakeaways'
             ),
         },
-    }
-}
-
-export function updateChapterContent(
-    unitInit: CreatedUnitInit,
-    chapterIndex: number,
-    input: UpdateChapterContentInput
-): CreatedUnitInit {
-    const generatedChapters = unitInit.generatedChapters ?? []
-    const existingChapterIndex = generatedChapters.findIndex(
-        (chapter) => chapter.chapterIndex === chapterIndex
-    )
-
-    if (existingChapterIndex < 0) {
-        throw new Error('Generated chapter not found.')
-    }
-
-    const currentChapter = generatedChapters[existingChapterIndex]
-    const updatedChapter: UnitInitGeneratedChapter = {
-        ...currentChapter,
-        title: input.chapter.title,
-        overview: input.chapter.overview,
-        content: input.chapter.content,
-        keyTakeaways: input.chapter.keyTakeaways,
-        updatedAt: new Date().toISOString(),
-    }
-
-    const updatedChapters = [...generatedChapters]
-    updatedChapters[existingChapterIndex] = updatedChapter
-
-    return {
-        ...unitInit,
-        generatedChapters: updatedChapters,
     }
 }

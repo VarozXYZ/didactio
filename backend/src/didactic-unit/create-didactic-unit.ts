@@ -2,8 +2,8 @@ import { randomUUID } from 'node:crypto'
 import type { CreatedUnitInit } from '../unit-init/create-unit-init.js'
 import type { UnitInitProvider } from '../unit-init/create-unit-init.js'
 import type { UnitInitQuestionAnswer } from '../unit-init/answer-questionnaire.js'
-import type { UnitInitGeneratedChapter } from '../unit-init/generate-chapter-content.js'
 import type { UnitInitSyllabus, UnitInitSyllabusChapter } from '../unit-init/generate-syllabus.js'
+import type { DidacticUnitGeneratedChapter } from './didactic-unit-chapter.js'
 
 export type DidacticUnitStatus = 'ready_for_content_generation'
 
@@ -19,7 +19,7 @@ export interface DidacticUnit {
     learningGoals: string[]
     chapters: UnitInitSyllabusChapter[]
     questionnaireAnswers: UnitInitQuestionAnswer[]
-    generatedChapters?: UnitInitGeneratedChapter[]
+    generatedChapters?: DidacticUnitGeneratedChapter[]
     createdAt: string
 }
 

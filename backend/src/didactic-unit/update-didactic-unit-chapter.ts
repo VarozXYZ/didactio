@@ -1,11 +1,13 @@
 import type { DidacticUnit } from './create-didactic-unit.js'
-import type { UpdateChapterContentInput } from '../unit-init/update-chapter-content.js'
-import type { UnitInitGeneratedChapter } from '../unit-init/generate-chapter-content.js'
+import type {
+    DidacticUnitGeneratedChapter,
+    UpdateDidacticUnitChapterInput,
+} from './didactic-unit-chapter.js'
 
 export function updateDidacticUnitChapter(
     didacticUnit: DidacticUnit,
     chapterIndex: number,
-    input: UpdateChapterContentInput
+    input: UpdateDidacticUnitChapterInput
 ): DidacticUnit {
     const generatedChapters = didacticUnit.generatedChapters ?? []
     const existingChapterIndex = generatedChapters.findIndex(
@@ -17,7 +19,7 @@ export function updateDidacticUnitChapter(
     }
 
     const currentChapter = generatedChapters[existingChapterIndex]
-    const updatedChapter: UnitInitGeneratedChapter = {
+    const updatedChapter: DidacticUnitGeneratedChapter = {
         ...currentChapter,
         title: input.chapter.title,
         overview: input.chapter.overview,

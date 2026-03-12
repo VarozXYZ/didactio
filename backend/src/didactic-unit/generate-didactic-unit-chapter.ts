@@ -19,7 +19,6 @@ function createChapterGenerationSource(didacticUnit: DidacticUnit): CreatedUnitI
             chapters: didacticUnit.chapters,
         },
         syllabusApprovedAt: didacticUnit.createdAt,
-        generatedChapters: didacticUnit.generatedChapters,
     }
 }
 
