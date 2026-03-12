@@ -1,5 +1,6 @@
 import { getAppEnv } from '../config/env.js'
 import type { CreatedUnitInit, UnitInitProvider } from '../unit-init/create-unit-init.js'
+import { DeepSeekSyllabusGenerator } from './deepseek-syllabus-generator.js'
 import { OpenAiSyllabusGenerator } from './openai-syllabus-generator.js'
 import type {
     UnitInitSyllabus,
@@ -17,7 +18,9 @@ export function resolveSyllabusGeneratorModel(provider: UnitInitProvider): strin
         return env.openAiApiKey ? env.openAiSyllabusModel : 'fake-openai-syllabus-generator'
     }
 
-    return 'fake-deepseek-syllabus-generator'
+    return env.deepSeekApiKey
+        ? env.deepSeekSyllabusModel
+        : 'fake-deepseek-syllabus-generator'
 }
 
 function findAnswerValue(unitInit: CreatedUnitInit, questionId: string): string {
@@ -154,7 +157,12 @@ export class ProviderBackedFakeSyllabusGenerator implements SyllabusGenerator {
                       model: env.openAiSyllabusModel,
                   })
                 : new OpenAiFakeSyllabusGenerator(),
-            deepseek: new DeepSeekFakeSyllabusGenerator(),
+            deepseek: env.deepSeekApiKey
+                ? new DeepSeekSyllabusGenerator({
+                      apiKey: env.deepSeekApiKey,
+                      model: env.deepSeekSyllabusModel,
+                  })
+                : new DeepSeekFakeSyllabusGenerator(),
         }
     }
 

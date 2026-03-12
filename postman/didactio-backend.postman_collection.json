@@ -3,7 +3,7 @@
     "_postman_id": "8c0f3cf2-1d6b-4f4b-a090-14c65f3a0ad5",
     "name": "Didactio Backend",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Single ordered runner flow for the Didactio backend. Requests are arranged in the exact lifecycle sequence so the collection can be run end-to-end without folder ordering issues. AI checks are structural and stop the runner after traced failures."
+    "description": "Single ordered runner flow for the Didactio backend. Set the collection variable `provider` to `openai` or `deepseek` before running the suite. Requests marked `AI GEN` are the ones that invoke model generation directly."
   },
   "item": [
     {
@@ -39,7 +39,7 @@
       ]
     },
     {
-      "name": "02 Create Unit Init",
+      "name": "02 Create Unit Init (Selected Provider)",
       "request": {
         "method": "POST",
         "header": [
@@ -252,7 +252,7 @@
       ]
     },
     {
-      "name": "07 Generate Syllabus",
+      "name": "07 AI GEN Generate Syllabus",
       "request": {
         "method": "POST",
         "header": [
@@ -429,7 +429,7 @@
       ]
     },
     {
-      "name": "11 Generate Chapter Content",
+      "name": "11 AI GEN Generate Chapter Content",
       "request": {
         "method": "POST",
         "header": [
@@ -684,6 +684,90 @@
               "pm.test('List Unit Inits returns 200', function () { pm.response.to.have.status(200); });",
               "const body = pm.response.json();",
               "pm.test('List Unit Inits returns an array', function () { pm.expect(body.unitInits).to.be.an('array'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "90 Manual Create Unit Init (OpenAI)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"topic\": \"{{topic}}\",\n  \"provider\": \"openai\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/unit-init",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "unit-init"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Create Unit Init (OpenAI) returns 201', function () { pm.response.to.have.status(201); });",
+              "const body = pm.response.json();",
+              "pm.test('OpenAI unit-init is created', function () { pm.expect(body.provider).to.eql('openai'); pm.expect(body.id).to.be.a('string').and.not.empty; });",
+              "pm.collectionVariables.set('unitInitId', body.id);",
+              "pm.collectionVariables.set('provider', 'openai');"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "91 Manual Create Unit Init (DeepSeek)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"topic\": \"{{topic}}\",\n  \"provider\": \"deepseek\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/unit-init",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "unit-init"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Create Unit Init (DeepSeek) returns 201', function () { pm.response.to.have.status(201); });",
+              "const body = pm.response.json();",
+              "pm.test('DeepSeek unit-init is created', function () { pm.expect(body.provider).to.eql('deepseek'); pm.expect(body.id).to.be.a('string').and.not.empty; });",
+              "pm.collectionVariables.set('unitInitId', body.id);",
+              "pm.collectionVariables.set('provider', 'deepseek');"
             ]
           }
         }
