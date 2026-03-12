@@ -9,6 +9,7 @@ export interface AppEnv {
     openAiChapterModel: string
     deepSeekApiKey: string | null
     deepSeekSyllabusModel: string
+    deepSeekChapterModel: string
     mongoDbUri: string | null
     mongoDbName: string
 }
@@ -50,6 +51,8 @@ export function getAppEnv(): AppEnv {
         deepSeekApiKey: parseOptionalString(process.env.DEEPSEEK_API_KEY),
         deepSeekSyllabusModel:
             parseOptionalString(process.env.DEEPSEEK_SYLLABUS_MODEL) ?? 'deepseek-chat',
+        deepSeekChapterModel:
+            parseOptionalString(process.env.DEEPSEEK_CHAPTER_MODEL) ?? 'deepseek-chat',
         mongoDbUri: parseOptionalString(process.env.MONGODB_URI),
         mongoDbName: parseOptionalString(process.env.MONGODB_DB_NAME) ?? 'didactio',
     }

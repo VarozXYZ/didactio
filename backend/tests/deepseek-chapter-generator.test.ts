@@ -1,18 +1,18 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
-    DeepSeekSyllabusGenerationError,
-    DeepSeekSyllabusGenerator,
-} from '../src/providers/deepseek-syllabus-generator.js'
+    DeepSeekChapterGenerationError,
+    DeepSeekChapterGenerator,
+} from '../src/providers/deepseek-chapter-generator.js'
 import type { CreatedUnitInit } from '../src/unit-init/create-unit-init.js'
 
-function createApprovedQuestionnaireUnitInit(): CreatedUnitInit {
+function createApprovedSyllabusUnitInit(): CreatedUnitInit {
     return {
         id: 'unit-init-1',
         ownerId: 'mock-user',
         topic: 'next.js framework',
         provider: 'deepseek',
-        status: 'syllabus_prompt_ready',
-        nextAction: 'review_syllabus_prompt',
+        status: 'syllabus_approved',
+        nextAction: 'generate_unit_content',
         createdAt: '2026-03-12T00:00:00.000Z',
         questionnaireAnswers: [
             { questionId: 'topic_knowledge_level', value: 'basic' },
@@ -21,13 +21,25 @@ function createApprovedQuestionnaireUnitInit(): CreatedUnitInit {
             { questionId: 'preferred_depth', value: 'balanced' },
             { questionId: 'preferred_length', value: 'medium' },
         ],
-        syllabusPrompt: 'Create a didactic unit about next.js framework.',
-        syllabusPromptGeneratedAt: '2026-03-12T00:01:00.000Z',
+        syllabus: {
+            title: 'Next.js Learning Path',
+            overview: 'A practical syllabus.',
+            learningGoals: ['One', 'Two', 'Three'],
+            chapters: [
+                {
+                    title: 'Rendering Foundations',
+                    overview: 'Understand the rendering model.',
+                    keyPoints: ['SSR', 'SSG', 'ISR'],
+                },
+            ],
+        },
+        syllabusGeneratedAt: '2026-03-12T00:01:00.000Z',
+        syllabusApprovedAt: '2026-03-12T00:02:00.000Z',
     }
 }
 
-describe('DeepSeekSyllabusGenerator', () => {
-    it('parses a valid DeepSeek JSON syllabus response', async () => {
+describe('DeepSeekChapterGenerator', () => {
+    it('parses a valid DeepSeek JSON chapter response', async () => {
         const fetchImplementation = vi.fn<typeof fetch>().mockResolvedValue(
             new Response(
                 JSON.stringify({
@@ -35,19 +47,14 @@ describe('DeepSeekSyllabusGenerator', () => {
                         {
                             message: {
                                 content: JSON.stringify({
-                                    title: 'Next.js Reasoning Path',
-                                    overview: 'A practical DeepSeek syllabus.',
-                                    learningGoals: [
-                                        'Understand rendering strategies',
-                                        'Ship production features',
-                                        'Evaluate architectural tradeoffs',
-                                    ],
-                                    chapters: [
-                                        {
-                                            title: 'Rendering Foundations',
-                                            overview: 'Understand the rendering model.',
-                                            keyPoints: ['SSR', 'SSG', 'ISR'],
-                                        },
+                                    title: 'Rendering Foundations',
+                                    overview: 'Understand the rendering model.',
+                                    content:
+                                        'This chapter explains the rendering model in a practical way.',
+                                    keyTakeaways: [
+                                        'Understand SSR',
+                                        'Understand SSG',
+                                        'Understand ISR',
                                     ],
                                 }),
                             },
@@ -63,13 +70,13 @@ describe('DeepSeekSyllabusGenerator', () => {
             )
         )
 
-        const generator = new DeepSeekSyllabusGenerator({
+        const generator = new DeepSeekChapterGenerator({
             apiKey: 'test-key',
             model: 'deepseek-chat',
             fetchImplementation,
         })
 
-        const syllabus = await generator.generate(createApprovedQuestionnaireUnitInit())
+        const chapter = await generator.generate(createApprovedSyllabusUnitInit(), 0)
 
         expect(fetchImplementation).toHaveBeenCalledOnce()
         const requestInit = fetchImplementation.mock.calls[0]?.[1]
@@ -78,13 +85,14 @@ describe('DeepSeekSyllabusGenerator', () => {
         expect(parsedBody.response_format).toEqual({
             type: 'json_object',
         })
-        expect(parsedBody.messages[1].content).toContain(
-            'Return only valid JSON with this exact shape:'
-        )
-        expect(parsedBody.messages[1].content).toContain('"chapters"')
-        expect(parsedBody.messages[1].content).toContain('include at least 3 chapters')
-        expect(syllabus.title).toBe('Next.js Reasoning Path')
-        expect(syllabus.chapters).toHaveLength(1)
+        expect(chapter).toMatchObject({
+            chapterIndex: 0,
+            title: 'Rendering Foundations',
+            overview: 'Understand the rendering model.',
+            content: 'This chapter explains the rendering model in a practical way.',
+        })
+        expect(chapter.keyTakeaways).toHaveLength(3)
+        expect(typeof chapter.generatedAt).toBe('string')
     })
 
     it('throws when DeepSeek returns a non-success status', async () => {
@@ -94,22 +102,22 @@ describe('DeepSeekSyllabusGenerator', () => {
             })
         )
 
-        const generator = new DeepSeekSyllabusGenerator({
+        const generator = new DeepSeekChapterGenerator({
             apiKey: 'test-key',
             fetchImplementation,
         })
 
         await expect(
-            generator.generate(createApprovedQuestionnaireUnitInit())
-        ).rejects.toThrow('DeepSeek syllabus generation failed with status 500.')
+            generator.generate(createApprovedSyllabusUnitInit(), 0)
+        ).rejects.toThrow('DeepSeek chapter generation failed with status 500.')
     })
 
     it('throws a parse error that preserves the raw model content', async () => {
         const rawContent = JSON.stringify({
-            title: 'Incomplete syllabus',
-            overview: 'Missing chapters',
-            learningGoals: ['One'],
-            chapters: [],
+            title: 'Rendering Foundations',
+            overview: 'Understand the rendering model.',
+            content: '',
+            keyTakeaways: [],
         })
         const fetchImplementation = vi.fn<typeof fetch>().mockResolvedValue(
             new Response(
@@ -131,15 +139,15 @@ describe('DeepSeekSyllabusGenerator', () => {
             )
         )
 
-        const generator = new DeepSeekSyllabusGenerator({
+        const generator = new DeepSeekChapterGenerator({
             apiKey: 'test-key',
             fetchImplementation,
         })
 
         await expect(
-            generator.generate(createApprovedQuestionnaireUnitInit())
-        ).rejects.toMatchObject({
-            message: 'DeepSeek syllabus response must include a non-empty chapters array.',
+            generator.generate(createApprovedSyllabusUnitInit(), 0)
+        ).rejects.toMatchObject<Partial<DeepSeekChapterGenerationError>>({
+            message: 'content is required.',
             rawOutput: rawContent,
         })
     })

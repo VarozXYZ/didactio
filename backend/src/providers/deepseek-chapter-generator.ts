@@ -1,9 +1,10 @@
 import type { CreatedUnitInit } from '../unit-init/create-unit-init.js'
-import type { UnitInitSyllabus } from '../unit-init/generate-syllabus.js'
+import type { UnitInitGeneratedChapter } from '../unit-init/generate-chapter-content.js'
+import { buildChapterGenerationPrompt } from './chapter-generator.js'
 
 type FetchImplementation = typeof fetch
 
-interface DeepSeekSyllabusGeneratorOptions {
+interface DeepSeekChapterGeneratorOptions {
     apiKey: string
     model?: string
     fetchImplementation?: FetchImplementation
@@ -17,14 +18,24 @@ interface DeepSeekChatCompletionResponse {
     }>
 }
 
-export class DeepSeekSyllabusGenerationError extends Error {
+export class DeepSeekChapterGenerationError extends Error {
     readonly rawOutput?: string
 
     constructor(message: string, rawOutput?: string) {
         super(message)
-        this.name = 'DeepSeekSyllabusGenerationError'
+        this.name = 'DeepSeekChapterGenerationError'
         this.rawOutput = rawOutput
     }
+}
+
+function getSyllabusChapter(unitInit: CreatedUnitInit, chapterIndex: number) {
+    const chapter = unitInit.syllabus?.chapters[chapterIndex]
+
+    if (!chapter) {
+        throw new Error('Chapter index is out of range for the approved syllabus.')
+    }
+
+    return chapter
 }
 
 function extractJsonBlock(value: string): string {
@@ -58,103 +69,53 @@ function parseStringArray(value: unknown, fieldName: string): string[] {
     )
 }
 
-function parseSyllabusResponse(content: string): UnitInitSyllabus {
+function parseChapterResponse(content: string, chapterIndex: number): UnitInitGeneratedChapter {
     let parsedValue: unknown
 
     try {
         parsedValue = JSON.parse(extractJsonBlock(content))
     } catch {
-        throw new Error('DeepSeek syllabus response was not valid JSON.')
+        throw new Error('DeepSeek chapter response was not valid JSON.')
     }
 
     if (!parsedValue || typeof parsedValue !== 'object') {
-        throw new Error('DeepSeek syllabus response must be a JSON object.')
+        throw new Error('DeepSeek chapter response must be a JSON object.')
     }
 
     const payload = parsedValue as {
         title?: unknown
         overview?: unknown
-        learningGoals?: unknown
-        chapters?: unknown
-    }
-
-    if (!Array.isArray(payload.chapters) || payload.chapters.length === 0) {
-        throw new Error('DeepSeek syllabus response must include a non-empty chapters array.')
+        content?: unknown
+        keyTakeaways?: unknown
     }
 
     return {
+        chapterIndex,
         title: parseNonEmptyString(payload.title, 'title'),
         overview: parseNonEmptyString(payload.overview, 'overview'),
-        learningGoals: parseStringArray(payload.learningGoals, 'learningGoals'),
-        chapters: payload.chapters.map((chapter, index) => {
-            if (!chapter || typeof chapter !== 'object') {
-                throw new Error(`chapters[${index}] must be an object.`)
-            }
-
-            const chapterPayload = chapter as {
-                title?: unknown
-                overview?: unknown
-                keyPoints?: unknown
-            }
-
-            return {
-                title: parseNonEmptyString(chapterPayload.title, `chapters[${index}].title`),
-                overview: parseNonEmptyString(
-                    chapterPayload.overview,
-                    `chapters[${index}].overview`
-                ),
-                keyPoints: parseStringArray(
-                    chapterPayload.keyPoints,
-                    `chapters[${index}].keyPoints`
-                ),
-            }
-        }),
+        content: parseNonEmptyString(payload.content, 'content'),
+        keyTakeaways: parseStringArray(payload.keyTakeaways, 'keyTakeaways'),
+        generatedAt: new Date().toISOString(),
     }
 }
 
-function buildPrompt(unitInit: CreatedUnitInit): string {
-    const basePrompt =
-        unitInit.syllabusPrompt?.trim() ??
-        [
-            'Create a syllabus for a personalized didactic unit.',
-            `Topic: ${unitInit.topic}`,
-        ].join('\n')
-
-    return [
-        basePrompt,
-        'Return only valid JSON with this exact shape:',
-        '{',
-        '  "title": "string",',
-        '  "overview": "string",',
-        '  "learningGoals": ["string", "string", "string"],',
-        '  "chapters": [',
-        '    {',
-        '      "title": "string",',
-        '      "overview": "string",',
-        '      "keyPoints": ["string", "string", "string"]',
-        '    }',
-        '  ]',
-        '}',
-        'Rules:',
-        '- chapters must be a non-empty array',
-        '- include at least 3 chapters',
-        '- each chapter must include title, overview, and a non-empty keyPoints array',
-        '- do not include markdown fences or explanatory text',
-    ].join('\n')
-}
-
-export class DeepSeekSyllabusGenerator {
+export class DeepSeekChapterGenerator {
     private readonly apiKey: string
     private readonly model: string
     private readonly fetchImplementation: FetchImplementation
 
-    constructor(options: DeepSeekSyllabusGeneratorOptions) {
+    constructor(options: DeepSeekChapterGeneratorOptions) {
         this.apiKey = options.apiKey
         this.model = options.model ?? 'deepseek-chat'
         this.fetchImplementation = options.fetchImplementation ?? fetch
     }
 
-    async generate(unitInit: CreatedUnitInit): Promise<UnitInitSyllabus> {
+    async generate(
+        unitInit: CreatedUnitInit,
+        chapterIndex: number
+    ): Promise<UnitInitGeneratedChapter> {
+        getSyllabusChapter(unitInit, chapterIndex)
+
         const response = await this.fetchImplementation(
             'https://api.deepseek.com/chat/completions',
             {
@@ -173,11 +134,11 @@ export class DeepSeekSyllabusGenerator {
                         {
                             role: 'system',
                             content:
-                                'You create high-quality personalized educational syllabi and return only valid JSON matching the requested shape.',
+                                'You create high-quality personalized educational chapter content and return only valid JSON matching the requested shape.',
                         },
                         {
                             role: 'user',
-                            content: buildPrompt(unitInit),
+                            content: buildChapterGenerationPrompt(unitInit, chapterIndex),
                         },
                     ],
                 }),
@@ -187,8 +148,8 @@ export class DeepSeekSyllabusGenerator {
         const responseText = await response.text()
 
         if (!response.ok) {
-            throw new DeepSeekSyllabusGenerationError(
-                `DeepSeek syllabus generation failed with status ${response.status}.`,
+            throw new DeepSeekChapterGenerationError(
+                `DeepSeek chapter generation failed with status ${response.status}.`,
                 responseText
             )
         }
@@ -198,8 +159,8 @@ export class DeepSeekSyllabusGenerator {
         try {
             payload = JSON.parse(responseText) as DeepSeekChatCompletionResponse
         } catch {
-            throw new DeepSeekSyllabusGenerationError(
-                'DeepSeek syllabus response was not valid JSON.',
+            throw new DeepSeekChapterGenerationError(
+                'DeepSeek chapter response was not valid JSON.',
                 responseText
             )
         }
@@ -207,19 +168,19 @@ export class DeepSeekSyllabusGenerator {
         const content = payload.choices?.[0]?.message?.content
 
         if (!content) {
-            throw new DeepSeekSyllabusGenerationError(
-                'DeepSeek syllabus response did not include message content.',
+            throw new DeepSeekChapterGenerationError(
+                'DeepSeek chapter response did not include message content.',
                 responseText
             )
         }
 
         try {
-            return parseSyllabusResponse(content)
+            return parseChapterResponse(content, chapterIndex)
         } catch (error) {
-            throw new DeepSeekSyllabusGenerationError(
+            throw new DeepSeekChapterGenerationError(
                 error instanceof Error
                     ? error.message
-                    : 'DeepSeek syllabus response could not be parsed.',
+                    : 'DeepSeek chapter response could not be parsed.',
                 content
             )
         }

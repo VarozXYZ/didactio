@@ -1,6 +1,7 @@
 import { getAppEnv } from '../config/env.js'
 import type { CreatedUnitInit, UnitInitProvider } from '../unit-init/create-unit-init.js'
 import type { UnitInitGeneratedChapter } from '../unit-init/generate-chapter-content.js'
+import { DeepSeekChapterGenerator } from './deepseek-chapter-generator.js'
 import { OpenAiChapterGenerator } from './openai-chapter-generator.js'
 
 export interface ChapterGenerator {
@@ -17,7 +18,7 @@ export function resolveChapterGeneratorModel(provider: UnitInitProvider): string
         return env.openAiApiKey ? env.openAiChapterModel : 'fake-openai-chapter-generator'
     }
 
-    return 'fake-deepseek-chapter-generator'
+    return env.deepSeekApiKey ? env.deepSeekChapterModel : 'fake-deepseek-chapter-generator'
 }
 
 function findAnswerValue(unitInit: CreatedUnitInit, questionId: string): string {
@@ -140,7 +141,12 @@ export class ProviderBackedFakeChapterGenerator implements ChapterGenerator {
                       model: env.openAiChapterModel,
                   })
                 : new OpenAiFakeChapterGenerator(),
-            deepseek: new DeepSeekFakeChapterGenerator(),
+            deepseek: env.deepSeekApiKey
+                ? new DeepSeekChapterGenerator({
+                      apiKey: env.deepSeekApiKey,
+                      model: env.deepSeekChapterModel,
+                  })
+                : new DeepSeekFakeChapterGenerator(),
         }
     }
 

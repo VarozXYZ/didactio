@@ -9,6 +9,7 @@ import {
     createFailedSyllabusGenerationRun,
     type SyllabusGenerationRunStore,
 } from './generation-runs/syllabus-generation-run-store.js'
+import { DeepSeekSyllabusGenerationError } from './providers/deepseek-syllabus-generator.js'
 import { OpenAiSyllabusGenerationError } from './providers/openai-syllabus-generator.js'
 import {
     buildChapterGenerationPrompt,
@@ -482,7 +483,8 @@ export function createApp(options: CreateAppOptions) {
                         model: resolveSyllabusGeneratorModel(unitInit.provider),
                         prompt: unitInit.syllabusPrompt ?? '',
                         rawOutput:
-                            error instanceof OpenAiSyllabusGenerationError
+                            error instanceof OpenAiSyllabusGenerationError ||
+                            error instanceof DeepSeekSyllabusGenerationError
                                 ? error.rawOutput
                                 : undefined,
                         error:
