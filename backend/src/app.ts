@@ -1,5 +1,10 @@
 import express from 'express'
 import {
+    InMemorySyllabusGenerationRunStore,
+    createSyllabusGenerationRun,
+    type SyllabusGenerationRunStore,
+} from './generation-runs/syllabus-generation-run-store.js'
+import {
     ProviderBackedFakeChapterGenerator,
     type ChapterGenerator,
 } from './providers/chapter-generator.js'
@@ -7,6 +12,7 @@ import { attachMockOwner, type RequestWithMockOwner } from './middleware/mock-ow
 import type { MongoHealthStatus } from './mongo/mongo-connection.js'
 import {
     ProviderBackedFakeSyllabusGenerator,
+    resolveSyllabusGeneratorModel,
     type SyllabusGenerator,
 } from './providers/syllabus-generator.js'
 import { approveSyllabus } from './unit-init/approve-syllabus.js'
@@ -36,6 +42,7 @@ import { InMemoryUnitInitStore, type UnitInitStore } from './unit-init/unit-init
 
 interface CreateAppOptions {
     unitInitStore?: UnitInitStore
+    syllabusGenerationRunStore?: SyllabusGenerationRunStore
     syllabusGenerator?: SyllabusGenerator
     chapterGenerator?: ChapterGenerator
     mongoHealth?: MongoHealthStatus
@@ -58,6 +65,8 @@ function parseChapterIndex(value: string): number {
 export function createApp(options: CreateAppOptions = {}) {
     const app = express()
     const unitInitStore = options.unitInitStore ?? new InMemoryUnitInitStore()
+    const syllabusGenerationRunStore =
+        options.syllabusGenerationRunStore ?? new InMemorySyllabusGenerationRunStore()
     const syllabusGenerator =
         options.syllabusGenerator ?? new ProviderBackedFakeSyllabusGenerator()
     const chapterGenerator =
@@ -147,6 +156,28 @@ export function createApp(options: CreateAppOptions = {}) {
                     error instanceof Error ? error.message : 'Unit init chapter list failed.',
             })
         }
+    })
+
+    app.get('/api/unit-init/:id/syllabus/runs', async (request, response) => {
+        const requestWithMockOwner = asRequestWithMockOwner(request)
+        const unitInit = await unitInitStore.getById(
+            requestWithMockOwner.mockOwner.id,
+            request.params.id
+        )
+
+        if (!unitInit) {
+            response.status(404).json({
+                error: 'Unit init not found.',
+            })
+            return
+        }
+
+        response.json({
+            runs: await syllabusGenerationRunStore.listByUnitInit(
+                requestWithMockOwner.mockOwner.id,
+                request.params.id
+            ),
+        })
     })
 
     app.get('/api/unit-init/:id/chapters/:chapterIndex', async (request, response) => {
@@ -380,6 +411,17 @@ export function createApp(options: CreateAppOptions = {}) {
         try {
             const updatedUnitInit = await generateSyllabus(unitInit, syllabusGenerator)
             await unitInitStore.save(updatedUnitInit)
+            await syllabusGenerationRunStore.save(
+                createSyllabusGenerationRun({
+                    unitInitId: updatedUnitInit.id,
+                    ownerId: updatedUnitInit.ownerId,
+                    provider: updatedUnitInit.provider,
+                    model: resolveSyllabusGeneratorModel(updatedUnitInit.provider),
+                    prompt: updatedUnitInit.syllabusPrompt ?? '',
+                    syllabus: updatedUnitInit.syllabus!,
+                    createdAt: updatedUnitInit.syllabusGeneratedAt ?? new Date().toISOString(),
+                })
+            )
             response.json(updatedUnitInit)
         } catch (error) {
             response.status(409).json({

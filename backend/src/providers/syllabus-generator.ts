@@ -10,6 +10,16 @@ export interface SyllabusGenerator {
     generate(unitInit: CreatedUnitInit): Promise<UnitInitSyllabus>
 }
 
+export function resolveSyllabusGeneratorModel(provider: UnitInitProvider): string {
+    const env = getAppEnv()
+
+    if (provider === 'openai') {
+        return env.openAiApiKey ? env.openAiSyllabusModel : 'fake-openai-syllabus-generator'
+    }
+
+    return 'fake-deepseek-syllabus-generator'
+}
+
 function findAnswerValue(unitInit: CreatedUnitInit, questionId: string): string {
     return (
         unitInit.questionnaireAnswers?.find((answer) => answer.questionId === questionId)?.value ??

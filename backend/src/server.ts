@@ -1,5 +1,6 @@
 import { getAppEnv, loadEnv } from './config/env.js'
 import { createApp } from './app.js'
+import { MongoSyllabusGenerationRunStore } from './generation-runs/mongo-syllabus-generation-run-store.js'
 import {
     connectMongoIfConfigured,
     createMongoHealthStatus,
@@ -16,8 +17,12 @@ if (!mongoConnection) {
 }
 
 const unitInitStore = new MongoUnitInitStore(mongoConnection.database)
+const syllabusGenerationRunStore = new MongoSyllabusGenerationRunStore(
+    mongoConnection.database
+)
 const app = createApp({
     unitInitStore,
+    syllabusGenerationRunStore,
     mongoHealth: createMongoHealthStatus(mongoConnection),
 })
 

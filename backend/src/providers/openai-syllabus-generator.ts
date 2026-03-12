@@ -110,6 +110,10 @@ function parseSyllabusResponse(content: string): UnitInitSyllabus {
 }
 
 function buildPrompt(unitInit: CreatedUnitInit): string {
+    if (unitInit.syllabusPrompt?.trim()) {
+        return unitInit.syllabusPrompt.trim()
+    }
+
     const topicKnowledgeLevel = findAnswerValue(unitInit, 'topic_knowledge_level')
     const relatedKnowledgeLevel = findAnswerValue(unitInit, 'related_knowledge_level')
     const learningGoal = findAnswerValue(unitInit, 'learning_goal')

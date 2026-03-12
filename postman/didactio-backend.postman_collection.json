@@ -322,6 +322,27 @@
       "response": []
     },
     {
+      "name": "Get Syllabus Generation Runs",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/unit-init/{{unitInitId}}/syllabus/runs",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "unit-init",
+            "{{unitInitId}}",
+            "syllabus",
+            "runs"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
       "name": "Update Syllabus",
       "request": {
         "method": "PATCH",

@@ -902,6 +902,73 @@ describe('POST /api/unit-init/:id/syllabus/generate', () => {
     })
 })
 
+describe('GET /api/unit-init/:id/syllabus/runs', () => {
+    it('returns persisted syllabus generation runs for the unit-init', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const createdResponse = await request(app)
+            .post('/api/unit-init')
+            .send({ topic: 'next.js framework' })
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/moderate`)
+            .send({})
+
+        const questionnaireResponse = await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/questionnaire/generate`)
+            .send({})
+
+        await request(app)
+            .patch(`/api/unit-init/${createdResponse.body.id}/questionnaire/answers`)
+            .send({
+                answers: questionnaireResponse.body.questionnaire.questions.map(
+                    (question: { id: string }) => ({
+                        questionId: question.id,
+                        value: `answer-for-${question.id}`,
+                    })
+                ),
+            })
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/syllabus-prompt/generate`)
+            .send({})
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/syllabus/generate`)
+            .send({})
+
+        const response = await request(app).get(
+            `/api/unit-init/${createdResponse.body.id}/syllabus/runs`
+        )
+
+        expect(response.status).toBe(200)
+        expect(response.body.runs).toHaveLength(1)
+        expect(response.body.runs[0]).toMatchObject({
+            unitInitId: createdResponse.body.id,
+            ownerId: 'mock-user',
+            provider: 'openai',
+            model: 'fake-openai-syllabus-generator',
+            status: 'completed',
+        })
+        expect(response.body.runs[0].prompt).toContain('next.js framework')
+        expect(response.body.runs[0].syllabus.title).toBe('next.js framework Learning Path')
+        expect(typeof response.body.runs[0].createdAt).toBe('string')
+    })
+
+    it('returns 404 when the unit-init does not exist', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const response = await request(app).get('/api/unit-init/missing-id/syllabus/runs')
+
+        expect(response.status).toBe(404)
+        expect(response.body).toEqual({
+            error: 'Unit init not found.',
+        })
+    })
+})
+
 describe('PATCH /api/unit-init/:id/syllabus', () => {
     it('replaces the generated syllabus and advances the next action', async () => {
         const store = new InMemoryUnitInitStore()
