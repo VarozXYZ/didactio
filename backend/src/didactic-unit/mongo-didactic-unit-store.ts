@@ -30,6 +30,15 @@ export class MongoDidacticUnitStore implements DidacticUnitStore {
         )
     }
 
+    async getById(ownerId: string, didacticUnitId: string): Promise<DidacticUnit | null> {
+        return stripMongoId(
+            await this.collection.findOne({
+                id: didacticUnitId,
+                ownerId,
+            })
+        )
+    }
+
     async getByUnitInitId(ownerId: string, unitInitId: string): Promise<DidacticUnit | null> {
         return stripMongoId(
             await this.collection.findOne({

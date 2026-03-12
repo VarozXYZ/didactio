@@ -453,7 +453,39 @@
             "exec": [
               "pm.test('List Didactic Units returns 200', function () { pm.response.to.have.status(200); });",
               "const body = pm.response.json();",
-              "pm.test('Approved syllabus creates a didactic unit record', function () { pm.expect(body.didacticUnits).to.be.an('array').that.is.not.empty; const latestUnit = body.didacticUnits[0]; pm.expect(latestUnit.unitInitId).to.eql(pm.collectionVariables.get('unitInitId')); pm.expect(latestUnit.status).to.eql('ready_for_content_generation'); pm.expect(latestUnit.title).to.be.a('string').and.not.empty; pm.expect(latestUnit.chapters).to.be.an('array').that.is.not.empty; });"
+              "pm.test('Approved syllabus creates a didactic unit record', function () { pm.expect(body.didacticUnits).to.be.an('array').that.is.not.empty; const latestUnit = body.didacticUnits[0]; pm.expect(latestUnit.unitInitId).to.eql(pm.collectionVariables.get('unitInitId')); pm.expect(latestUnit.status).to.eql('ready_for_content_generation'); pm.expect(latestUnit.title).to.be.a('string').and.not.empty; pm.expect(latestUnit.chapters).to.be.an('array').that.is.not.empty; pm.collectionVariables.set('didacticUnitId', latestUnit.id); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10b Get Didactic Unit By Id",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/didactic-unit/{{didacticUnitId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "didactic-unit",
+            "{{didacticUnitId}}"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Get Didactic Unit By Id returns 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('Single didactic unit payload is complete', function () { pm.expect(body.id).to.eql(pm.collectionVariables.get('didacticUnitId')); pm.expect(body.unitInitId).to.eql(pm.collectionVariables.get('unitInitId')); pm.expect(body.status).to.eql('ready_for_content_generation'); pm.expect(body.title).to.be.a('string').and.not.empty; pm.expect(body.chapters).to.be.an('array').that.is.not.empty; });"
             ]
           }
         }
@@ -851,6 +883,10 @@
     {
       "key": "chapterIndex",
       "value": "0"
+    },
+    {
+      "key": "didacticUnitId",
+      "value": ""
     },
     {
       "key": "topic",

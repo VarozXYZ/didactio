@@ -44,6 +44,7 @@ describe('MongoDidacticUnitStore', () => {
         const store = new MongoDidacticUnitStore(database as never)
 
         await store.save(didacticUnit)
+        const didacticUnitById = await store.getById('mock-user', 'didactic-unit-1')
         const storedDidacticUnit = await store.getByUnitInitId('mock-user', 'unit-init-1')
         const listedDidacticUnits = await store.listByOwner('mock-user')
 
@@ -53,6 +54,10 @@ describe('MongoDidacticUnitStore', () => {
             { upsert: true }
         )
         expect(findOne).toHaveBeenCalledWith({
+            id: 'didactic-unit-1',
+            ownerId: 'mock-user',
+        })
+        expect(findOne).toHaveBeenCalledWith({
             ownerId: 'mock-user',
             unitInitId: 'unit-init-1',
         })
@@ -60,6 +65,7 @@ describe('MongoDidacticUnitStore', () => {
             ownerId: 'mock-user',
         })
         expect(sort).toHaveBeenCalledWith({ createdAt: -1 })
+        expect(didacticUnitById).toEqual(didacticUnit)
         expect(storedDidacticUnit).toEqual(didacticUnit)
         expect(listedDidacticUnits).toEqual([didacticUnit])
     })
