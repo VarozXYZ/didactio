@@ -1,8 +1,5 @@
 import type { CreatedUnitInit } from './create-unit-init.js'
-import {
-    ProviderBackedFakeChapterGenerator,
-    type ChapterGenerator,
-} from '../providers/chapter-generator.js'
+import type { ChapterGenerator } from '../providers/chapter-generator.js'
 
 export interface UnitInitGeneratedChapter {
     chapterIndex: number
@@ -14,12 +11,10 @@ export interface UnitInitGeneratedChapter {
     updatedAt?: string
 }
 
-const defaultChapterGenerator = new ProviderBackedFakeChapterGenerator()
-
 export async function generateChapterContent(
     unitInit: CreatedUnitInit,
     chapterIndex: number,
-    chapterGenerator: ChapterGenerator = defaultChapterGenerator
+    chapterGenerator: ChapterGenerator
 ): Promise<CreatedUnitInit> {
     if (unitInit.status !== 'syllabus_approved' || !unitInit.syllabus) {
         throw new Error('Chapter content cannot be generated from the current unit-init state.')
