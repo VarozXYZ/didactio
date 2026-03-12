@@ -2,6 +2,7 @@ import express from 'express'
 import {
     createDidacticUnitFromApprovedUnitInit,
 } from './didactic-unit/create-didactic-unit.js'
+import { generateDidacticUnitChapter } from './didactic-unit/generate-didactic-unit-chapter.js'
 import type { DidacticUnitStore } from './didactic-unit/didactic-unit-store.js'
 import {
     createCompletedChapterGenerationRunRecord,
@@ -184,6 +185,137 @@ export function createApp(options: CreateAppOptions) {
         }
 
         response.json(didacticUnit)
+    })
+
+    app.post('/api/didactic-unit/:id/chapters/:chapterIndex/generate', async (request, response) => {
+        const requestWithMockOwner = asRequestWithMockOwner(request)
+        const didacticUnit = await didacticUnitStore.getById(
+            requestWithMockOwner.mockOwner.id,
+            request.params.id
+        )
+
+        if (!didacticUnit) {
+            response.status(404).json({
+                error: 'Didactic unit not found.',
+            })
+            return
+        }
+
+        let chapterIndex
+        try {
+            chapterIndex = parseChapterIndex(request.params.chapterIndex)
+        } catch (error) {
+            response.status(400).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : 'Invalid didactic unit chapter generation request.',
+            })
+            return
+        }
+
+        try {
+            const updatedDidacticUnit = await generateDidacticUnitChapter(
+                didacticUnit,
+                chapterIndex,
+                chapterGenerator
+            )
+            await didacticUnitStore.save(updatedDidacticUnit)
+
+            const generatedChapter = updatedDidacticUnit.generatedChapters?.find(
+                (chapter) => chapter.chapterIndex === chapterIndex
+            )
+
+            if (generatedChapter) {
+                await generationRunStore.save(
+                    createCompletedChapterGenerationRunRecord({
+                        unitInitId: updatedDidacticUnit.unitInitId,
+                        ownerId: updatedDidacticUnit.ownerId,
+                        chapterIndex,
+                        provider: updatedDidacticUnit.provider,
+                        model: resolveChapterGeneratorModel(updatedDidacticUnit.provider),
+                        prompt: buildChapterGenerationPrompt(
+                            {
+                                id: updatedDidacticUnit.unitInitId,
+                                ownerId: updatedDidacticUnit.ownerId,
+                                topic: updatedDidacticUnit.topic,
+                                provider: updatedDidacticUnit.provider,
+                                status: 'syllabus_approved',
+                                nextAction: 'generate_unit_content',
+                                createdAt: updatedDidacticUnit.createdAt,
+                                questionnaireAnswers: updatedDidacticUnit.questionnaireAnswers,
+                                syllabus: {
+                                    title: updatedDidacticUnit.title,
+                                    overview: updatedDidacticUnit.overview,
+                                    learningGoals: updatedDidacticUnit.learningGoals,
+                                    chapters: updatedDidacticUnit.chapters,
+                                },
+                                syllabusApprovedAt: updatedDidacticUnit.createdAt,
+                            },
+                            chapterIndex
+                        ),
+                        chapter: generatedChapter,
+                        createdAt: generatedChapter.generatedAt,
+                    })
+                )
+            }
+
+            response.json(updatedDidacticUnit)
+        } catch (error) {
+            const promptSource = {
+                id: didacticUnit.unitInitId,
+                ownerId: didacticUnit.ownerId,
+                topic: didacticUnit.topic,
+                provider: didacticUnit.provider,
+                status: 'syllabus_approved' as const,
+                nextAction: 'generate_unit_content' as const,
+                createdAt: didacticUnit.createdAt,
+                questionnaireAnswers: didacticUnit.questionnaireAnswers,
+                syllabus: {
+                    title: didacticUnit.title,
+                    overview: didacticUnit.overview,
+                    learningGoals: didacticUnit.learningGoals,
+                    chapters: didacticUnit.chapters,
+                },
+                syllabusApprovedAt: didacticUnit.createdAt,
+            }
+
+            if (canBuildChapterGenerationPrompt(promptSource, chapterIndex)) {
+                await generationRunStore.save(
+                    createFailedChapterGenerationRunRecord({
+                        unitInitId: didacticUnit.unitInitId,
+                        ownerId: didacticUnit.ownerId,
+                        chapterIndex,
+                        provider: didacticUnit.provider,
+                        model: resolveChapterGeneratorModel(didacticUnit.provider),
+                        prompt: buildChapterGenerationPrompt(promptSource, chapterIndex),
+                        rawOutput:
+                            error instanceof OpenAiChapterGenerationError ||
+                            error instanceof DeepSeekChapterGenerationError
+                                ? error.rawOutput
+                                : undefined,
+                        error:
+                            error instanceof Error
+                                ? error.message
+                                : 'Didactic unit chapter generation failed.',
+                        createdAt: new Date().toISOString(),
+                    })
+                )
+            }
+
+            const message =
+                error instanceof Error
+                    ? error.message
+                    : 'Didactic unit chapter generation failed.'
+
+            response.status(
+                message === 'Chapter index is out of range for the approved syllabus.'
+                    ? 400
+                    : 409
+            ).json({
+                error: message,
+            })
+        }
     })
 
     app.get('/api/unit-init/:id', async (request, response) => {

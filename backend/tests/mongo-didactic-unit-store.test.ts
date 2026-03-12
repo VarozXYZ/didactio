@@ -20,6 +20,12 @@ function createStoredDidacticUnit(): DidacticUnit {
                 keyPoints: ['Routing'],
             },
         ],
+        questionnaireAnswers: [
+            {
+                questionId: 'learning_goal',
+                value: 'Build production-ready applications',
+            },
+        ],
         createdAt: '2026-03-12T00:00:00.000Z',
     }
 }

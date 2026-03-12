@@ -492,6 +492,54 @@
       ]
     },
     {
+      "name": "10c AI GEN Generate Didactic Unit Chapter",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/didactic-unit/{{didacticUnitId}}/chapters/{{chapterIndex}}/generate",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "didactic-unit",
+            "{{didacticUnitId}}",
+            "chapters",
+            "{{chapterIndex}}",
+            "generate"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Generate Didactic Unit Chapter returns 200 or 409', function () { pm.expect([200, 409]).to.include(pm.response.code); });",
+              "const body = pm.response.json();",
+              "if (pm.response.code === 200) {",
+              "  pm.test('Didactic unit chapter generation is structurally valid', function () { pm.expect(body.id).to.eql(pm.collectionVariables.get('didacticUnitId')); pm.expect(body.generatedChapters).to.be.an('array').that.is.not.empty; const chapter = body.generatedChapters.find((item) => item.chapterIndex === Number(pm.collectionVariables.get('chapterIndex') || '0')); pm.expect(chapter).to.be.an('object'); pm.expect(chapter.content).to.be.a('string').and.not.empty; pm.expect(chapter.keyTakeaways).to.be.an('array').that.is.not.empty; });",
+              "} else {",
+              "  pm.test('Didactic unit chapter generation returns a useful AI error', function () { pm.expect(body.error).to.be.a('string').and.not.empty; });",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
       "name": "11 AI GEN Generate Chapter Content",
       "request": {
         "method": "POST",
