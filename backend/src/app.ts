@@ -1,14 +1,14 @@
 import express from 'express'
 import {
-    createCompletedChapterGenerationRun,
-    createFailedChapterGenerationRun,
-    type ChapterGenerationRunStore,
-} from './generation-runs/chapter-generation-run-store.js'
-import {
-    createCompletedSyllabusGenerationRun,
-    createFailedSyllabusGenerationRun,
-    type SyllabusGenerationRunStore,
-} from './generation-runs/syllabus-generation-run-store.js'
+    createCompletedChapterGenerationRunRecord,
+    createCompletedSyllabusGenerationRunRecord,
+    createFailedChapterGenerationRunRecord,
+    createFailedSyllabusGenerationRunRecord,
+    type ChapterGenerationRunRecord,
+    type GenerationRunStore,
+    type SyllabusGenerationRunRecord,
+} from './generation-runs/generation-run-store.js'
+import { DeepSeekChapterGenerationError } from './providers/deepseek-chapter-generator.js'
 import { DeepSeekSyllabusGenerationError } from './providers/deepseek-syllabus-generator.js'
 import { OpenAiSyllabusGenerationError } from './providers/openai-syllabus-generator.js'
 import {
@@ -55,8 +55,7 @@ import type { UnitInitStore } from './unit-init/unit-init-store.js'
 
 export interface CreateAppOptions {
     unitInitStore: UnitInitStore
-    chapterGenerationRunStore: ChapterGenerationRunStore
-    syllabusGenerationRunStore: SyllabusGenerationRunStore
+    generationRunStore: GenerationRunStore
     syllabusGenerator?: SyllabusGenerator
     chapterGenerator?: ChapterGenerator
     mongoHealth?: MongoHealthStatus
@@ -94,11 +93,22 @@ function canBuildChapterGenerationPrompt(
     return Boolean(unitInit.syllabus?.chapters?.[chapterIndex])
 }
 
+function isSyllabusGenerationRun(
+    run: SyllabusGenerationRunRecord | ChapterGenerationRunRecord
+): run is SyllabusGenerationRunRecord {
+    return run.stage === 'syllabus'
+}
+
+function isChapterGenerationRun(
+    run: SyllabusGenerationRunRecord | ChapterGenerationRunRecord
+): run is ChapterGenerationRunRecord {
+    return run.stage === 'chapter'
+}
+
 export function createApp(options: CreateAppOptions) {
     const app = express()
     const unitInitStore = options.unitInitStore
-    const chapterGenerationRunStore = options.chapterGenerationRunStore
-    const syllabusGenerationRunStore = options.syllabusGenerationRunStore
+    const generationRunStore = options.generationRunStore
     const syllabusGenerator =
         options.syllabusGenerator ?? new ProviderBackedFakeSyllabusGenerator()
     const chapterGenerator =
@@ -201,10 +211,12 @@ export function createApp(options: CreateAppOptions) {
         }
 
         response.json({
-            runs: await syllabusGenerationRunStore.listByUnitInit(
-                requestWithMockOwner.mockOwner.id,
-                request.params.id
-            ),
+            runs: (
+                await generationRunStore.listByUnitInit(
+                    requestWithMockOwner.mockOwner.id,
+                    request.params.id
+                )
+            ).filter(isSyllabusGenerationRun),
         })
     })
 
@@ -223,10 +235,12 @@ export function createApp(options: CreateAppOptions) {
         }
 
         response.json({
-            runs: await chapterGenerationRunStore.listByUnitInit(
-                requestWithMockOwner.mockOwner.id,
-                request.params.id
-            ),
+            runs: (
+                await generationRunStore.listByUnitInit(
+                    requestWithMockOwner.mockOwner.id,
+                    request.params.id
+                )
+            ).filter(isChapterGenerationRun),
         })
     })
 
@@ -461,8 +475,8 @@ export function createApp(options: CreateAppOptions) {
         try {
             const updatedUnitInit = await generateSyllabus(unitInit, syllabusGenerator)
             await unitInitStore.save(updatedUnitInit)
-            await syllabusGenerationRunStore.save(
-                createCompletedSyllabusGenerationRun({
+            await generationRunStore.save(
+                createCompletedSyllabusGenerationRunRecord({
                     unitInitId: updatedUnitInit.id,
                     ownerId: updatedUnitInit.ownerId,
                     provider: updatedUnitInit.provider,
@@ -475,8 +489,8 @@ export function createApp(options: CreateAppOptions) {
             response.json(updatedUnitInit)
         } catch (error) {
             if (canCreateSyllabusGenerationRun(unitInit)) {
-                await syllabusGenerationRunStore.save(
-                    createFailedSyllabusGenerationRun({
+                await generationRunStore.save(
+                    createFailedSyllabusGenerationRunRecord({
                         unitInitId: unitInit.id,
                         ownerId: unitInit.ownerId,
                         provider: unitInit.provider,
@@ -610,8 +624,8 @@ export function createApp(options: CreateAppOptions) {
             )
 
             if (generatedChapter) {
-                await chapterGenerationRunStore.save(
-                    createCompletedChapterGenerationRun({
+                await generationRunStore.save(
+                    createCompletedChapterGenerationRunRecord({
                         unitInitId: updatedUnitInit.id,
                         ownerId: updatedUnitInit.ownerId,
                         chapterIndex,
@@ -630,8 +644,8 @@ export function createApp(options: CreateAppOptions) {
                 canCreateChapterGenerationRun(unitInit) &&
                 canBuildChapterGenerationPrompt(unitInit, chapterIndex)
             ) {
-                await chapterGenerationRunStore.save(
-                    createFailedChapterGenerationRun({
+                await generationRunStore.save(
+                    createFailedChapterGenerationRunRecord({
                         unitInitId: unitInit.id,
                         ownerId: unitInit.ownerId,
                         chapterIndex,
@@ -639,7 +653,8 @@ export function createApp(options: CreateAppOptions) {
                         model: resolveChapterGeneratorModel(unitInit.provider),
                         prompt: buildChapterGenerationPrompt(unitInit, chapterIndex),
                         rawOutput:
-                            error instanceof OpenAiChapterGenerationError
+                            error instanceof OpenAiChapterGenerationError ||
+                            error instanceof DeepSeekChapterGenerationError
                                 ? error.rawOutput
                                 : undefined,
                         error:
