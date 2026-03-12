@@ -4,6 +4,7 @@ import {
 } from './didactic-unit/create-didactic-unit.js'
 import { generateDidacticUnitChapter } from './didactic-unit/generate-didactic-unit-chapter.js'
 import { listDidacticUnitChapters } from './didactic-unit/list-didactic-unit-chapters.js'
+import { updateDidacticUnitChapter } from './didactic-unit/update-didactic-unit-chapter.js'
 import type { DidacticUnitStore } from './didactic-unit/didactic-unit-store.js'
 import {
     createCompletedChapterGenerationRunRecord,
@@ -246,6 +247,72 @@ export function createApp(options: CreateAppOptions) {
         }
 
         response.json(generatedChapter)
+    })
+
+    app.patch('/api/didactic-unit/:id/chapters/:chapterIndex', async (request, response) => {
+        const requestWithMockOwner = asRequestWithMockOwner(request)
+        const didacticUnit = await didacticUnitStore.getById(
+            requestWithMockOwner.mockOwner.id,
+            request.params.id
+        )
+
+        if (!didacticUnit) {
+            response.status(404).json({
+                error: 'Didactic unit not found.',
+            })
+            return
+        }
+
+        let chapterIndex
+        try {
+            chapterIndex = parseChapterIndex(request.params.chapterIndex)
+        } catch (error) {
+            response.status(400).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : 'Invalid didactic unit chapter update request.',
+            })
+            return
+        }
+
+        let parsedInput
+        try {
+            parsedInput = parseUpdateChapterContentInput(request.body)
+        } catch (error) {
+            response.status(400).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : 'Invalid didactic unit chapter update request.',
+            })
+            return
+        }
+
+        try {
+            const updatedDidacticUnit = updateDidacticUnitChapter(
+                didacticUnit,
+                chapterIndex,
+                parsedInput
+            )
+            await didacticUnitStore.save(updatedDidacticUnit)
+            const updatedChapter = updatedDidacticUnit.generatedChapters?.find(
+                (chapter) => chapter.chapterIndex === chapterIndex
+            )
+
+            response.json(updatedChapter)
+        } catch (error) {
+            const message =
+                error instanceof Error
+                    ? error.message
+                    : 'Didactic unit chapter update failed.'
+
+            response.status(
+                message === 'Generated didactic unit chapter not found.' ? 404 : 409
+            ).json({
+                error: message,
+            })
+        }
     })
 
     app.post('/api/didactic-unit/:id/chapters/:chapterIndex/generate', async (request, response) => {

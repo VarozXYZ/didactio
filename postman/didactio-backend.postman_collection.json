@@ -607,6 +607,49 @@
       ]
     },
     {
+      "name": "10f Update Didactic Unit Chapter",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"chapter\": {\n    \"title\": \"Edited Didactic Foundations\",\n    \"overview\": \"A rewritten overview for the didactic unit chapter.\",\n    \"content\": \"A rewritten didactic unit chapter body.\",\n    \"keyTakeaways\": [\n      \"Edited didactic takeaway one\",\n      \"Edited didactic takeaway two\"\n    ]\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/didactic-unit/{{didacticUnitId}}/chapters/{{chapterIndex}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "didactic-unit",
+            "{{didacticUnitId}}",
+            "chapters",
+            "{{chapterIndex}}"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Update Didactic Unit Chapter returns 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('Didactic unit chapter update is stored', function () { pm.expect(body.title).to.eql('Edited Didactic Foundations'); pm.expect(body.updatedAt).to.be.a('string').and.not.empty; });"
+            ]
+          }
+        }
+      ]
+    },
+    {
       "name": "11 AI GEN Generate Chapter Content",
       "request": {
         "method": "POST",

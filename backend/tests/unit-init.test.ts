@@ -545,6 +545,200 @@ describe('POST /api/didactic-unit/:id/chapters/:chapterIndex/generate', () => {
     })
 })
 
+describe('PATCH /api/didactic-unit/:id/chapters/:chapterIndex', () => {
+    it('updates one generated didactic unit chapter by index', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const createdResponse = await request(app)
+            .post('/api/unit-init')
+            .send({ topic: 'next.js framework' })
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/moderate`)
+            .send({})
+
+        const questionnaireResponse = await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/questionnaire/generate`)
+            .send({})
+
+        await request(app)
+            .patch(`/api/unit-init/${createdResponse.body.id}/questionnaire/answers`)
+            .send({
+                answers: questionnaireResponse.body.questionnaire.questions.map(
+                    (question: { id: string }) => ({
+                        questionId: question.id,
+                        value: `answer-for-${question.id}`,
+                    })
+                ),
+            })
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/syllabus-prompt/generate`)
+            .send({})
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/syllabus/generate`)
+            .send({})
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/approve-syllabus`)
+            .send({})
+
+        const didacticUnitsResponse = await request(app).get('/api/didactic-unit')
+        const didacticUnitId = didacticUnitsResponse.body.didacticUnits[0].id
+
+        await request(app)
+            .post(`/api/didactic-unit/${didacticUnitId}/chapters/0/generate`)
+            .send({})
+
+        const response = await request(app)
+            .patch(`/api/didactic-unit/${didacticUnitId}/chapters/0`)
+            .send({
+                chapter: {
+                    title: 'Edited Didactic Foundations',
+                    overview: 'A rewritten overview for the didactic unit chapter.',
+                    content: 'A rewritten didactic unit chapter body.',
+                    keyTakeaways: [
+                        'Edited didactic takeaway one',
+                        'Edited didactic takeaway two',
+                    ],
+                },
+            })
+
+        expect(response.status).toBe(200)
+        expect(response.body).toMatchObject({
+            chapterIndex: 0,
+            title: 'Edited Didactic Foundations',
+            overview: 'A rewritten overview for the didactic unit chapter.',
+            content: 'A rewritten didactic unit chapter body.',
+        })
+        expect(response.body.keyTakeaways).toEqual([
+            'Edited didactic takeaway one',
+            'Edited didactic takeaway two',
+        ])
+        expect(typeof response.body.updatedAt).toBe('string')
+    })
+
+    it('returns 400 for an invalid didactic unit chapter update payload', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const createdResponse = await request(app)
+            .post('/api/unit-init')
+            .send({ topic: 'next.js framework' })
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/moderate`)
+            .send({})
+
+        const questionnaireResponse = await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/questionnaire/generate`)
+            .send({})
+
+        await request(app)
+            .patch(`/api/unit-init/${createdResponse.body.id}/questionnaire/answers`)
+            .send({
+                answers: questionnaireResponse.body.questionnaire.questions.map(
+                    (question: { id: string }) => ({
+                        questionId: question.id,
+                        value: `answer-for-${question.id}`,
+                    })
+                ),
+            })
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/syllabus-prompt/generate`)
+            .send({})
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/syllabus/generate`)
+            .send({})
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/approve-syllabus`)
+            .send({})
+
+        const didacticUnitsResponse = await request(app).get('/api/didactic-unit')
+        const didacticUnitId = didacticUnitsResponse.body.didacticUnits[0].id
+
+        const response = await request(app)
+            .patch(`/api/didactic-unit/${didacticUnitId}/chapters/0`)
+            .send({
+                chapter: {
+                    title: '',
+                    overview: 'Overview',
+                    content: 'Content',
+                    keyTakeaways: ['Takeaway'],
+                },
+            })
+
+        expect(response.status).toBe(400)
+        expect(response.body).toEqual({
+            error: 'chapter.title is required.',
+        })
+    })
+
+    it('returns 404 when the generated didactic unit chapter does not exist yet', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const createdResponse = await request(app)
+            .post('/api/unit-init')
+            .send({ topic: 'next.js framework' })
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/moderate`)
+            .send({})
+
+        const questionnaireResponse = await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/questionnaire/generate`)
+            .send({})
+
+        await request(app)
+            .patch(`/api/unit-init/${createdResponse.body.id}/questionnaire/answers`)
+            .send({
+                answers: questionnaireResponse.body.questionnaire.questions.map(
+                    (question: { id: string }) => ({
+                        questionId: question.id,
+                        value: `answer-for-${question.id}`,
+                    })
+                ),
+            })
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/syllabus-prompt/generate`)
+            .send({})
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/syllabus/generate`)
+            .send({})
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/approve-syllabus`)
+            .send({})
+
+        const didacticUnitsResponse = await request(app).get('/api/didactic-unit')
+        const didacticUnitId = didacticUnitsResponse.body.didacticUnits[0].id
+
+        const response = await request(app)
+            .patch(`/api/didactic-unit/${didacticUnitId}/chapters/0`)
+            .send({
+                chapter: {
+                    title: 'Edited Didactic Foundations',
+                    overview: 'Overview',
+                    content: 'Content',
+                    keyTakeaways: ['Takeaway'],
+                },
+            })
+
+        expect(response.status).toBe(404)
+        expect(response.body).toEqual({
+            error: 'Generated didactic unit chapter not found.',
+        })
+    })
+})
+
 describe('GET /api/unit-init/:id', () => {
     it('returns a previously created unit-init for the same mock owner', async () => {
         const store = new InMemoryUnitInitStore()
