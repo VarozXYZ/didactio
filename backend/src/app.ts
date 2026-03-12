@@ -3,6 +3,7 @@ import {
     createDidacticUnitFromApprovedUnitInit,
 } from './didactic-unit/create-didactic-unit.js'
 import { generateDidacticUnitChapter } from './didactic-unit/generate-didactic-unit-chapter.js'
+import { listDidacticUnitChapters } from './didactic-unit/list-didactic-unit-chapters.js'
 import type { DidacticUnitStore } from './didactic-unit/didactic-unit-store.js'
 import {
     createCompletedChapterGenerationRunRecord,
@@ -185,6 +186,66 @@ export function createApp(options: CreateAppOptions) {
         }
 
         response.json(didacticUnit)
+    })
+
+    app.get('/api/didactic-unit/:id/chapters', async (request, response) => {
+        const requestWithMockOwner = asRequestWithMockOwner(request)
+        const didacticUnit = await didacticUnitStore.getById(
+            requestWithMockOwner.mockOwner.id,
+            request.params.id
+        )
+
+        if (!didacticUnit) {
+            response.status(404).json({
+                error: 'Didactic unit not found.',
+            })
+            return
+        }
+
+        response.json({
+            chapters: listDidacticUnitChapters(didacticUnit),
+        })
+    })
+
+    app.get('/api/didactic-unit/:id/chapters/:chapterIndex', async (request, response) => {
+        const requestWithMockOwner = asRequestWithMockOwner(request)
+        const didacticUnit = await didacticUnitStore.getById(
+            requestWithMockOwner.mockOwner.id,
+            request.params.id
+        )
+
+        if (!didacticUnit) {
+            response.status(404).json({
+                error: 'Didactic unit not found.',
+            })
+            return
+        }
+
+        let chapterIndex
+        try {
+            chapterIndex = parseChapterIndex(request.params.chapterIndex)
+        } catch (error) {
+            response.status(400).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : 'Invalid didactic unit chapter lookup request.',
+            })
+            return
+        }
+
+        const generatedChapter = didacticUnit.generatedChapters?.find(
+            (chapter) => chapter.chapterIndex === chapterIndex
+        )
+
+        if (!generatedChapter) {
+            response.status(404).json({
+                error: 'Generated didactic unit chapter not found.',
+            })
+            return
+        }
+
+        response.json(generatedChapter)
     })
 
     app.post('/api/didactic-unit/:id/chapters/:chapterIndex/generate', async (request, response) => {

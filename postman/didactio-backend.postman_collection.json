@@ -540,6 +540,73 @@
       ]
     },
     {
+      "name": "10d Get Didactic Unit Chapters",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/didactic-unit/{{didacticUnitId}}/chapters",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "didactic-unit",
+            "{{didacticUnitId}}",
+            "chapters"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Get Didactic Unit Chapters returns 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('Didactic unit chapter list exposes generation flags', function () { pm.expect(body.chapters).to.be.an('array').that.is.not.empty; const chapter = body.chapters.find((item) => item.chapterIndex === Number(pm.collectionVariables.get('chapterIndex') || '0')); pm.expect(chapter).to.be.an('object'); pm.expect(chapter.hasGeneratedContent).to.be.true; });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10e Get Didactic Unit Chapter By Index",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/didactic-unit/{{didacticUnitId}}/chapters/{{chapterIndex}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "didactic-unit",
+            "{{didacticUnitId}}",
+            "chapters",
+            "{{chapterIndex}}"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Get Didactic Unit Chapter returns 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('Didactic unit generated chapter payload is complete', function () { pm.expect(body.chapterIndex).to.eql(Number(pm.collectionVariables.get('chapterIndex') || '0')); pm.expect(body.title).to.be.a('string').and.not.empty; pm.expect(body.content).to.be.a('string').and.not.empty; pm.expect(body.keyTakeaways).to.be.an('array').that.is.not.empty; });"
+            ]
+          }
+        }
+      ]
+    },
+    {
       "name": "11 AI GEN Generate Chapter Content",
       "request": {
         "method": "POST",
