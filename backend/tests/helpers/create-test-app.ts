@@ -1,4 +1,8 @@
 import {
+    InMemoryDidacticUnitStore,
+    type DidacticUnitStore,
+} from '../../src/didactic-unit/didactic-unit-store.js'
+import {
     InMemoryGenerationRunStore,
     type GenerationRunStore,
 } from '../../src/generation-runs/generation-run-store.js'
@@ -13,6 +17,7 @@ import {
 
 interface CreateTestAppOptions {
     unitInitStore?: UnitInitStore
+    didacticUnitStore?: DidacticUnitStore
     generationRunStore?: GenerationRunStore
     syllabusGenerator?: SyllabusGenerator
     chapterGenerator?: ChapterGenerator
@@ -22,6 +27,7 @@ interface CreateTestAppOptions {
 export function createTestApp(options: CreateTestAppOptions = {}) {
     const appOptions: CreateAppOptions = {
         unitInitStore: options.unitInitStore ?? new InMemoryUnitInitStore(),
+        didacticUnitStore: options.didacticUnitStore ?? new InMemoryDidacticUnitStore(),
         generationRunStore: options.generationRunStore ?? new InMemoryGenerationRunStore(),
         syllabusGenerator: options.syllabusGenerator,
         chapterGenerator: options.chapterGenerator,

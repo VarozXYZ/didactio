@@ -108,6 +108,76 @@ describe('GET /api/unit-init', () => {
     })
 })
 
+describe('GET /api/didactic-unit', () => {
+    it('returns an empty list when no didactic units exist', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const response = await request(app).get('/api/didactic-unit')
+
+        expect(response.status).toBe(200)
+        expect(response.body).toEqual({
+            didacticUnits: [],
+        })
+    })
+
+    it('returns didactic units created from approved syllabi', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const createdResponse = await request(app)
+            .post('/api/unit-init')
+            .send({ topic: 'next.js framework' })
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/moderate`)
+            .send({})
+
+        const questionnaireResponse = await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/questionnaire/generate`)
+            .send({})
+
+        await request(app)
+            .patch(`/api/unit-init/${createdResponse.body.id}/questionnaire/answers`)
+            .send({
+                answers: questionnaireResponse.body.questionnaire.questions.map(
+                    (question: { id: string }) => ({
+                        questionId: question.id,
+                        value: `answer-for-${question.id}`,
+                    })
+                ),
+            })
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/syllabus-prompt/generate`)
+            .send({})
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/syllabus/generate`)
+            .send({})
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/approve-syllabus`)
+            .send({})
+
+        const response = await request(app).get('/api/didactic-unit')
+
+        expect(response.status).toBe(200)
+        expect(response.body.didacticUnits).toHaveLength(1)
+        expect(response.body.didacticUnits[0]).toMatchObject({
+            unitInitId: createdResponse.body.id,
+            ownerId: 'mock-user',
+            title: 'next.js framework Learning Path',
+            topic: 'next.js framework',
+            provider: 'openai',
+            status: 'ready_for_content_generation',
+        })
+        expect(response.body.didacticUnits[0].chapters).toHaveLength(3)
+        expect(typeof response.body.didacticUnits[0].id).toBe('string')
+        expect(typeof response.body.didacticUnits[0].createdAt).toBe('string')
+    })
+})
+
 describe('GET /api/unit-init/:id', () => {
     it('returns a previously created unit-init for the same mock owner', async () => {
         const store = new InMemoryUnitInitStore()
@@ -1415,6 +1485,14 @@ describe('POST /api/unit-init/:id/approve-syllabus', () => {
         expect(response.body.nextAction).toBe('generate_unit_content')
         expect(typeof response.body.syllabusApprovedAt).toBe('string')
         expect(Number.isNaN(Date.parse(response.body.syllabusApprovedAt))).toBe(false)
+
+        const didacticUnitsResponse = await request(app).get('/api/didactic-unit')
+
+        expect(didacticUnitsResponse.status).toBe(200)
+        expect(didacticUnitsResponse.body.didacticUnits).toHaveLength(1)
+        expect(didacticUnitsResponse.body.didacticUnits[0].unitInitId).toBe(
+            createdResponse.body.id
+        )
     })
 
     it('returns 404 when the unit-init does not exist', async () => {

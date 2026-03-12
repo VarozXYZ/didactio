@@ -1,5 +1,9 @@
 import express from 'express'
 import {
+    createDidacticUnitFromApprovedUnitInit,
+} from './didactic-unit/create-didactic-unit.js'
+import type { DidacticUnitStore } from './didactic-unit/didactic-unit-store.js'
+import {
     createCompletedChapterGenerationRunRecord,
     createCompletedSyllabusGenerationRunRecord,
     createFailedChapterGenerationRunRecord,
@@ -55,6 +59,7 @@ import type { UnitInitStore } from './unit-init/unit-init-store.js'
 
 export interface CreateAppOptions {
     unitInitStore: UnitInitStore
+    didacticUnitStore: DidacticUnitStore
     generationRunStore: GenerationRunStore
     syllabusGenerator?: SyllabusGenerator
     chapterGenerator?: ChapterGenerator
@@ -108,6 +113,7 @@ function isChapterGenerationRun(
 export function createApp(options: CreateAppOptions) {
     const app = express()
     const unitInitStore = options.unitInitStore
+    const didacticUnitStore = options.didacticUnitStore
     const generationRunStore = options.generationRunStore
     const syllabusGenerator =
         options.syllabusGenerator ?? new ProviderBackedFakeSyllabusGenerator()
@@ -150,6 +156,16 @@ export function createApp(options: CreateAppOptions) {
 
         response.json({
             unitInits: await unitInitStore.listByOwner(requestWithMockOwner.mockOwner.id),
+        })
+    })
+
+    app.get('/api/didactic-unit', async (request, response) => {
+        const requestWithMockOwner = asRequestWithMockOwner(request)
+
+        response.json({
+            didacticUnits: await didacticUnitStore.listByOwner(
+                requestWithMockOwner.mockOwner.id
+            ),
         })
     })
 
@@ -596,6 +612,8 @@ export function createApp(options: CreateAppOptions) {
         try {
             const updatedUnitInit = approveSyllabus(unitInit)
             await unitInitStore.save(updatedUnitInit)
+            const didacticUnit = createDidacticUnitFromApprovedUnitInit(updatedUnitInit)
+            await didacticUnitStore.save(didacticUnit)
             response.json(updatedUnitInit)
         } catch (error) {
             response.status(409).json({

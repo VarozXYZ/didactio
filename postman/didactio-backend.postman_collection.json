@@ -429,6 +429,37 @@
       ]
     },
     {
+      "name": "10a List Didactic Units",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/didactic-unit",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "didactic-unit"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('List Didactic Units returns 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('Approved syllabus creates a didactic unit record', function () { pm.expect(body.didacticUnits).to.be.an('array').that.is.not.empty; const latestUnit = body.didacticUnits[0]; pm.expect(latestUnit.unitInitId).to.eql(pm.collectionVariables.get('unitInitId')); pm.expect(latestUnit.status).to.eql('ready_for_content_generation'); pm.expect(latestUnit.title).to.be.a('string').and.not.empty; pm.expect(latestUnit.chapters).to.be.an('array').that.is.not.empty; });"
+            ]
+          }
+        }
+      ]
+    },
+    {
       "name": "11 AI GEN Generate Chapter Content",
       "request": {
         "method": "POST",
