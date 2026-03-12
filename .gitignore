@@ -5,5 +5,6 @@ frontend/*.local
 backend/node_modules
 backend/dist
 backend/.env
+backend/.data
 app-spec.md
 DEVELOPMENT_WORKFLOW.md
