@@ -255,24 +255,13 @@ export function createApp(options: CreateAppOptions) {
             return
         }
 
-        const [syllabusRuns, chapterRuns] = await Promise.all([
-            generationRunStore.listByUnitInit(
-                requestWithMockOwner.mockOwner.id,
-                didacticUnit.unitInitId
-            ),
-            generationRunStore.listByDidacticUnit(
-                requestWithMockOwner.mockOwner.id,
-                didacticUnit.id
-            ),
-        ])
-
-        const runs: Array<SyllabusGenerationRunRecord | ChapterGenerationRunRecord> = [
-            ...syllabusRuns.filter(isSyllabusGenerationRun),
-            ...chapterRuns,
-        ]
-
         response.json({
-            runs: runs.sort(compareRunsByCreatedAtDesc),
+            runs: (
+                await generationRunStore.listByDidacticUnit(
+                    requestWithMockOwner.mockOwner.id,
+                    didacticUnit.id
+                )
+            ).sort(compareRunsByCreatedAtDesc),
         })
     })
 
@@ -778,6 +767,11 @@ export function createApp(options: CreateAppOptions) {
             await unitInitStore.save(updatedUnitInit)
             const didacticUnit = createDidacticUnitFromApprovedUnitInit(updatedUnitInit)
             await didacticUnitStore.save(didacticUnit)
+            await generationRunStore.linkUnitInitRunsToDidacticUnit(
+                updatedUnitInit.ownerId,
+                updatedUnitInit.id,
+                didacticUnit.id
+            )
             response.json(updatedUnitInit)
         } catch (error) {
             response.status(409).json({

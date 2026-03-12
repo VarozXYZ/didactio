@@ -9,6 +9,7 @@ export type GenerationRunStatus = 'completed' | 'failed'
 interface GenerationRunBase {
     id: string
     unitInitId: string
+    didacticUnitId?: string
     ownerId: string
     provider: UnitInitProvider
     model: string
@@ -36,7 +37,12 @@ export type GenerationRun = SyllabusGenerationRunRecord | ChapterGenerationRunRe
 export interface GenerationRunStore {
     save(run: GenerationRun): Promise<void>
     listByUnitInit(ownerId: string, unitInitId: string): Promise<GenerationRun[]>
-    listByDidacticUnit(ownerId: string, didacticUnitId: string): Promise<ChapterGenerationRunRecord[]>
+    listByDidacticUnit(ownerId: string, didacticUnitId: string): Promise<GenerationRun[]>
+    linkUnitInitRunsToDidacticUnit(
+        ownerId: string,
+        unitInitId: string,
+        didacticUnitId: string
+    ): Promise<void>
 }
 
 export class InMemoryGenerationRunStore implements GenerationRunStore {
@@ -55,14 +61,25 @@ export class InMemoryGenerationRunStore implements GenerationRunStore {
     async listByDidacticUnit(
         ownerId: string,
         didacticUnitId: string
-    ): Promise<ChapterGenerationRunRecord[]> {
+    ): Promise<GenerationRun[]> {
         const runs = Array.from(this.runs.values()).flat()
 
         return runs.filter(
-            (run): run is ChapterGenerationRunRecord =>
-                run.ownerId === ownerId &&
-                run.stage === 'chapter' &&
-                run.didacticUnitId === didacticUnitId
+            (run) => run.ownerId === ownerId && run.didacticUnitId === didacticUnitId
+        )
+    }
+
+    async linkUnitInitRunsToDidacticUnit(
+        ownerId: string,
+        unitInitId: string,
+        didacticUnitId: string
+    ): Promise<void> {
+        const unitInitRuns = this.runs.get(unitInitId) ?? []
+        this.runs.set(
+            unitInitId,
+            unitInitRuns.map((run) =>
+                run.ownerId === ownerId ? { ...run, didacticUnitId } : run
+            )
         )
     }
 }
@@ -120,6 +137,7 @@ export function createCompletedSyllabusGenerationRunRecord(
         id: randomUUID(),
         stage: 'syllabus',
         unitInitId: input.unitInitId,
+        didacticUnitId: undefined,
         ownerId: input.ownerId,
         provider: input.provider,
         model: input.model,
@@ -137,6 +155,7 @@ export function createFailedSyllabusGenerationRunRecord(
         id: randomUUID(),
         stage: 'syllabus',
         unitInitId: input.unitInitId,
+        didacticUnitId: undefined,
         ownerId: input.ownerId,
         provider: input.provider,
         model: input.model,

@@ -1,6 +1,5 @@
 import type { Db, Document } from 'mongodb'
 import type {
-    ChapterGenerationRunRecord,
     GenerationRun,
     GenerationRunStore,
 } from './generation-run-store.js'
@@ -50,11 +49,10 @@ export class MongoGenerationRunStore implements GenerationRunStore {
     async listByDidacticUnit(
         ownerId: string,
         didacticUnitId: string
-    ): Promise<ChapterGenerationRunRecord[]> {
+    ): Promise<GenerationRun[]> {
         const documents = await this.collection
             .find({
                 ownerId,
-                stage: 'chapter',
                 didacticUnitId,
             })
             .sort({ createdAt: -1 })
@@ -62,9 +60,24 @@ export class MongoGenerationRunStore implements GenerationRunStore {
 
         return documents
             .map((document) => stripMongoId(document))
-            .filter(
-                (document): document is ChapterGenerationRunRecord =>
-                    document !== null && document.stage === 'chapter'
-            )
+            .filter((document): document is GenerationRun => document !== null)
+    }
+
+    async linkUnitInitRunsToDidacticUnit(
+        ownerId: string,
+        unitInitId: string,
+        didacticUnitId: string
+    ): Promise<void> {
+        await this.collection.updateMany(
+            {
+                ownerId,
+                unitInitId,
+            },
+            {
+                $set: {
+                    didacticUnitId,
+                },
+            }
+        )
     }
 }

@@ -508,6 +508,7 @@ describe('GET /api/didactic-unit/:id/runs', () => {
         })
         expect(response.body.runs[1]).toMatchObject({
             unitInitId: createdResponse.body.id,
+            didacticUnitId,
             stage: 'syllabus',
         })
     })
