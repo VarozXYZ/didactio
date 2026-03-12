@@ -4,6 +4,7 @@ import {
     type ChapterGenerator,
 } from './providers/chapter-generator.js'
 import { attachMockOwner, type RequestWithMockOwner } from './middleware/mock-owner.js'
+import type { MongoHealthStatus } from './mongo/mongo-connection.js'
 import {
     ProviderBackedFakeSyllabusGenerator,
     type SyllabusGenerator,
@@ -37,6 +38,7 @@ interface CreateAppOptions {
     unitInitStore?: UnitInitStore
     syllabusGenerator?: SyllabusGenerator
     chapterGenerator?: ChapterGenerator
+    mongoHealth?: MongoHealthStatus
 }
 
 function asRequestWithMockOwner(request: express.Request): RequestWithMockOwner {
@@ -60,6 +62,11 @@ export function createApp(options: CreateAppOptions = {}) {
         options.syllabusGenerator ?? new ProviderBackedFakeSyllabusGenerator()
     const chapterGenerator =
         options.chapterGenerator ?? new ProviderBackedFakeChapterGenerator()
+    const mongoHealth = options.mongoHealth ?? {
+        configured: false,
+        connected: false,
+        databaseName: null,
+    }
 
     app.use(express.json())
     app.use(attachMockOwner)
@@ -71,6 +78,7 @@ export function createApp(options: CreateAppOptions = {}) {
             status: 'ok',
             service: 'didactio-backend',
             mockOwnerId: requestWithMockOwner.mockOwner.id,
+            mongo: mongoHealth,
         })
     })
 

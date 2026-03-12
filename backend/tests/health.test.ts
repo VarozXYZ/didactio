@@ -17,6 +17,11 @@ describe('GET /api/health', () => {
             status: 'ok',
             service: 'didactio-backend',
             mockOwnerId: 'mock-user',
+            mongo: {
+                configured: false,
+                connected: false,
+                databaseName: null,
+            },
         })
     })
 
@@ -28,5 +33,24 @@ describe('GET /api/health', () => {
 
         expect(response.status).toBe(200)
         expect(response.body.mockOwnerId).toBe('local-dev-user')
+    })
+
+    it('returns the configured mongo health when provided', async () => {
+        const app = createApp({
+            mongoHealth: {
+                configured: true,
+                connected: true,
+                databaseName: 'didactio',
+            },
+        })
+
+        const response = await request(app).get('/api/health')
+
+        expect(response.status).toBe(200)
+        expect(response.body.mongo).toEqual({
+            configured: true,
+            connected: true,
+            databaseName: 'didactio',
+        })
     })
 })

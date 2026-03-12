@@ -7,6 +7,8 @@ export interface AppEnv {
     openAiApiKey: string | null
     openAiSyllabusModel: string
     openAiChapterModel: string
+    mongoDbUri: string | null
+    mongoDbName: string
     unitInitStoreKind: 'memory' | 'file'
     unitInitStoreFilePath: string
 }
@@ -57,6 +59,8 @@ export function getAppEnv(): AppEnv {
         openAiApiKey: parseOptionalString(process.env.OPENAI_API_KEY),
         openAiSyllabusModel: parseOptionalString(process.env.OPENAI_SYLLABUS_MODEL) ?? 'gpt-4o-mini',
         openAiChapterModel: parseOptionalString(process.env.OPENAI_CHAPTER_MODEL) ?? 'gpt-4o-mini',
+        mongoDbUri: parseOptionalString(process.env.MONGODB_URI),
+        mongoDbName: parseOptionalString(process.env.MONGODB_DB_NAME) ?? 'didactio',
         unitInitStoreKind: parseUnitInitStoreKind(process.env.UNIT_INIT_STORE_KIND),
         unitInitStoreFilePath:
             parseOptionalString(process.env.UNIT_INIT_STORE_FILE_PATH) ?? '.data/unit-inits.json',
