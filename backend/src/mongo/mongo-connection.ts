@@ -14,11 +14,15 @@ export interface MongoConnection {
     health: MongoHealthStatus
 }
 
-export async function connectMongoIfConfigured(
-    env: AppEnv
-): Promise<MongoConnection | null> {
+export const disconnectedMongoHealthStatus: MongoHealthStatus = {
+    configured: false,
+    connected: false,
+    databaseName: null,
+}
+
+export async function connectMongo(env: AppEnv): Promise<MongoConnection> {
     if (!env.mongoDbUri) {
-        return null
+        throw new Error('MONGODB_URI must be configured to start the backend.')
     }
 
     const client = new MongoClient(env.mongoDbUri)
@@ -38,16 +42,6 @@ export async function connectMongoIfConfigured(
     }
 }
 
-export function createMongoHealthStatus(
-    connection: MongoConnection | null
-): MongoHealthStatus {
-    if (!connection) {
-        return {
-            configured: false,
-            connected: false,
-            databaseName: null,
-        }
-    }
-
+export function getMongoHealthStatus(connection: MongoConnection): MongoHealthStatus {
     return connection.health
 }

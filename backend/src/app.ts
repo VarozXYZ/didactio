@@ -16,7 +16,10 @@ import {
     type ChapterGenerator,
 } from './providers/chapter-generator.js'
 import { attachMockOwner, type RequestWithMockOwner } from './middleware/mock-owner.js'
-import type { MongoHealthStatus } from './mongo/mongo-connection.js'
+import {
+    disconnectedMongoHealthStatus,
+    type MongoHealthStatus,
+} from './mongo/mongo-connection.js'
 import {
     ProviderBackedFakeSyllabusGenerator,
     resolveSyllabusGeneratorModel,
@@ -81,11 +84,7 @@ export function createApp(options: CreateAppOptions = {}) {
         options.syllabusGenerator ?? new ProviderBackedFakeSyllabusGenerator()
     const chapterGenerator =
         options.chapterGenerator ?? new ProviderBackedFakeChapterGenerator()
-    const mongoHealth = options.mongoHealth ?? {
-        configured: false,
-        connected: false,
-        databaseName: null,
-    }
+    const mongoHealth = options.mongoHealth ?? disconnectedMongoHealthStatus
 
     app.use(express.json())
     app.use(attachMockOwner)
