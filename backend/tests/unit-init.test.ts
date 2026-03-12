@@ -305,6 +305,86 @@ describe('GET /api/unit-init/:id/chapters/runs', () => {
     })
 })
 
+describe('GET /api/unit-init/:id/runs', () => {
+    it('returns all persisted generation runs for the unit-init in descending order', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const createdResponse = await request(app)
+            .post('/api/unit-init')
+            .send({ topic: 'next.js framework' })
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/moderate`)
+            .send({})
+
+        const questionnaireResponse = await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/questionnaire/generate`)
+            .send({})
+
+        await request(app)
+            .patch(`/api/unit-init/${createdResponse.body.id}/questionnaire/answers`)
+            .send({
+                answers: questionnaireResponse.body.questionnaire.questions.map(
+                    (question: { id: string }) => ({
+                        questionId: question.id,
+                        value: `answer-for-${question.id}`,
+                    })
+                ),
+            })
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/syllabus-prompt/generate`)
+            .send({})
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/syllabus/generate`)
+            .send({})
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/approve-syllabus`)
+            .send({})
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/chapters/0/generate`)
+            .send({})
+
+        const response = await request(app).get(`/api/unit-init/${createdResponse.body.id}/runs`)
+
+        expect(response.status).toBe(200)
+        expect(response.body.runs).toHaveLength(2)
+        expect(response.body.runs[0]).toMatchObject({
+            unitInitId: createdResponse.body.id,
+            ownerId: 'mock-user',
+            stage: 'chapter',
+            chapterIndex: 0,
+            provider: 'openai',
+            model: 'fake-openai-chapter-generator',
+            status: 'completed',
+        })
+        expect(response.body.runs[1]).toMatchObject({
+            unitInitId: createdResponse.body.id,
+            ownerId: 'mock-user',
+            stage: 'syllabus',
+            provider: 'openai',
+            model: 'fake-openai-syllabus-generator',
+            status: 'completed',
+        })
+    })
+
+    it('returns 404 when the unit-init does not exist', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const response = await request(app).get('/api/unit-init/missing-id/runs')
+
+        expect(response.status).toBe(404)
+        expect(response.body).toEqual({
+            error: 'Unit init not found.',
+        })
+    })
+})
+
 describe('GET /api/unit-init/:id/chapters/:chapterIndex', () => {
     it('returns one generated chapter by index', async () => {
         const store = new InMemoryUnitInitStore()

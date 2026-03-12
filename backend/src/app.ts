@@ -220,6 +220,28 @@ export function createApp(options: CreateAppOptions) {
         })
     })
 
+    app.get('/api/unit-init/:id/runs', async (request, response) => {
+        const requestWithMockOwner = asRequestWithMockOwner(request)
+        const unitInit = await unitInitStore.getById(
+            requestWithMockOwner.mockOwner.id,
+            request.params.id
+        )
+
+        if (!unitInit) {
+            response.status(404).json({
+                error: 'Unit init not found.',
+            })
+            return
+        }
+
+        response.json({
+            runs: await generationRunStore.listByUnitInit(
+                requestWithMockOwner.mockOwner.id,
+                request.params.id
+            ),
+        })
+    })
+
     app.get('/api/unit-init/:id/chapters/runs', async (request, response) => {
         const requestWithMockOwner = asRequestWithMockOwner(request)
         const unitInit = await unitInitStore.getById(
