@@ -10,6 +10,7 @@ function createStoredRuns(): GenerationRun[] {
             id: 'run-2',
             stage: 'chapter',
             unitInitId: 'unit-init-1',
+            didacticUnitId: 'didactic-unit-1',
             ownerId: 'mock-user',
             chapterIndex: 0,
             provider: 'deepseek',
@@ -71,6 +72,10 @@ describe('MongoGenerationRunStore', () => {
 
         await store.save(runs[0]!)
         const storedRuns = await store.listByUnitInit('mock-user', 'unit-init-1')
+        const didacticUnitRuns = await store.listByDidacticUnit(
+            'mock-user',
+            'didactic-unit-1'
+        )
 
         expect(updateOne).toHaveBeenCalledWith(
             { id: runs[0]!.id },
@@ -81,7 +86,13 @@ describe('MongoGenerationRunStore', () => {
             ownerId: 'mock-user',
             unitInitId: 'unit-init-1',
         })
+        expect(find).toHaveBeenCalledWith({
+            ownerId: 'mock-user',
+            stage: 'chapter',
+            didacticUnitId: 'didactic-unit-1',
+        })
         expect(sort).toHaveBeenCalledWith({ createdAt: -1 })
         expect(storedRuns).toEqual(runs)
+        expect(didacticUnitRuns).toEqual([runs[0]])
     })
 })

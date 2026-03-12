@@ -98,6 +98,13 @@ function isSyllabusGenerationRun(
     return run.stage === 'syllabus'
 }
 
+function compareRunsByCreatedAtDesc(
+    left: SyllabusGenerationRunRecord | ChapterGenerationRunRecord,
+    right: SyllabusGenerationRunRecord | ChapterGenerationRunRecord
+): number {
+    return right.createdAt.localeCompare(left.createdAt)
+}
+
 export function createApp(options: CreateAppOptions) {
     const app = express()
     const unitInitStore = options.unitInitStore
@@ -248,11 +255,24 @@ export function createApp(options: CreateAppOptions) {
             return
         }
 
-        response.json({
-            runs: await generationRunStore.listByUnitInit(
+        const [syllabusRuns, chapterRuns] = await Promise.all([
+            generationRunStore.listByUnitInit(
                 requestWithMockOwner.mockOwner.id,
                 didacticUnit.unitInitId
             ),
+            generationRunStore.listByDidacticUnit(
+                requestWithMockOwner.mockOwner.id,
+                didacticUnit.id
+            ),
+        ])
+
+        const runs: Array<SyllabusGenerationRunRecord | ChapterGenerationRunRecord> = [
+            ...syllabusRuns.filter(isSyllabusGenerationRun),
+            ...chapterRuns,
+        ]
+
+        response.json({
+            runs: runs.sort(compareRunsByCreatedAtDesc),
         })
     })
 
@@ -365,6 +385,7 @@ export function createApp(options: CreateAppOptions) {
                 await generationRunStore.save(
                     createCompletedChapterGenerationRunRecord({
                         unitInitId: updatedDidacticUnit.unitInitId,
+                        didacticUnitId: updatedDidacticUnit.id,
                         ownerId: updatedDidacticUnit.ownerId,
                         chapterIndex,
                         provider: updatedDidacticUnit.provider,
@@ -419,6 +440,7 @@ export function createApp(options: CreateAppOptions) {
                 await generationRunStore.save(
                     createFailedChapterGenerationRunRecord({
                         unitInitId: didacticUnit.unitInitId,
+                        didacticUnitId: didacticUnit.id,
                         ownerId: didacticUnit.ownerId,
                         chapterIndex,
                         provider: didacticUnit.provider,

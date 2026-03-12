@@ -633,7 +633,7 @@
             "exec": [
               "pm.test('Get Didactic Unit Runs returns 200', function () { pm.response.to.have.status(200); });",
               "const body = pm.response.json();",
-              "pm.test('Didactic unit runs include syllabus and chapter stages', function () { pm.expect(body.runs).to.be.an('array').that.is.not.empty; const stages = body.runs.map((run) => run.stage); pm.expect(stages).to.include('syllabus'); pm.expect(stages).to.include('chapter'); });"
+              "pm.test('Didactic unit runs include syllabus and chapter stages', function () { pm.expect(body.runs).to.be.an('array').that.is.not.empty; const stages = body.runs.map((run) => run.stage); pm.expect(stages).to.include('syllabus'); pm.expect(stages).to.include('chapter'); const latestChapterRun = body.runs.find((run) => run.stage === 'chapter'); pm.expect(latestChapterRun.didacticUnitId).to.eql(pm.collectionVariables.get('didacticUnitId')); });"
             ]
           }
         }

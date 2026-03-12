@@ -1,5 +1,9 @@
 import type { Db, Document } from 'mongodb'
-import type { GenerationRun, GenerationRunStore } from './generation-run-store.js'
+import type {
+    ChapterGenerationRunRecord,
+    GenerationRun,
+    GenerationRunStore,
+} from './generation-run-store.js'
 
 type GenerationRunDocument = GenerationRun & Document
 
@@ -41,5 +45,26 @@ export class MongoGenerationRunStore implements GenerationRunStore {
         return documents
             .map((document) => stripMongoId(document))
             .filter((document): document is GenerationRun => document !== null)
+    }
+
+    async listByDidacticUnit(
+        ownerId: string,
+        didacticUnitId: string
+    ): Promise<ChapterGenerationRunRecord[]> {
+        const documents = await this.collection
+            .find({
+                ownerId,
+                stage: 'chapter',
+                didacticUnitId,
+            })
+            .sort({ createdAt: -1 })
+            .toArray()
+
+        return documents
+            .map((document) => stripMongoId(document))
+            .filter(
+                (document): document is ChapterGenerationRunRecord =>
+                    document !== null && document.stage === 'chapter'
+            )
     }
 }

@@ -502,6 +502,7 @@ describe('GET /api/didactic-unit/:id/runs', () => {
         expect(response.body.runs).toHaveLength(2)
         expect(response.body.runs[0]).toMatchObject({
             unitInitId: createdResponse.body.id,
+            didacticUnitId,
             stage: 'chapter',
             chapterIndex: 0,
         })
@@ -588,6 +589,15 @@ describe('POST /api/didactic-unit/:id/chapters/:chapterIndex/generate', () => {
 
         expect(didacticUnitResponse.status).toBe(200)
         expect(didacticUnitResponse.body.generatedChapters).toHaveLength(1)
+
+        const runsResponse = await request(app).get(`/api/didactic-unit/${didacticUnitId}/runs`)
+
+        expect(runsResponse.status).toBe(200)
+        expect(runsResponse.body.runs[0]).toMatchObject({
+            stage: 'chapter',
+            didacticUnitId,
+            chapterIndex: 0,
+        })
     })
 
     it('returns 404 when the didactic unit does not exist', async () => {
