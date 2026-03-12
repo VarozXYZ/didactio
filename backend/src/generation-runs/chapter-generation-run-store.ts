@@ -10,8 +10,10 @@ export interface ChapterGenerationRun {
     provider: UnitInitProvider
     model: string
     prompt: string
-    chapter: UnitInitGeneratedChapter
-    status: 'completed'
+    chapter?: UnitInitGeneratedChapter
+    rawOutput?: string
+    error?: string
+    status: 'completed' | 'failed'
     createdAt: string
 }
 
@@ -34,7 +36,7 @@ export class InMemoryChapterGenerationRunStore implements ChapterGenerationRunSt
     }
 }
 
-interface CreateChapterGenerationRunInput {
+interface CreateCompletedChapterGenerationRunInput {
     unitInitId: string
     ownerId: string
     chapterIndex: number
@@ -45,8 +47,20 @@ interface CreateChapterGenerationRunInput {
     createdAt: string
 }
 
-export function createChapterGenerationRun(
-    input: CreateChapterGenerationRunInput
+interface CreateFailedChapterGenerationRunInput {
+    unitInitId: string
+    ownerId: string
+    chapterIndex: number
+    provider: UnitInitProvider
+    model: string
+    prompt: string
+    rawOutput?: string
+    error: string
+    createdAt: string
+}
+
+export function createCompletedChapterGenerationRun(
+    input: CreateCompletedChapterGenerationRunInput
 ): ChapterGenerationRun {
     return {
         id: randomUUID(),
@@ -58,6 +72,24 @@ export function createChapterGenerationRun(
         prompt: input.prompt,
         chapter: input.chapter,
         status: 'completed',
+        createdAt: input.createdAt,
+    }
+}
+
+export function createFailedChapterGenerationRun(
+    input: CreateFailedChapterGenerationRunInput
+): ChapterGenerationRun {
+    return {
+        id: randomUUID(),
+        unitInitId: input.unitInitId,
+        ownerId: input.ownerId,
+        chapterIndex: input.chapterIndex,
+        provider: input.provider,
+        model: input.model,
+        prompt: input.prompt,
+        rawOutput: input.rawOutput,
+        error: input.error,
+        status: 'failed',
         createdAt: input.createdAt,
     }
 }

@@ -1,6 +1,7 @@
 import express from 'express'
 import {
-    createChapterGenerationRun,
+    createCompletedChapterGenerationRun,
+    createFailedChapterGenerationRun,
     type ChapterGenerationRunStore,
 } from './generation-runs/chapter-generation-run-store.js'
 import {
@@ -15,6 +16,7 @@ import {
     resolveChapterGeneratorModel,
     type ChapterGenerator,
 } from './providers/chapter-generator.js'
+import { OpenAiChapterGenerationError } from './providers/openai-chapter-generator.js'
 import { attachMockOwner, type RequestWithMockOwner } from './middleware/mock-owner.js'
 import {
     disconnectedMongoHealthStatus,
@@ -78,6 +80,17 @@ function canCreateSyllabusGenerationRun(unitInit: {
     syllabusPrompt?: string
 }): boolean {
     return unitInit.status === 'syllabus_prompt_ready' && Boolean(unitInit.syllabusPrompt?.trim())
+}
+
+function canCreateChapterGenerationRun(unitInit: { status: string; syllabus?: unknown }): boolean {
+    return unitInit.status === 'syllabus_approved' && Boolean(unitInit.syllabus)
+}
+
+function canBuildChapterGenerationPrompt(
+    unitInit: { syllabus?: { chapters?: unknown[] } | undefined },
+    chapterIndex: number
+): boolean {
+    return Boolean(unitInit.syllabus?.chapters?.[chapterIndex])
 }
 
 export function createApp(options: CreateAppOptions) {
@@ -596,7 +609,7 @@ export function createApp(options: CreateAppOptions) {
 
             if (generatedChapter) {
                 await chapterGenerationRunStore.save(
-                    createChapterGenerationRun({
+                    createCompletedChapterGenerationRun({
                         unitInitId: updatedUnitInit.id,
                         ownerId: updatedUnitInit.ownerId,
                         chapterIndex,
@@ -611,6 +624,31 @@ export function createApp(options: CreateAppOptions) {
 
             response.json(updatedUnitInit)
         } catch (error) {
+            if (
+                canCreateChapterGenerationRun(unitInit) &&
+                canBuildChapterGenerationPrompt(unitInit, chapterIndex)
+            ) {
+                await chapterGenerationRunStore.save(
+                    createFailedChapterGenerationRun({
+                        unitInitId: unitInit.id,
+                        ownerId: unitInit.ownerId,
+                        chapterIndex,
+                        provider: unitInit.provider,
+                        model: resolveChapterGeneratorModel(unitInit.provider),
+                        prompt: buildChapterGenerationPrompt(unitInit, chapterIndex),
+                        rawOutput:
+                            error instanceof OpenAiChapterGenerationError
+                                ? error.rawOutput
+                                : undefined,
+                        error:
+                            error instanceof Error
+                                ? error.message
+                                : 'Unit init chapter generation failed.',
+                        createdAt: new Date().toISOString(),
+                    })
+                )
+            }
+
             const message =
                 error instanceof Error
                     ? error.message

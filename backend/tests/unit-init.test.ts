@@ -1,5 +1,6 @@
 import request from 'supertest'
 import { describe, expect, it } from 'vitest'
+import { OpenAiChapterGenerationError } from '../src/providers/openai-chapter-generator.js'
 import { createTestApp } from './helpers/create-test-app.js'
 import { OpenAiSyllabusGenerationError } from '../src/providers/openai-syllabus-generator.js'
 import { InMemoryUnitInitStore } from '../src/unit-init/unit-init-store.js'
@@ -1587,6 +1588,82 @@ describe('POST /api/unit-init/:id/chapters/:chapterIndex/generate', () => {
         expect(response.status).toBe(409)
         expect(response.body).toEqual({
             error: 'Chapter content cannot be generated from the current unit-init state.',
+        })
+    })
+
+    it('persists a failed chapter generation run with raw output', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({
+            unitInitStore: store,
+            chapterGenerator: {
+                async generate() {
+                    throw new OpenAiChapterGenerationError(
+                        'content is required.',
+                        '{"title":"Rendering Foundations","content":"","keyTakeaways":[]}'
+                    )
+                },
+            },
+        })
+
+        const createdResponse = await request(app)
+            .post('/api/unit-init')
+            .send({ topic: 'next.js framework' })
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/moderate`)
+            .send({})
+
+        const questionnaireResponse = await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/questionnaire/generate`)
+            .send({})
+
+        await request(app)
+            .patch(`/api/unit-init/${createdResponse.body.id}/questionnaire/answers`)
+            .send({
+                answers: questionnaireResponse.body.questionnaire.questions.map(
+                    (question: { id: string }) => ({
+                        questionId: question.id,
+                        value: `answer-for-${question.id}`,
+                    })
+                ),
+            })
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/syllabus-prompt/generate`)
+            .send({})
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/syllabus/generate`)
+            .send({})
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/approve-syllabus`)
+            .send({})
+
+        const response = await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/chapters/0/generate`)
+            .send({})
+
+        expect(response.status).toBe(409)
+        expect(response.body).toEqual({
+            error: 'content is required.',
+        })
+
+        const runsResponse = await request(app).get(
+            `/api/unit-init/${createdResponse.body.id}/chapters/runs`
+        )
+
+        expect(runsResponse.status).toBe(200)
+        expect(runsResponse.body.runs).toHaveLength(1)
+        expect(runsResponse.body.runs[0]).toMatchObject({
+            unitInitId: createdResponse.body.id,
+            ownerId: 'mock-user',
+            chapterIndex: 0,
+            provider: 'openai',
+            model: 'fake-openai-chapter-generator',
+            status: 'failed',
+            error: 'content is required.',
+            rawOutput: '{"title":"Rendering Foundations","content":"","keyTakeaways":[]}',
         })
     })
 })

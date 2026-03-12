@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
-import { OpenAiChapterGenerator } from '../src/providers/openai-chapter-generator.js'
+import {
+    OpenAiChapterGenerationError,
+    OpenAiChapterGenerator,
+} from '../src/providers/openai-chapter-generator.js'
 import type { CreatedUnitInit } from '../src/unit-init/create-unit-init.js'
 
 function createApprovedSyllabusUnitInit(): CreatedUnitInit {
@@ -101,5 +104,45 @@ describe('OpenAiChapterGenerator', () => {
         await expect(
             generator.generate(createApprovedSyllabusUnitInit(), 0)
         ).rejects.toThrow('OpenAI chapter generation failed with status 500.')
+    })
+
+    it('throws a parse error that preserves the raw model content', async () => {
+        const rawContent = JSON.stringify({
+            title: 'Rendering Foundations',
+            overview: 'Understand the rendering model.',
+            content: '',
+            keyTakeaways: [],
+        })
+        const fetchImplementation = vi.fn<typeof fetch>().mockResolvedValue(
+            new Response(
+                JSON.stringify({
+                    choices: [
+                        {
+                            message: {
+                                content: rawContent,
+                            },
+                        },
+                    ],
+                }),
+                {
+                    status: 200,
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                }
+            )
+        )
+
+        const generator = new OpenAiChapterGenerator({
+            apiKey: 'test-key',
+            fetchImplementation,
+        })
+
+        await expect(
+            generator.generate(createApprovedSyllabusUnitInit(), 0)
+        ).rejects.toMatchObject<Partial<OpenAiChapterGenerationError>>({
+            message: 'content is required.',
+            rawOutput: rawContent,
+        })
     })
 })

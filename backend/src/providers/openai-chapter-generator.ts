@@ -18,6 +18,16 @@ interface OpenAiChatCompletionResponse {
     }>
 }
 
+export class OpenAiChapterGenerationError extends Error {
+    readonly rawOutput?: string
+
+    constructor(message: string, rawOutput?: string) {
+        super(message)
+        this.name = 'OpenAiChapterGenerationError'
+        this.rawOutput = rawOutput
+    }
+}
+
 function getSyllabusChapter(unitInit: CreatedUnitInit, chapterIndex: number) {
     const chapter = unitInit.syllabus?.chapters[chapterIndex]
 
@@ -132,17 +142,44 @@ export class OpenAiChapterGenerator {
             }
         )
 
+        const responseText = await response.text()
+
         if (!response.ok) {
-            throw new Error(`OpenAI chapter generation failed with status ${response.status}.`)
+            throw new OpenAiChapterGenerationError(
+                `OpenAI chapter generation failed with status ${response.status}.`,
+                responseText
+            )
         }
 
-        const payload = (await response.json()) as OpenAiChatCompletionResponse
+        let payload: OpenAiChatCompletionResponse
+
+        try {
+            payload = JSON.parse(responseText) as OpenAiChatCompletionResponse
+        } catch {
+            throw new OpenAiChapterGenerationError(
+                'OpenAI chapter response was not valid JSON.',
+                responseText
+            )
+        }
+
         const content = payload.choices?.[0]?.message?.content
 
         if (!content) {
-            throw new Error('OpenAI chapter response did not include message content.')
+            throw new OpenAiChapterGenerationError(
+                'OpenAI chapter response did not include message content.',
+                responseText
+            )
         }
 
-        return parseChapterResponse(content, chapterIndex)
+        try {
+            return parseChapterResponse(content, chapterIndex)
+        } catch (error) {
+            throw new OpenAiChapterGenerationError(
+                error instanceof Error
+                    ? error.message
+                    : 'OpenAI chapter response could not be parsed.',
+                content
+            )
+        }
     }
 }
