@@ -1,14 +1,14 @@
 import express from 'express'
 import {
-    InMemoryChapterGenerationRunStore,
     createChapterGenerationRun,
     type ChapterGenerationRunStore,
 } from './generation-runs/chapter-generation-run-store.js'
 import {
-    InMemorySyllabusGenerationRunStore,
-    createSyllabusGenerationRun,
+    createCompletedSyllabusGenerationRun,
+    createFailedSyllabusGenerationRun,
     type SyllabusGenerationRunStore,
 } from './generation-runs/syllabus-generation-run-store.js'
+import { OpenAiSyllabusGenerationError } from './providers/openai-syllabus-generator.js'
 import {
     buildChapterGenerationPrompt,
     ProviderBackedFakeChapterGenerator,
@@ -48,12 +48,12 @@ import {
     parseUpdateSyllabusInput,
     updateSyllabus,
 } from './unit-init/update-syllabus.js'
-import { InMemoryUnitInitStore, type UnitInitStore } from './unit-init/unit-init-store.js'
+import type { UnitInitStore } from './unit-init/unit-init-store.js'
 
-interface CreateAppOptions {
-    unitInitStore?: UnitInitStore
-    chapterGenerationRunStore?: ChapterGenerationRunStore
-    syllabusGenerationRunStore?: SyllabusGenerationRunStore
+export interface CreateAppOptions {
+    unitInitStore: UnitInitStore
+    chapterGenerationRunStore: ChapterGenerationRunStore
+    syllabusGenerationRunStore: SyllabusGenerationRunStore
     syllabusGenerator?: SyllabusGenerator
     chapterGenerator?: ChapterGenerator
     mongoHealth?: MongoHealthStatus
@@ -73,13 +73,18 @@ function parseChapterIndex(value: string): number {
     return chapterIndex
 }
 
-export function createApp(options: CreateAppOptions = {}) {
+function canCreateSyllabusGenerationRun(unitInit: {
+    status: string
+    syllabusPrompt?: string
+}): boolean {
+    return unitInit.status === 'syllabus_prompt_ready' && Boolean(unitInit.syllabusPrompt?.trim())
+}
+
+export function createApp(options: CreateAppOptions) {
     const app = express()
-    const unitInitStore = options.unitInitStore ?? new InMemoryUnitInitStore()
-    const chapterGenerationRunStore =
-        options.chapterGenerationRunStore ?? new InMemoryChapterGenerationRunStore()
-    const syllabusGenerationRunStore =
-        options.syllabusGenerationRunStore ?? new InMemorySyllabusGenerationRunStore()
+    const unitInitStore = options.unitInitStore
+    const chapterGenerationRunStore = options.chapterGenerationRunStore
+    const syllabusGenerationRunStore = options.syllabusGenerationRunStore
     const syllabusGenerator =
         options.syllabusGenerator ?? new ProviderBackedFakeSyllabusGenerator()
     const chapterGenerator =
@@ -443,7 +448,7 @@ export function createApp(options: CreateAppOptions = {}) {
             const updatedUnitInit = await generateSyllabus(unitInit, syllabusGenerator)
             await unitInitStore.save(updatedUnitInit)
             await syllabusGenerationRunStore.save(
-                createSyllabusGenerationRun({
+                createCompletedSyllabusGenerationRun({
                     unitInitId: updatedUnitInit.id,
                     ownerId: updatedUnitInit.ownerId,
                     provider: updatedUnitInit.provider,
@@ -455,6 +460,27 @@ export function createApp(options: CreateAppOptions = {}) {
             )
             response.json(updatedUnitInit)
         } catch (error) {
+            if (canCreateSyllabusGenerationRun(unitInit)) {
+                await syllabusGenerationRunStore.save(
+                    createFailedSyllabusGenerationRun({
+                        unitInitId: unitInit.id,
+                        ownerId: unitInit.ownerId,
+                        provider: unitInit.provider,
+                        model: resolveSyllabusGeneratorModel(unitInit.provider),
+                        prompt: unitInit.syllabusPrompt ?? '',
+                        rawOutput:
+                            error instanceof OpenAiSyllabusGenerationError
+                                ? error.rawOutput
+                                : undefined,
+                        error:
+                            error instanceof Error
+                                ? error.message
+                                : 'Unit init syllabus generation failed.',
+                        createdAt: new Date().toISOString(),
+                    })
+                )
+            }
+
             response.status(409).json({
                 error:
                     error instanceof Error

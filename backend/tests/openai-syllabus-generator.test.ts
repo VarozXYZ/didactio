@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
-import { OpenAiSyllabusGenerator } from '../src/providers/openai-syllabus-generator.js'
+import {
+    OpenAiSyllabusGenerationError,
+    OpenAiSyllabusGenerator,
+} from '../src/providers/openai-syllabus-generator.js'
 import type { CreatedUnitInit } from '../src/unit-init/create-unit-init.js'
 
 function createApprovedQuestionnaireUnitInit(): CreatedUnitInit {
@@ -70,6 +73,19 @@ describe('OpenAiSyllabusGenerator', () => {
         const syllabus = await generator.generate(createApprovedQuestionnaireUnitInit())
 
         expect(fetchImplementation).toHaveBeenCalledOnce()
+        expect(fetchImplementation.mock.calls[0]?.[1]).toMatchObject({
+            method: 'POST',
+        })
+        const requestInit = fetchImplementation.mock.calls[0]?.[1]
+        const parsedBody = JSON.parse(String(requestInit?.body))
+        expect(parsedBody.temperature).toBe(0.1)
+        expect(parsedBody.response_format).toMatchObject({
+            type: 'json_schema',
+        })
+        expect(parsedBody.response_format.json_schema).toMatchObject({
+            name: 'didactio_syllabus',
+            strict: true,
+        })
         expect(syllabus).toMatchObject({
             title: 'Next.js Mastery Path',
             overview:
@@ -97,5 +113,45 @@ describe('OpenAiSyllabusGenerator', () => {
         await expect(
             generator.generate(createApprovedQuestionnaireUnitInit())
         ).rejects.toThrow('OpenAI syllabus generation failed with status 500.')
+    })
+
+    it('throws a parse error that preserves the raw model content', async () => {
+        const rawContent = JSON.stringify({
+            title: 'Incomplete syllabus',
+            overview: 'Missing chapters',
+            learningGoals: ['One'],
+            chapters: [],
+        })
+        const fetchImplementation = vi.fn<typeof fetch>().mockResolvedValue(
+            new Response(
+                JSON.stringify({
+                    choices: [
+                        {
+                            message: {
+                                content: rawContent,
+                            },
+                        },
+                    ],
+                }),
+                {
+                    status: 200,
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                }
+            )
+        )
+
+        const generator = new OpenAiSyllabusGenerator({
+            apiKey: 'test-key',
+            fetchImplementation,
+        })
+
+        await expect(
+            generator.generate(createApprovedQuestionnaireUnitInit())
+        ).rejects.toMatchObject<Partial<OpenAiSyllabusGenerationError>>({
+            message: 'OpenAI syllabus response must include a non-empty chapters array.',
+            rawOutput: rawContent,
+        })
     })
 })

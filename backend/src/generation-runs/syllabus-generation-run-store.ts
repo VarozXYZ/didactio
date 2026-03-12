@@ -9,8 +9,10 @@ export interface SyllabusGenerationRun {
     provider: UnitInitProvider
     model: string
     prompt: string
-    syllabus: UnitInitSyllabus
-    status: 'completed'
+    syllabus?: UnitInitSyllabus
+    rawOutput?: string
+    error?: string
+    status: 'completed' | 'failed'
     createdAt: string
 }
 
@@ -36,7 +38,7 @@ export class InMemorySyllabusGenerationRunStore implements SyllabusGenerationRun
     }
 }
 
-interface CreateSyllabusGenerationRunInput {
+interface CreateCompletedSyllabusGenerationRunInput {
     unitInitId: string
     ownerId: string
     provider: UnitInitProvider
@@ -46,8 +48,19 @@ interface CreateSyllabusGenerationRunInput {
     createdAt: string
 }
 
-export function createSyllabusGenerationRun(
-    input: CreateSyllabusGenerationRunInput
+interface CreateFailedSyllabusGenerationRunInput {
+    unitInitId: string
+    ownerId: string
+    provider: UnitInitProvider
+    model: string
+    prompt: string
+    rawOutput?: string
+    error: string
+    createdAt: string
+}
+
+export function createCompletedSyllabusGenerationRun(
+    input: CreateCompletedSyllabusGenerationRunInput
 ): SyllabusGenerationRun {
     return {
         id: randomUUID(),
@@ -58,6 +71,23 @@ export function createSyllabusGenerationRun(
         prompt: input.prompt,
         syllabus: input.syllabus,
         status: 'completed',
+        createdAt: input.createdAt,
+    }
+}
+
+export function createFailedSyllabusGenerationRun(
+    input: CreateFailedSyllabusGenerationRunInput
+): SyllabusGenerationRun {
+    return {
+        id: randomUUID(),
+        unitInitId: input.unitInitId,
+        ownerId: input.ownerId,
+        provider: input.provider,
+        model: input.model,
+        prompt: input.prompt,
+        rawOutput: input.rawOutput,
+        error: input.error,
+        status: 'failed',
         createdAt: input.createdAt,
     }
 }

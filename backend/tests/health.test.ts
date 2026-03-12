@@ -1,6 +1,6 @@
 import request from 'supertest'
 import { afterEach, describe, expect, it } from 'vitest'
-import { createApp } from '../src/app.js'
+import { createTestApp } from './helpers/create-test-app.js'
 
 describe('GET /api/health', () => {
     afterEach(() => {
@@ -8,7 +8,7 @@ describe('GET /api/health', () => {
     })
 
     it('returns the service health and default mock owner id', async () => {
-        const app = createApp()
+        const app = createTestApp()
 
         const response = await request(app).get('/api/health')
 
@@ -27,7 +27,7 @@ describe('GET /api/health', () => {
 
     it('uses the configured mock owner id when provided', async () => {
         process.env.MOCK_OWNER_ID = 'local-dev-user'
-        const app = createApp()
+        const app = createTestApp()
 
         const response = await request(app).get('/api/health')
 
@@ -36,7 +36,7 @@ describe('GET /api/health', () => {
     })
 
     it('returns the configured mongo health when provided', async () => {
-        const app = createApp({
+        const app = createTestApp({
             mongoHealth: {
                 configured: true,
                 connected: true,

@@ -1,7 +1,10 @@
 import request from 'supertest'
 import { describe, expect, it } from 'vitest'
-import { createApp } from '../src/app.js'
+import { createTestApp } from './helpers/create-test-app.js'
+import { OpenAiSyllabusGenerationError } from '../src/providers/openai-syllabus-generator.js'
 import { InMemoryUnitInitStore } from '../src/unit-init/unit-init-store.js'
+
+const createApp = createTestApp
 
 describe('POST /api/unit-init', () => {
     it('creates a unit-init with the default provider', async () => {
@@ -976,6 +979,73 @@ describe('POST /api/unit-init/:id/syllabus/generate', () => {
         expect(response.status).toBe(409)
         expect(response.body).toEqual({
             error: 'Syllabus cannot be generated from the current unit-init state.',
+        })
+    })
+
+    it('persists a failed syllabus generation run with raw output', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({
+            unitInitStore: store,
+            syllabusGenerator: {
+                async generate() {
+                    throw new OpenAiSyllabusGenerationError(
+                        'OpenAI syllabus response must include a non-empty chapters array.',
+                        '{"title":"Incomplete syllabus","chapters":[]}'
+                    )
+                },
+            },
+        })
+
+        const createdResponse = await request(app)
+            .post('/api/unit-init')
+            .send({ topic: 'next.js framework' })
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/moderate`)
+            .send({})
+
+        const questionnaireResponse = await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/questionnaire/generate`)
+            .send({})
+
+        await request(app)
+            .patch(`/api/unit-init/${createdResponse.body.id}/questionnaire/answers`)
+            .send({
+                answers: questionnaireResponse.body.questionnaire.questions.map(
+                    (question: { id: string }) => ({
+                        questionId: question.id,
+                        value: `answer-for-${question.id}`,
+                    })
+                ),
+            })
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/syllabus-prompt/generate`)
+            .send({})
+
+        const response = await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/syllabus/generate`)
+            .send({})
+
+        expect(response.status).toBe(409)
+        expect(response.body).toEqual({
+            error: 'OpenAI syllabus response must include a non-empty chapters array.',
+        })
+
+        const runsResponse = await request(app).get(
+            `/api/unit-init/${createdResponse.body.id}/syllabus/runs`
+        )
+
+        expect(runsResponse.status).toBe(200)
+        expect(runsResponse.body.runs).toHaveLength(1)
+        expect(runsResponse.body.runs[0]).toMatchObject({
+            unitInitId: createdResponse.body.id,
+            ownerId: 'mock-user',
+            provider: 'openai',
+            model: 'fake-openai-syllabus-generator',
+            status: 'failed',
+            error: 'OpenAI syllabus response must include a non-empty chapters array.',
+            rawOutput: '{"title":"Incomplete syllabus","chapters":[]}',
         })
     })
 })

@@ -17,6 +17,16 @@ interface OpenAiChatCompletionResponse {
     }>
 }
 
+export class OpenAiSyllabusGenerationError extends Error {
+    readonly rawOutput?: string
+
+    constructor(message: string, rawOutput?: string) {
+        super(message)
+        this.name = 'OpenAiSyllabusGenerationError'
+        this.rawOutput = rawOutput
+    }
+}
+
 function findAnswerValue(unitInit: CreatedUnitInit, questionId: string): string {
     return (
         unitInit.questionnaireAnswers?.find((answer) => answer.questionId === questionId)?.value ??
@@ -144,6 +154,60 @@ function buildPrompt(unitInit: CreatedUnitInit): string {
     ].join('\n')
 }
 
+function buildSyllabusResponseFormat() {
+    return {
+        type: 'json_schema' as const,
+        json_schema: {
+            name: 'didactio_syllabus',
+            strict: true,
+            schema: {
+                type: 'object',
+                additionalProperties: false,
+                required: ['title', 'overview', 'learningGoals', 'chapters'],
+                properties: {
+                    title: {
+                        type: 'string',
+                    },
+                    overview: {
+                        type: 'string',
+                    },
+                    learningGoals: {
+                        type: 'array',
+                        minItems: 1,
+                        items: {
+                            type: 'string',
+                        },
+                    },
+                    chapters: {
+                        type: 'array',
+                        minItems: 1,
+                        items: {
+                            type: 'object',
+                            additionalProperties: false,
+                            required: ['title', 'overview', 'keyPoints'],
+                            properties: {
+                                title: {
+                                    type: 'string',
+                                },
+                                overview: {
+                                    type: 'string',
+                                },
+                                keyPoints: {
+                                    type: 'array',
+                                    minItems: 1,
+                                    items: {
+                                        type: 'string',
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    }
+}
+
 export class OpenAiSyllabusGenerator {
     private readonly apiKey: string
     private readonly model: string
@@ -166,7 +230,8 @@ export class OpenAiSyllabusGenerator {
                 },
                 body: JSON.stringify({
                     model: this.model,
-                    temperature: 0.3,
+                    temperature: 0.1,
+                    response_format: buildSyllabusResponseFormat(),
                     messages: [
                         {
                             role: 'system',
@@ -182,17 +247,44 @@ export class OpenAiSyllabusGenerator {
             }
         )
 
+        const responseText = await response.text()
+
         if (!response.ok) {
-            throw new Error(`OpenAI syllabus generation failed with status ${response.status}.`)
+            throw new OpenAiSyllabusGenerationError(
+                `OpenAI syllabus generation failed with status ${response.status}.`,
+                responseText
+            )
         }
 
-        const payload = (await response.json()) as OpenAiChatCompletionResponse
+        let payload: OpenAiChatCompletionResponse
+
+        try {
+            payload = JSON.parse(responseText) as OpenAiChatCompletionResponse
+        } catch {
+            throw new OpenAiSyllabusGenerationError(
+                'OpenAI syllabus response was not valid JSON.',
+                responseText
+            )
+        }
+
         const content = payload.choices?.[0]?.message?.content
 
         if (!content) {
-            throw new Error('OpenAI syllabus response did not include message content.')
+            throw new OpenAiSyllabusGenerationError(
+                'OpenAI syllabus response did not include message content.',
+                responseText
+            )
         }
 
-        return parseSyllabusResponse(content)
+        try {
+            return parseSyllabusResponse(content)
+        } catch (error) {
+            throw new OpenAiSyllabusGenerationError(
+                error instanceof Error
+                    ? error.message
+                    : 'OpenAI syllabus response could not be parsed.',
+                content
+            )
+        }
     }
 }

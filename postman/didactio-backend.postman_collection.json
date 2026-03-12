@@ -2,11 +2,12 @@
   "info": {
     "_postman_id": "8c0f3cf2-1d6b-4f4b-a090-14c65f3a0ad5",
     "name": "Didactio Backend",
-    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Single ordered runner flow for the Didactio backend. Requests are arranged in the exact lifecycle sequence so the collection can be run end-to-end without folder ordering issues. AI checks are structural and stop the runner after traced failures."
   },
   "item": [
     {
-      "name": "Health Check",
+      "name": "01 Health Check",
       "request": {
         "method": "GET",
         "header": [],
@@ -21,10 +22,24 @@
           ]
         }
       },
-      "response": []
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Health returns 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('Health payload exposes service status', function () { pm.expect(body.status).to.eql('ok'); pm.expect(body.service).to.eql('didactio-backend'); });",
+              "pm.test('Health payload exposes mongo state', function () { pm.expect(body.mongo).to.be.an('object'); pm.expect(body.mongo.connected).to.be.a('boolean'); });"
+            ]
+          }
+        }
+      ]
     },
     {
-      "name": "Create Unit Init",
+      "name": "02 Create Unit Init",
       "request": {
         "method": "POST",
         "header": [
@@ -35,7 +50,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"topic\": \"next.js framework\",\n  \"provider\": \"openai\"\n}"
+          "raw": "{\n  \"topic\": \"{{topic}}\",\n  \"provider\": \"{{provider}}\"\n}"
         },
         "url": {
           "raw": "{{baseUrl}}/api/unit-init",
@@ -55,146 +70,18 @@
           "script": {
             "type": "text/javascript",
             "exec": [
-              "const response = pm.response.json();",
-              "if (response && response.id) {",
-              "  pm.collectionVariables.set('unitInitId', response.id);",
-              "}"
+              "pm.test('Create Unit Init returns 201', function () { pm.response.to.have.status(201); });",
+              "const body = pm.response.json();",
+              "pm.test('Unit init is created in submitted state', function () { pm.expect(body.id).to.be.a('string').and.not.empty; pm.expect(body.status).to.eql('submitted'); pm.expect(body.nextAction).to.eql('moderate_topic'); });",
+              "pm.collectionVariables.set('unitInitId', body.id);",
+              "pm.collectionVariables.set('lastCreatedProvider', body.provider);"
             ]
           }
         }
       ]
     },
     {
-      "name": "List Unit Inits",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{baseUrl}}/api/unit-init",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "api",
-            "unit-init"
-          ]
-        }
-      },
-      "response": []
-    },
-    {
-      "name": "Get Unit Init By Id",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{baseUrl}}/api/unit-init/{{unitInitId}}",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "api",
-            "unit-init",
-            "{{unitInitId}}"
-          ]
-        }
-      },
-      "response": []
-    },
-    {
-      "name": "Get Chapter List",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{baseUrl}}/api/unit-init/{{unitInitId}}/chapters",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "api",
-            "unit-init",
-            "{{unitInitId}}",
-            "chapters"
-          ]
-        }
-      },
-      "response": []
-    },
-    {
-      "name": "Get Chapter Generation Runs",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{baseUrl}}/api/unit-init/{{unitInitId}}/chapters/runs",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "api",
-            "unit-init",
-            "{{unitInitId}}",
-            "chapters",
-            "runs"
-          ]
-        }
-      },
-      "response": []
-    },
-    {
-      "name": "Get Generated Chapter",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{baseUrl}}/api/unit-init/{{unitInitId}}/chapters/{{chapterIndex}}",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "api",
-            "unit-init",
-            "{{unitInitId}}",
-            "chapters",
-            "{{chapterIndex}}"
-          ]
-        }
-      },
-      "response": []
-    },
-    {
-      "name": "Update Generated Chapter",
-      "request": {
-        "method": "PATCH",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"chapter\": {\n    \"title\": \"Edited Foundations\",\n    \"overview\": \"A rewritten overview for the chapter.\",\n    \"content\": \"A rewritten body of content for manual editing.\",\n    \"keyTakeaways\": [\n      \"Edited takeaway one\",\n      \"Edited takeaway two\"\n    ]\n  }\n}"
-        },
-        "url": {
-          "raw": "{{baseUrl}}/api/unit-init/{{unitInitId}}/chapters/{{chapterIndex}}",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "api",
-            "unit-init",
-            "{{unitInitId}}",
-            "chapters",
-            "{{chapterIndex}}"
-          ]
-        }
-      },
-      "response": []
-    },
-    {
-      "name": "Moderate Unit Init",
+      "name": "03 Moderate Unit Init",
       "request": {
         "method": "POST",
         "header": [
@@ -220,10 +107,23 @@
           ]
         }
       },
-      "response": []
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Moderate Unit Init returns 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('Unit init moves to moderation completed', function () { pm.expect(body.status).to.eql('moderation_completed'); pm.expect(body.nextAction).to.eql('generate_questionnaire'); pm.expect(body.moderatedAt).to.be.a('string').and.not.empty; });"
+            ]
+          }
+        }
+      ]
     },
     {
-      "name": "Generate Questionnaire",
+      "name": "04 Generate Questionnaire",
       "request": {
         "method": "POST",
         "header": [
@@ -250,10 +150,23 @@
           ]
         }
       },
-      "response": []
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Generate Questionnaire returns 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('Questionnaire is ready with core questions', function () { pm.expect(body.status).to.eql('questionnaire_ready'); pm.expect(body.nextAction).to.eql('answer_questionnaire'); pm.expect(body.questionnaire.questions).to.be.an('array'); pm.expect(body.questionnaire.questions.length).to.be.at.least(5); });"
+            ]
+          }
+        }
+      ]
     },
     {
-      "name": "Answer Questionnaire",
+      "name": "05 Answer Questionnaire",
       "request": {
         "method": "PATCH",
         "header": [
@@ -264,7 +177,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"answers\": [\n    {\n      \"questionId\": \"topic_knowledge_level\",\n      \"value\": \"basic\"\n    },\n    {\n      \"questionId\": \"related_knowledge_level\",\n      \"value\": \"basic\"\n    },\n    {\n      \"questionId\": \"learning_goal\",\n      \"value\": \"I want to build production-ready applications with Next.js\"\n    },\n    {\n      \"questionId\": \"preferred_depth\",\n      \"value\": \"balanced\"\n    },\n    {\n      \"questionId\": \"preferred_length\",\n      \"value\": \"medium\"\n    }\n  ]\n}"
+          "raw": "{\n  \"answers\": [\n    {\n      \"questionId\": \"topic_knowledge_level\",\n      \"value\": \"{{topicKnowledgeLevel}}\"\n    },\n    {\n      \"questionId\": \"related_knowledge_level\",\n      \"value\": \"{{relatedKnowledgeLevel}}\"\n    },\n    {\n      \"questionId\": \"learning_goal\",\n      \"value\": \"{{learningGoal}}\"\n    },\n    {\n      \"questionId\": \"preferred_depth\",\n      \"value\": \"{{preferredDepth}}\"\n    },\n    {\n      \"questionId\": \"preferred_length\",\n      \"value\": \"{{preferredLength}}\"\n    }\n  ]\n}"
         },
         "url": {
           "raw": "{{baseUrl}}/api/unit-init/{{unitInitId}}/questionnaire/answers",
@@ -280,10 +193,23 @@
           ]
         }
       },
-      "response": []
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Answer Questionnaire returns 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('Questionnaire answers are stored', function () { pm.expect(body.status).to.eql('questionnaire_answered'); pm.expect(body.nextAction).to.eql('generate_syllabus_prompt'); pm.expect(body.questionnaireAnswers).to.be.an('array').with.lengthOf(5); });"
+            ]
+          }
+        }
+      ]
     },
     {
-      "name": "Generate Syllabus Prompt",
+      "name": "06 Generate Syllabus Prompt",
       "request": {
         "method": "POST",
         "header": [
@@ -310,10 +236,23 @@
           ]
         }
       },
-      "response": []
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Generate Syllabus Prompt returns 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('Syllabus prompt is ready', function () { pm.expect(body.status).to.eql('syllabus_prompt_ready'); pm.expect(body.nextAction).to.eql('review_syllabus_prompt'); pm.expect(body.syllabusPrompt).to.be.a('string').and.not.empty; });"
+            ]
+          }
+        }
+      ]
     },
     {
-      "name": "Generate Syllabus",
+      "name": "07 Generate Syllabus",
       "request": {
         "method": "POST",
         "header": [
@@ -340,10 +279,30 @@
           ]
         }
       },
-      "response": []
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Generate Syllabus returns 200 or 409', function () { pm.expect([200, 409]).to.include(pm.response.code); });",
+              "const body = pm.response.json();",
+              "pm.collectionVariables.set('latestSyllabusGenerationResponseCode', String(pm.response.code));",
+              "if (pm.response.code === 200) {",
+              "  pm.collectionVariables.set('latestSyllabusRunExpectedStatus', 'completed');",
+              "  pm.test('Generated syllabus is structurally valid', function () { pm.expect(body.status).to.eql('syllabus_ready'); pm.expect(body.nextAction).to.eql('review_syllabus'); pm.expect(body.syllabus).to.be.an('object'); pm.expect(body.syllabus.title).to.be.a('string').and.not.empty; pm.expect(body.syllabus.learningGoals).to.be.an('array').that.is.not.empty; pm.expect(body.syllabus.chapters).to.be.an('array').that.is.not.empty; });",
+              "} else {",
+              "  pm.collectionVariables.set('latestSyllabusRunExpectedStatus', 'failed');",
+              "  pm.test('Syllabus generation returns a useful AI error', function () { pm.expect(body.error).to.be.a('string').and.not.empty; });",
+              "}"
+            ]
+          }
+        }
+      ]
     },
     {
-      "name": "Get Syllabus Generation Runs",
+      "name": "08 Get Syllabus Generation Runs",
       "request": {
         "method": "GET",
         "header": [],
@@ -361,10 +320,32 @@
           ]
         }
       },
-      "response": []
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Get Syllabus Generation Runs returns 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('At least one syllabus run is stored', function () { pm.expect(body.runs).to.be.an('array').that.is.not.empty; });",
+              "const latestRun = body.runs[0];",
+              "const expectedStatus = pm.collectionVariables.get('latestSyllabusRunExpectedStatus') || 'completed';",
+              "pm.test('Latest syllabus run matches expected status', function () { pm.expect(latestRun.status).to.eql(expectedStatus); pm.expect(latestRun.provider).to.be.a('string').and.not.empty; pm.expect(latestRun.model).to.be.a('string').and.not.empty; pm.expect(latestRun.prompt).to.be.a('string').and.not.empty; });",
+              "if (expectedStatus === 'completed') {",
+              "  pm.test('Completed syllabus run includes syllabus payload', function () { pm.expect(latestRun.syllabus).to.be.an('object'); pm.expect(latestRun.syllabus.chapters).to.be.an('array').that.is.not.empty; });",
+              "} else {",
+              "  pm.test('Failed syllabus run includes debug payload', function () { pm.expect(latestRun.error).to.be.a('string').and.not.empty; pm.expect(latestRun.rawOutput).to.be.a('string').and.not.empty; });",
+              "  postman.setNextRequest(null);",
+              "}"
+            ]
+          }
+        }
+      ]
     },
     {
-      "name": "Update Syllabus",
+      "name": "09 Update Syllabus",
       "request": {
         "method": "PATCH",
         "header": [
@@ -375,7 +356,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"syllabus\": {\n    \"title\": \"Advanced Next.js Delivery Plan\",\n    \"overview\": \"A custom syllabus focused on shipping production-ready Next.js systems.\",\n    \"learningGoals\": [\n      \"Understand the framework architecture\",\n      \"Build production features confidently\",\n      \"Choose appropriate rendering strategies\"\n    ],\n    \"chapters\": [\n      {\n        \"title\": \"Runtime Fundamentals\",\n        \"overview\": \"Review the core runtime model and framework primitives.\",\n        \"keyPoints\": [\n          \"Routing model\",\n          \"Rendering modes\",\n          \"Server and client boundaries\"\n        ]\n      },\n      {\n        \"title\": \"Delivery Workflow\",\n        \"overview\": \"Move from local development to production delivery.\",\n        \"keyPoints\": [\n          \"Project structure\",\n          \"Deployment pipeline\",\n          \"Operational checks\"\n        ]\n      }\n    ]\n  }\n}"
+          "raw": "{\n  \"syllabus\": {\n    \"title\": \"Advanced {{topic}} Delivery Plan\",\n    \"overview\": \"A custom syllabus focused on shipping production-ready outcomes.\",\n    \"learningGoals\": [\n      \"Understand the framework architecture\",\n      \"Build production features confidently\",\n      \"Choose appropriate implementation tradeoffs\"\n    ],\n    \"chapters\": [\n      {\n        \"title\": \"Runtime Fundamentals\",\n        \"overview\": \"Review the core runtime model and framework primitives.\",\n        \"keyPoints\": [\n          \"Routing model\",\n          \"Rendering modes\",\n          \"Server and client boundaries\"\n        ]\n      },\n      {\n        \"title\": \"Delivery Workflow\",\n        \"overview\": \"Move from local development to production delivery.\",\n        \"keyPoints\": [\n          \"Project structure\",\n          \"Deployment pipeline\",\n          \"Operational checks\"\n        ]\n      }\n    ]\n  }\n}"
         },
         "url": {
           "raw": "{{baseUrl}}/api/unit-init/{{unitInitId}}/syllabus",
@@ -390,10 +371,23 @@
           ]
         }
       },
-      "response": []
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Update Syllabus returns 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('Updated syllabus is stored before approval', function () { pm.expect(body.nextAction).to.eql('approve_syllabus'); pm.expect(body.syllabus.title).to.be.a('string').and.not.empty; pm.expect(body.syllabus.chapters).to.be.an('array').that.is.not.empty; });"
+            ]
+          }
+        }
+      ]
     },
     {
-      "name": "Approve Syllabus",
+      "name": "10 Approve Syllabus",
       "request": {
         "method": "POST",
         "header": [
@@ -419,10 +413,23 @@
           ]
         }
       },
-      "response": []
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Approve Syllabus returns 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('Syllabus approval advances the lifecycle', function () { pm.expect(body.status).to.eql('syllabus_approved'); pm.expect(body.nextAction).to.eql('generate_unit_content'); pm.expect(body.syllabusApprovedAt).to.be.a('string').and.not.empty; });"
+            ]
+          }
+        }
+      ]
     },
     {
-      "name": "Generate Chapter Content",
+      "name": "11 Generate Chapter Content",
       "request": {
         "method": "POST",
         "header": [
@@ -450,7 +457,237 @@
           ]
         }
       },
-      "response": []
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Generate Chapter Content returns 200 or 409', function () { pm.expect([200, 409]).to.include(pm.response.code); });",
+              "const body = pm.response.json();",
+              "pm.collectionVariables.set('latestChapterGenerationResponseCode', String(pm.response.code));",
+              "if (pm.response.code === 200) {",
+              "  pm.collectionVariables.set('latestChapterRunExpectedStatus', 'completed');",
+              "  pm.test('Generated chapter is structurally valid', function () { pm.expect(body.generatedChapters).to.be.an('array').that.is.not.empty; const chapter = body.generatedChapters.find((item) => item.chapterIndex === Number(pm.collectionVariables.get('chapterIndex') || '0')); pm.expect(chapter).to.be.an('object'); pm.expect(chapter.content).to.be.a('string').and.not.empty; pm.expect(chapter.keyTakeaways).to.be.an('array').that.is.not.empty; });",
+              "} else {",
+              "  pm.collectionVariables.set('latestChapterRunExpectedStatus', 'failed');",
+              "  pm.test('Chapter generation returns a useful AI error', function () { pm.expect(body.error).to.be.a('string').and.not.empty; });",
+              "  postman.setNextRequest(null);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "12 Get Chapter Generation Runs",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/unit-init/{{unitInitId}}/chapters/runs",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "unit-init",
+            "{{unitInitId}}",
+            "chapters",
+            "runs"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Get Chapter Generation Runs returns 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('At least one chapter run is stored', function () { pm.expect(body.runs).to.be.an('array').that.is.not.empty; });",
+              "const latestRun = body.runs[0];",
+              "pm.test('Latest chapter run is completed and inspectable', function () { pm.expect(latestRun.status).to.eql('completed'); pm.expect(latestRun.chapterIndex).to.eql(Number(pm.collectionVariables.get('chapterIndex') || '0')); pm.expect(latestRun.prompt).to.be.a('string').and.not.empty; pm.expect(latestRun.chapter).to.be.an('object'); pm.expect(latestRun.chapter.content).to.be.a('string').and.not.empty; });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "13 Get Generated Chapter",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/unit-init/{{unitInitId}}/chapters/{{chapterIndex}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "unit-init",
+            "{{unitInitId}}",
+            "chapters",
+            "{{chapterIndex}}"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Get Generated Chapter returns 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('Generated chapter payload is complete', function () { pm.expect(body.chapterIndex).to.eql(Number(pm.collectionVariables.get('chapterIndex') || '0')); pm.expect(body.title).to.be.a('string').and.not.empty; pm.expect(body.content).to.be.a('string').and.not.empty; pm.expect(body.keyTakeaways).to.be.an('array').that.is.not.empty; });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "14 Get Chapter List",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/unit-init/{{unitInitId}}/chapters",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "unit-init",
+            "{{unitInitId}}",
+            "chapters"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Get Chapter List returns 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('Chapter list exposes generation flags', function () { pm.expect(body.chapters).to.be.an('array').that.is.not.empty; const chapter = body.chapters.find((item) => item.chapterIndex === Number(pm.collectionVariables.get('chapterIndex') || '0')); pm.expect(chapter).to.be.an('object'); pm.expect(chapter.hasGeneratedContent).to.be.true; });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "15 Update Generated Chapter",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"chapter\": {\n    \"title\": \"Edited Foundations\",\n    \"overview\": \"A rewritten overview for the chapter.\",\n    \"content\": \"A rewritten body of content for manual editing.\",\n    \"keyTakeaways\": [\n      \"Edited takeaway one\",\n      \"Edited takeaway two\"\n    ]\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/unit-init/{{unitInitId}}/chapters/{{chapterIndex}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "unit-init",
+            "{{unitInitId}}",
+            "chapters",
+            "{{chapterIndex}}"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Update Generated Chapter returns 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('Updated chapter is stored', function () { pm.expect(body.title).to.eql('Edited Foundations'); pm.expect(body.updatedAt).to.be.a('string').and.not.empty; });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "16 Get Unit Init By Id",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/unit-init/{{unitInitId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "unit-init",
+            "{{unitInitId}}"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Get Unit Init returns 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('Fetched unit-init reflects later lifecycle state', function () { pm.expect(body.id).to.eql(pm.collectionVariables.get('unitInitId')); pm.expect(body.status).to.be.a('string').and.not.empty; });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "17 List Unit Inits",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/unit-init",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "unit-init"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('List Unit Inits returns 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('List Unit Inits returns an array', function () { pm.expect(body.unitInits).to.be.an('array'); });"
+            ]
+          }
+        }
+      ]
     }
   ],
   "variable": [
@@ -465,6 +702,54 @@
     {
       "key": "chapterIndex",
       "value": "0"
+    },
+    {
+      "key": "topic",
+      "value": "next.js framework"
+    },
+    {
+      "key": "provider",
+      "value": "openai"
+    },
+    {
+      "key": "topicKnowledgeLevel",
+      "value": "basic"
+    },
+    {
+      "key": "relatedKnowledgeLevel",
+      "value": "basic"
+    },
+    {
+      "key": "learningGoal",
+      "value": "I want to build production-ready applications with Next.js"
+    },
+    {
+      "key": "preferredDepth",
+      "value": "balanced"
+    },
+    {
+      "key": "preferredLength",
+      "value": "medium"
+    },
+    {
+      "key": "latestSyllabusRunExpectedStatus",
+      "value": ""
+    },
+    {
+      "key": "latestSyllabusGenerationResponseCode",
+      "value": ""
+    },
+    {
+      "key": "latestChapterRunExpectedStatus",
+      "value": ""
+    },
+    {
+      "key": "latestChapterGenerationResponseCode",
+      "value": ""
+    },
+    {
+      "key": "lastCreatedProvider",
+      "value": ""
     }
   ]
 }
