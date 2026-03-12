@@ -3,6 +3,7 @@ import type { CreatedUnitInit } from './create-unit-init.js'
 export interface UnitInitStore {
     save(unitInit: CreatedUnitInit): void
     getById(ownerId: string, unitInitId: string): CreatedUnitInit | null
+    listByOwner(ownerId: string): CreatedUnitInit[]
 }
 
 export class InMemoryUnitInitStore implements UnitInitStore {
@@ -19,5 +20,11 @@ export class InMemoryUnitInitStore implements UnitInitStore {
         }
 
         return unitInit
+    }
+
+    listByOwner(ownerId: string): CreatedUnitInit[] {
+        return [...this.unitInits.values()]
+            .filter((unitInit) => unitInit.ownerId === ownerId)
+            .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
     }
 }

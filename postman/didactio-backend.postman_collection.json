@@ -65,6 +65,24 @@
       ]
     },
     {
+      "name": "List Unit Inits",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/unit-init",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "unit-init"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
       "name": "Get Unit Init By Id",
       "request": {
         "method": "GET",

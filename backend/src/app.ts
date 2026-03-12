@@ -90,6 +90,14 @@ export function createApp(options: CreateAppOptions = {}) {
         }
     })
 
+    app.get('/api/unit-init', (request, response) => {
+        const requestWithMockOwner = asRequestWithMockOwner(request)
+
+        response.json({
+            unitInits: unitInitStore.listByOwner(requestWithMockOwner.mockOwner.id),
+        })
+    })
+
     app.get('/api/unit-init/:id', (request, response) => {
         const requestWithMockOwner = asRequestWithMockOwner(request)
         const unitInit = unitInitStore.getById(

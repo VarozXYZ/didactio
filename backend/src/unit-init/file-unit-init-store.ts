@@ -26,6 +26,12 @@ export class FileUnitInitStore implements UnitInitStore {
         return unitInit
     }
 
+    listByOwner(ownerId: string): CreatedUnitInit[] {
+        return [...this.unitInits.values()]
+            .filter((unitInit) => unitInit.ownerId === ownerId)
+            .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+    }
+
     private readStoredUnitInits(): CreatedUnitInit[] {
         try {
             const fileContents = readFileSync(this.filePath, 'utf8')

@@ -62,6 +62,48 @@ describe('POST /api/unit-init', () => {
     })
 })
 
+describe('GET /api/unit-init', () => {
+    it('returns all unit-inits for the current mock owner', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const firstCreatedResponse = await request(app)
+            .post('/api/unit-init')
+            .send({ topic: 'next.js framework' })
+
+        const secondCreatedResponse = await request(app)
+            .post('/api/unit-init')
+            .send({ topic: 'english language', provider: 'deepseek' })
+
+        const response = await request(app).get('/api/unit-init')
+
+        expect(response.status).toBe(200)
+        expect(response.body.unitInits).toHaveLength(2)
+        expect(response.body.unitInits[0]).toMatchObject({
+            id: secondCreatedResponse.body.id,
+            topic: 'english language',
+            provider: 'deepseek',
+        })
+        expect(response.body.unitInits[1]).toMatchObject({
+            id: firstCreatedResponse.body.id,
+            topic: 'next.js framework',
+            provider: 'openai',
+        })
+    })
+
+    it('returns an empty list when no unit-inits exist', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const response = await request(app).get('/api/unit-init')
+
+        expect(response.status).toBe(200)
+        expect(response.body).toEqual({
+            unitInits: [],
+        })
+    })
+})
+
 describe('GET /api/unit-init/:id', () => {
     it('returns a previously created unit-init for the same mock owner', async () => {
         const store = new InMemoryUnitInitStore()
