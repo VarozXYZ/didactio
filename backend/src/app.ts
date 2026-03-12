@@ -43,6 +43,7 @@ import {
 } from './unit-init/answer-questionnaire.js'
 import {
     createUnitInit,
+    linkDidacticUnitToUnitInit,
     moderateUnitInit,
     parseCreateUnitInitInput,
 } from './unit-init/create-unit-init.js'
@@ -386,7 +387,7 @@ export function createApp(options: CreateAppOptions) {
                                 topic: updatedDidacticUnit.topic,
                                 provider: updatedDidacticUnit.provider,
                                 status: 'syllabus_approved',
-                                nextAction: 'generate_unit_content',
+                                nextAction: 'view_didactic_unit',
                                 createdAt: updatedDidacticUnit.createdAt,
                                 questionnaireAnswers: updatedDidacticUnit.questionnaireAnswers,
                                 syllabus: {
@@ -413,7 +414,7 @@ export function createApp(options: CreateAppOptions) {
                 topic: didacticUnit.topic,
                 provider: didacticUnit.provider,
                 status: 'syllabus_approved' as const,
-                nextAction: 'generate_unit_content' as const,
+                nextAction: 'view_didactic_unit' as const,
                 createdAt: didacticUnit.createdAt,
                 questionnaireAnswers: didacticUnit.questionnaireAnswers,
                 syllabus: {
@@ -763,16 +764,17 @@ export function createApp(options: CreateAppOptions) {
         }
 
         try {
-            const updatedUnitInit = approveSyllabus(unitInit)
-            await unitInitStore.save(updatedUnitInit)
-            const didacticUnit = createDidacticUnitFromApprovedUnitInit(updatedUnitInit)
+            const approvedUnitInit = approveSyllabus(unitInit)
+            const didacticUnit = createDidacticUnitFromApprovedUnitInit(approvedUnitInit)
+            const linkedUnitInit = linkDidacticUnitToUnitInit(approvedUnitInit, didacticUnit.id)
+            await unitInitStore.save(linkedUnitInit)
             await didacticUnitStore.save(didacticUnit)
             await generationRunStore.linkUnitInitRunsToDidacticUnit(
-                updatedUnitInit.ownerId,
-                updatedUnitInit.id,
+                linkedUnitInit.ownerId,
+                linkedUnitInit.id,
                 didacticUnit.id
             )
-            response.json(updatedUnitInit)
+            response.json(linkedUnitInit)
         } catch (error) {
             response.status(409).json({
                 error:

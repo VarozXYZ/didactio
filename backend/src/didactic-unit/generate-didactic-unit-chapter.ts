@@ -9,7 +9,7 @@ function createChapterGenerationSource(didacticUnit: DidacticUnit): CreatedUnitI
         topic: didacticUnit.topic,
         provider: didacticUnit.provider,
         status: 'syllabus_approved',
-        nextAction: 'generate_unit_content',
+        nextAction: 'view_didactic_unit',
         createdAt: didacticUnit.createdAt,
         questionnaireAnswers: didacticUnit.questionnaireAnswers,
         syllabus: {

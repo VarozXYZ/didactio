@@ -1708,9 +1708,10 @@ describe('POST /api/unit-init/:id/approve-syllabus', () => {
 
         expect(response.status).toBe(200)
         expect(response.body.status).toBe('syllabus_approved')
-        expect(response.body.nextAction).toBe('generate_unit_content')
+        expect(response.body.nextAction).toBe('view_didactic_unit')
         expect(typeof response.body.syllabusApprovedAt).toBe('string')
         expect(Number.isNaN(Date.parse(response.body.syllabusApprovedAt))).toBe(false)
+        expect(response.body.didacticUnitId).toBeDefined()
 
         const didacticUnitsResponse = await request(app).get('/api/didactic-unit')
 
@@ -1718,6 +1719,9 @@ describe('POST /api/unit-init/:id/approve-syllabus', () => {
         expect(didacticUnitsResponse.body.didacticUnits).toHaveLength(1)
         expect(didacticUnitsResponse.body.didacticUnits[0].unitInitId).toBe(
             createdResponse.body.id
+        )
+        expect(didacticUnitsResponse.body.didacticUnits[0].id).toBe(
+            response.body.didacticUnitId
         )
     })
 

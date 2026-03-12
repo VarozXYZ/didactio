@@ -8,7 +8,7 @@ export function approveSyllabus(unitInit: CreatedUnitInit): CreatedUnitInit {
     return {
         ...unitInit,
         status: 'syllabus_approved',
-        nextAction: 'generate_unit_content',
+        nextAction: 'view_didactic_unit',
         syllabusApprovedAt: new Date().toISOString(),
     }
 }

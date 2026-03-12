@@ -12,7 +12,7 @@ function createApprovedSyllabusUnitInit(): CreatedUnitInit {
         topic: 'next.js framework',
         provider: 'openai',
         status: 'syllabus_approved',
-        nextAction: 'generate_unit_content',
+        nextAction: 'view_didactic_unit',
         createdAt: '2026-03-12T00:00:00.000Z',
         questionnaireAnswers: [
             { questionId: 'topic_knowledge_level', value: 'basic' },

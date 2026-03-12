@@ -20,7 +20,7 @@ export type UnitInitNextAction =
     | 'review_syllabus_prompt'
     | 'review_syllabus'
     | 'approve_syllabus'
-    | 'generate_unit_content'
+    | 'view_didactic_unit'
 
 export interface CreateUnitInitInput {
     topic: string
@@ -46,6 +46,7 @@ export interface CreatedUnitInit {
     syllabusGeneratedAt?: string
     syllabusUpdatedAt?: string
     syllabusApprovedAt?: string
+    didacticUnitId?: string
 }
 
 function isSupportedProvider(value: unknown): value is UnitInitProvider {
@@ -101,5 +102,20 @@ export function moderateUnitInit(unitInit: CreatedUnitInit): CreatedUnitInit {
         status: 'moderation_completed',
         nextAction: 'generate_questionnaire',
         moderatedAt: new Date().toISOString(),
+    }
+}
+
+export function linkDidacticUnitToUnitInit(
+    unitInit: CreatedUnitInit,
+    didacticUnitId: string
+): CreatedUnitInit {
+    if (unitInit.status !== 'syllabus_approved' || !unitInit.syllabusApprovedAt) {
+        throw new Error('Didactic unit link can only be added after syllabus approval.')
+    }
+
+    return {
+        ...unitInit,
+        nextAction: 'view_didactic_unit',
+        didacticUnitId,
     }
 }

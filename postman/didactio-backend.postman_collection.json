@@ -422,7 +422,8 @@
             "exec": [
               "pm.test('Approve Syllabus returns 200', function () { pm.response.to.have.status(200); });",
               "const body = pm.response.json();",
-              "pm.test('Syllabus approval advances the lifecycle', function () { pm.expect(body.status).to.eql('syllabus_approved'); pm.expect(body.nextAction).to.eql('generate_unit_content'); pm.expect(body.syllabusApprovedAt).to.be.a('string').and.not.empty; });"
+              "pm.test('Syllabus approval advances the lifecycle', function () { pm.expect(body.status).to.eql('syllabus_approved'); pm.expect(body.nextAction).to.eql('view_didactic_unit'); pm.expect(body.syllabusApprovedAt).to.be.a('string').and.not.empty; pm.expect(body.didacticUnitId).to.be.a('string').and.not.empty; });",
+              "pm.collectionVariables.set('didacticUnitId', body.didacticUnitId);"
             ]
           }
         }
@@ -453,7 +454,7 @@
             "exec": [
               "pm.test('List Didactic Units returns 200', function () { pm.response.to.have.status(200); });",
               "const body = pm.response.json();",
-              "pm.test('Approved syllabus creates a didactic unit record', function () { pm.expect(body.didacticUnits).to.be.an('array').that.is.not.empty; const latestUnit = body.didacticUnits[0]; pm.expect(latestUnit.unitInitId).to.eql(pm.collectionVariables.get('unitInitId')); pm.expect(latestUnit.status).to.eql('ready_for_content_generation'); pm.expect(latestUnit.title).to.be.a('string').and.not.empty; pm.expect(latestUnit.chapters).to.be.an('array').that.is.not.empty; pm.collectionVariables.set('didacticUnitId', latestUnit.id); });"
+              "pm.test('Approved syllabus creates a didactic unit record', function () { pm.expect(body.didacticUnits).to.be.an('array').that.is.not.empty; const linkedUnit = body.didacticUnits.find((unit) => unit.id === pm.collectionVariables.get('didacticUnitId')); pm.expect(linkedUnit).to.be.an('object'); pm.expect(linkedUnit.unitInitId).to.eql(pm.collectionVariables.get('unitInitId')); pm.expect(linkedUnit.status).to.eql('ready_for_content_generation'); pm.expect(linkedUnit.title).to.be.a('string').and.not.empty; pm.expect(linkedUnit.chapters).to.be.an('array').that.is.not.empty; });"
             ]
           }
         }
@@ -708,7 +709,7 @@
             "exec": [
               "pm.test('Get Unit Init returns 200', function () { pm.response.to.have.status(200); });",
               "const body = pm.response.json();",
-              "pm.test('Fetched unit-init reflects later lifecycle state', function () { pm.expect(body.id).to.eql(pm.collectionVariables.get('unitInitId')); pm.expect(body.status).to.be.a('string').and.not.empty; });"
+              "pm.test('Fetched unit-init reflects later lifecycle state', function () { pm.expect(body.id).to.eql(pm.collectionVariables.get('unitInitId')); pm.expect(body.status).to.be.a('string').and.not.empty; if (body.status === 'syllabus_approved') { pm.expect(body.didacticUnitId).to.eql(pm.collectionVariables.get('didacticUnitId')); pm.expect(body.nextAction).to.eql('view_didactic_unit'); } });"
             ]
           }
         }
