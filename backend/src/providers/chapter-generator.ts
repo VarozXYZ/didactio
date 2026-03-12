@@ -10,6 +10,16 @@ export interface ChapterGenerator {
     ): Promise<UnitInitGeneratedChapter>
 }
 
+export function resolveChapterGeneratorModel(provider: UnitInitProvider): string {
+    const env = getAppEnv()
+
+    if (provider === 'openai') {
+        return env.openAiApiKey ? env.openAiChapterModel : 'fake-openai-chapter-generator'
+    }
+
+    return 'fake-deepseek-chapter-generator'
+}
+
 function findAnswerValue(unitInit: CreatedUnitInit, questionId: string): string {
     return (
         unitInit.questionnaireAnswers?.find((answer) => answer.questionId === questionId)?.value ??
@@ -25,6 +35,36 @@ function getSyllabusChapter(unitInit: CreatedUnitInit, chapterIndex: number) {
     }
 
     return chapter
+}
+
+export function buildChapterGenerationPrompt(
+    unitInit: CreatedUnitInit,
+    chapterIndex: number
+): string {
+    const chapter = getSyllabusChapter(unitInit, chapterIndex)
+    const topicKnowledgeLevel = findAnswerValue(unitInit, 'topic_knowledge_level')
+    const relatedKnowledgeLevel = findAnswerValue(unitInit, 'related_knowledge_level')
+    const learningGoal = findAnswerValue(unitInit, 'learning_goal')
+    const preferredDepth = findAnswerValue(unitInit, 'preferred_depth')
+
+    return [
+        'Create one chapter of a personalized didactic unit.',
+        `Topic: ${unitInit.topic}`,
+        `Chapter title: ${chapter.title}`,
+        `Chapter overview: ${chapter.overview}`,
+        `Chapter key points: ${chapter.keyPoints.join(', ')}`,
+        `Current topic knowledge: ${topicKnowledgeLevel}`,
+        `Related knowledge: ${relatedKnowledgeLevel}`,
+        `Learner goal: ${learningGoal}`,
+        `Preferred depth: ${preferredDepth}`,
+        'Return only valid JSON with this exact shape:',
+        '{',
+        '  "title": "string",',
+        '  "overview": "string",',
+        '  "content": "string",',
+        '  "keyTakeaways": ["string"]',
+        '}',
+    ].join('\n')
 }
 
 class OpenAiFakeChapterGenerator implements ChapterGenerator {

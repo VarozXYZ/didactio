@@ -122,6 +122,27 @@
       "response": []
     },
     {
+      "name": "Get Chapter Generation Runs",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/unit-init/{{unitInitId}}/chapters/runs",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "unit-init",
+            "{{unitInitId}}",
+            "chapters",
+            "runs"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
       "name": "Get Generated Chapter",
       "request": {
         "method": "GET",

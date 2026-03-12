@@ -1,5 +1,6 @@
 import type { CreatedUnitInit } from '../unit-init/create-unit-init.js'
 import type { UnitInitGeneratedChapter } from '../unit-init/generate-chapter-content.js'
+import { buildChapterGenerationPrompt } from './chapter-generator.js'
 
 type FetchImplementation = typeof fetch
 
@@ -15,13 +16,6 @@ interface OpenAiChatCompletionResponse {
             content?: string | null
         }
     }>
-}
-
-function findAnswerValue(unitInit: CreatedUnitInit, questionId: string): string {
-    return (
-        unitInit.questionnaireAnswers?.find((answer) => answer.questionId === questionId)?.value ??
-        'not provided'
-    )
 }
 
 function getSyllabusChapter(unitInit: CreatedUnitInit, chapterIndex: number) {
@@ -95,33 +89,6 @@ function parseChapterResponse(content: string, chapterIndex: number): UnitInitGe
     }
 }
 
-function buildPrompt(unitInit: CreatedUnitInit, chapterIndex: number): string {
-    const chapter = getSyllabusChapter(unitInit, chapterIndex)
-    const topicKnowledgeLevel = findAnswerValue(unitInit, 'topic_knowledge_level')
-    const relatedKnowledgeLevel = findAnswerValue(unitInit, 'related_knowledge_level')
-    const learningGoal = findAnswerValue(unitInit, 'learning_goal')
-    const preferredDepth = findAnswerValue(unitInit, 'preferred_depth')
-
-    return [
-        'Create one chapter of a personalized didactic unit.',
-        `Topic: ${unitInit.topic}`,
-        `Chapter title: ${chapter.title}`,
-        `Chapter overview: ${chapter.overview}`,
-        `Chapter key points: ${chapter.keyPoints.join(', ')}`,
-        `Current topic knowledge: ${topicKnowledgeLevel}`,
-        `Related knowledge: ${relatedKnowledgeLevel}`,
-        `Learner goal: ${learningGoal}`,
-        `Preferred depth: ${preferredDepth}`,
-        'Return only valid JSON with this exact shape:',
-        '{',
-        '  "title": "string",',
-        '  "overview": "string",',
-        '  "content": "string",',
-        '  "keyTakeaways": ["string"]',
-        '}',
-    ].join('\n')
-}
-
 export class OpenAiChapterGenerator {
     private readonly apiKey: string
     private readonly model: string
@@ -158,7 +125,7 @@ export class OpenAiChapterGenerator {
                         },
                         {
                             role: 'user',
-                            content: buildPrompt(unitInit, chapterIndex),
+                            content: buildChapterGenerationPrompt(unitInit, chapterIndex),
                         },
                     ],
                 }),

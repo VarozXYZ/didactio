@@ -1,11 +1,18 @@
 import express from 'express'
 import {
+    InMemoryChapterGenerationRunStore,
+    createChapterGenerationRun,
+    type ChapterGenerationRunStore,
+} from './generation-runs/chapter-generation-run-store.js'
+import {
     InMemorySyllabusGenerationRunStore,
     createSyllabusGenerationRun,
     type SyllabusGenerationRunStore,
 } from './generation-runs/syllabus-generation-run-store.js'
 import {
+    buildChapterGenerationPrompt,
     ProviderBackedFakeChapterGenerator,
+    resolveChapterGeneratorModel,
     type ChapterGenerator,
 } from './providers/chapter-generator.js'
 import { attachMockOwner, type RequestWithMockOwner } from './middleware/mock-owner.js'
@@ -42,6 +49,7 @@ import { InMemoryUnitInitStore, type UnitInitStore } from './unit-init/unit-init
 
 interface CreateAppOptions {
     unitInitStore?: UnitInitStore
+    chapterGenerationRunStore?: ChapterGenerationRunStore
     syllabusGenerationRunStore?: SyllabusGenerationRunStore
     syllabusGenerator?: SyllabusGenerator
     chapterGenerator?: ChapterGenerator
@@ -65,6 +73,8 @@ function parseChapterIndex(value: string): number {
 export function createApp(options: CreateAppOptions = {}) {
     const app = express()
     const unitInitStore = options.unitInitStore ?? new InMemoryUnitInitStore()
+    const chapterGenerationRunStore =
+        options.chapterGenerationRunStore ?? new InMemoryChapterGenerationRunStore()
     const syllabusGenerationRunStore =
         options.syllabusGenerationRunStore ?? new InMemorySyllabusGenerationRunStore()
     const syllabusGenerator =
@@ -174,6 +184,28 @@ export function createApp(options: CreateAppOptions = {}) {
 
         response.json({
             runs: await syllabusGenerationRunStore.listByUnitInit(
+                requestWithMockOwner.mockOwner.id,
+                request.params.id
+            ),
+        })
+    })
+
+    app.get('/api/unit-init/:id/chapters/runs', async (request, response) => {
+        const requestWithMockOwner = asRequestWithMockOwner(request)
+        const unitInit = await unitInitStore.getById(
+            requestWithMockOwner.mockOwner.id,
+            request.params.id
+        )
+
+        if (!unitInit) {
+            response.status(404).json({
+                error: 'Unit init not found.',
+            })
+            return
+        }
+
+        response.json({
+            runs: await chapterGenerationRunStore.listByUnitInit(
                 requestWithMockOwner.mockOwner.id,
                 request.params.id
             ),
@@ -533,6 +565,25 @@ export function createApp(options: CreateAppOptions = {}) {
                 chapterGenerator
             )
             await unitInitStore.save(updatedUnitInit)
+            const generatedChapter = updatedUnitInit.generatedChapters?.find(
+                (chapter) => chapter.chapterIndex === chapterIndex
+            )
+
+            if (generatedChapter) {
+                await chapterGenerationRunStore.save(
+                    createChapterGenerationRun({
+                        unitInitId: updatedUnitInit.id,
+                        ownerId: updatedUnitInit.ownerId,
+                        chapterIndex,
+                        provider: updatedUnitInit.provider,
+                        model: resolveChapterGeneratorModel(updatedUnitInit.provider),
+                        prompt: buildChapterGenerationPrompt(updatedUnitInit, chapterIndex),
+                        chapter: generatedChapter,
+                        createdAt: generatedChapter.generatedAt,
+                    })
+                )
+            }
+
             response.json(updatedUnitInit)
         } catch (error) {
             const message =

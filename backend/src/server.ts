@@ -1,5 +1,6 @@
 import { getAppEnv, loadEnv } from './config/env.js'
 import { createApp } from './app.js'
+import { MongoChapterGenerationRunStore } from './generation-runs/mongo-chapter-generation-run-store.js'
 import { MongoSyllabusGenerationRunStore } from './generation-runs/mongo-syllabus-generation-run-store.js'
 import {
     connectMongoIfConfigured,
@@ -17,11 +18,15 @@ if (!mongoConnection) {
 }
 
 const unitInitStore = new MongoUnitInitStore(mongoConnection.database)
+const chapterGenerationRunStore = new MongoChapterGenerationRunStore(
+    mongoConnection.database
+)
 const syllabusGenerationRunStore = new MongoSyllabusGenerationRunStore(
     mongoConnection.database
 )
 const app = createApp({
     unitInitStore,
+    chapterGenerationRunStore,
     syllabusGenerationRunStore,
     mongoHealth: createMongoHealthStatus(mongoConnection),
 })
