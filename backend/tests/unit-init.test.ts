@@ -450,6 +450,81 @@ describe('GET /api/didactic-unit/:id/chapters/:chapterIndex', () => {
     })
 })
 
+describe('GET /api/didactic-unit/:id/runs', () => {
+    it('returns generation runs through the didactic unit id', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const createdResponse = await request(app)
+            .post('/api/unit-init')
+            .send({ topic: 'next.js framework' })
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/moderate`)
+            .send({})
+
+        const questionnaireResponse = await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/questionnaire/generate`)
+            .send({})
+
+        await request(app)
+            .patch(`/api/unit-init/${createdResponse.body.id}/questionnaire/answers`)
+            .send({
+                answers: questionnaireResponse.body.questionnaire.questions.map(
+                    (question: { id: string }) => ({
+                        questionId: question.id,
+                        value: `answer-for-${question.id}`,
+                    })
+                ),
+            })
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/syllabus-prompt/generate`)
+            .send({})
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/syllabus/generate`)
+            .send({})
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/approve-syllabus`)
+            .send({})
+
+        const didacticUnitsResponse = await request(app).get('/api/didactic-unit')
+        const didacticUnitId = didacticUnitsResponse.body.didacticUnits[0].id
+
+        await request(app)
+            .post(`/api/didactic-unit/${didacticUnitId}/chapters/0/generate`)
+            .send({})
+
+        const response = await request(app).get(`/api/didactic-unit/${didacticUnitId}/runs`)
+
+        expect(response.status).toBe(200)
+        expect(response.body.runs).toHaveLength(2)
+        expect(response.body.runs[0]).toMatchObject({
+            unitInitId: createdResponse.body.id,
+            stage: 'chapter',
+            chapterIndex: 0,
+        })
+        expect(response.body.runs[1]).toMatchObject({
+            unitInitId: createdResponse.body.id,
+            stage: 'syllabus',
+        })
+    })
+
+    it('returns 404 when the didactic unit does not exist', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const response = await request(app).get('/api/didactic-unit/missing-id/runs')
+
+        expect(response.status).toBe(404)
+        expect(response.body).toEqual({
+            error: 'Didactic unit not found.',
+        })
+    })
+})
+
 describe('POST /api/didactic-unit/:id/chapters/:chapterIndex/generate', () => {
     it('generates chapter content onto the didactic unit record', async () => {
         const store = new InMemoryUnitInitStore()

@@ -249,6 +249,28 @@ export function createApp(options: CreateAppOptions) {
         response.json(generatedChapter)
     })
 
+    app.get('/api/didactic-unit/:id/runs', async (request, response) => {
+        const requestWithMockOwner = asRequestWithMockOwner(request)
+        const didacticUnit = await didacticUnitStore.getById(
+            requestWithMockOwner.mockOwner.id,
+            request.params.id
+        )
+
+        if (!didacticUnit) {
+            response.status(404).json({
+                error: 'Didactic unit not found.',
+            })
+            return
+        }
+
+        response.json({
+            runs: await generationRunStore.listByUnitInit(
+                requestWithMockOwner.mockOwner.id,
+                didacticUnit.unitInitId
+            ),
+        })
+    })
+
     app.patch('/api/didactic-unit/:id/chapters/:chapterIndex', async (request, response) => {
         const requestWithMockOwner = asRequestWithMockOwner(request)
         const didacticUnit = await didacticUnitStore.getById(
