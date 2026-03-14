@@ -115,7 +115,16 @@ function isPlanningUnitInit(unitInit: { didacticUnitId?: string }): boolean {
 
 function buildUnitInitResponse(unitInit: CreatedUnitInit) {
     if (!unitInit.didacticUnitId || unitInit.status !== 'syllabus_approved') {
-        return unitInit
+        const summary = summarizeUnitInit(unitInit)
+
+        return {
+            ...unitInit,
+            planning: {
+                progressPercent: summary.progressPercent,
+                lastActivityAt: summary.lastActivityAt,
+                isInProgress: true,
+            },
+        }
     }
 
     return {

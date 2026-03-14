@@ -926,7 +926,7 @@ describe('PATCH /api/didactic-unit/:id/chapters/:chapterIndex', () => {
 })
 
 describe('GET /api/unit-init/:id', () => {
-    it('returns a previously created unit-init for the same mock owner', async () => {
+    it('returns an explicit planning detail shape for in-progress unit-inits', async () => {
         const store = new InMemoryUnitInitStore()
         const app = createApp({ unitInitStore: store })
 
@@ -937,7 +937,14 @@ describe('GET /api/unit-init/:id', () => {
         const response = await request(app).get(`/api/unit-init/${createdResponse.body.id}`)
 
         expect(response.status).toBe(200)
-        expect(response.body).toEqual(createdResponse.body)
+        expect(response.body).toMatchObject({
+            ...createdResponse.body,
+            planning: {
+                progressPercent: 0,
+                lastActivityAt: createdResponse.body.createdAt,
+                isInProgress: true,
+            },
+        })
     })
 
     it('returns an explicit didactic-unit handoff for approved unit-inits', async () => {
