@@ -6,6 +6,7 @@ import { parseUpdateDidacticUnitChapterInput } from './didactic-unit/didactic-un
 import {
     createChapterGenerationSourceFromDidacticUnit,
     generateDidacticUnitChapter,
+    hasGeneratedDidacticUnitChapter,
 } from './didactic-unit/generate-didactic-unit-chapter.js'
 import { listDidacticUnitChapters } from './didactic-unit/list-didactic-unit-chapters.js'
 import { summarizeDidacticUnit } from './didactic-unit/summarize-didactic-unit.js'
@@ -473,6 +474,116 @@ export function createApp(options: CreateAppOptions) {
                 error instanceof Error
                     ? error.message
                     : 'Didactic unit chapter generation failed.'
+
+            response.status(
+                message === 'Chapter index is out of range for the approved syllabus.'
+                    ? 400
+                    : 409
+            ).json({
+                error: message,
+            })
+        }
+    })
+
+    app.post('/api/didactic-unit/:id/chapters/:chapterIndex/regenerate', async (request, response) => {
+        const requestWithMockOwner = asRequestWithMockOwner(request)
+        const didacticUnit = await didacticUnitStore.getById(
+            requestWithMockOwner.mockOwner.id,
+            request.params.id
+        )
+
+        if (!didacticUnit) {
+            response.status(404).json({
+                error: 'Didactic unit not found.',
+            })
+            return
+        }
+
+        let chapterIndex
+        try {
+            chapterIndex = parseChapterIndex(request.params.chapterIndex)
+        } catch (error) {
+            response.status(400).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : 'Invalid didactic unit chapter regeneration request.',
+            })
+            return
+        }
+
+        if (!hasGeneratedDidacticUnitChapter(didacticUnit, chapterIndex)) {
+            response.status(404).json({
+                error: 'Generated didactic unit chapter not found.',
+            })
+            return
+        }
+
+        try {
+            const updatedDidacticUnit = await generateDidacticUnitChapter(
+                didacticUnit,
+                chapterIndex,
+                chapterGenerator
+            )
+            await didacticUnitStore.save(updatedDidacticUnit)
+
+            const regeneratedChapter = updatedDidacticUnit.generatedChapters?.find(
+                (chapter) => chapter.chapterIndex === chapterIndex
+            )
+
+            if (regeneratedChapter) {
+                await generationRunStore.save(
+                    createCompletedChapterGenerationRunRecord({
+                        unitInitId: updatedDidacticUnit.unitInitId,
+                        didacticUnitId: updatedDidacticUnit.id,
+                        ownerId: updatedDidacticUnit.ownerId,
+                        chapterIndex,
+                        provider: updatedDidacticUnit.provider,
+                        model: resolveChapterGeneratorModel(updatedDidacticUnit.provider),
+                        prompt: buildChapterGenerationPrompt(
+                            createChapterGenerationSourceFromDidacticUnit(
+                                updatedDidacticUnit
+                            ),
+                            chapterIndex
+                        ),
+                        chapter: regeneratedChapter,
+                        createdAt: regeneratedChapter.generatedAt,
+                    })
+                )
+            }
+
+            response.json(updatedDidacticUnit)
+        } catch (error) {
+            const promptSource = createChapterGenerationSourceFromDidacticUnit(didacticUnit)
+
+            if (canBuildChapterGenerationPrompt(promptSource, chapterIndex)) {
+                await generationRunStore.save(
+                    createFailedChapterGenerationRunRecord({
+                        unitInitId: didacticUnit.unitInitId,
+                        didacticUnitId: didacticUnit.id,
+                        ownerId: didacticUnit.ownerId,
+                        chapterIndex,
+                        provider: didacticUnit.provider,
+                        model: resolveChapterGeneratorModel(didacticUnit.provider),
+                        prompt: buildChapterGenerationPrompt(promptSource, chapterIndex),
+                        rawOutput:
+                            error instanceof OpenAiChapterGenerationError ||
+                            error instanceof DeepSeekChapterGenerationError
+                                ? error.rawOutput
+                                : undefined,
+                        error:
+                            error instanceof Error
+                                ? error.message
+                                : 'Didactic unit chapter regeneration failed.',
+                        createdAt: new Date().toISOString(),
+                    })
+                )
+            }
+
+            const message =
+                error instanceof Error
+                    ? error.message
+                    : 'Didactic unit chapter regeneration failed.'
 
             response.status(
                 message === 'Chapter index is out of range for the approved syllabus.'

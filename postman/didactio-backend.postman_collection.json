@@ -704,6 +704,51 @@
       ]
     },
     {
+      "name": "97 Advanced AI GEN Regenerate Didactic Unit Chapter",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/didactic-unit/{{didacticUnitId}}/chapters/{{chapterIndex}}/regenerate",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "didactic-unit",
+            "{{didacticUnitId}}",
+            "chapters",
+            "{{chapterIndex}}",
+            "regenerate"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Regenerate Didactic Unit Chapter returns 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('Didactic unit chapter is regenerated', function () { pm.expect(body.id).to.eql(pm.collectionVariables.get('didacticUnitId')); pm.expect(body.status).to.be.oneOf(['content_generation_in_progress', 'content_generation_completed']); pm.expect(body.generatedChapters).to.be.an('array').that.is.not.empty; const regeneratedChapter = body.generatedChapters.find((chapter) => chapter.chapterIndex === Number(pm.collectionVariables.get('chapterIndex'))); pm.expect(regeneratedChapter).to.be.an('object'); pm.expect(regeneratedChapter.content).to.be.a('string').and.not.empty; });"
+            ]
+          }
+        }
+      ],
+      "description": "Advanced manual AI rerun for an already generated didactic-unit chapter. Keep this outside the main runner because it intentionally spends an extra provider call."
+    },
+    {
       "name": "98 Advanced Get Syllabus Generation Runs",
       "request": {
         "method": "GET",

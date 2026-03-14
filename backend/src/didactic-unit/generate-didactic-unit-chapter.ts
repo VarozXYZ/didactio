@@ -23,6 +23,17 @@ export function createChapterGenerationSourceFromDidacticUnit(
     }
 }
 
+export function hasGeneratedDidacticUnitChapter(
+    didacticUnit: DidacticUnit,
+    chapterIndex: number
+): boolean {
+    return (
+        didacticUnit.generatedChapters?.some(
+            (chapter) => chapter.chapterIndex === chapterIndex
+        ) ?? false
+    )
+}
+
 export async function generateDidacticUnitChapter(
     didacticUnit: DidacticUnit,
     chapterIndex: number,
