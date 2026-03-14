@@ -39,15 +39,6 @@ export class MongoDidacticUnitStore implements DidacticUnitStore {
         )
     }
 
-    async getByUnitInitId(ownerId: string, unitInitId: string): Promise<DidacticUnit | null> {
-        return stripMongoId(
-            await this.collection.findOne({
-                ownerId,
-                unitInitId,
-            })
-        )
-    }
-
     async listByOwner(ownerId: string): Promise<DidacticUnit[]> {
         const documents = await this.collection
             .find({ ownerId })
