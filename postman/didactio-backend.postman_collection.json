@@ -3,7 +3,7 @@
     "_postman_id": "8c0f3cf2-1d6b-4f4b-a090-14c65f3a0ad5",
     "name": "Didactio Backend",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Single ordered runner flow for the Didactio backend. Set the collection variable `provider` to `openai` or `deepseek` before running the suite. Requests marked `AI GEN` are the ones that invoke model generation directly."
+    "description": "Single ordered runner flow for the Didactio backend. Set the collection variable `provider` to `openai` or `deepseek` before running the suite. Requests marked `AI GEN` are the ones that invoke model generation directly. Requests marked `Advanced` are drill-down/debug helpers and are not part of the main happy-path runner."
   },
   "item": [
     {
@@ -295,49 +295,6 @@
               "} else {",
               "  pm.collectionVariables.set('latestSyllabusRunExpectedStatus', 'failed');",
               "  pm.test('Syllabus generation returns a useful AI error', function () { pm.expect(body.error).to.be.a('string').and.not.empty; });",
-              "}"
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "08 Get Syllabus Generation Runs",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{baseUrl}}/api/unit-init/{{unitInitId}}/syllabus/runs",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "api",
-            "unit-init",
-            "{{unitInitId}}",
-            "syllabus",
-            "runs"
-          ]
-        }
-      },
-      "response": [],
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "pm.test('Get Syllabus Generation Runs returns 200', function () { pm.response.to.have.status(200); });",
-              "const body = pm.response.json();",
-              "pm.test('At least one syllabus run is stored', function () { pm.expect(body.runs).to.be.an('array').that.is.not.empty; });",
-              "const latestRun = body.runs[0];",
-              "const expectedStatus = pm.collectionVariables.get('latestSyllabusRunExpectedStatus') || 'completed';",
-              "pm.test('Latest syllabus run matches expected status', function () { pm.expect(latestRun.status).to.eql(expectedStatus); pm.expect(latestRun.provider).to.be.a('string').and.not.empty; pm.expect(latestRun.model).to.be.a('string').and.not.empty; pm.expect(latestRun.prompt).to.be.a('string').and.not.empty; });",
-              "if (expectedStatus === 'completed') {",
-              "  pm.test('Completed syllabus run includes syllabus payload', function () { pm.expect(latestRun.syllabus).to.be.an('object'); pm.expect(latestRun.syllabus.chapters).to.be.an('array').that.is.not.empty; });",
-              "} else {",
-              "  pm.test('Failed syllabus run includes debug payload', function () { pm.expect(latestRun.error).to.be.a('string').and.not.empty; pm.expect(latestRun.rawOutput).to.be.a('string').and.not.empty; });",
-              "  postman.setNextRequest(null);",
               "}"
             ]
           }
@@ -745,6 +702,50 @@
           }
         }
       ]
+    },
+    {
+      "name": "98 Advanced Get Syllabus Generation Runs",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/unit-init/{{unitInitId}}/syllabus/runs",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "unit-init",
+            "{{unitInitId}}",
+            "syllabus",
+            "runs"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Get Syllabus Generation Runs returns 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('At least one syllabus run is stored', function () { pm.expect(body.runs).to.be.an('array').that.is.not.empty; });",
+              "const latestRun = body.runs[0];",
+              "const expectedStatus = pm.collectionVariables.get('latestSyllabusRunExpectedStatus') || 'completed';",
+              "pm.test('Latest syllabus run matches expected status', function () { pm.expect(latestRun.status).to.eql(expectedStatus); pm.expect(latestRun.provider).to.be.a('string').and.not.empty; pm.expect(latestRun.model).to.be.a('string').and.not.empty; pm.expect(latestRun.prompt).to.be.a('string').and.not.empty; });",
+              "if (expectedStatus === 'completed') {",
+              "  pm.test('Completed syllabus run includes syllabus payload', function () { pm.expect(latestRun.syllabus).to.be.an('object'); pm.expect(latestRun.syllabus.chapters).to.be.an('array').that.is.not.empty; });",
+              "} else {",
+              "  pm.test('Failed syllabus run includes debug payload', function () { pm.expect(latestRun.error).to.be.a('string').and.not.empty; pm.expect(latestRun.rawOutput).to.be.a('string').and.not.empty; });",
+              "  postman.setNextRequest(null);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "description": "Advanced drill-down for syllabus generation traces. Kept out of the main happy-path runner because unit-init detail now exposes the key syllabus run summary directly."
     },
     {
       "name": "90 Manual Create Unit Init (OpenAI)",
