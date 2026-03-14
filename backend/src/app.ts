@@ -143,6 +143,11 @@ function buildUnitInitResponse(
     }
 }
 
+function setAdvancedPlanningHistoryHeaders(response: express.Response) {
+    response.setHeader('X-Didactio-Endpoint-Tier', 'advanced')
+    response.setHeader('X-Didactio-Endpoint-Purpose', 'planning-history')
+}
+
 export function createApp(options: CreateAppOptions) {
     const app = express()
     const unitInitStore = options.unitInitStore
@@ -544,6 +549,7 @@ export function createApp(options: CreateAppOptions) {
             return
         }
 
+        setAdvancedPlanningHistoryHeaders(response)
         response.json({
             runs: (
                 await generationRunStore.listByUnitInit(
@@ -568,6 +574,7 @@ export function createApp(options: CreateAppOptions) {
             return
         }
 
+        setAdvancedPlanningHistoryHeaders(response)
         response.json({
             runs: (
                 await generationRunStore.listByUnitInit(

@@ -1107,6 +1107,8 @@ describe('GET /api/unit-init/:id/runs', () => {
         const response = await request(app).get(`/api/unit-init/${createdResponse.body.id}/runs`)
 
         expect(response.status).toBe(200)
+        expect(response.headers['x-didactio-endpoint-tier']).toBe('advanced')
+        expect(response.headers['x-didactio-endpoint-purpose']).toBe('planning-history')
         expect(response.body.runs).toHaveLength(1)
         expect(response.body.runs[0]).toMatchObject({
             unitInitId: createdResponse.body.id,
@@ -1664,6 +1666,8 @@ describe('GET /api/unit-init/:id/syllabus/runs', () => {
         )
 
         expect(response.status).toBe(200)
+        expect(response.headers['x-didactio-endpoint-tier']).toBe('advanced')
+        expect(response.headers['x-didactio-endpoint-purpose']).toBe('planning-history')
         expect(response.body.runs).toHaveLength(1)
         expect(response.body.runs[0]).toMatchObject({
             unitInitId: createdResponse.body.id,

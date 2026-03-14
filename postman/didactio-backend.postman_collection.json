@@ -731,6 +731,7 @@
             "exec": [
               "pm.test('Get Syllabus Generation Runs returns 200', function () { pm.response.to.have.status(200); });",
               "const body = pm.response.json();",
+              "pm.test('Syllabus run lookup is marked as advanced planning history', function () { pm.expect(pm.response.headers.get('X-Didactio-Endpoint-Tier')).to.eql('advanced'); pm.expect(pm.response.headers.get('X-Didactio-Endpoint-Purpose')).to.eql('planning-history'); });",
               "pm.test('At least one syllabus run is stored', function () { pm.expect(body.runs).to.be.an('array').that.is.not.empty; });",
               "const latestRun = body.runs[0];",
               "const expectedStatus = pm.collectionVariables.get('latestSyllabusRunExpectedStatus') || 'completed';",
