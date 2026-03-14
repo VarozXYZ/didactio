@@ -709,7 +709,7 @@
             "exec": [
               "pm.test('Get Unit Init returns 200', function () { pm.response.to.have.status(200); });",
               "const body = pm.response.json();",
-              "pm.test('Fetched unit-init reflects later lifecycle state', function () { pm.expect(body.id).to.eql(pm.collectionVariables.get('unitInitId')); pm.expect(body.status).to.be.a('string').and.not.empty; if (body.status === 'syllabus_approved') { pm.expect(body.didacticUnitId).to.eql(pm.collectionVariables.get('didacticUnitId')); pm.expect(body.nextAction).to.eql('view_didactic_unit'); } });"
+              "pm.test('Fetched unit-init reflects later lifecycle state', function () { pm.expect(body.id).to.eql(pm.collectionVariables.get('unitInitId')); pm.expect(body.status).to.be.a('string').and.not.empty; if (body.status === 'syllabus_approved') { pm.expect(body.didacticUnitId).to.eql(pm.collectionVariables.get('didacticUnitId')); pm.expect(body.nextAction).to.eql('view_didactic_unit'); pm.expect(body.handoff).to.be.an('object'); pm.expect(body.handoff.didacticUnitId).to.eql(pm.collectionVariables.get('didacticUnitId')); pm.expect(body.handoff.nextRoute).to.eql('/api/didactic-unit/' + pm.collectionVariables.get('didacticUnitId')); } });"
             ]
           }
         }

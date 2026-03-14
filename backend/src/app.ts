@@ -43,6 +43,7 @@ import {
     parseQuestionnaireAnswersInput,
 } from './unit-init/answer-questionnaire.js'
 import {
+    type CreatedUnitInit,
     createUnitInit,
     linkDidacticUnitToUnitInit,
     moderateUnitInit,
@@ -109,6 +110,20 @@ function compareRunsByCreatedAtDesc(
 
 function isPlanningUnitInit(unitInit: { didacticUnitId?: string }): boolean {
     return !unitInit.didacticUnitId
+}
+
+function buildUnitInitResponse(unitInit: CreatedUnitInit) {
+    if (!unitInit.didacticUnitId || unitInit.status !== 'syllabus_approved') {
+        return unitInit
+    }
+
+    return {
+        ...unitInit,
+        handoff: {
+            didacticUnitId: unitInit.didacticUnitId,
+            nextRoute: `/api/didactic-unit/${unitInit.didacticUnitId}`,
+        },
+    }
 }
 
 export function createApp(options: CreateAppOptions) {
@@ -486,7 +501,7 @@ export function createApp(options: CreateAppOptions) {
             return
         }
 
-        response.json(unitInit)
+        response.json(buildUnitInitResponse(unitInit))
     })
 
     app.get('/api/unit-init/:id/syllabus/runs', async (request, response) => {

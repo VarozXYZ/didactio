@@ -889,6 +889,55 @@ describe('GET /api/unit-init/:id', () => {
         expect(response.body).toEqual(createdResponse.body)
     })
 
+    it('returns an explicit didactic-unit handoff for approved unit-inits', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const createdResponse = await request(app)
+            .post('/api/unit-init')
+            .send({ topic: 'next.js framework' })
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/moderate`)
+            .send({})
+
+        const questionnaireResponse = await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/questionnaire/generate`)
+            .send({})
+
+        await request(app)
+            .patch(`/api/unit-init/${createdResponse.body.id}/questionnaire/answers`)
+            .send({
+                answers: questionnaireResponse.body.questionnaire.questions.map(
+                    (question: { id: string }) => ({
+                        questionId: question.id,
+                        value: `answer-for-${question.id}`,
+                    })
+                ),
+            })
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/syllabus-prompt/generate`)
+            .send({})
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/syllabus/generate`)
+            .send({})
+
+        const approvalResponse = await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/approve-syllabus`)
+            .send({})
+
+        const response = await request(app).get(`/api/unit-init/${createdResponse.body.id}`)
+
+        expect(response.status).toBe(200)
+        expect(response.body.didacticUnitId).toBe(approvalResponse.body.didacticUnitId)
+        expect(response.body.handoff).toEqual({
+            didacticUnitId: approvalResponse.body.didacticUnitId,
+            nextRoute: `/api/didactic-unit/${approvalResponse.body.didacticUnitId}`,
+        })
+    })
+
     it('returns 404 when the unit-init does not exist', async () => {
         const store = new InMemoryUnitInitStore()
         const app = createApp({ unitInitStore: store })
