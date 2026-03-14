@@ -3,17 +3,12 @@ import {
     OpenAiChapterGenerationError,
     OpenAiChapterGenerator,
 } from '../src/providers/openai-chapter-generator.js'
-import type { CreatedUnitInit } from '../src/unit-init/create-unit-init.js'
+import type { ChapterGenerationSource } from '../src/providers/chapter-generator.js'
 
-function createApprovedSyllabusUnitInit(): CreatedUnitInit {
+function createChapterGenerationSource(): ChapterGenerationSource {
     return {
-        id: 'unit-init-1',
-        ownerId: 'mock-user',
         topic: 'next.js framework',
         provider: 'openai',
-        status: 'syllabus_approved',
-        nextAction: 'view_didactic_unit',
-        createdAt: '2026-03-12T00:00:00.000Z',
         questionnaireAnswers: [
             { questionId: 'topic_knowledge_level', value: 'basic' },
             { questionId: 'related_knowledge_level', value: 'basic' },
@@ -76,7 +71,7 @@ describe('OpenAiChapterGenerator', () => {
             fetchImplementation,
         })
 
-        const chapter = await generator.generate(createApprovedSyllabusUnitInit(), 0)
+        const chapter = await generator.generate(createChapterGenerationSource(), 0)
 
         expect(fetchImplementation).toHaveBeenCalledOnce()
         expect(chapter).toMatchObject({
@@ -102,7 +97,7 @@ describe('OpenAiChapterGenerator', () => {
         })
 
         await expect(
-            generator.generate(createApprovedSyllabusUnitInit(), 0)
+            generator.generate(createChapterGenerationSource(), 0)
         ).rejects.toThrow('OpenAI chapter generation failed with status 500.')
     })
 
@@ -139,7 +134,7 @@ describe('OpenAiChapterGenerator', () => {
         })
 
         await expect(
-            generator.generate(createApprovedSyllabusUnitInit(), 0)
+            generator.generate(createChapterGenerationSource(), 0)
         ).rejects.toMatchObject<Partial<OpenAiChapterGenerationError>>({
             message: 'content is required.',
             rawOutput: rawContent,

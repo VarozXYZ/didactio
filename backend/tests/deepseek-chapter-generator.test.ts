@@ -3,17 +3,12 @@ import {
     DeepSeekChapterGenerationError,
     DeepSeekChapterGenerator,
 } from '../src/providers/deepseek-chapter-generator.js'
-import type { CreatedUnitInit } from '../src/unit-init/create-unit-init.js'
+import type { ChapterGenerationSource } from '../src/providers/chapter-generator.js'
 
-function createApprovedSyllabusUnitInit(): CreatedUnitInit {
+function createChapterGenerationSource(): ChapterGenerationSource {
     return {
-        id: 'unit-init-1',
-        ownerId: 'mock-user',
         topic: 'next.js framework',
         provider: 'deepseek',
-        status: 'syllabus_approved',
-        nextAction: 'view_didactic_unit',
-        createdAt: '2026-03-12T00:00:00.000Z',
         questionnaireAnswers: [
             { questionId: 'topic_knowledge_level', value: 'basic' },
             { questionId: 'related_knowledge_level', value: 'basic' },
@@ -76,7 +71,7 @@ describe('DeepSeekChapterGenerator', () => {
             fetchImplementation,
         })
 
-        const chapter = await generator.generate(createApprovedSyllabusUnitInit(), 0)
+        const chapter = await generator.generate(createChapterGenerationSource(), 0)
 
         expect(fetchImplementation).toHaveBeenCalledOnce()
         const requestInit = fetchImplementation.mock.calls[0]?.[1]
@@ -108,7 +103,7 @@ describe('DeepSeekChapterGenerator', () => {
         })
 
         await expect(
-            generator.generate(createApprovedSyllabusUnitInit(), 0)
+            generator.generate(createChapterGenerationSource(), 0)
         ).rejects.toThrow('DeepSeek chapter generation failed with status 500.')
     })
 
@@ -145,7 +140,7 @@ describe('DeepSeekChapterGenerator', () => {
         })
 
         await expect(
-            generator.generate(createApprovedSyllabusUnitInit(), 0)
+            generator.generate(createChapterGenerationSource(), 0)
         ).rejects.toMatchObject<Partial<DeepSeekChapterGenerationError>>({
             message: 'content is required.',
             rawOutput: rawContent,

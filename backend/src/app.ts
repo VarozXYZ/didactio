@@ -3,7 +3,10 @@ import {
     createDidacticUnitFromApprovedUnitInit,
 } from './didactic-unit/create-didactic-unit.js'
 import { parseUpdateDidacticUnitChapterInput } from './didactic-unit/didactic-unit-chapter.js'
-import { generateDidacticUnitChapter } from './didactic-unit/generate-didactic-unit-chapter.js'
+import {
+    createChapterGenerationSourceFromDidacticUnit,
+    generateDidacticUnitChapter,
+} from './didactic-unit/generate-didactic-unit-chapter.js'
 import { listDidacticUnitChapters } from './didactic-unit/list-didactic-unit-chapters.js'
 import { summarizeDidacticUnit } from './didactic-unit/summarize-didactic-unit.js'
 import { updateDidacticUnitChapter } from './didactic-unit/update-didactic-unit-chapter.js'
@@ -427,23 +430,9 @@ export function createApp(options: CreateAppOptions) {
                         provider: updatedDidacticUnit.provider,
                         model: resolveChapterGeneratorModel(updatedDidacticUnit.provider),
                         prompt: buildChapterGenerationPrompt(
-                            {
-                                id: updatedDidacticUnit.unitInitId,
-                                ownerId: updatedDidacticUnit.ownerId,
-                                topic: updatedDidacticUnit.topic,
-                                provider: updatedDidacticUnit.provider,
-                                status: 'syllabus_approved',
-                                nextAction: 'view_didactic_unit',
-                                createdAt: updatedDidacticUnit.createdAt,
-                                questionnaireAnswers: updatedDidacticUnit.questionnaireAnswers,
-                                syllabus: {
-                                    title: updatedDidacticUnit.title,
-                                    overview: updatedDidacticUnit.overview,
-                                    learningGoals: updatedDidacticUnit.learningGoals,
-                                    chapters: updatedDidacticUnit.chapters,
-                                },
-                                syllabusApprovedAt: updatedDidacticUnit.createdAt,
-                            },
+                            createChapterGenerationSourceFromDidacticUnit(
+                                updatedDidacticUnit
+                            ),
                             chapterIndex
                         ),
                         chapter: generatedChapter,
@@ -454,23 +443,7 @@ export function createApp(options: CreateAppOptions) {
 
             response.json(updatedDidacticUnit)
         } catch (error) {
-            const promptSource = {
-                id: didacticUnit.unitInitId,
-                ownerId: didacticUnit.ownerId,
-                topic: didacticUnit.topic,
-                provider: didacticUnit.provider,
-                status: 'syllabus_approved' as const,
-                nextAction: 'view_didactic_unit' as const,
-                createdAt: didacticUnit.createdAt,
-                questionnaireAnswers: didacticUnit.questionnaireAnswers,
-                syllabus: {
-                    title: didacticUnit.title,
-                    overview: didacticUnit.overview,
-                    learningGoals: didacticUnit.learningGoals,
-                    chapters: didacticUnit.chapters,
-                },
-                syllabusApprovedAt: didacticUnit.createdAt,
-            }
+            const promptSource = createChapterGenerationSourceFromDidacticUnit(didacticUnit)
 
             if (canBuildChapterGenerationPrompt(promptSource, chapterIndex)) {
                 await generationRunStore.save(

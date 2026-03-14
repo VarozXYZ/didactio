@@ -1,12 +1,21 @@
 import { getAppEnv } from '../config/env.js'
-import type { CreatedUnitInit, UnitInitProvider } from '../unit-init/create-unit-init.js'
+import type { UnitInitProvider } from '../unit-init/create-unit-init.js'
+import type { UnitInitQuestionAnswer } from '../unit-init/answer-questionnaire.js'
+import type { UnitInitSyllabus } from '../unit-init/generate-syllabus.js'
 import type { DidacticUnitGeneratedChapter } from '../didactic-unit/didactic-unit-chapter.js'
 import { DeepSeekChapterGenerator } from './deepseek-chapter-generator.js'
 import { OpenAiChapterGenerator } from './openai-chapter-generator.js'
 
+export interface ChapterGenerationSource {
+    topic: string
+    provider: UnitInitProvider
+    questionnaireAnswers?: UnitInitQuestionAnswer[]
+    syllabus?: UnitInitSyllabus
+}
+
 export interface ChapterGenerator {
     generate(
-        unitInit: CreatedUnitInit,
+        source: ChapterGenerationSource,
         chapterIndex: number
     ): Promise<DidacticUnitGeneratedChapter>
 }
@@ -21,15 +30,15 @@ export function resolveChapterGeneratorModel(provider: UnitInitProvider): string
     return env.deepSeekApiKey ? env.deepSeekChapterModel : 'fake-deepseek-chapter-generator'
 }
 
-function findAnswerValue(unitInit: CreatedUnitInit, questionId: string): string {
+function findAnswerValue(source: ChapterGenerationSource, questionId: string): string {
     return (
-        unitInit.questionnaireAnswers?.find((answer) => answer.questionId === questionId)?.value ??
+        source.questionnaireAnswers?.find((answer) => answer.questionId === questionId)?.value ??
         'not provided'
     )
 }
 
-function getSyllabusChapter(unitInit: CreatedUnitInit, chapterIndex: number) {
-    const chapter = unitInit.syllabus?.chapters[chapterIndex]
+function getSyllabusChapter(source: ChapterGenerationSource, chapterIndex: number) {
+    const chapter = source.syllabus?.chapters[chapterIndex]
 
     if (!chapter) {
         throw new Error('Chapter index is out of range for the approved syllabus.')
@@ -39,18 +48,18 @@ function getSyllabusChapter(unitInit: CreatedUnitInit, chapterIndex: number) {
 }
 
 export function buildChapterGenerationPrompt(
-    unitInit: CreatedUnitInit,
+    source: ChapterGenerationSource,
     chapterIndex: number
 ): string {
-    const chapter = getSyllabusChapter(unitInit, chapterIndex)
-    const topicKnowledgeLevel = findAnswerValue(unitInit, 'topic_knowledge_level')
-    const relatedKnowledgeLevel = findAnswerValue(unitInit, 'related_knowledge_level')
-    const learningGoal = findAnswerValue(unitInit, 'learning_goal')
-    const preferredDepth = findAnswerValue(unitInit, 'preferred_depth')
+    const chapter = getSyllabusChapter(source, chapterIndex)
+    const topicKnowledgeLevel = findAnswerValue(source, 'topic_knowledge_level')
+    const relatedKnowledgeLevel = findAnswerValue(source, 'related_knowledge_level')
+    const learningGoal = findAnswerValue(source, 'learning_goal')
+    const preferredDepth = findAnswerValue(source, 'preferred_depth')
 
     return [
         'Create one chapter of a personalized didactic unit.',
-        `Topic: ${unitInit.topic}`,
+        `Topic: ${source.topic}`,
         `Chapter title: ${chapter.title}`,
         `Chapter overview: ${chapter.overview}`,
         `Chapter key points: ${chapter.keyPoints.join(', ')}`,
@@ -70,12 +79,12 @@ export function buildChapterGenerationPrompt(
 
 class OpenAiFakeChapterGenerator implements ChapterGenerator {
     async generate(
-        unitInit: CreatedUnitInit,
+        source: ChapterGenerationSource,
         chapterIndex: number
     ): Promise<DidacticUnitGeneratedChapter> {
-        const chapter = getSyllabusChapter(unitInit, chapterIndex)
-        const learningGoal = findAnswerValue(unitInit, 'learning_goal')
-        const preferredDepth = findAnswerValue(unitInit, 'preferred_depth')
+        const chapter = getSyllabusChapter(source, chapterIndex)
+        const learningGoal = findAnswerValue(source, 'learning_goal')
+        const preferredDepth = findAnswerValue(source, 'preferred_depth')
 
         return {
             chapterIndex,
@@ -84,7 +93,7 @@ class OpenAiFakeChapterGenerator implements ChapterGenerator {
             content: [
                 `This chapter focuses on ${chapter.title}.`,
                 `The purpose is to help the learner move closer to ${learningGoal}.`,
-                `It should keep a ${preferredDepth} level of explanation while staying grounded in ${unitInit.topic}.`,
+                `It should keep a ${preferredDepth} level of explanation while staying grounded in ${source.topic}.`,
                 `Core ideas covered here include ${chapter.keyPoints.join(', ')}.`,
                 `By the end of the chapter, the learner should be able to explain the main concepts, connect them to practical decisions, and continue into the next chapter with clear context.`,
             ].join(' '),
@@ -100,12 +109,12 @@ class OpenAiFakeChapterGenerator implements ChapterGenerator {
 
 class DeepSeekFakeChapterGenerator implements ChapterGenerator {
     async generate(
-        unitInit: CreatedUnitInit,
+        source: ChapterGenerationSource,
         chapterIndex: number
     ): Promise<DidacticUnitGeneratedChapter> {
-        const chapter = getSyllabusChapter(unitInit, chapterIndex)
-        const learningGoal = findAnswerValue(unitInit, 'learning_goal')
-        const relatedKnowledge = findAnswerValue(unitInit, 'related_knowledge_level')
+        const chapter = getSyllabusChapter(source, chapterIndex)
+        const learningGoal = findAnswerValue(source, 'learning_goal')
+        const relatedKnowledge = findAnswerValue(source, 'related_knowledge_level')
 
         return {
             chapterIndex,
@@ -114,7 +123,7 @@ class DeepSeekFakeChapterGenerator implements ChapterGenerator {
             content: [
                 `This chapter builds a practical reasoning model for ${chapter.title}.`,
                 `It connects the learner goal (${learningGoal}) with the current related knowledge level (${relatedKnowledge}).`,
-                `The chapter emphasizes decisions, tradeoffs, and how to tell whether understanding of ${unitInit.topic} is actually usable.`,
+                `The chapter emphasizes decisions, tradeoffs, and how to tell whether understanding of ${source.topic} is actually usable.`,
                 `Important signals in this chapter include ${chapter.keyPoints.join(', ')}.`,
                 `By the end, the learner should be able to reason through the main patterns and justify the next practical step.`,
             ].join(' '),
@@ -151,9 +160,9 @@ export class ProviderBackedFakeChapterGenerator implements ChapterGenerator {
     }
 
     async generate(
-        unitInit: CreatedUnitInit,
+        source: ChapterGenerationSource,
         chapterIndex: number
     ): Promise<DidacticUnitGeneratedChapter> {
-        return this.generators[unitInit.provider].generate(unitInit, chapterIndex)
+        return this.generators[source.provider].generate(source, chapterIndex)
     }
 }

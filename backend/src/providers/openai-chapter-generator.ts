@@ -1,6 +1,8 @@
-import type { CreatedUnitInit } from '../unit-init/create-unit-init.js'
 import type { DidacticUnitGeneratedChapter } from '../didactic-unit/didactic-unit-chapter.js'
-import { buildChapterGenerationPrompt } from './chapter-generator.js'
+import {
+    buildChapterGenerationPrompt,
+    type ChapterGenerationSource,
+} from './chapter-generator.js'
 
 type FetchImplementation = typeof fetch
 
@@ -28,8 +30,8 @@ export class OpenAiChapterGenerationError extends Error {
     }
 }
 
-function getSyllabusChapter(unitInit: CreatedUnitInit, chapterIndex: number) {
-    const chapter = unitInit.syllabus?.chapters[chapterIndex]
+function getSyllabusChapter(source: ChapterGenerationSource, chapterIndex: number) {
+    const chapter = source.syllabus?.chapters[chapterIndex]
 
     if (!chapter) {
         throw new Error('Chapter index is out of range for the approved syllabus.')
@@ -114,10 +116,10 @@ export class OpenAiChapterGenerator {
     }
 
     async generate(
-        unitInit: CreatedUnitInit,
+        source: ChapterGenerationSource,
         chapterIndex: number
     ): Promise<DidacticUnitGeneratedChapter> {
-        getSyllabusChapter(unitInit, chapterIndex)
+        getSyllabusChapter(source, chapterIndex)
 
         const response = await this.fetchImplementation(
             'https://api.openai.com/v1/chat/completions',
@@ -138,7 +140,7 @@ export class OpenAiChapterGenerator {
                         },
                         {
                             role: 'user',
-                            content: buildChapterGenerationPrompt(unitInit, chapterIndex),
+                            content: buildChapterGenerationPrompt(source, chapterIndex),
                         },
                     ],
                 }),

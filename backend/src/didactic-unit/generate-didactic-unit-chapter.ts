@@ -1,16 +1,15 @@
-import type { ChapterGenerator } from '../providers/chapter-generator.js'
-import type { CreatedUnitInit } from '../unit-init/create-unit-init.js'
+import type {
+    ChapterGenerationSource,
+    ChapterGenerator,
+} from '../providers/chapter-generator.js'
 import type { DidacticUnit } from './create-didactic-unit.js'
 
-function createChapterGenerationSource(didacticUnit: DidacticUnit): CreatedUnitInit {
+export function createChapterGenerationSourceFromDidacticUnit(
+    didacticUnit: DidacticUnit
+): ChapterGenerationSource {
     return {
-        id: didacticUnit.unitInitId,
-        ownerId: didacticUnit.ownerId,
         topic: didacticUnit.topic,
         provider: didacticUnit.provider,
-        status: 'syllabus_approved',
-        nextAction: 'view_didactic_unit',
-        createdAt: didacticUnit.createdAt,
         questionnaireAnswers: didacticUnit.questionnaireAnswers,
         syllabus: {
             title: didacticUnit.title,
@@ -18,7 +17,6 @@ function createChapterGenerationSource(didacticUnit: DidacticUnit): CreatedUnitI
             learningGoals: didacticUnit.learningGoals,
             chapters: didacticUnit.chapters,
         },
-        syllabusApprovedAt: didacticUnit.createdAt,
     }
 }
 
@@ -27,7 +25,9 @@ export async function generateDidacticUnitChapter(
     chapterIndex: number,
     chapterGenerator: ChapterGenerator
 ): Promise<DidacticUnit> {
-    const chapterGenerationSource = createChapterGenerationSource(didacticUnit)
+    const chapterGenerationSource = createChapterGenerationSourceFromDidacticUnit(
+        didacticUnit
+    )
     const generatedChapter = await chapterGenerator.generate(
         chapterGenerationSource,
         chapterIndex
