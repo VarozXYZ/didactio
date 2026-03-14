@@ -411,7 +411,7 @@
             "exec": [
               "pm.test('List Didactic Units returns 200', function () { pm.response.to.have.status(200); });",
               "const body = pm.response.json();",
-              "pm.test('Didactic unit list returns dashboard summaries', function () { pm.expect(body.didacticUnits).to.be.an('array').that.is.not.empty; const linkedUnit = body.didacticUnits.find((unit) => unit.id === pm.collectionVariables.get('didacticUnitId')); pm.expect(linkedUnit).to.be.an('object'); pm.expect(linkedUnit.unitInitId).to.eql(pm.collectionVariables.get('unitInitId')); pm.expect(linkedUnit.status).to.eql('ready_for_content_generation'); pm.expect(linkedUnit.overview).to.be.a('string').and.not.empty; pm.expect(linkedUnit.chapterCount).to.be.a('number').and.to.be.above(0); pm.expect(linkedUnit.generatedChapterCount).to.be.a('number'); pm.expect(linkedUnit.progressPercent).to.be.a('number'); });"
+              "pm.test('Didactic unit list returns dashboard summaries', function () { pm.expect(body.didacticUnits).to.be.an('array').that.is.not.empty; const linkedUnit = body.didacticUnits.find((unit) => unit.id === pm.collectionVariables.get('didacticUnitId')); pm.expect(linkedUnit).to.be.an('object'); pm.expect(linkedUnit.unitInitId).to.eql(pm.collectionVariables.get('unitInitId')); pm.expect(linkedUnit.status).to.be.oneOf(['ready_for_content_generation', 'content_generation_in_progress', 'content_generation_completed']); pm.expect(linkedUnit.overview).to.be.a('string').and.not.empty; pm.expect(linkedUnit.chapterCount).to.be.a('number').and.to.be.above(0); pm.expect(linkedUnit.generatedChapterCount).to.be.a('number'); pm.expect(linkedUnit.progressPercent).to.be.a('number'); });"
             ]
           }
         }
@@ -443,7 +443,7 @@
             "exec": [
               "pm.test('Get Didactic Unit By Id returns 200', function () { pm.response.to.have.status(200); });",
               "const body = pm.response.json();",
-              "pm.test('Single didactic unit payload is complete', function () { pm.expect(body.id).to.eql(pm.collectionVariables.get('didacticUnitId')); pm.expect(body.unitInitId).to.eql(pm.collectionVariables.get('unitInitId')); pm.expect(body.status).to.eql('ready_for_content_generation'); pm.expect(body.title).to.be.a('string').and.not.empty; pm.expect(body.chapters).to.be.an('array').that.is.not.empty; });"
+              "pm.test('Single didactic unit payload is complete', function () { pm.expect(body.id).to.eql(pm.collectionVariables.get('didacticUnitId')); pm.expect(body.unitInitId).to.eql(pm.collectionVariables.get('unitInitId')); pm.expect(body.status).to.be.oneOf(['ready_for_content_generation', 'content_generation_in_progress', 'content_generation_completed']); pm.expect(body.title).to.be.a('string').and.not.empty; pm.expect(body.chapters).to.be.an('array').that.is.not.empty; });"
             ]
           }
         }
@@ -488,7 +488,7 @@
               "pm.test('Generate Didactic Unit Chapter returns 200 or 409', function () { pm.expect([200, 409]).to.include(pm.response.code); });",
               "const body = pm.response.json();",
               "if (pm.response.code === 200) {",
-              "  pm.test('Didactic unit chapter generation is structurally valid', function () { pm.expect(body.id).to.eql(pm.collectionVariables.get('didacticUnitId')); pm.expect(body.generatedChapters).to.be.an('array').that.is.not.empty; const chapter = body.generatedChapters.find((item) => item.chapterIndex === Number(pm.collectionVariables.get('chapterIndex') || '0')); pm.expect(chapter).to.be.an('object'); pm.expect(chapter.content).to.be.a('string').and.not.empty; pm.expect(chapter.keyTakeaways).to.be.an('array').that.is.not.empty; });",
+              "  pm.test('Didactic unit chapter generation is structurally valid', function () { pm.expect(body.id).to.eql(pm.collectionVariables.get('didacticUnitId')); pm.expect(body.status).to.be.oneOf(['content_generation_in_progress', 'content_generation_completed']); pm.expect(body.generatedChapters).to.be.an('array').that.is.not.empty; const chapter = body.generatedChapters.find((item) => item.chapterIndex === Number(pm.collectionVariables.get('chapterIndex') || '0')); pm.expect(chapter).to.be.an('object'); pm.expect(chapter.content).to.be.a('string').and.not.empty; pm.expect(chapter.keyTakeaways).to.be.an('array').that.is.not.empty; });",
               "} else {",
               "  pm.test('Didactic unit chapter generation returns a useful AI error', function () { pm.expect(body.error).to.be.a('string').and.not.empty; });",
               "}"

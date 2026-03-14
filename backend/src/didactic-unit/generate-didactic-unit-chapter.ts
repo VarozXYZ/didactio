@@ -2,7 +2,10 @@ import type {
     ChapterGenerationSource,
     ChapterGenerator,
 } from '../providers/chapter-generator.js'
-import type { DidacticUnit } from './create-didactic-unit.js'
+import {
+    resolveDidacticUnitStatus,
+    type DidacticUnit,
+} from './create-didactic-unit.js'
 
 export function createChapterGenerationSourceFromDidacticUnit(
     didacticUnit: DidacticUnit
@@ -43,6 +46,10 @@ export async function generateDidacticUnitChapter(
 
         return {
             ...didacticUnit,
+            status: resolveDidacticUnitStatus({
+                ...didacticUnit,
+                generatedChapters: updatedChapters,
+            }),
             generatedChapters: updatedChapters,
         }
     }
@@ -52,5 +59,11 @@ export async function generateDidacticUnitChapter(
         generatedChapters: [...generatedChapters, generatedChapter].sort(
             (left, right) => left.chapterIndex - right.chapterIndex
         ),
+        status: resolveDidacticUnitStatus({
+            ...didacticUnit,
+            generatedChapters: [...generatedChapters, generatedChapter].sort(
+                (left, right) => left.chapterIndex - right.chapterIndex
+            ),
+        }),
     }
 }

@@ -5,7 +5,10 @@ import type { UnitInitQuestionAnswer } from '../unit-init/answer-questionnaire.j
 import type { UnitInitSyllabus, UnitInitSyllabusChapter } from '../unit-init/generate-syllabus.js'
 import type { DidacticUnitGeneratedChapter } from './didactic-unit-chapter.js'
 
-export type DidacticUnitStatus = 'ready_for_content_generation'
+export type DidacticUnitStatus =
+    | 'ready_for_content_generation'
+    | 'content_generation_in_progress'
+    | 'content_generation_completed'
 
 export interface DidacticUnit {
     id: string
@@ -31,6 +34,24 @@ function ensureApprovedSyllabus(
     }
 
     return unitInit.syllabus
+}
+
+export function resolveDidacticUnitStatus(didacticUnit: {
+    chapters: UnitInitSyllabusChapter[]
+    generatedChapters?: DidacticUnitGeneratedChapter[]
+}): DidacticUnitStatus {
+    const chapterCount = didacticUnit.chapters.length
+    const generatedChapterCount = didacticUnit.generatedChapters?.length ?? 0
+
+    if (generatedChapterCount === 0) {
+        return 'ready_for_content_generation'
+    }
+
+    if (generatedChapterCount >= chapterCount) {
+        return 'content_generation_completed'
+    }
+
+    return 'content_generation_in_progress'
 }
 
 export function createDidacticUnitFromApprovedUnitInit(
