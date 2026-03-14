@@ -740,7 +740,7 @@
             "exec": [
               "pm.test('List Unit Inits returns 200', function () { pm.response.to.have.status(200); });",
               "const body = pm.response.json();",
-              "pm.test('List Unit Inits returns only in-progress planning items', function () { pm.expect(body.unitInits).to.be.an('array'); body.unitInits.forEach((unitInit) => { pm.expect(unitInit.didacticUnitId).to.be.oneOf([undefined, null, '']); }); });"
+              "pm.test('List Unit Inits returns only planning summaries', function () { pm.expect(body.unitInits).to.be.an('array'); body.unitInits.forEach((unitInit) => { pm.expect(unitInit.id).to.be.a('string').and.not.empty; pm.expect(unitInit.topic).to.be.a('string').and.not.empty; pm.expect(unitInit.provider).to.be.a('string').and.not.empty; pm.expect(unitInit.status).to.be.a('string').and.not.empty; pm.expect(unitInit.nextAction).to.be.a('string').and.not.empty; pm.expect(unitInit.createdAt).to.be.a('string').and.not.empty; pm.expect(unitInit.lastActivityAt).to.be.a('string').and.not.empty; pm.expect(unitInit.progressPercent).to.be.a('number'); pm.expect(unitInit.didacticUnitId).to.be.oneOf([undefined, null, '']); }); });"
             ]
           }
         }

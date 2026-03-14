@@ -52,6 +52,7 @@ import {
 import { generateQuestionnaire } from './unit-init/generate-questionnaire.js'
 import { generateSyllabus } from './unit-init/generate-syllabus.js'
 import { generateSyllabusPrompt } from './unit-init/generate-syllabus-prompt.js'
+import { summarizeUnitInit } from './unit-init/summarize-unit-init.js'
 import {
     parseUpdateSyllabusInput,
     updateSyllabus,
@@ -173,7 +174,9 @@ export function createApp(options: CreateAppOptions) {
         response.json({
             unitInits: (
                 await unitInitStore.listByOwner(requestWithMockOwner.mockOwner.id)
-            ).filter(isPlanningUnitInit),
+            )
+                .filter(isPlanningUnitInit)
+                .map(summarizeUnitInit),
         })
     })
 

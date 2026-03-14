@@ -66,7 +66,7 @@ describe('POST /api/unit-init', () => {
 })
 
 describe('GET /api/unit-init', () => {
-    it('returns in-progress unit-inits for the current mock owner', async () => {
+    it('returns in-progress unit-init summaries for the current mock owner', async () => {
         const store = new InMemoryUnitInitStore()
         const app = createApp({ unitInitStore: store })
 
@@ -86,12 +86,63 @@ describe('GET /api/unit-init', () => {
             id: secondCreatedResponse.body.id,
             topic: 'english language',
             provider: 'deepseek',
+            status: 'submitted',
+            nextAction: 'moderate_topic',
+            progressPercent: 0,
+            createdAt: secondCreatedResponse.body.createdAt,
+            lastActivityAt: secondCreatedResponse.body.createdAt,
         })
         expect(response.body.unitInits[1]).toMatchObject({
             id: firstCreatedResponse.body.id,
             topic: 'next.js framework',
             provider: 'openai',
+            status: 'submitted',
+            nextAction: 'moderate_topic',
+            progressPercent: 0,
+            createdAt: firstCreatedResponse.body.createdAt,
+            lastActivityAt: firstCreatedResponse.body.createdAt,
         })
+    })
+
+    it('returns planning progress and last activity for advanced unit-inits', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const createdResponse = await request(app)
+            .post('/api/unit-init')
+            .send({ topic: 'next.js framework' })
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/moderate`)
+            .send({})
+
+        const questionnaireResponse = await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/questionnaire/generate`)
+            .send({})
+
+        await request(app)
+            .patch(`/api/unit-init/${createdResponse.body.id}/questionnaire/answers`)
+            .send({
+                answers: questionnaireResponse.body.questionnaire.questions.map(
+                    (question: { id: string }) => ({
+                        questionId: question.id,
+                        value: `answer-for-${question.id}`,
+                    })
+                ),
+            })
+
+        const response = await request(app).get('/api/unit-init')
+
+        expect(response.status).toBe(200)
+        expect(response.body.unitInits).toHaveLength(1)
+        expect(response.body.unitInits[0]).toMatchObject({
+            id: createdResponse.body.id,
+            status: 'questionnaire_answered',
+            nextAction: 'generate_syllabus_prompt',
+            progressPercent: 50,
+        })
+        expect(typeof response.body.unitInits[0].lastActivityAt).toBe('string')
+        expect(Number.isNaN(Date.parse(response.body.unitInits[0].lastActivityAt))).toBe(false)
     })
 
     it('excludes approved unit-inits that already handed off to didactic units', async () => {
