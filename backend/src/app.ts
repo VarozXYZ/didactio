@@ -113,9 +113,13 @@ function isPlanningUnitInit(unitInit: { didacticUnitId?: string }): boolean {
     return !unitInit.didacticUnitId
 }
 
-function buildUnitInitResponse(unitInit: CreatedUnitInit) {
+function buildUnitInitResponse(
+    unitInit: CreatedUnitInit,
+    syllabusRuns: SyllabusGenerationRunRecord[] = []
+) {
     if (!unitInit.didacticUnitId || unitInit.status !== 'syllabus_approved') {
         const summary = summarizeUnitInit(unitInit)
+        const latestSyllabusRun = syllabusRuns[0]
 
         return {
             ...unitInit,
@@ -123,6 +127,9 @@ function buildUnitInitResponse(unitInit: CreatedUnitInit) {
                 progressPercent: summary.progressPercent,
                 lastActivityAt: summary.lastActivityAt,
                 isInProgress: true,
+                syllabusRunCount: syllabusRuns.length,
+                latestSyllabusRunStatus: latestSyllabusRun?.status,
+                latestSyllabusRunAt: latestSyllabusRun?.createdAt,
             },
         }
     }
@@ -513,7 +520,14 @@ export function createApp(options: CreateAppOptions) {
             return
         }
 
-        response.json(buildUnitInitResponse(unitInit))
+        const syllabusRuns = (
+            await generationRunStore.listByUnitInit(
+                requestWithMockOwner.mockOwner.id,
+                request.params.id
+            )
+        ).filter(isSyllabusGenerationRun)
+
+        response.json(buildUnitInitResponse(unitInit, syllabusRuns))
     })
 
     app.get('/api/unit-init/:id/syllabus/runs', async (request, response) => {
