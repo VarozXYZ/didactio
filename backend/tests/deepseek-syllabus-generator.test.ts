@@ -3,17 +3,12 @@ import {
     DeepSeekSyllabusGenerationError,
     DeepSeekSyllabusGenerator,
 } from '../src/providers/deepseek-syllabus-generator.js'
-import type { CreatedUnitInit } from '../src/unit-init/create-unit-init.js'
+import type { SyllabusGenerationSource } from '../src/providers/syllabus-generator.js'
 
-function createApprovedQuestionnaireUnitInit(): CreatedUnitInit {
+function createSyllabusGenerationSource(): SyllabusGenerationSource {
     return {
-        id: 'unit-init-1',
-        ownerId: 'mock-user',
         topic: 'next.js framework',
         provider: 'deepseek',
-        status: 'syllabus_prompt_ready',
-        nextAction: 'review_syllabus_prompt',
-        createdAt: '2026-03-12T00:00:00.000Z',
         questionnaireAnswers: [
             { questionId: 'topic_knowledge_level', value: 'basic' },
             { questionId: 'related_knowledge_level', value: 'basic' },
@@ -69,7 +64,7 @@ describe('DeepSeekSyllabusGenerator', () => {
             fetchImplementation,
         })
 
-        const syllabus = await generator.generate(createApprovedQuestionnaireUnitInit())
+        const syllabus = await generator.generate(createSyllabusGenerationSource())
 
         expect(fetchImplementation).toHaveBeenCalledOnce()
         const requestInit = fetchImplementation.mock.calls[0]?.[1]
@@ -100,7 +95,7 @@ describe('DeepSeekSyllabusGenerator', () => {
         })
 
         await expect(
-            generator.generate(createApprovedQuestionnaireUnitInit())
+            generator.generate(createSyllabusGenerationSource())
         ).rejects.toThrow('DeepSeek syllabus generation failed with status 500.')
     })
 
@@ -137,7 +132,7 @@ describe('DeepSeekSyllabusGenerator', () => {
         })
 
         await expect(
-            generator.generate(createApprovedQuestionnaireUnitInit())
+            generator.generate(createSyllabusGenerationSource())
         ).rejects.toMatchObject({
             message: 'DeepSeek syllabus response must include a non-empty chapters array.',
             rawOutput: rawContent,

@@ -1,5 +1,5 @@
-import type { CreatedUnitInit } from '../unit-init/create-unit-init.js'
 import type { UnitInitSyllabus } from '../unit-init/generate-syllabus.js'
+import type { SyllabusGenerationSource } from './syllabus-generator.js'
 
 type FetchImplementation = typeof fetch
 
@@ -112,12 +112,12 @@ function parseSyllabusResponse(content: string): UnitInitSyllabus {
     }
 }
 
-function buildPrompt(unitInit: CreatedUnitInit): string {
+function buildPrompt(source: SyllabusGenerationSource): string {
     const basePrompt =
-        unitInit.syllabusPrompt?.trim() ??
+        source.syllabusPrompt?.trim() ??
         [
             'Create a syllabus for a personalized didactic unit.',
-            `Topic: ${unitInit.topic}`,
+            `Topic: ${source.topic}`,
         ].join('\n')
 
     return [
@@ -154,7 +154,7 @@ export class DeepSeekSyllabusGenerator {
         this.fetchImplementation = options.fetchImplementation ?? fetch
     }
 
-    async generate(unitInit: CreatedUnitInit): Promise<UnitInitSyllabus> {
+    async generate(source: SyllabusGenerationSource): Promise<UnitInitSyllabus> {
         const response = await this.fetchImplementation(
             'https://api.deepseek.com/chat/completions',
             {
@@ -177,7 +177,7 @@ export class DeepSeekSyllabusGenerator {
                         },
                         {
                             role: 'user',
-                            content: buildPrompt(unitInit),
+                            content: buildPrompt(source),
                         },
                     ],
                 }),

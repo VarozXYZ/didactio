@@ -1,5 +1,5 @@
-import type { CreatedUnitInit } from '../unit-init/create-unit-init.js'
 import type { UnitInitSyllabus } from '../unit-init/generate-syllabus.js'
+import type { SyllabusGenerationSource } from './syllabus-generator.js'
 
 type FetchImplementation = typeof fetch
 
@@ -27,9 +27,9 @@ export class OpenAiSyllabusGenerationError extends Error {
     }
 }
 
-function findAnswerValue(unitInit: CreatedUnitInit, questionId: string): string {
+function findAnswerValue(source: SyllabusGenerationSource, questionId: string): string {
     return (
-        unitInit.questionnaireAnswers?.find((answer) => answer.questionId === questionId)?.value ??
+        source.questionnaireAnswers?.find((answer) => answer.questionId === questionId)?.value ??
         'not provided'
     )
 }
@@ -119,20 +119,20 @@ function parseSyllabusResponse(content: string): UnitInitSyllabus {
     }
 }
 
-function buildPrompt(unitInit: CreatedUnitInit): string {
-    if (unitInit.syllabusPrompt?.trim()) {
-        return unitInit.syllabusPrompt.trim()
+function buildPrompt(source: SyllabusGenerationSource): string {
+    if (source.syllabusPrompt?.trim()) {
+        return source.syllabusPrompt.trim()
     }
 
-    const topicKnowledgeLevel = findAnswerValue(unitInit, 'topic_knowledge_level')
-    const relatedKnowledgeLevel = findAnswerValue(unitInit, 'related_knowledge_level')
-    const learningGoal = findAnswerValue(unitInit, 'learning_goal')
-    const preferredDepth = findAnswerValue(unitInit, 'preferred_depth')
-    const preferredLength = findAnswerValue(unitInit, 'preferred_length')
+    const topicKnowledgeLevel = findAnswerValue(source, 'topic_knowledge_level')
+    const relatedKnowledgeLevel = findAnswerValue(source, 'related_knowledge_level')
+    const learningGoal = findAnswerValue(source, 'learning_goal')
+    const preferredDepth = findAnswerValue(source, 'preferred_depth')
+    const preferredLength = findAnswerValue(source, 'preferred_length')
 
     return [
         'Create a syllabus for a personalized didactic unit.',
-        `Topic: ${unitInit.topic}`,
+        `Topic: ${source.topic}`,
         `Current topic knowledge: ${topicKnowledgeLevel}`,
         `Related knowledge: ${relatedKnowledgeLevel}`,
         `Learner goal: ${learningGoal}`,
@@ -219,7 +219,7 @@ export class OpenAiSyllabusGenerator {
         this.fetchImplementation = options.fetchImplementation ?? fetch
     }
 
-    async generate(unitInit: CreatedUnitInit): Promise<UnitInitSyllabus> {
+    async generate(source: SyllabusGenerationSource): Promise<UnitInitSyllabus> {
         const response = await this.fetchImplementation(
             'https://api.openai.com/v1/chat/completions',
             {
@@ -240,7 +240,7 @@ export class OpenAiSyllabusGenerator {
                         },
                         {
                             role: 'user',
-                            content: buildPrompt(unitInit),
+                            content: buildPrompt(source),
                         },
                     ],
                 }),

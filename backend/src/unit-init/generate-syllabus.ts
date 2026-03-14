@@ -1,5 +1,8 @@
 import type { CreatedUnitInit } from './create-unit-init.js'
-import type { SyllabusGenerator } from '../providers/syllabus-generator.js'
+import type {
+    SyllabusGenerationSource,
+    SyllabusGenerator,
+} from '../providers/syllabus-generator.js'
 
 export interface UnitInitSyllabusChapter {
     title: string
@@ -14,6 +17,17 @@ export interface UnitInitSyllabus {
     chapters: UnitInitSyllabusChapter[]
 }
 
+export function createSyllabusGenerationSourceFromUnitInit(
+    unitInit: CreatedUnitInit
+): SyllabusGenerationSource {
+    return {
+        topic: unitInit.topic,
+        provider: unitInit.provider,
+        questionnaireAnswers: unitInit.questionnaireAnswers,
+        syllabusPrompt: unitInit.syllabusPrompt,
+    }
+}
+
 export async function generateSyllabus(
     unitInit: CreatedUnitInit,
     syllabusGenerator: SyllabusGenerator
@@ -26,7 +40,9 @@ export async function generateSyllabus(
         ...unitInit,
         status: 'syllabus_ready',
         nextAction: 'review_syllabus',
-        syllabus: await syllabusGenerator.generate(unitInit),
+        syllabus: await syllabusGenerator.generate(
+            createSyllabusGenerationSourceFromUnitInit(unitInit)
+        ),
         syllabusGeneratedAt: new Date().toISOString(),
     }
 }

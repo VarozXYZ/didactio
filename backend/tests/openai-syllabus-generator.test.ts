@@ -3,17 +3,12 @@ import {
     OpenAiSyllabusGenerationError,
     OpenAiSyllabusGenerator,
 } from '../src/providers/openai-syllabus-generator.js'
-import type { CreatedUnitInit } from '../src/unit-init/create-unit-init.js'
+import type { SyllabusGenerationSource } from '../src/providers/syllabus-generator.js'
 
-function createApprovedQuestionnaireUnitInit(): CreatedUnitInit {
+function createSyllabusGenerationSource(): SyllabusGenerationSource {
     return {
-        id: 'unit-init-1',
-        ownerId: 'mock-user',
         topic: 'next.js framework',
         provider: 'openai',
-        status: 'syllabus_prompt_ready',
-        nextAction: 'review_syllabus_prompt',
-        createdAt: '2026-03-12T00:00:00.000Z',
         questionnaireAnswers: [
             { questionId: 'topic_knowledge_level', value: 'basic' },
             { questionId: 'related_knowledge_level', value: 'basic' },
@@ -70,7 +65,7 @@ describe('OpenAiSyllabusGenerator', () => {
             fetchImplementation,
         })
 
-        const syllabus = await generator.generate(createApprovedQuestionnaireUnitInit())
+        const syllabus = await generator.generate(createSyllabusGenerationSource())
 
         expect(fetchImplementation).toHaveBeenCalledOnce()
         expect(fetchImplementation.mock.calls[0]?.[1]).toMatchObject({
@@ -111,7 +106,7 @@ describe('OpenAiSyllabusGenerator', () => {
         })
 
         await expect(
-            generator.generate(createApprovedQuestionnaireUnitInit())
+            generator.generate(createSyllabusGenerationSource())
         ).rejects.toThrow('OpenAI syllabus generation failed with status 500.')
     })
 
@@ -148,7 +143,7 @@ describe('OpenAiSyllabusGenerator', () => {
         })
 
         await expect(
-            generator.generate(createApprovedQuestionnaireUnitInit())
+            generator.generate(createSyllabusGenerationSource())
         ).rejects.toMatchObject<Partial<OpenAiSyllabusGenerationError>>({
             message: 'OpenAI syllabus response must include a non-empty chapters array.',
             rawOutput: rawContent,

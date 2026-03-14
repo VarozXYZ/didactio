@@ -1,5 +1,6 @@
 import { getAppEnv } from '../config/env.js'
-import type { CreatedUnitInit, UnitInitProvider } from '../unit-init/create-unit-init.js'
+import type { UnitInitProvider } from '../unit-init/create-unit-init.js'
+import type { UnitInitQuestionAnswer } from '../unit-init/answer-questionnaire.js'
 import { DeepSeekSyllabusGenerator } from './deepseek-syllabus-generator.js'
 import { OpenAiSyllabusGenerator } from './openai-syllabus-generator.js'
 import type {
@@ -7,8 +8,15 @@ import type {
     UnitInitSyllabusChapter,
 } from '../unit-init/generate-syllabus.js'
 
+export interface SyllabusGenerationSource {
+    topic: string
+    provider: UnitInitProvider
+    questionnaireAnswers?: UnitInitQuestionAnswer[]
+    syllabusPrompt?: string
+}
+
 export interface SyllabusGenerator {
-    generate(unitInit: CreatedUnitInit): Promise<UnitInitSyllabus>
+    generate(source: SyllabusGenerationSource): Promise<UnitInitSyllabus>
 }
 
 export function resolveSyllabusGeneratorModel(provider: UnitInitProvider): string {
@@ -23,49 +31,49 @@ export function resolveSyllabusGeneratorModel(provider: UnitInitProvider): strin
         : 'fake-deepseek-syllabus-generator'
 }
 
-function findAnswerValue(unitInit: CreatedUnitInit, questionId: string): string {
+function findAnswerValue(source: SyllabusGenerationSource, questionId: string): string {
     return (
-        unitInit.questionnaireAnswers?.find((answer) => answer.questionId === questionId)?.value ??
+        source.questionnaireAnswers?.find((answer) => answer.questionId === questionId)?.value ??
         'not provided'
     )
 }
 
-function buildOpenAiLearningGoals(unitInit: CreatedUnitInit): string[] {
-    const learningGoal = findAnswerValue(unitInit, 'learning_goal')
-    const preferredDepth = findAnswerValue(unitInit, 'preferred_depth')
+function buildOpenAiLearningGoals(source: SyllabusGenerationSource): string[] {
+    const learningGoal = findAnswerValue(source, 'learning_goal')
+    const preferredDepth = findAnswerValue(source, 'preferred_depth')
 
     return [
-        `Build confidence in ${unitInit.topic}`,
+        `Build confidence in ${source.topic}`,
         `Reach the learner goal: ${learningGoal}`,
         `Match a ${preferredDepth} level of detail throughout the unit`,
     ]
 }
 
-function buildDeepSeekLearningGoals(unitInit: CreatedUnitInit): string[] {
-    const learningGoal = findAnswerValue(unitInit, 'learning_goal')
-    const relatedKnowledge = findAnswerValue(unitInit, 'related_knowledge_level')
+function buildDeepSeekLearningGoals(source: SyllabusGenerationSource): string[] {
+    const learningGoal = findAnswerValue(source, 'learning_goal')
+    const relatedKnowledge = findAnswerValue(source, 'related_knowledge_level')
 
     return [
-        `Map the core reasoning model behind ${unitInit.topic}`,
+        `Map the core reasoning model behind ${source.topic}`,
         `Connect prior related knowledge (${relatedKnowledge}) to the learner goal: ${learningGoal}`,
         `Practice making sound decisions with the topic in realistic scenarios`,
     ]
 }
 
-function buildOpenAiChapters(unitInit: CreatedUnitInit): UnitInitSyllabusChapter[] {
+function buildOpenAiChapters(source: SyllabusGenerationSource): UnitInitSyllabusChapter[] {
     return [
         {
-            title: `Foundations of ${unitInit.topic}`,
-            overview: `Introduce the core concepts and shared vocabulary required to understand ${unitInit.topic}.`,
+            title: `Foundations of ${source.topic}`,
+            overview: `Introduce the core concepts and shared vocabulary required to understand ${source.topic}.`,
             keyPoints: [
-                `What ${unitInit.topic} is and why it matters`,
+                `What ${source.topic} is and why it matters`,
                 'Essential terminology',
                 'Common beginner misunderstandings',
             ],
         },
         {
-            title: `Practical workflow for ${unitInit.topic}`,
-            overview: `Move from theory into hands-on use of ${unitInit.topic} through guided practice.`,
+            title: `Practical workflow for ${source.topic}`,
+            overview: `Move from theory into hands-on use of ${source.topic} through guided practice.`,
             keyPoints: [
                 'Recommended workflow',
                 'Step-by-step example',
@@ -73,7 +81,7 @@ function buildOpenAiChapters(unitInit: CreatedUnitInit): UnitInitSyllabusChapter
             ],
         },
         {
-            title: `Applied use cases for ${unitInit.topic}`,
+            title: `Applied use cases for ${source.topic}`,
             overview: `Connect the topic to real-world goals and decision-making scenarios.`,
             keyPoints: [
                 'When to use it',
@@ -84,11 +92,11 @@ function buildOpenAiChapters(unitInit: CreatedUnitInit): UnitInitSyllabusChapter
     ]
 }
 
-function buildDeepSeekChapters(unitInit: CreatedUnitInit): UnitInitSyllabusChapter[] {
+function buildDeepSeekChapters(source: SyllabusGenerationSource): UnitInitSyllabusChapter[] {
     return [
         {
-            title: `${unitInit.topic} mental model`,
-            overview: `Build a practical reasoning framework for understanding how ${unitInit.topic} works.`,
+            title: `${source.topic} mental model`,
+            overview: `Build a practical reasoning framework for understanding how ${source.topic} works.`,
             keyPoints: [
                 'Core system model',
                 'How the moving parts relate',
@@ -96,8 +104,8 @@ function buildDeepSeekChapters(unitInit: CreatedUnitInit): UnitInitSyllabusChapt
             ],
         },
         {
-            title: `${unitInit.topic} decision patterns`,
-            overview: `Learn how to choose the right approach when working with ${unitInit.topic}.`,
+            title: `${source.topic} decision patterns`,
+            overview: `Learn how to choose the right approach when working with ${source.topic}.`,
             keyPoints: [
                 'Common decision points',
                 'Tradeoff analysis',
@@ -105,7 +113,7 @@ function buildDeepSeekChapters(unitInit: CreatedUnitInit): UnitInitSyllabusChapt
             ],
         },
         {
-            title: `${unitInit.topic} applied practice`,
+            title: `${source.topic} applied practice`,
             overview: `Turn the topic into repeatable practical action through scenarios and structured practice.`,
             keyPoints: [
                 'Scenario-based application',
@@ -117,29 +125,29 @@ function buildDeepSeekChapters(unitInit: CreatedUnitInit): UnitInitSyllabusChapt
 }
 
 class OpenAiFakeSyllabusGenerator implements SyllabusGenerator {
-    async generate(unitInit: CreatedUnitInit): Promise<UnitInitSyllabus> {
-        const preferredLength = findAnswerValue(unitInit, 'preferred_length')
-        const learningGoal = findAnswerValue(unitInit, 'learning_goal')
+    async generate(source: SyllabusGenerationSource): Promise<UnitInitSyllabus> {
+        const preferredLength = findAnswerValue(source, 'preferred_length')
+        const learningGoal = findAnswerValue(source, 'learning_goal')
 
         return {
-            title: `${unitInit.topic} Learning Path`,
+            title: `${source.topic} Learning Path`,
             overview: `A ${preferredLength} didactic unit designed to help the learner achieve: ${learningGoal}.`,
-            learningGoals: buildOpenAiLearningGoals(unitInit),
-            chapters: buildOpenAiChapters(unitInit),
+            learningGoals: buildOpenAiLearningGoals(source),
+            chapters: buildOpenAiChapters(source),
         }
     }
 }
 
 class DeepSeekFakeSyllabusGenerator implements SyllabusGenerator {
-    async generate(unitInit: CreatedUnitInit): Promise<UnitInitSyllabus> {
-        const preferredLength = findAnswerValue(unitInit, 'preferred_length')
-        const learningGoal = findAnswerValue(unitInit, 'learning_goal')
+    async generate(source: SyllabusGenerationSource): Promise<UnitInitSyllabus> {
+        const preferredLength = findAnswerValue(source, 'preferred_length')
+        const learningGoal = findAnswerValue(source, 'learning_goal')
 
         return {
-            title: `${unitInit.topic} Learning Path`,
+            title: `${source.topic} Learning Path`,
             overview: `A ${preferredLength} didactic unit organized around practical reasoning for: ${learningGoal}.`,
-            learningGoals: buildDeepSeekLearningGoals(unitInit),
-            chapters: buildDeepSeekChapters(unitInit),
+            learningGoals: buildDeepSeekLearningGoals(source),
+            chapters: buildDeepSeekChapters(source),
         }
     }
 }
@@ -166,7 +174,7 @@ export class ProviderBackedFakeSyllabusGenerator implements SyllabusGenerator {
         }
     }
 
-    async generate(unitInit: CreatedUnitInit): Promise<UnitInitSyllabus> {
-        return this.generators[unitInit.provider].generate(unitInit)
+    async generate(source: SyllabusGenerationSource): Promise<UnitInitSyllabus> {
+        return this.generators[source.provider].generate(source)
     }
 }
