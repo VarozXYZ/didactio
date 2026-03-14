@@ -685,6 +685,11 @@ describe('POST /api/didactic-unit/:id/chapters/:chapterIndex/generate', () => {
         expect(response.body.generatedChapters[0].content).toContain(
             'The purpose is to help the learner move closer to answer-for-learning_goal.'
         )
+        expect(response.body.chapterRevisions).toHaveLength(1)
+        expect(response.body.chapterRevisions[0]).toMatchObject({
+            chapterIndex: 0,
+            source: 'ai_generation',
+        })
 
         const didacticUnitResponse = await request(app).get(
             `/api/didactic-unit/${didacticUnitId}`
@@ -855,6 +860,15 @@ describe('POST /api/didactic-unit/:id/chapters/:chapterIndex/regenerate', () => 
             chapterIndex: 0,
             title: 'Foundations of next.js framework',
         })
+        expect(response.body.chapterRevisions).toHaveLength(2)
+        expect(response.body.chapterRevisions[0]).toMatchObject({
+            chapterIndex: 0,
+            source: 'ai_generation',
+        })
+        expect(response.body.chapterRevisions[1]).toMatchObject({
+            chapterIndex: 0,
+            source: 'ai_regeneration',
+        })
 
         const runsResponse = await request(app).get(`/api/didactic-unit/${didacticUnitId}/runs`)
 
@@ -1005,6 +1019,17 @@ describe('PATCH /api/didactic-unit/:id/chapters/:chapterIndex', () => {
             'Edited didactic takeaway two',
         ])
         expect(typeof response.body.updatedAt).toBe('string')
+
+        const revisionsResponse = await request(app).get(
+            `/api/didactic-unit/${didacticUnitId}/chapters/0/revisions`
+        )
+
+        expect(revisionsResponse.status).toBe(200)
+        expect(revisionsResponse.body.revisions).toHaveLength(2)
+        expect(revisionsResponse.body.revisions[0]).toMatchObject({
+            chapterIndex: 0,
+            source: 'manual_edit',
+        })
     })
 
     it('returns 400 for an invalid didactic unit chapter update payload', async () => {
@@ -1122,6 +1147,146 @@ describe('PATCH /api/didactic-unit/:id/chapters/:chapterIndex', () => {
         expect(response.status).toBe(404)
         expect(response.body).toEqual({
             error: 'Generated didactic unit chapter not found.',
+        })
+    })
+})
+
+describe('GET /api/didactic-unit/:id/chapters/:chapterIndex/revisions', () => {
+    it('returns didactic unit chapter revisions newest first', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const createdResponse = await request(app)
+            .post('/api/unit-init')
+            .send({ topic: 'next.js framework' })
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/moderate`)
+            .send({})
+
+        const questionnaireResponse = await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/questionnaire/generate`)
+            .send({})
+
+        await request(app)
+            .patch(`/api/unit-init/${createdResponse.body.id}/questionnaire/answers`)
+            .send({
+                answers: questionnaireResponse.body.questionnaire.questions.map(
+                    (question: { id: string }) => ({
+                        questionId: question.id,
+                        value: `answer-for-${question.id}`,
+                    })
+                ),
+            })
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/syllabus-prompt/generate`)
+            .send({})
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/syllabus/generate`)
+            .send({})
+
+        const approvalResponse = await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/approve-syllabus`)
+            .send({})
+
+        const didacticUnitId = approvalResponse.body.didacticUnitId
+
+        await request(app)
+            .post(`/api/didactic-unit/${didacticUnitId}/chapters/0/generate`)
+            .send({})
+
+        await request(app)
+            .patch(`/api/didactic-unit/${didacticUnitId}/chapters/0`)
+            .send({
+                chapter: {
+                    title: 'Edited Didactic Foundations',
+                    overview: 'A rewritten overview for the didactic unit chapter.',
+                    content: 'A rewritten didactic unit chapter body.',
+                    keyTakeaways: [
+                        'Edited didactic takeaway one',
+                        'Edited didactic takeaway two',
+                    ],
+                },
+            })
+
+        const response = await request(app).get(
+            `/api/didactic-unit/${didacticUnitId}/chapters/0/revisions`
+        )
+
+        expect(response.status).toBe(200)
+        expect(response.body.revisions).toHaveLength(2)
+        expect(response.body.revisions[0]).toMatchObject({
+            chapterIndex: 0,
+            source: 'manual_edit',
+        })
+        expect(response.body.revisions[1]).toMatchObject({
+            chapterIndex: 0,
+            source: 'ai_generation',
+        })
+    })
+
+    it('returns 404 when the didactic unit does not exist', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const response = await request(app).get(
+            '/api/didactic-unit/missing-id/chapters/0/revisions'
+        )
+
+        expect(response.status).toBe(404)
+        expect(response.body).toEqual({
+            error: 'Didactic unit not found.',
+        })
+    })
+
+    it('returns 404 when the didactic unit chapter revision history does not exist yet', async () => {
+        const store = new InMemoryUnitInitStore()
+        const app = createApp({ unitInitStore: store })
+
+        const createdResponse = await request(app)
+            .post('/api/unit-init')
+            .send({ topic: 'next.js framework' })
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/moderate`)
+            .send({})
+
+        const questionnaireResponse = await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/questionnaire/generate`)
+            .send({})
+
+        await request(app)
+            .patch(`/api/unit-init/${createdResponse.body.id}/questionnaire/answers`)
+            .send({
+                answers: questionnaireResponse.body.questionnaire.questions.map(
+                    (question: { id: string }) => ({
+                        questionId: question.id,
+                        value: `answer-for-${question.id}`,
+                    })
+                ),
+            })
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/syllabus-prompt/generate`)
+            .send({})
+
+        await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/syllabus/generate`)
+            .send({})
+
+        const approvalResponse = await request(app)
+            .post(`/api/unit-init/${createdResponse.body.id}/approve-syllabus`)
+            .send({})
+
+        const response = await request(app).get(
+            `/api/didactic-unit/${approvalResponse.body.didacticUnitId}/chapters/0/revisions`
+        )
+
+        expect(response.status).toBe(404)
+        expect(response.body).toEqual({
+            error: 'Didactic unit chapter revisions not found.',
         })
     })
 })

@@ -3,7 +3,10 @@ import type { CreatedUnitInit } from '../unit-init/create-unit-init.js'
 import type { UnitInitProvider } from '../unit-init/create-unit-init.js'
 import type { UnitInitQuestionAnswer } from '../unit-init/answer-questionnaire.js'
 import type { UnitInitSyllabus, UnitInitSyllabusChapter } from '../unit-init/generate-syllabus.js'
-import type { DidacticUnitGeneratedChapter } from './didactic-unit-chapter.js'
+import type {
+    DidacticUnitChapterRevision,
+    DidacticUnitGeneratedChapter,
+} from './didactic-unit-chapter.js'
 
 export type DidacticUnitStatus =
     | 'ready_for_content_generation'
@@ -23,6 +26,7 @@ export interface DidacticUnit {
     chapters: UnitInitSyllabusChapter[]
     questionnaireAnswers: UnitInitQuestionAnswer[]
     generatedChapters?: DidacticUnitGeneratedChapter[]
+    chapterRevisions?: DidacticUnitChapterRevision[]
     createdAt: string
 }
 

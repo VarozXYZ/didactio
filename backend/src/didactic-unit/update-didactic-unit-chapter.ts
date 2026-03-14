@@ -3,6 +3,7 @@ import type {
     DidacticUnitGeneratedChapter,
     UpdateDidacticUnitChapterInput,
 } from './didactic-unit-chapter.js'
+import { createDidacticUnitChapterRevision } from './didactic-unit-chapter.js'
 
 export function updateDidacticUnitChapter(
     didacticUnit: DidacticUnit,
@@ -33,6 +34,14 @@ export function updateDidacticUnitChapter(
 
     return {
         ...didacticUnit,
+        chapterRevisions: [
+            ...(didacticUnit.chapterRevisions ?? []),
+            createDidacticUnitChapterRevision({
+                chapterIndex,
+                source: 'manual_edit',
+                chapter: updatedChapter,
+            }),
+        ],
         generatedChapters: updatedChapters,
     }
 }

@@ -6,6 +6,10 @@ import {
     resolveDidacticUnitStatus,
     type DidacticUnit,
 } from './create-didactic-unit.js'
+import {
+    createDidacticUnitChapterRevision,
+    type DidacticUnitChapterRevisionSource,
+} from './didactic-unit-chapter.js'
 
 export function createChapterGenerationSourceFromDidacticUnit(
     didacticUnit: DidacticUnit
@@ -37,7 +41,8 @@ export function hasGeneratedDidacticUnitChapter(
 export async function generateDidacticUnitChapter(
     didacticUnit: DidacticUnit,
     chapterIndex: number,
-    chapterGenerator: ChapterGenerator
+    chapterGenerator: ChapterGenerator,
+    revisionSource: DidacticUnitChapterRevisionSource = 'ai_generation'
 ): Promise<DidacticUnit> {
     const chapterGenerationSource = createChapterGenerationSourceFromDidacticUnit(
         didacticUnit
@@ -57,6 +62,14 @@ export async function generateDidacticUnitChapter(
 
         return {
             ...didacticUnit,
+            chapterRevisions: [
+                ...(didacticUnit.chapterRevisions ?? []),
+                createDidacticUnitChapterRevision({
+                    chapterIndex,
+                    source: revisionSource,
+                    chapter: generatedChapter,
+                }),
+            ],
             status: resolveDidacticUnitStatus({
                 ...didacticUnit,
                 generatedChapters: updatedChapters,
@@ -67,6 +80,14 @@ export async function generateDidacticUnitChapter(
 
     return {
         ...didacticUnit,
+        chapterRevisions: [
+            ...(didacticUnit.chapterRevisions ?? []),
+            createDidacticUnitChapterRevision({
+                chapterIndex,
+                source: revisionSource,
+                chapter: generatedChapter,
+            }),
+        ],
         generatedChapters: [...generatedChapters, generatedChapter].sort(
             (left, right) => left.chapterIndex - right.chapterIndex
         ),

@@ -292,6 +292,49 @@ export function createApp(options: CreateAppOptions) {
         response.json(generatedChapter)
     })
 
+    app.get('/api/didactic-unit/:id/chapters/:chapterIndex/revisions', async (request, response) => {
+        const requestWithMockOwner = asRequestWithMockOwner(request)
+        const didacticUnit = await didacticUnitStore.getById(
+            requestWithMockOwner.mockOwner.id,
+            request.params.id
+        )
+
+        if (!didacticUnit) {
+            response.status(404).json({
+                error: 'Didactic unit not found.',
+            })
+            return
+        }
+
+        let chapterIndex
+        try {
+            chapterIndex = parseChapterIndex(request.params.chapterIndex)
+        } catch (error) {
+            response.status(400).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : 'Invalid didactic unit chapter revision lookup request.',
+            })
+            return
+        }
+
+        const revisions = (didacticUnit.chapterRevisions ?? [])
+            .filter((revision) => revision.chapterIndex === chapterIndex)
+            .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+
+        if (revisions.length === 0) {
+            response.status(404).json({
+                error: 'Didactic unit chapter revisions not found.',
+            })
+            return
+        }
+
+        response.json({
+            revisions,
+        })
+    })
+
     app.get('/api/didactic-unit/:id/runs', async (request, response) => {
         const requestWithMockOwner = asRequestWithMockOwner(request)
         const didacticUnit = await didacticUnitStore.getById(
@@ -413,7 +456,8 @@ export function createApp(options: CreateAppOptions) {
             const updatedDidacticUnit = await generateDidacticUnitChapter(
                 didacticUnit,
                 chapterIndex,
-                chapterGenerator
+                chapterGenerator,
+                'ai_generation'
             )
             await didacticUnitStore.save(updatedDidacticUnit)
 
@@ -523,7 +567,8 @@ export function createApp(options: CreateAppOptions) {
             const updatedDidacticUnit = await generateDidacticUnitChapter(
                 didacticUnit,
                 chapterIndex,
-                chapterGenerator
+                chapterGenerator,
+                'ai_regeneration'
             )
             await didacticUnitStore.save(updatedDidacticUnit)
 

@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto'
+
 export interface DidacticUnitGeneratedChapter {
     chapterIndex: number
     title: string
@@ -6,6 +8,19 @@ export interface DidacticUnitGeneratedChapter {
     keyTakeaways: string[]
     generatedAt: string
     updatedAt?: string
+}
+
+export type DidacticUnitChapterRevisionSource =
+    | 'ai_generation'
+    | 'ai_regeneration'
+    | 'manual_edit'
+
+export interface DidacticUnitChapterRevision {
+    id: string
+    chapterIndex: number
+    source: DidacticUnitChapterRevisionSource
+    chapter: DidacticUnitGeneratedChapter
+    createdAt: string
 }
 
 export interface UpdateDidacticUnitChapterInput {
@@ -67,5 +82,22 @@ export function parseUpdateDidacticUnitChapterInput(
                 'chapter.keyTakeaways'
             ),
         },
+    }
+}
+
+export function createDidacticUnitChapterRevision(input: {
+    chapterIndex: number
+    source: DidacticUnitChapterRevisionSource
+    chapter: DidacticUnitGeneratedChapter
+}): DidacticUnitChapterRevision {
+    return {
+        id: randomUUID(),
+        chapterIndex: input.chapterIndex,
+        source: input.source,
+        chapter: {
+            ...input.chapter,
+            keyTakeaways: [...input.chapter.keyTakeaways],
+        },
+        createdAt: input.chapter.updatedAt ?? input.chapter.generatedAt,
     }
 }

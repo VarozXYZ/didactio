@@ -488,7 +488,7 @@
               "pm.test('Generate Didactic Unit Chapter returns 200 or 409', function () { pm.expect([200, 409]).to.include(pm.response.code); });",
               "const body = pm.response.json();",
               "if (pm.response.code === 200) {",
-              "  pm.test('Didactic unit chapter generation is structurally valid', function () { pm.expect(body.id).to.eql(pm.collectionVariables.get('didacticUnitId')); pm.expect(body.status).to.be.oneOf(['content_generation_in_progress', 'content_generation_completed']); pm.expect(body.generatedChapters).to.be.an('array').that.is.not.empty; const chapter = body.generatedChapters.find((item) => item.chapterIndex === Number(pm.collectionVariables.get('chapterIndex') || '0')); pm.expect(chapter).to.be.an('object'); pm.expect(chapter.content).to.be.a('string').and.not.empty; pm.expect(chapter.keyTakeaways).to.be.an('array').that.is.not.empty; });",
+              "  pm.test('Didactic unit chapter generation is structurally valid', function () { pm.expect(body.id).to.eql(pm.collectionVariables.get('didacticUnitId')); pm.expect(body.status).to.be.oneOf(['content_generation_in_progress', 'content_generation_completed']); pm.expect(body.generatedChapters).to.be.an('array').that.is.not.empty; pm.expect(body.chapterRevisions).to.be.an('array').that.is.not.empty; const chapterIndex = Number(pm.collectionVariables.get('chapterIndex') || '0'); const chapter = body.generatedChapters.find((item) => item.chapterIndex === chapterIndex); const revision = body.chapterRevisions.find((item) => item.chapterIndex === chapterIndex); pm.expect(chapter).to.be.an('object'); pm.expect(chapter.content).to.be.a('string').and.not.empty; pm.expect(chapter.keyTakeaways).to.be.an('array').that.is.not.empty; pm.expect(revision).to.be.an('object'); pm.expect(revision.source).to.eql('ai_generation'); });",
               "} else {",
               "  pm.test('Didactic unit chapter generation returns a useful AI error', function () { pm.expect(body.error).to.be.a('string').and.not.empty; });",
               "}"
@@ -635,6 +635,41 @@
               "pm.test('Update Didactic Unit Chapter returns 200', function () { pm.response.to.have.status(200); });",
               "const body = pm.response.json();",
               "pm.test('Didactic unit chapter update is stored', function () { pm.expect(body.title).to.eql('Edited Didactic Foundations'); pm.expect(body.updatedAt).to.be.a('string').and.not.empty; });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10f.5 Get Didactic Unit Chapter Revisions",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/didactic-unit/{{didacticUnitId}}/chapters/{{chapterIndex}}/revisions",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "didactic-unit",
+            "{{didacticUnitId}}",
+            "chapters",
+            "{{chapterIndex}}",
+            "revisions"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Get Didactic Unit Chapter Revisions returns 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('Didactic unit chapter revisions expose chapter history newest first', function () { pm.expect(body.revisions).to.be.an('array').that.is.not.empty; const latestRevision = body.revisions[0]; pm.expect(latestRevision.chapterIndex).to.eql(Number(pm.collectionVariables.get('chapterIndex') || '0')); pm.expect(latestRevision.source).to.eql('manual_edit'); pm.expect(latestRevision.chapter).to.be.an('object'); pm.expect(latestRevision.chapter.title).to.eql('Edited Didactic Foundations'); });"
             ]
           }
         }
