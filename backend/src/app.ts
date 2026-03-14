@@ -546,10 +546,12 @@ export function createApp(options: CreateAppOptions) {
         }
 
         response.json({
-            runs: await generationRunStore.listByUnitInit(
-                requestWithMockOwner.mockOwner.id,
-                request.params.id
-            ),
+            runs: (
+                await generationRunStore.listByUnitInit(
+                    requestWithMockOwner.mockOwner.id,
+                    request.params.id
+                )
+            ).filter(isSyllabusGenerationRun),
         })
     })
 

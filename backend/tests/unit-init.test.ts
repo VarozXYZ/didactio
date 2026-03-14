@@ -1003,7 +1003,7 @@ describe('GET /api/unit-init/:id', () => {
 })
 
 describe('GET /api/unit-init/:id/runs', () => {
-    it('returns all persisted generation runs for the unit-init in descending order', async () => {
+    it('returns only planning generation runs for the unit-init', async () => {
         const store = new InMemoryUnitInitStore()
         const app = createApp({ unitInitStore: store })
 
@@ -1052,17 +1052,8 @@ describe('GET /api/unit-init/:id/runs', () => {
         const response = await request(app).get(`/api/unit-init/${createdResponse.body.id}/runs`)
 
         expect(response.status).toBe(200)
-        expect(response.body.runs).toHaveLength(2)
+        expect(response.body.runs).toHaveLength(1)
         expect(response.body.runs[0]).toMatchObject({
-            unitInitId: createdResponse.body.id,
-            ownerId: 'mock-user',
-            stage: 'chapter',
-            chapterIndex: 0,
-            provider: 'openai',
-            model: 'fake-openai-chapter-generator',
-            status: 'completed',
-        })
-        expect(response.body.runs[1]).toMatchObject({
             unitInitId: createdResponse.body.id,
             ownerId: 'mock-user',
             stage: 'syllabus',
