@@ -10,6 +10,11 @@ export interface DidacticUnitGeneratedChapter {
     updatedAt?: string
 }
 
+export interface DidacticUnitChapterCompletion {
+    chapterIndex: number
+    completedAt: string
+}
+
 export type DidacticUnitChapterRevisionSource =
     | 'ai_generation'
     | 'ai_regeneration'

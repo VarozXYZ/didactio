@@ -10,7 +10,9 @@ export interface DidacticUnitSummary {
     overview: string
     chapterCount: number
     generatedChapterCount: number
+    completedChapterCount: number
     progressPercent: number
+    studyProgressPercent: number
     createdAt: string
 }
 
@@ -28,6 +30,7 @@ function calculateProgressPercent(
 export function summarizeDidacticUnit(didacticUnit: DidacticUnit): DidacticUnitSummary {
     const chapterCount = didacticUnit.chapters.length
     const generatedChapterCount = didacticUnit.generatedChapters?.length ?? 0
+    const completedChapterCount = didacticUnit.completedChapters?.length ?? 0
 
     return {
         id: didacticUnit.id,
@@ -39,7 +42,34 @@ export function summarizeDidacticUnit(didacticUnit: DidacticUnit): DidacticUnitS
         overview: didacticUnit.overview,
         chapterCount,
         generatedChapterCount,
+        completedChapterCount,
         progressPercent: calculateProgressPercent(chapterCount, generatedChapterCount),
+        studyProgressPercent: calculateProgressPercent(
+            chapterCount,
+            completedChapterCount
+        ),
         createdAt: didacticUnit.createdAt,
+    }
+}
+
+export interface DidacticUnitStudyProgress {
+    chapterCount: number
+    completedChapterCount: number
+    studyProgressPercent: number
+}
+
+export function summarizeDidacticUnitStudyProgress(
+    didacticUnit: DidacticUnit
+): DidacticUnitStudyProgress {
+    const chapterCount = didacticUnit.chapters.length
+    const completedChapterCount = didacticUnit.completedChapters?.length ?? 0
+
+    return {
+        chapterCount,
+        completedChapterCount,
+        studyProgressPercent: calculateProgressPercent(
+            chapterCount,
+            completedChapterCount
+        ),
     }
 }

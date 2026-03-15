@@ -411,7 +411,7 @@
             "exec": [
               "pm.test('List Didactic Units returns 200', function () { pm.response.to.have.status(200); });",
               "const body = pm.response.json();",
-              "pm.test('Didactic unit list returns dashboard summaries', function () { pm.expect(body.didacticUnits).to.be.an('array').that.is.not.empty; const linkedUnit = body.didacticUnits.find((unit) => unit.id === pm.collectionVariables.get('didacticUnitId')); pm.expect(linkedUnit).to.be.an('object'); pm.expect(linkedUnit.unitInitId).to.eql(pm.collectionVariables.get('unitInitId')); pm.expect(linkedUnit.status).to.be.oneOf(['ready_for_content_generation', 'content_generation_in_progress', 'content_generation_completed']); pm.expect(linkedUnit.overview).to.be.a('string').and.not.empty; pm.expect(linkedUnit.chapterCount).to.be.a('number').and.to.be.above(0); pm.expect(linkedUnit.generatedChapterCount).to.be.a('number'); pm.expect(linkedUnit.progressPercent).to.be.a('number'); });"
+              "pm.test('Didactic unit list returns dashboard summaries', function () { pm.expect(body.didacticUnits).to.be.an('array').that.is.not.empty; const linkedUnit = body.didacticUnits.find((unit) => unit.id === pm.collectionVariables.get('didacticUnitId')); pm.expect(linkedUnit).to.be.an('object'); pm.expect(linkedUnit.unitInitId).to.eql(pm.collectionVariables.get('unitInitId')); pm.expect(linkedUnit.status).to.be.oneOf(['ready_for_content_generation', 'content_generation_in_progress', 'content_generation_completed']); pm.expect(linkedUnit.overview).to.be.a('string').and.not.empty; pm.expect(linkedUnit.chapterCount).to.be.a('number').and.to.be.above(0); pm.expect(linkedUnit.generatedChapterCount).to.be.a('number'); pm.expect(linkedUnit.completedChapterCount).to.be.a('number'); pm.expect(linkedUnit.progressPercent).to.be.a('number'); pm.expect(linkedUnit.studyProgressPercent).to.be.a('number'); });"
             ]
           }
         }
@@ -443,7 +443,7 @@
             "exec": [
               "pm.test('Get Didactic Unit By Id returns 200', function () { pm.response.to.have.status(200); });",
               "const body = pm.response.json();",
-              "pm.test('Single didactic unit payload is complete', function () { pm.expect(body.id).to.eql(pm.collectionVariables.get('didacticUnitId')); pm.expect(body.unitInitId).to.eql(pm.collectionVariables.get('unitInitId')); pm.expect(body.status).to.be.oneOf(['ready_for_content_generation', 'content_generation_in_progress', 'content_generation_completed']); pm.expect(body.title).to.be.a('string').and.not.empty; pm.expect(body.chapters).to.be.an('array').that.is.not.empty; });"
+              "pm.test('Single didactic unit payload is complete', function () { pm.expect(body.id).to.eql(pm.collectionVariables.get('didacticUnitId')); pm.expect(body.unitInitId).to.eql(pm.collectionVariables.get('unitInitId')); pm.expect(body.status).to.be.oneOf(['ready_for_content_generation', 'content_generation_in_progress', 'content_generation_completed']); pm.expect(body.title).to.be.a('string').and.not.empty; pm.expect(body.chapters).to.be.an('array').that.is.not.empty; pm.expect(body.studyProgress).to.be.an('object'); pm.expect(body.studyProgress.chapterCount).to.be.a('number'); pm.expect(body.studyProgress.completedChapterCount).to.be.a('number'); pm.expect(body.studyProgress.studyProgressPercent).to.be.a('number'); });"
             ]
           }
         }
@@ -558,7 +558,51 @@
             "exec": [
               "pm.test('Get Didactic Unit Chapter returns 200', function () { pm.response.to.have.status(200); });",
               "const body = pm.response.json();",
-              "pm.test('Didactic unit generated chapter payload is complete', function () { pm.expect(body.chapterIndex).to.eql(Number(pm.collectionVariables.get('chapterIndex') || '0')); pm.expect(body.title).to.be.a('string').and.not.empty; pm.expect(body.content).to.be.a('string').and.not.empty; pm.expect(body.keyTakeaways).to.be.an('array').that.is.not.empty; });"
+              "pm.test('Didactic unit generated chapter payload is complete', function () { pm.expect(body.chapterIndex).to.eql(Number(pm.collectionVariables.get('chapterIndex') || '0')); pm.expect(body.title).to.be.a('string').and.not.empty; pm.expect(body.content).to.be.a('string').and.not.empty; pm.expect(body.keyTakeaways).to.be.an('array').that.is.not.empty; pm.expect(body.isCompleted).to.eql(false); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10e.6 Complete Didactic Unit Chapter",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/didactic-unit/{{didacticUnitId}}/chapters/{{chapterIndex}}/complete",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "didactic-unit",
+            "{{didacticUnitId}}",
+            "chapters",
+            "{{chapterIndex}}",
+            "complete"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Complete Didactic Unit Chapter returns 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('Didactic unit chapter completion updates study progress', function () { pm.expect(body.id).to.eql(pm.collectionVariables.get('didacticUnitId')); pm.expect(body.completedChapters).to.be.an('array').that.is.not.empty; const completion = body.completedChapters.find((item) => item.chapterIndex === Number(pm.collectionVariables.get('chapterIndex') || '0')); pm.expect(completion).to.be.an('object'); pm.expect(completion.completedAt).to.be.a('string').and.not.empty; pm.expect(body.studyProgress).to.be.an('object'); pm.expect(body.studyProgress.completedChapterCount).to.be.at.least(1); pm.expect(body.studyProgress.studyProgressPercent).to.be.at.least(1); });"
             ]
           }
         }

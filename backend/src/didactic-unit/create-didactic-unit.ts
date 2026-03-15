@@ -4,6 +4,7 @@ import type { UnitInitProvider } from '../unit-init/create-unit-init.js'
 import type { UnitInitQuestionAnswer } from '../unit-init/answer-questionnaire.js'
 import type { UnitInitSyllabus, UnitInitSyllabusChapter } from '../unit-init/generate-syllabus.js'
 import type {
+    DidacticUnitChapterCompletion,
     DidacticUnitChapterRevision,
     DidacticUnitGeneratedChapter,
 } from './didactic-unit-chapter.js'
@@ -26,6 +27,7 @@ export interface DidacticUnit {
     chapters: UnitInitSyllabusChapter[]
     questionnaireAnswers: UnitInitQuestionAnswer[]
     generatedChapters?: DidacticUnitGeneratedChapter[]
+    completedChapters?: DidacticUnitChapterCompletion[]
     chapterRevisions?: DidacticUnitChapterRevision[]
     createdAt: string
 }

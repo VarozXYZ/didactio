@@ -1,7 +1,9 @@
 import express from 'express'
 import {
     createDidacticUnitFromApprovedUnitInit,
+    type DidacticUnit,
 } from './didactic-unit/create-didactic-unit.js'
+import { completeDidacticUnitChapter } from './didactic-unit/complete-didactic-unit-chapter.js'
 import { parseUpdateDidacticUnitChapterInput } from './didactic-unit/didactic-unit-chapter.js'
 import {
     createChapterGenerationSourceFromDidacticUnit,
@@ -9,7 +11,10 @@ import {
     hasGeneratedDidacticUnitChapter,
 } from './didactic-unit/generate-didactic-unit-chapter.js'
 import { listDidacticUnitChapters } from './didactic-unit/list-didactic-unit-chapters.js'
-import { summarizeDidacticUnit } from './didactic-unit/summarize-didactic-unit.js'
+import {
+    summarizeDidacticUnit,
+    summarizeDidacticUnitStudyProgress,
+} from './didactic-unit/summarize-didactic-unit.js'
 import { updateDidacticUnitChapter } from './didactic-unit/update-didactic-unit-chapter.js'
 import type { DidacticUnitStore } from './didactic-unit/didactic-unit-store.js'
 import {
@@ -152,6 +157,13 @@ function setAdvancedPlanningHistoryHeaders(response: express.Response) {
     response.setHeader('X-Didactio-Endpoint-Purpose', 'planning-history')
 }
 
+function buildDidacticUnitResponse(didacticUnit: DidacticUnit) {
+    return {
+        ...didacticUnit,
+        studyProgress: summarizeDidacticUnitStudyProgress(didacticUnit),
+    }
+}
+
 export function createApp(options: CreateAppOptions) {
     const app = express()
     const unitInitStore = options.unitInitStore
@@ -229,7 +241,7 @@ export function createApp(options: CreateAppOptions) {
             return
         }
 
-        response.json(didacticUnit)
+        response.json(buildDidacticUnitResponse(didacticUnit))
     })
 
     app.get('/api/didactic-unit/:id/chapters', async (request, response) => {
@@ -289,7 +301,15 @@ export function createApp(options: CreateAppOptions) {
             return
         }
 
-        response.json(generatedChapter)
+        const completedChapter = didacticUnit.completedChapters?.find(
+            (chapter) => chapter.chapterIndex === chapterIndex
+        )
+
+        response.json({
+            ...generatedChapter,
+            isCompleted: completedChapter !== undefined,
+            completedAt: completedChapter?.completedAt,
+        })
     })
 
     app.get('/api/didactic-unit/:id/chapters/:chapterIndex/revisions', async (request, response) => {
@@ -357,6 +377,54 @@ export function createApp(options: CreateAppOptions) {
                 )
             ).sort(compareRunsByCreatedAtDesc),
         })
+    })
+
+    app.post('/api/didactic-unit/:id/chapters/:chapterIndex/complete', async (request, response) => {
+        const requestWithMockOwner = asRequestWithMockOwner(request)
+        const didacticUnit = await didacticUnitStore.getById(
+            requestWithMockOwner.mockOwner.id,
+            request.params.id
+        )
+
+        if (!didacticUnit) {
+            response.status(404).json({
+                error: 'Didactic unit not found.',
+            })
+            return
+        }
+
+        let chapterIndex
+        try {
+            chapterIndex = parseChapterIndex(request.params.chapterIndex)
+        } catch (error) {
+            response.status(400).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : 'Invalid didactic unit chapter completion request.',
+            })
+            return
+        }
+
+        try {
+            const updatedDidacticUnit = completeDidacticUnitChapter(
+                didacticUnit,
+                chapterIndex
+            )
+            await didacticUnitStore.save(updatedDidacticUnit)
+            response.json(buildDidacticUnitResponse(updatedDidacticUnit))
+        } catch (error) {
+            const message =
+                error instanceof Error
+                    ? error.message
+                    : 'Didactic unit chapter completion failed.'
+
+            response.status(
+                message === 'Generated didactic unit chapter not found.' ? 404 : 409
+            ).json({
+                error: message,
+            })
+        }
     })
 
     app.patch('/api/didactic-unit/:id/chapters/:chapterIndex', async (request, response) => {
@@ -486,7 +554,7 @@ export function createApp(options: CreateAppOptions) {
                 )
             }
 
-            response.json(updatedDidacticUnit)
+            response.json(buildDidacticUnitResponse(updatedDidacticUnit))
         } catch (error) {
             const promptSource = createChapterGenerationSourceFromDidacticUnit(didacticUnit)
 
@@ -597,7 +665,7 @@ export function createApp(options: CreateAppOptions) {
                 )
             }
 
-            response.json(updatedDidacticUnit)
+            response.json(buildDidacticUnitResponse(updatedDidacticUnit))
         } catch (error) {
             const promptSource = createChapterGenerationSourceFromDidacticUnit(didacticUnit)
 
