@@ -1,8 +1,6 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { login, register } from '../services/auth'
-import { saveAuthSession } from '../services/auth.storage'
 
 type AuthMode = 'login' | 'register'
 
@@ -33,64 +31,21 @@ function AuthScreen({ mode }: AuthScreenProps) {
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [confirmPassword, setConfirmPassword] = useState('')
-    const [errorMessage, setErrorMessage] = useState<string | null>(null)
+    const [noticeMessage, setNoticeMessage] = useState<string | null>(null)
     const [isSubmitting, setIsSubmitting] = useState(false)
 
     const title = isLogin ? 'Welcome back' : 'Create your account'
     const subtitle = isLogin
-        ? 'Sign in to access the dashboard.'
-        : 'Sign up to start building smarter curricula in minutes.'
+        ? 'This frontend runs in demo mode. Continue to open the dashboard experience.'
+        : 'Create a demo entry and continue directly into the dashboard experience.'
 
     async function handleSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault()
-        setErrorMessage(null)
-
-        const normalizedEmail = email.trim()
-        if (!normalizedEmail) {
-            setErrorMessage('Please enter your email address.')
-            return
-        }
-
-        if (!password) {
-            setErrorMessage('Please enter your password.')
-            return
-        }
-
-        if (!isLogin) {
-            if (password.length < 8) {
-                setErrorMessage('Password must be at least 8 characters.')
-                return
-            }
-
-            if (password !== confirmPassword) {
-                setErrorMessage('Passwords do not match.')
-                return
-            }
-        }
-
+        setNoticeMessage('Demo mode active. Redirecting to the dashboard...')
         setIsSubmitting(true)
-
-        try {
-            const authResponse = isLogin
-                ? await login({
-                    email: normalizedEmail,
-                    password,
-                })
-                : await register({
-                    name: fullName.trim() || undefined,
-                    email: normalizedEmail,
-                    password,
-                })
-
-            saveAuthSession(authResponse)
+        window.setTimeout(() => {
             navigate('/dashboard', { replace: true })
-        } catch (error) {
-            setErrorMessage(
-                error instanceof Error ? error.message : 'Unable to authenticate right now.'
-            )
-        } finally {
-            setIsSubmitting(false)
-        }
+        }, 300)
     }
 
     return (
@@ -115,6 +70,9 @@ function AuthScreen({ mode }: AuthScreenProps) {
                     <header>
                         <h2 className="font-sora text-5xl font-bold text-dark">{title}</h2>
                         <p className="mt-4 font-inter text-xl text-dark/65">{subtitle}</p>
+                        <p className="mt-5 rounded-sm border border-accent/20 bg-accent/10 px-4 py-3 font-inter text-base text-dark/75">
+                            Authentication is intentionally disconnected in this frontend build. These forms now act as demo entry points.
+                        </p>
                     </header>
 
                     <div className="mt-14 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -217,9 +175,9 @@ function AuthScreen({ mode }: AuthScreenProps) {
                             </p>
                         )}
 
-                        {errorMessage && (
-                            <p className="rounded-sm border border-red-400/40 bg-red-50 px-3 py-2 font-inter text-sm text-red-700">
-                                {errorMessage}
+                        {noticeMessage && (
+                            <p className="rounded-sm border border-accent/30 bg-accent/10 px-3 py-2 font-inter text-sm text-dark/75">
+                                {noticeMessage}
                             </p>
                         )}
 
@@ -228,7 +186,7 @@ function AuthScreen({ mode }: AuthScreenProps) {
                             disabled={isSubmitting}
                             className="mt-4 h-13 w-full cursor-pointer rounded-sm bg-accent font-sora text-xl font-semibold text-white shadow-card transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-70"
                         >
-                            {isSubmitting ? (isLogin ? 'Logging in...' : 'Creating account...') : (isLogin ? 'Log In' : 'Create account')}
+                            {isSubmitting ? 'Opening dashboard...' : (isLogin ? 'Log In' : 'Create account')}
                         </button>
                     </form>
 

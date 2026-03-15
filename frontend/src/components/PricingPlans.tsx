@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 
 const checkIcon = '/assets/icons/check-mark.png'
 
@@ -164,12 +165,12 @@ function PlanCard({
                 ))}
             </ul>
 
-            <button
-                type="button"
+            <Link
+                to="/dashboard"
                 className={`mt-10 self-center rounded-full px-12 py-3 text-base font-sora font-semibold transition-colors ${buttonStyle}`}
             >
                 {plan.cta}
-            </button>
+            </Link>
         </div>
     )
 }

@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'
+
 function Hero() {
     return (
         <section className="relative w-[1300px] h-[1180px] overflow-hidden rounded-xl mb-10">
@@ -20,9 +22,9 @@ function Hero() {
                     Didactio uses AI and pedagogical expertise to generate high-quality, structured learning content tailored to your needs.
                 </p>
 
-                <button className="bg-accent text-dark font-sora font-semibold text-xl px-10 py-4 rounded-full hover:bg-accent/90 transition-colors mb-16">
+                <Link to="/dashboard" className="bg-accent text-dark font-sora font-semibold text-xl px-10 py-4 rounded-full hover:bg-accent/90 transition-colors mb-16">
                     Start now, free
-                </button>
+                </Link>
 
                 <div className="w-full max-w-[1040px] px-8">
                     <img
