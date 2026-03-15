@@ -11,18 +11,21 @@ import {
 } from 'lucide-react'
 import { motion } from 'motion/react'
 import type { Dispatch, SetStateAction } from 'react'
-import type { DashboardFolder, DashboardSection, UnitSummary } from '../../../types'
+import type {
+    DashboardFolder,
+    DashboardListItem,
+    DashboardSection,
+} from '../../../types'
 
 type SidebarProps = {
     isSidebarOpen: boolean
     activeSection: DashboardSection
     setActiveSection: Dispatch<SetStateAction<DashboardSection>>
-    expandedFolders: number[]
-    toggleFolder: (folderId: number) => void
+    expandedFolders: string[]
+    toggleFolder: (folderId: string) => void
     folders: DashboardFolder[]
-    isUnitEditable: (unitId: number) => boolean
-    onOpenUnit: (unitId: number) => void
-    units: UnitSummary[]
+    onOpenItem: (itemId: string) => void
+    items: DashboardListItem[]
 }
 
 export function Sidebar({
@@ -32,9 +35,8 @@ export function Sidebar({
     expandedFolders,
     toggleFolder,
     folders,
-    isUnitEditable,
-    onOpenUnit,
-    units,
+    onOpenItem,
+    items,
 }: SidebarProps) {
     const settingsItems: Array<{
         id: DashboardSection
@@ -115,7 +117,7 @@ export function Sidebar({
                             {isSidebarOpen && expandedFolders.includes(folder.id) && (
                                 <div className="ml-8 mt-1 space-y-0.5">
                                     {folder.units.map((unitId) => {
-                                        const unit = units.find((entry) => entry.id === unitId)
+                                        const unit = items.find((entry) => entry.id === unitId)
 
                                         if (!unit) {
                                             return null
@@ -125,15 +127,18 @@ export function Sidebar({
                                             <button
                                                 key={unitId}
                                                 type="button"
-                                                disabled={!isUnitEditable(unitId)}
-                                                onClick={() => onOpenUnit(unitId)}
+                                                onClick={() => onOpenItem(unitId)}
                                                 className="block w-full rounded-[6px] px-3 py-1.5 text-left text-[13px] text-[#86868B] transition-all hover:bg-[#F5F5F7]/50 hover:text-[#1D1D1F]"
                                             >
                                                 <span className="flex items-center justify-between gap-3">
                                                     <span className="truncate">{unit.title}</span>
-                                                    {isUnitEditable(unitId) && (
+                                                    {unit.canOpenEditor ? (
                                                         <span className="rounded-full bg-[#1D1D1F] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
                                                             Editor
+                                                        </span>
+                                                    ) : (
+                                                        <span className="rounded-full bg-[#F5F5F7] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#86868B]">
+                                                            Setup
                                                         </span>
                                                     )}
                                                 </span>

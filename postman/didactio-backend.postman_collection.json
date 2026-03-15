@@ -3,7 +3,7 @@
     "_postman_id": "8c0f3cf2-1d6b-4f4b-a090-14c65f3a0ad5",
     "name": "Didactio Backend",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Single ordered runner flow for the Didactio backend. Set the collection variable `provider` to `openai` or `deepseek` before running the suite. Requests marked `AI GEN` are the ones that invoke model generation directly. Requests marked `Advanced` are drill-down/debug helpers and are not part of the main happy-path runner."
+    "description": "Single ordered runner flow for the Didactio backend. Set the collection variable `provider` to `openai` or `deepseek` before running the suite. Requests marked `AI GEN` invoke model generation directly. Requests marked `Advanced` are optional extra AI/debug helpers and are not part of the main happy-path runner. The flow is fully didactic-unit based."
   },
   "item": [
     {
@@ -39,7 +39,7 @@
       ]
     },
     {
-      "name": "02 Create Unit Init (Selected Provider)",
+      "name": "02 Create Didactic Unit (Selected Provider)",
       "request": {
         "method": "POST",
         "header": [
@@ -53,13 +53,13 @@
           "raw": "{\n  \"topic\": \"{{topic}}\",\n  \"provider\": \"{{provider}}\"\n}"
         },
         "url": {
-          "raw": "{{baseUrl}}/api/unit-init",
+          "raw": "{{baseUrl}}/api/didactic-unit",
           "host": [
             "{{baseUrl}}"
           ],
           "path": [
             "api",
-            "unit-init"
+            "didactic-unit"
           ]
         }
       },
@@ -70,10 +70,10 @@
           "script": {
             "type": "text/javascript",
             "exec": [
-              "pm.test('Create Unit Init returns 201', function () { pm.response.to.have.status(201); });",
+              "pm.test('Create Didactic Unit returns 201', function () { pm.response.to.have.status(201); });",
               "const body = pm.response.json();",
-              "pm.test('Unit init is created in submitted state', function () { pm.expect(body.id).to.be.a('string').and.not.empty; pm.expect(body.status).to.eql('submitted'); pm.expect(body.nextAction).to.eql('moderate_topic'); });",
-              "pm.collectionVariables.set('unitInitId', body.id);",
+              "pm.test('Didactic unit is created already moderated', function () { pm.expect(body.id).to.be.a('string').and.not.empty; pm.expect(body.status).to.eql('moderation_completed'); pm.expect(body.nextAction).to.eql('generate_questionnaire'); pm.expect(body.moderatedAt).to.be.a('string').and.not.empty; pm.expect(body.studyProgress).to.be.an('object'); });",
+              "pm.collectionVariables.set('didacticUnitId', body.id);",
               "pm.collectionVariables.set('lastCreatedProvider', body.provider);"
             ]
           }
@@ -81,29 +81,19 @@
       ]
     },
     {
-      "name": "03 Moderate Unit Init",
+      "name": "03 Verify Topic Was Auto-Moderated",
       "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{}"
-        },
+        "method": "GET",
+        "header": [],
         "url": {
-          "raw": "{{baseUrl}}/api/unit-init/{{unitInitId}}/moderate",
+          "raw": "{{baseUrl}}/api/didactic-unit/{{didacticUnitId}}",
           "host": [
             "{{baseUrl}}"
           ],
           "path": [
             "api",
-            "unit-init",
-            "{{unitInitId}}",
-            "moderate"
+            "didactic-unit",
+            "{{didacticUnitId}}"
           ]
         }
       },
@@ -114,9 +104,9 @@
           "script": {
             "type": "text/javascript",
             "exec": [
-              "pm.test('Moderate Unit Init returns 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('Get Didactic Unit after create returns 200', function () { pm.response.to.have.status(200); });",
               "const body = pm.response.json();",
-              "pm.test('Unit init moves to moderation completed', function () { pm.expect(body.status).to.eql('moderation_completed'); pm.expect(body.nextAction).to.eql('generate_questionnaire'); pm.expect(body.moderatedAt).to.be.a('string').and.not.empty; });"
+              "pm.test('Didactic unit is already moderation completed', function () { pm.expect(body.status).to.eql('moderation_completed'); pm.expect(body.nextAction).to.eql('generate_questionnaire'); pm.expect(body.moderatedAt).to.be.a('string').and.not.empty; });"
             ]
           }
         }
@@ -137,14 +127,14 @@
           "raw": "{}"
         },
         "url": {
-          "raw": "{{baseUrl}}/api/unit-init/{{unitInitId}}/questionnaire/generate",
+          "raw": "{{baseUrl}}/api/didactic-unit/{{didacticUnitId}}/questionnaire/generate",
           "host": [
             "{{baseUrl}}"
           ],
           "path": [
             "api",
-            "unit-init",
-            "{{unitInitId}}",
+            "didactic-unit",
+            "{{didacticUnitId}}",
             "questionnaire",
             "generate"
           ]
@@ -180,14 +170,14 @@
           "raw": "{\n  \"answers\": [\n    {\n      \"questionId\": \"topic_knowledge_level\",\n      \"value\": \"{{topicKnowledgeLevel}}\"\n    },\n    {\n      \"questionId\": \"related_knowledge_level\",\n      \"value\": \"{{relatedKnowledgeLevel}}\"\n    },\n    {\n      \"questionId\": \"learning_goal\",\n      \"value\": \"{{learningGoal}}\"\n    },\n    {\n      \"questionId\": \"preferred_depth\",\n      \"value\": \"{{preferredDepth}}\"\n    },\n    {\n      \"questionId\": \"preferred_length\",\n      \"value\": \"{{preferredLength}}\"\n    }\n  ]\n}"
         },
         "url": {
-          "raw": "{{baseUrl}}/api/unit-init/{{unitInitId}}/questionnaire/answers",
+          "raw": "{{baseUrl}}/api/didactic-unit/{{didacticUnitId}}/questionnaire/answers",
           "host": [
             "{{baseUrl}}"
           ],
           "path": [
             "api",
-            "unit-init",
-            "{{unitInitId}}",
+            "didactic-unit",
+            "{{didacticUnitId}}",
             "questionnaire",
             "answers"
           ]
@@ -223,14 +213,14 @@
           "raw": "{}"
         },
         "url": {
-          "raw": "{{baseUrl}}/api/unit-init/{{unitInitId}}/syllabus-prompt/generate",
+          "raw": "{{baseUrl}}/api/didactic-unit/{{didacticUnitId}}/syllabus-prompt/generate",
           "host": [
             "{{baseUrl}}"
           ],
           "path": [
             "api",
-            "unit-init",
-            "{{unitInitId}}",
+            "didactic-unit",
+            "{{didacticUnitId}}",
             "syllabus-prompt",
             "generate"
           ]
@@ -266,14 +256,14 @@
           "raw": "{}"
         },
         "url": {
-          "raw": "{{baseUrl}}/api/unit-init/{{unitInitId}}/syllabus/generate",
+          "raw": "{{baseUrl}}/api/didactic-unit/{{didacticUnitId}}/syllabus/generate",
           "host": [
             "{{baseUrl}}"
           ],
           "path": [
             "api",
-            "unit-init",
-            "{{unitInitId}}",
+            "didactic-unit",
+            "{{didacticUnitId}}",
             "syllabus",
             "generate"
           ]
@@ -295,6 +285,7 @@
               "} else {",
               "  pm.collectionVariables.set('latestSyllabusRunExpectedStatus', 'failed');",
               "  pm.test('Syllabus generation returns a useful AI error', function () { pm.expect(body.error).to.be.a('string').and.not.empty; });",
+              "  postman.setNextRequest(null);",
               "}"
             ]
           }
@@ -316,14 +307,14 @@
           "raw": "{\n  \"syllabus\": {\n    \"title\": \"Advanced {{topic}} Delivery Plan\",\n    \"overview\": \"A custom syllabus focused on shipping production-ready outcomes.\",\n    \"learningGoals\": [\n      \"Understand the framework architecture\",\n      \"Build production features confidently\",\n      \"Choose appropriate implementation tradeoffs\"\n    ],\n    \"chapters\": [\n      {\n        \"title\": \"Runtime Fundamentals\",\n        \"overview\": \"Review the core runtime model and framework primitives.\",\n        \"keyPoints\": [\n          \"Routing model\",\n          \"Rendering modes\",\n          \"Server and client boundaries\"\n        ]\n      },\n      {\n        \"title\": \"Delivery Workflow\",\n        \"overview\": \"Move from local development to production delivery.\",\n        \"keyPoints\": [\n          \"Project structure\",\n          \"Deployment pipeline\",\n          \"Operational checks\"\n        ]\n      }\n    ]\n  }\n}"
         },
         "url": {
-          "raw": "{{baseUrl}}/api/unit-init/{{unitInitId}}/syllabus",
+          "raw": "{{baseUrl}}/api/didactic-unit/{{didacticUnitId}}/syllabus",
           "host": [
             "{{baseUrl}}"
           ],
           "path": [
             "api",
-            "unit-init",
-            "{{unitInitId}}",
+            "didactic-unit",
+            "{{didacticUnitId}}",
             "syllabus"
           ]
         }
@@ -358,14 +349,14 @@
           "raw": "{}"
         },
         "url": {
-          "raw": "{{baseUrl}}/api/unit-init/{{unitInitId}}/approve-syllabus",
+          "raw": "{{baseUrl}}/api/didactic-unit/{{didacticUnitId}}/approve-syllabus",
           "host": [
             "{{baseUrl}}"
           ],
           "path": [
             "api",
-            "unit-init",
-            "{{unitInitId}}",
+            "didactic-unit",
+            "{{didacticUnitId}}",
             "approve-syllabus"
           ]
         }
@@ -379,8 +370,8 @@
             "exec": [
               "pm.test('Approve Syllabus returns 200', function () { pm.response.to.have.status(200); });",
               "const body = pm.response.json();",
-              "pm.test('Syllabus approval advances the lifecycle', function () { pm.expect(body.status).to.eql('syllabus_approved'); pm.expect(body.nextAction).to.eql('view_didactic_unit'); pm.expect(body.syllabusApprovedAt).to.be.a('string').and.not.empty; pm.expect(body.didacticUnitId).to.be.a('string').and.not.empty; });",
-              "pm.collectionVariables.set('didacticUnitId', body.didacticUnitId);"
+              "pm.test('Syllabus approval advances the didactic unit lifecycle', function () { pm.expect(body.status).to.eql('syllabus_approved'); pm.expect(body.nextAction).to.eql('view_didactic_unit'); pm.expect(body.syllabusApprovedAt).to.be.a('string').and.not.empty; pm.expect(body.id).to.eql(pm.collectionVariables.get('didacticUnitId')); });",
+              "pm.collectionVariables.set('didacticUnitId', body.id);"
             ]
           }
         }
@@ -411,7 +402,7 @@
             "exec": [
               "pm.test('List Didactic Units returns 200', function () { pm.response.to.have.status(200); });",
               "const body = pm.response.json();",
-              "pm.test('Didactic unit list returns dashboard summaries', function () { pm.expect(body.didacticUnits).to.be.an('array').that.is.not.empty; const linkedUnit = body.didacticUnits.find((unit) => unit.id === pm.collectionVariables.get('didacticUnitId')); pm.expect(linkedUnit).to.be.an('object'); pm.expect(linkedUnit.unitInitId).to.eql(pm.collectionVariables.get('unitInitId')); pm.expect(linkedUnit.status).to.be.oneOf(['ready_for_content_generation', 'content_generation_in_progress', 'content_generation_completed']); pm.expect(linkedUnit.overview).to.be.a('string').and.not.empty; pm.expect(linkedUnit.chapterCount).to.be.a('number').and.to.be.above(0); pm.expect(linkedUnit.generatedChapterCount).to.be.a('number'); pm.expect(linkedUnit.completedChapterCount).to.be.a('number'); pm.expect(linkedUnit.progressPercent).to.be.a('number'); pm.expect(linkedUnit.studyProgressPercent).to.be.a('number'); });"
+              "pm.test('Didactic unit list returns dashboard summaries', function () { pm.expect(body.didacticUnits).to.be.an('array').that.is.not.empty; const linkedUnit = body.didacticUnits.find((unit) => unit.id === pm.collectionVariables.get('didacticUnitId')); pm.expect(linkedUnit).to.be.an('object'); pm.expect(linkedUnit.status).to.be.oneOf(['syllabus_approved', 'ready_for_content_generation', 'content_generation_in_progress', 'content_generation_completed']); pm.expect(linkedUnit.nextAction).to.be.a('string').and.not.empty; pm.expect(linkedUnit.overview).to.be.a('string'); pm.expect(linkedUnit.chapterCount).to.be.a('number'); pm.expect(linkedUnit.generatedChapterCount).to.be.a('number'); pm.expect(linkedUnit.completedChapterCount).to.be.a('number'); pm.expect(linkedUnit.progressPercent).to.be.a('number'); pm.expect(linkedUnit.studyProgressPercent).to.be.a('number'); });"
             ]
           }
         }
@@ -443,7 +434,7 @@
             "exec": [
               "pm.test('Get Didactic Unit By Id returns 200', function () { pm.response.to.have.status(200); });",
               "const body = pm.response.json();",
-              "pm.test('Single didactic unit payload is complete', function () { pm.expect(body.id).to.eql(pm.collectionVariables.get('didacticUnitId')); pm.expect(body.unitInitId).to.eql(pm.collectionVariables.get('unitInitId')); pm.expect(body.status).to.be.oneOf(['ready_for_content_generation', 'content_generation_in_progress', 'content_generation_completed']); pm.expect(body.title).to.be.a('string').and.not.empty; pm.expect(body.chapters).to.be.an('array').that.is.not.empty; pm.expect(body.studyProgress).to.be.an('object'); pm.expect(body.studyProgress.chapterCount).to.be.a('number'); pm.expect(body.studyProgress.completedChapterCount).to.be.a('number'); pm.expect(body.studyProgress.studyProgressPercent).to.be.a('number'); });"
+              "pm.test('Single didactic unit payload is complete', function () { pm.expect(body.id).to.eql(pm.collectionVariables.get('didacticUnitId')); pm.expect(body.status).to.be.oneOf(['syllabus_approved', 'ready_for_content_generation', 'content_generation_in_progress', 'content_generation_completed']); pm.expect(body.nextAction).to.be.a('string').and.not.empty; pm.expect(body.title).to.be.a('string').and.not.empty; pm.expect(body.chapters).to.be.an('array'); pm.expect(body.studyProgress).to.be.an('object'); pm.expect(body.studyProgress.chapterCount).to.be.a('number'); pm.expect(body.studyProgress.completedChapterCount).to.be.a('number'); pm.expect(body.studyProgress.studyProgressPercent).to.be.a('number'); });"
             ]
           }
         }
@@ -720,69 +711,6 @@
       ]
     },
     {
-      "name": "16 Get Unit Init By Id",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{baseUrl}}/api/unit-init/{{unitInitId}}",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "api",
-            "unit-init",
-            "{{unitInitId}}"
-          ]
-        }
-      },
-      "response": [],
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "pm.test('Get Unit Init returns 200', function () { pm.response.to.have.status(200); });",
-              "const body = pm.response.json();",
-              "pm.test('Fetched unit-init reflects later lifecycle state', function () { pm.expect(body.id).to.eql(pm.collectionVariables.get('unitInitId')); pm.expect(body.status).to.be.a('string').and.not.empty; if (body.status === 'syllabus_approved') { pm.expect(body.didacticUnitId).to.eql(pm.collectionVariables.get('didacticUnitId')); pm.expect(body.nextAction).to.eql('view_didactic_unit'); pm.expect(body.handoff).to.be.an('object'); pm.expect(body.handoff.didacticUnitId).to.eql(pm.collectionVariables.get('didacticUnitId')); pm.expect(body.handoff.nextRoute).to.eql('/api/didactic-unit/' + pm.collectionVariables.get('didacticUnitId')); } else { pm.expect(body.planning).to.be.an('object'); pm.expect(body.planning.progressPercent).to.be.a('number'); pm.expect(body.planning.lastActivityAt).to.be.a('string').and.not.empty; pm.expect(body.planning.isInProgress).to.eql(true); pm.expect(body.planning.syllabusRunCount).to.be.a('number'); pm.expect(body.planning.latestSyllabusRunStatus).to.be.oneOf([undefined, 'completed', 'failed']); if (body.planning.latestSyllabusRunAt !== undefined) { pm.expect(body.planning.latestSyllabusRunAt).to.be.a('string').and.not.empty; } } });"
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "17 List Unit Inits",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{baseUrl}}/api/unit-init",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "api",
-            "unit-init"
-          ]
-        }
-      },
-      "response": [],
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "pm.test('List Unit Inits returns 200', function () { pm.response.to.have.status(200); });",
-              "const body = pm.response.json();",
-              "pm.test('List Unit Inits returns only planning summaries', function () { pm.expect(body.unitInits).to.be.an('array'); body.unitInits.forEach((unitInit) => { pm.expect(unitInit.id).to.be.a('string').and.not.empty; pm.expect(unitInit.topic).to.be.a('string').and.not.empty; pm.expect(unitInit.provider).to.be.a('string').and.not.empty; pm.expect(unitInit.status).to.be.a('string').and.not.empty; pm.expect(unitInit.nextAction).to.be.a('string').and.not.empty; pm.expect(unitInit.createdAt).to.be.a('string').and.not.empty; pm.expect(unitInit.lastActivityAt).to.be.a('string').and.not.empty; pm.expect(unitInit.progressPercent).to.be.a('number'); pm.expect(unitInit.didacticUnitId).to.be.oneOf([undefined, null, '']); }); });"
-            ]
-          }
-        }
-      ]
-    },
-    {
       "name": "97 Advanced AI GEN Regenerate Didactic Unit Chapter",
       "request": {
         "method": "POST",
@@ -828,52 +756,7 @@
       "description": "Advanced manual AI rerun for an already generated didactic-unit chapter. Keep this outside the main runner because it intentionally spends an extra provider call."
     },
     {
-      "name": "98 Advanced Get Syllabus Generation Runs",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{baseUrl}}/api/unit-init/{{unitInitId}}/syllabus/runs",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "api",
-            "unit-init",
-            "{{unitInitId}}",
-            "syllabus",
-            "runs"
-          ]
-        }
-      },
-      "response": [],
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "pm.test('Get Syllabus Generation Runs returns 200', function () { pm.response.to.have.status(200); });",
-              "const body = pm.response.json();",
-              "pm.test('Syllabus run lookup is marked as advanced planning history', function () { pm.expect(pm.response.headers.get('X-Didactio-Endpoint-Tier')).to.eql('advanced'); pm.expect(pm.response.headers.get('X-Didactio-Endpoint-Purpose')).to.eql('planning-history'); });",
-              "pm.test('At least one syllabus run is stored', function () { pm.expect(body.runs).to.be.an('array').that.is.not.empty; });",
-              "const latestRun = body.runs[0];",
-              "const expectedStatus = pm.collectionVariables.get('latestSyllabusRunExpectedStatus') || 'completed';",
-              "pm.test('Latest syllabus run matches expected status', function () { pm.expect(latestRun.status).to.eql(expectedStatus); pm.expect(latestRun.provider).to.be.a('string').and.not.empty; pm.expect(latestRun.model).to.be.a('string').and.not.empty; pm.expect(latestRun.prompt).to.be.a('string').and.not.empty; });",
-              "if (expectedStatus === 'completed') {",
-              "  pm.test('Completed syllabus run includes syllabus payload', function () { pm.expect(latestRun.syllabus).to.be.an('object'); pm.expect(latestRun.syllabus.chapters).to.be.an('array').that.is.not.empty; });",
-              "} else {",
-              "  pm.test('Failed syllabus run includes debug payload', function () { pm.expect(latestRun.error).to.be.a('string').and.not.empty; pm.expect(latestRun.rawOutput).to.be.a('string').and.not.empty; });",
-              "  postman.setNextRequest(null);",
-              "}"
-            ]
-          }
-        }
-      ],
-      "description": "Advanced drill-down for syllabus generation traces. Kept out of the main happy-path runner because unit-init detail now exposes the key syllabus run summary directly."
-    },
-    {
-      "name": "90 Manual Create Unit Init (OpenAI)",
+      "name": "90 Manual Create Didactic Unit (OpenAI)",
       "request": {
         "method": "POST",
         "header": [
@@ -887,13 +770,13 @@
           "raw": "{\n  \"topic\": \"{{topic}}\",\n  \"provider\": \"openai\"\n}"
         },
         "url": {
-          "raw": "{{baseUrl}}/api/unit-init",
+          "raw": "{{baseUrl}}/api/didactic-unit",
           "host": [
             "{{baseUrl}}"
           ],
           "path": [
             "api",
-            "unit-init"
+            "didactic-unit"
           ]
         }
       },
@@ -904,10 +787,10 @@
           "script": {
             "type": "text/javascript",
             "exec": [
-              "pm.test('Create Unit Init (OpenAI) returns 201', function () { pm.response.to.have.status(201); });",
+              "pm.test('Create Didactic Unit (OpenAI) returns 201', function () { pm.response.to.have.status(201); });",
               "const body = pm.response.json();",
-              "pm.test('OpenAI unit-init is created', function () { pm.expect(body.provider).to.eql('openai'); pm.expect(body.id).to.be.a('string').and.not.empty; });",
-              "pm.collectionVariables.set('unitInitId', body.id);",
+              "pm.test('OpenAI didactic unit is created', function () { pm.expect(body.provider).to.eql('openai'); pm.expect(body.id).to.be.a('string').and.not.empty; pm.expect(body.status).to.eql('moderation_completed'); pm.expect(body.nextAction).to.eql('generate_questionnaire'); });",
+              "pm.collectionVariables.set('didacticUnitId', body.id);",
               "pm.collectionVariables.set('provider', 'openai');"
             ]
           }
@@ -915,7 +798,7 @@
       ]
     },
     {
-      "name": "91 Manual Create Unit Init (DeepSeek)",
+      "name": "91 Manual Create Didactic Unit (DeepSeek)",
       "request": {
         "method": "POST",
         "header": [
@@ -929,13 +812,13 @@
           "raw": "{\n  \"topic\": \"{{topic}}\",\n  \"provider\": \"deepseek\"\n}"
         },
         "url": {
-          "raw": "{{baseUrl}}/api/unit-init",
+          "raw": "{{baseUrl}}/api/didactic-unit",
           "host": [
             "{{baseUrl}}"
           ],
           "path": [
             "api",
-            "unit-init"
+            "didactic-unit"
           ]
         }
       },
@@ -946,10 +829,10 @@
           "script": {
             "type": "text/javascript",
             "exec": [
-              "pm.test('Create Unit Init (DeepSeek) returns 201', function () { pm.response.to.have.status(201); });",
+              "pm.test('Create Didactic Unit (DeepSeek) returns 201', function () { pm.response.to.have.status(201); });",
               "const body = pm.response.json();",
-              "pm.test('DeepSeek unit-init is created', function () { pm.expect(body.provider).to.eql('deepseek'); pm.expect(body.id).to.be.a('string').and.not.empty; });",
-              "pm.collectionVariables.set('unitInitId', body.id);",
+              "pm.test('DeepSeek didactic unit is created', function () { pm.expect(body.provider).to.eql('deepseek'); pm.expect(body.id).to.be.a('string').and.not.empty; pm.expect(body.status).to.eql('moderation_completed'); pm.expect(body.nextAction).to.eql('generate_questionnaire'); });",
+              "pm.collectionVariables.set('didacticUnitId', body.id);",
               "pm.collectionVariables.set('provider', 'deepseek');"
             ]
           }
@@ -961,10 +844,6 @@
     {
       "key": "baseUrl",
       "value": "http://localhost:3000"
-    },
-    {
-      "key": "unitInitId",
-      "value": ""
     },
     {
       "key": "chapterIndex",

@@ -2,10 +2,10 @@ import { Grid3x3, List, Search } from 'lucide-react'
 import { AllUnitsHeader } from './AllUnitsHeader'
 import { UnitsGrid } from './UnitsGrid'
 import { UnitsTable } from './UnitsTable'
-import type { UnitSummary } from '../../../types'
+import type { DashboardListItem } from '../../../types'
 
 type AllUnitsViewProps = {
-    filteredUnits: UnitSummary[]
+    filteredUnits: DashboardListItem[]
     searchQuery: string
     setSearchQuery: (value: string) => void
     viewMode: 'grid' | 'list'
@@ -13,8 +13,8 @@ type AllUnitsViewProps = {
     totalUnits: number
     folderCount: number
     averageProgress: number
-    isUnitEditable: (unitId: number) => boolean
-    onOpenUnit: (unitId: number) => void
+    onOpenItem: (itemId: string) => void
+    onCreateUnit: () => void
 }
 
 export function AllUnitsView({
@@ -26,8 +26,8 @@ export function AllUnitsView({
     totalUnits,
     folderCount,
     averageProgress,
-    isUnitEditable,
-    onOpenUnit,
+    onOpenItem,
+    onCreateUnit,
 }: AllUnitsViewProps) {
     void totalUnits
     void folderCount
@@ -35,7 +35,10 @@ export function AllUnitsView({
 
     return (
         <div className="flex min-w-0 flex-1 flex-col">
-            <AllUnitsHeader filteredUnitsCount={filteredUnits.length} />
+            <AllUnitsHeader
+                filteredUnitsCount={filteredUnits.length}
+                onCreateUnit={onCreateUnit}
+            />
             <div className="bg-[#F5F5F7] p-8">
                 <div className="mx-auto w-full max-w-[1560px]">
                     <div className="mb-6 flex items-center justify-between gap-4">
@@ -80,17 +83,9 @@ export function AllUnitsView({
                     </div>
 
                     {viewMode === 'grid' ? (
-                        <UnitsGrid
-                            isUnitEditable={isUnitEditable}
-                            onOpenUnit={onOpenUnit}
-                            units={filteredUnits}
-                        />
+                        <UnitsGrid onOpenItem={onOpenItem} units={filteredUnits} />
                     ) : (
-                        <UnitsTable
-                            isUnitEditable={isUnitEditable}
-                            onOpenUnit={onOpenUnit}
-                            units={filteredUnits}
-                        />
+                        <UnitsTable onOpenItem={onOpenItem} units={filteredUnits} />
                     )}
                 </div>
             </div>

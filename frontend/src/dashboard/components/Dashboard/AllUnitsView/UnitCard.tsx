@@ -1,23 +1,21 @@
 import { Clock, MoreVertical, PencilLine } from 'lucide-react'
 import { getSubjectStyle } from '../../../utils/subjectStyles'
-import type { UnitSummary } from '../../../types'
+import type { DashboardListItem } from '../../../types'
 
 type UnitCardProps = {
-    isEditable: boolean
-    onOpenUnit: (unitId: number) => void
-    unit: UnitSummary
+    onOpenItem: (itemId: string) => void
+    unit: DashboardListItem
 }
 
-export function UnitCard({ isEditable, onOpenUnit, unit }: UnitCardProps) {
+export function UnitCard({ onOpenItem, unit }: UnitCardProps) {
     const style = getSubjectStyle(unit.subject)
     const SubjectIcon = style.icon
 
     return (
         <button
             type="button"
-            disabled={!isEditable}
-            onClick={() => onOpenUnit(unit.id)}
-            className={`group text-left ${isEditable ? 'cursor-pointer' : 'cursor-default'}`}
+            onClick={() => onOpenItem(unit.id)}
+            className="group cursor-pointer text-left"
         >
             <div className="overflow-hidden rounded-2xl border border-[#E5E5E7] bg-white transition-all duration-300 hover:border-[#4ADE80] hover:shadow-lg">
                 <div
@@ -38,14 +36,19 @@ export function UnitCard({ isEditable, onOpenUnit, unit }: UnitCardProps) {
                     {unit.status === 'generating' && (
                         <div className="absolute right-3 top-3 flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-600 backdrop-blur-sm">
                             <div className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
-                            Generating
+                            Setup in progress
                         </div>
                     )}
 
-                    {isEditable && (
+                    {unit.canOpenEditor ? (
                         <div className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[#1D1D1F] backdrop-blur-sm">
                             <PencilLine size={12} />
                             Open Editor
+                        </div>
+                    ) : (
+                        <div className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[#1D1D1F] backdrop-blur-sm">
+                            <PencilLine size={12} />
+                            Continue Setup
                         </div>
                     )}
 
@@ -53,7 +56,7 @@ export function UnitCard({ isEditable, onOpenUnit, unit }: UnitCardProps) {
                         <div
                             className="h-full transition-all"
                             style={{
-                                width: `${unit.progress}%`,
+                                width: `${unit.primaryProgressPercent}%`,
                                 backgroundColor: style.accentColor,
                             }}
                         />
@@ -81,18 +84,22 @@ export function UnitCard({ isEditable, onOpenUnit, unit }: UnitCardProps) {
                             <SubjectIcon size={10} strokeWidth={2.5} />
                             {unit.subject}
                         </span>
-                        <span className="text-[11px] text-[#86868B]">{unit.chapters} chapters</span>
-                        {!isEditable && (
-                            <span className="text-[11px] text-[#B0B0B6]">Summary only</span>
-                        )}
+                        <span className="text-[11px] text-[#86868B]">
+                            {unit.chapterCount} {unit.chapterCount === 1 ? 'chapter' : 'chapters'}
+                        </span>
+                        <span className="text-[11px] text-[#B0B0B6]">
+                            {unit.canOpenEditor ? 'Learner workspace' : 'Setup workflow'}
+                        </span>
                     </div>
 
                     <div className="flex items-center justify-between text-[11px] text-[#86868B]">
                         <div className="flex items-center gap-1.5">
                             <Clock size={12} />
-                            <span>{unit.lastModified}</span>
+                            <span>{unit.lastActivityAt}</span>
                         </div>
-                        <div className="font-semibold text-[#4ADE80]">{unit.progress}%</div>
+                        <div className="font-semibold text-[#4ADE80]">
+                            {unit.primaryProgressPercent}%
+                        </div>
                     </div>
                 </div>
             </div>

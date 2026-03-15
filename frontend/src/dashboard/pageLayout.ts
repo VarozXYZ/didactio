@@ -1,4 +1,4 @@
-import type { UnitChapter } from './types'
+import type { DidacticUnitEditorChapter as UnitChapter } from './types'
 
 const MOBILE_BREAKPOINT = 768
 const HEADER_HEIGHT = 64
@@ -138,7 +138,7 @@ function splitParagraphToFit({
 
 export function getStatusPillClass(status: UnitChapter['status']): string {
     if (status === 'ready') return 'bg-[#4ADE80]/10 text-[#2D8F4B]'
-    if (status === 'generating') return 'bg-amber-50 text-amber-600'
+    if (status === 'pending') return 'bg-amber-50 text-amber-600'
     return 'bg-red-50 text-red-600'
 }
 
