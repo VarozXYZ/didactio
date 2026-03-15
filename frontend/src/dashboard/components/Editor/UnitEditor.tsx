@@ -322,12 +322,11 @@ export function UnitEditor({ onBack, unit }: UnitEditorProps) {
                 >
                     {isSidebarOpen ? (
                         <>
-                            <div className="flex items-center gap-3">
-                                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1D1D1F]">
-                                    <Sparkles size={18} className="text-[#4ADE80]" />
-                                </div>
-                                <span className="text-lg font-semibold tracking-tight">Didactio</span>
-                            </div>
+                            <img
+                                src="/assets/logos/logo-horizontal.png"
+                                alt="Didactio"
+                                className="h-8 w-auto object-contain"
+                            />
                             <button
                                 className="rounded-lg p-1.5 text-[#86868B] transition-all hover:bg-[#F5F5F7]"
                                 onClick={() => setIsSidebarOpen(false)}
@@ -337,13 +336,20 @@ export function UnitEditor({ onBack, unit }: UnitEditorProps) {
                             </button>
                         </>
                     ) : (
-                        <button
-                            className="rounded-lg p-1.5 text-[#86868B] transition-all hover:bg-[#F5F5F7]"
-                            onClick={() => setIsSidebarOpen(true)}
-                            type="button"
-                        >
-                            <ChevronRight size={18} />
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <img
+                                src="/assets/logos/logo.png"
+                                alt="Didactio"
+                                className="h-8 w-8 object-contain"
+                            />
+                            <button
+                                className="rounded-lg p-1.5 text-[#86868B] transition-all hover:bg-[#F5F5F7]"
+                                onClick={() => setIsSidebarOpen(true)}
+                                type="button"
+                            >
+                                <ChevronRight size={18} />
+                            </button>
+                        </div>
                     )}
                 </div>
 

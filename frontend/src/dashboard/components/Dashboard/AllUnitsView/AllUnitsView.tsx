@@ -53,11 +53,11 @@ export function AllUnitsView({
                             />
                         </div>
 
-                        <div className="flex items-center gap-1 rounded-xl border border-[#D9D9D9] bg-white p-1 shadow-[0_1px_0_rgba(255,255,255,0.8)_inset]">
+                        <div className="flex items-center gap-1 rounded-[10px] border border-[#D9D9D9] bg-white p-1 shadow-[0_1px_0_rgba(255,255,255,0.8)_inset]">
                             <button
                                 type="button"
                                 onClick={() => setViewMode('grid')}
-                                className={`rounded-lg p-2.5 transition-all ${
+                                className={`rounded-[8px] p-2.5 transition-all ${
                                     viewMode === 'grid'
                                         ? 'bg-[#F5F5F7] text-[#1D1D1F]'
                                         : 'text-[#86868B] hover:text-[#1D1D1F]'
@@ -68,7 +68,7 @@ export function AllUnitsView({
                             <button
                                 type="button"
                                 onClick={() => setViewMode('list')}
-                                className={`rounded-lg p-2.5 transition-all ${
+                                className={`rounded-[8px] p-2.5 transition-all ${
                                     viewMode === 'list'
                                         ? 'bg-[#F5F5F7] text-[#1D1D1F]'
                                         : 'text-[#86868B] hover:text-[#1D1D1F]'

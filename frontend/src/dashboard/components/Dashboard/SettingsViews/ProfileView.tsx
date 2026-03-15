@@ -14,7 +14,7 @@ export function ProfileView() {
 
             <div className="p-8">
                 <div className="max-w-[700px] space-y-6">
-                    <div className="rounded-2xl border border-[#E5E5E7] bg-white p-8">
+                    <div className="rounded-[12px] border border-[#E5E5E7] bg-white p-8">
                         <h2 className="mb-6 text-[18px] font-bold text-[#1D1D1F]">
                             Profile Photo
                         </h2>
@@ -25,13 +25,13 @@ export function ProfileView() {
                             <div className="flex gap-3">
                                 <button
                                     type="button"
-                                    className="rounded-xl bg-[#1D1D1F] px-4 py-2 text-[13px] font-semibold text-white transition-all hover:bg-[#333333]"
+                                    className="rounded-[8px] bg-[#1D1D1F] px-4 py-2 text-[13px] font-semibold text-white transition-all hover:bg-[#333333]"
                                 >
                                     Upload Photo
                                 </button>
                                 <button
                                     type="button"
-                                    className="rounded-xl border border-[#E5E5E7] px-4 py-2 text-[13px] font-semibold transition-all hover:border-[#4ADE80] hover:bg-[#4ADE80]/5"
+                                    className="rounded-[8px] border border-[#E5E5E7] px-4 py-2 text-[13px] font-semibold transition-all hover:border-[#4ADE80] hover:bg-[#4ADE80]/5"
                                 >
                                     Remove
                                 </button>
@@ -39,7 +39,7 @@ export function ProfileView() {
                         </div>
                     </div>
 
-                    <div className="rounded-2xl border border-[#E5E5E7] bg-white p-8">
+                    <div className="rounded-[12px] border border-[#E5E5E7] bg-white p-8">
                         <h2 className="mb-6 text-[18px] font-bold text-[#1D1D1F]">
                             Basic Information
                         </h2>
@@ -51,7 +51,7 @@ export function ProfileView() {
                                 <input
                                     type="text"
                                     defaultValue="John Doe"
-                                    className="w-full rounded-xl border border-[#E5E5E7] px-4 py-3 text-[14px] focus:border-[#4ADE80] focus:outline-none"
+                                    className="w-full rounded-[8px] border border-[#E5E5E7] px-4 py-3 text-[14px] focus:border-[#4ADE80] focus:outline-none"
                                 />
                             </div>
                             <div>
@@ -61,7 +61,7 @@ export function ProfileView() {
                                 <input
                                     type="email"
                                     defaultValue="john.doe@example.com"
-                                    className="w-full rounded-xl border border-[#E5E5E7] px-4 py-3 text-[14px] focus:border-[#4ADE80] focus:outline-none"
+                                    className="w-full rounded-[8px] border border-[#E5E5E7] px-4 py-3 text-[14px] focus:border-[#4ADE80] focus:outline-none"
                                 />
                             </div>
                             <div>
@@ -71,12 +71,12 @@ export function ProfileView() {
                                 <textarea
                                     rows={4}
                                     placeholder="Tell us about yourself..."
-                                    className="w-full resize-none rounded-xl border border-[#E5E5E7] px-4 py-3 text-[14px] focus:border-[#4ADE80] focus:outline-none"
+                                    className="w-full resize-none rounded-[8px] border border-[#E5E5E7] px-4 py-3 text-[14px] focus:border-[#4ADE80] focus:outline-none"
                                 />
                             </div>
                             <button
                                 type="button"
-                                className="w-full rounded-xl bg-[#1D1D1F] px-4 py-3 text-[14px] font-semibold text-white transition-all hover:bg-[#333333]"
+                                className="w-full rounded-[8px] bg-[#1D1D1F] px-4 py-3 text-[14px] font-semibold text-white transition-all hover:bg-[#333333]"
                             >
                                 Save Changes
                             </button>

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { getDetailedUnitById, isUnitEditable, mockFolders, mockUnits } from './data/dashboardMockData'
 import { Sidebar } from './components/Dashboard/Sidebar/Sidebar'
 import { AllUnitsView } from './components/Dashboard/AllUnitsView/AllUnitsView'
 import { SubscriptionView } from './components/Dashboard/SettingsViews/SubscriptionView'
@@ -7,19 +8,13 @@ import { SecurityView } from './components/Dashboard/SettingsViews/SecurityView'
 import { PreferencesView } from './components/Dashboard/SettingsViews/PreferencesView'
 import { AnalyticsView } from './components/Dashboard/SettingsViews/AnalyticsView'
 import { UnitEditor } from './components/Editor/UnitEditor'
-import {
-    getDetailedUnitById,
-    isUnitEditable,
-    mockFolders,
-    mockUnits,
-} from './data/dashboardMockData'
 import type { DashboardSection } from './types'
 
 export default function DashboardApp() {
     const [isSidebarOpen] = useState(true)
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
     const [searchQuery, setSearchQuery] = useState('')
-    const [expandedFolders, setExpandedFolders] = useState<number[]>([1, 2])
+    const [expandedFolders, setExpandedFolders] = useState<number[]>([])
     const [activeSection, setActiveSection] = useState<DashboardSection>('all-units')
     const [selectedUnitId, setSelectedUnitId] = useState<number | null>(null)
 

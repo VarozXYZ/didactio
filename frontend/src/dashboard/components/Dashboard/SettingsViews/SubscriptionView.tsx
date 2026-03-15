@@ -16,7 +16,7 @@ export function SubscriptionView() {
 
             <div className="p-8">
                 <div className="max-w-[900px] space-y-6">
-                    <div className="rounded-2xl border border-[#E5E5E7] bg-white p-8">
+                    <div className="rounded-[12px] border border-[#E5E5E7] bg-white p-8">
                         <div className="mb-6 flex items-start justify-between">
                             <div>
                                 <h2 className="mb-1 text-[20px] font-bold text-[#1D1D1F]">
@@ -28,7 +28,7 @@ export function SubscriptionView() {
                             </div>
                             <button
                                 type="button"
-                                className="rounded-xl bg-[#1D1D1F] px-5 py-2.5 text-[14px] font-semibold text-white transition-all hover:bg-[#333333]"
+                                className="rounded-[8px] bg-[#1D1D1F] px-5 py-2.5 text-[14px] font-semibold text-white transition-all hover:bg-[#333333]"
                             >
                                 Manage Plan
                             </button>
@@ -53,7 +53,7 @@ export function SubscriptionView() {
                         </div>
                     </div>
 
-                    <div className="rounded-2xl border border-[#E5E5E7] bg-white p-8">
+                    <div className="rounded-[12px] border border-[#E5E5E7] bg-white p-8">
                         <h2 className="mb-6 text-[18px] font-bold text-[#1D1D1F]">AI Credits</h2>
                         <div className="mb-4 flex items-center justify-between">
                             <div>
@@ -62,7 +62,7 @@ export function SubscriptionView() {
                             </div>
                             <button
                                 type="button"
-                                className="rounded-xl border border-[#E5E5E7] px-5 py-2.5 text-[14px] font-semibold transition-all hover:border-[#4ADE80] hover:bg-[#4ADE80]/5"
+                                className="rounded-[8px] border border-[#E5E5E7] px-5 py-2.5 text-[14px] font-semibold transition-all hover:border-[#4ADE80] hover:bg-[#4ADE80]/5"
                             >
                                 Buy More
                             </button>
@@ -75,7 +75,7 @@ export function SubscriptionView() {
                         </p>
                     </div>
 
-                    <div className="overflow-hidden rounded-2xl border border-[#E5E5E7] bg-white">
+                    <div className="overflow-hidden rounded-[12px] border border-[#E5E5E7] bg-white">
                         <div className="border-b border-[#E5E5E7] p-6">
                             <h2 className="text-[18px] font-bold text-[#1D1D1F]">
                                 Billing History

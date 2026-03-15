@@ -16,7 +16,7 @@ export function SecurityView() {
 
             <div className="p-8">
                 <div className="max-w-[700px] space-y-6">
-                    <div className="rounded-2xl border border-[#E5E5E7] bg-white p-8">
+                    <div className="rounded-[12px] border border-[#E5E5E7] bg-white p-8">
                         <h2 className="mb-6 text-[18px] font-bold text-[#1D1D1F]">
                             Change Password
                         </h2>
@@ -27,7 +27,7 @@ export function SecurityView() {
                                 </label>
                                 <input
                                     type="password"
-                                    className="w-full rounded-xl border border-[#E5E5E7] px-4 py-3 text-[14px] focus:border-[#4ADE80] focus:outline-none"
+                                    className="w-full rounded-[8px] border border-[#E5E5E7] px-4 py-3 text-[14px] focus:border-[#4ADE80] focus:outline-none"
                                 />
                             </div>
                             <div>
@@ -36,7 +36,7 @@ export function SecurityView() {
                                 </label>
                                 <input
                                     type="password"
-                                    className="w-full rounded-xl border border-[#E5E5E7] px-4 py-3 text-[14px] focus:border-[#4ADE80] focus:outline-none"
+                                    className="w-full rounded-[8px] border border-[#E5E5E7] px-4 py-3 text-[14px] focus:border-[#4ADE80] focus:outline-none"
                                 />
                             </div>
                             <div>
@@ -45,19 +45,19 @@ export function SecurityView() {
                                 </label>
                                 <input
                                     type="password"
-                                    className="w-full rounded-xl border border-[#E5E5E7] px-4 py-3 text-[14px] focus:border-[#4ADE80] focus:outline-none"
+                                    className="w-full rounded-[8px] border border-[#E5E5E7] px-4 py-3 text-[14px] focus:border-[#4ADE80] focus:outline-none"
                                 />
                             </div>
                             <button
                                 type="button"
-                                className="w-full rounded-xl bg-[#1D1D1F] px-4 py-3 text-[14px] font-semibold text-white transition-all hover:bg-[#333333]"
+                                className="w-full rounded-[8px] bg-[#1D1D1F] px-4 py-3 text-[14px] font-semibold text-white transition-all hover:bg-[#333333]"
                             >
                                 Update Password
                             </button>
                         </div>
                     </div>
 
-                    <div className="rounded-2xl border border-[#E5E5E7] bg-white p-8">
+                    <div className="rounded-[12px] border border-[#E5E5E7] bg-white p-8">
                         <div className="mb-4 flex items-start justify-between">
                             <div>
                                 <h2 className="mb-1 text-[18px] font-bold text-[#1D1D1F]">
@@ -69,14 +69,14 @@ export function SecurityView() {
                             </div>
                             <button
                                 type="button"
-                                className="rounded-xl bg-[#4ADE80] px-4 py-2 text-[13px] font-semibold text-white transition-all hover:bg-[#3BCD6F]"
+                                className="rounded-[8px] bg-[#4ADE80] px-4 py-2 text-[13px] font-semibold text-white transition-all hover:bg-[#3BCD6F]"
                             >
                                 Enable
                             </button>
                         </div>
                     </div>
 
-                    <div className="rounded-2xl border border-[#E5E5E7] bg-white p-8">
+                    <div className="rounded-[12px] border border-[#E5E5E7] bg-white p-8">
                         <h2 className="mb-6 text-[18px] font-bold text-[#1D1D1F]">
                             Active Sessions
                         </h2>
@@ -87,7 +87,7 @@ export function SecurityView() {
                             ].map((session, index) => (
                                 <div
                                     key={`${session.device}-${session.time}`}
-                                    className="flex items-center justify-between rounded-xl border border-[#E5E5E7] p-4"
+                                    className="flex items-center justify-between rounded-[10px] border border-[#E5E5E7] p-4"
                                 >
                                     <div className="flex items-center gap-3">
                                         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#F5F5F7]">
@@ -115,7 +115,7 @@ export function SecurityView() {
                         </div>
                     </div>
 
-                    <div className="rounded-2xl border border-red-200 bg-red-50 p-8">
+                    <div className="rounded-[12px] border border-red-200 bg-red-50 p-8">
                         <h2 className="mb-2 text-[18px] font-bold text-red-600">
                             Danger Zone
                         </h2>
@@ -124,7 +124,7 @@ export function SecurityView() {
                         </p>
                         <button
                             type="button"
-                            className="rounded-xl bg-red-600 px-5 py-2.5 text-[14px] font-semibold text-white transition-all hover:bg-red-700"
+                            className="rounded-[8px] bg-red-600 px-5 py-2.5 text-[14px] font-semibold text-white transition-all hover:bg-red-700"
                         >
                             Delete Account
                         </button>

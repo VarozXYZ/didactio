@@ -27,7 +27,7 @@ export function AnalyticsView() {
                         {stats.map((stat) => (
                             <div
                                 key={stat.label}
-                                className="rounded-2xl border border-[#E5E5E7] bg-white p-6"
+                                className="rounded-[12px] border border-[#E5E5E7] bg-white p-6"
                             >
                                 <div
                                     className="mb-4 flex h-12 w-12 items-center justify-center rounded-full"
@@ -45,11 +45,11 @@ export function AnalyticsView() {
                         ))}
                     </div>
 
-                    <div className="rounded-2xl border border-[#E5E5E7] bg-white p-8">
+                    <div className="rounded-[12px] border border-[#E5E5E7] bg-white p-8">
                         <h2 className="mb-6 text-[18px] font-bold text-[#1D1D1F]">
                             Activity Over Time
                         </h2>
-                        <div className="flex h-[300px] items-center justify-center rounded-xl border-2 border-dashed border-[#E5E5E7]">
+                        <div className="flex h-[300px] items-center justify-center rounded-[10px] border-2 border-dashed border-[#E5E5E7]">
                             <div className="text-center">
                                 <BarChart3 size={48} className="mx-auto mb-3 text-[#86868B]" />
                                 <p className="text-[14px] text-[#86868B]">

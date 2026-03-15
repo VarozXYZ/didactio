@@ -3,12 +3,10 @@ import {
     ChevronDown,
     ChevronRight,
     CreditCard,
-    FileText,
     Lock,
     MoreVertical,
     Palette,
     Plus,
-    Sparkles,
     User,
 } from 'lucide-react'
 import { motion } from 'motion/react'
@@ -63,38 +61,26 @@ export function Sidebar({
                 }`}
             >
                 {isSidebarOpen ? (
-                    <div className="flex items-center gap-3">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1D1D1F]">
-                            <Sparkles size={18} className="text-[#4ADE80]" />
-                        </div>
-                        <span className="text-lg font-semibold tracking-tight">Didactio</span>
-                    </div>
+                    <img
+                        src="/assets/logos/logo-horizontal.png"
+                        alt="Didactio"
+                        className="h-10 w-auto object-contain"
+                    />
                 ) : (
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1D1D1F]">
-                        <Sparkles size={18} className="text-[#4ADE80]" />
-                    </div>
+                    <img
+                        src="/assets/logos/logo.png"
+                        alt="Didactio"
+                        className="h-10 w-10 object-contain"
+                    />
                 )}
             </div>
 
             <div className="flex-1 overflow-y-auto px-3">
                 {isSidebarOpen && (
-                    <div className="mb-2 px-3 text-[10px] font-bold uppercase tracking-widest text-[#86868B]">
-                        Content
+                    <div className="mb-2 mt-6 px-3 text-[10px] font-bold uppercase tracking-widest text-[#86868B]">
+                        MY FOLDERS
                     </div>
                 )}
-
-                <button
-                    type="button"
-                    onClick={() => setActiveSection('all-units')}
-                    className={`mb-1 flex w-full items-center gap-3 rounded-[10px] px-3 py-2.5 transition-all ${
-                        activeSection === 'all-units'
-                            ? 'bg-[#F5F5F7] text-[#1D1D1F]'
-                            : 'text-[#86868B] hover:bg-[#F5F5F7]/50 hover:text-[#1D1D1F]'
-                    } ${!isSidebarOpen ? 'justify-center' : ''}`}
-                >
-                    <FileText size={18} />
-                    {isSidebarOpen && <span className="text-[14px] font-medium">All Units</span>}
-                </button>
 
                 <div className="mb-6 space-y-0.5">
                     {folders.map((folder) => (
