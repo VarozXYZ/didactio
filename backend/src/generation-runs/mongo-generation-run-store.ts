@@ -32,20 +32,6 @@ export class MongoGenerationRunStore implements GenerationRunStore {
         )
     }
 
-    async listByUnitInit(ownerId: string, unitInitId: string): Promise<GenerationRun[]> {
-        const documents = await this.collection
-            .find({
-                ownerId,
-                unitInitId,
-            })
-            .sort({ createdAt: -1 })
-            .toArray()
-
-        return documents
-            .map((document) => stripMongoId(document))
-            .filter((document): document is GenerationRun => document !== null)
-    }
-
     async listByDidacticUnit(
         ownerId: string,
         didacticUnitId: string
@@ -61,23 +47,5 @@ export class MongoGenerationRunStore implements GenerationRunStore {
         return documents
             .map((document) => stripMongoId(document))
             .filter((document): document is GenerationRun => document !== null)
-    }
-
-    async linkUnitInitRunsToDidacticUnit(
-        ownerId: string,
-        unitInitId: string,
-        didacticUnitId: string
-    ): Promise<void> {
-        await this.collection.updateMany(
-            {
-                ownerId,
-                unitInitId,
-            },
-            {
-                $set: {
-                    didacticUnitId,
-                },
-            }
-        )
     }
 }

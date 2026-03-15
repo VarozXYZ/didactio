@@ -1,16 +1,18 @@
 import { getAppEnv } from '../config/env.js'
-import type { UnitInitProvider } from '../unit-init/create-unit-init.js'
-import type { UnitInitQuestionAnswer } from '../unit-init/answer-questionnaire.js'
-import type { UnitInitSyllabus } from '../unit-init/generate-syllabus.js'
 import type { DidacticUnitGeneratedChapter } from '../didactic-unit/didactic-unit-chapter.js'
+import type {
+    DidacticUnitProvider,
+    DidacticUnitQuestionAnswer,
+    DidacticUnitSyllabus,
+} from '../didactic-unit/planning.js'
 import { DeepSeekChapterGenerator } from './deepseek-chapter-generator.js'
 import { OpenAiChapterGenerator } from './openai-chapter-generator.js'
 
 export interface ChapterGenerationSource {
     topic: string
-    provider: UnitInitProvider
-    questionnaireAnswers?: UnitInitQuestionAnswer[]
-    syllabus?: UnitInitSyllabus
+    provider: DidacticUnitProvider
+    questionnaireAnswers?: DidacticUnitQuestionAnswer[]
+    syllabus?: DidacticUnitSyllabus
 }
 
 export interface ChapterGenerator {
@@ -20,7 +22,7 @@ export interface ChapterGenerator {
     ): Promise<DidacticUnitGeneratedChapter>
 }
 
-export function resolveChapterGeneratorModel(provider: UnitInitProvider): string {
+export function resolveChapterGeneratorModel(provider: DidacticUnitProvider): string {
     const env = getAppEnv()
 
     if (provider === 'openai') {
@@ -138,7 +140,7 @@ class DeepSeekFakeChapterGenerator implements ChapterGenerator {
 }
 
 export class ProviderBackedFakeChapterGenerator implements ChapterGenerator {
-    private readonly generators: Record<UnitInitProvider, ChapterGenerator>
+    private readonly generators: Record<DidacticUnitProvider, ChapterGenerator>
 
     constructor() {
         const env = getAppEnv()

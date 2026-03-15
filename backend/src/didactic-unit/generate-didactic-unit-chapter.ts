@@ -51,6 +51,7 @@ export async function generateDidacticUnitChapter(
         chapterGenerationSource,
         chapterIndex
     )
+    const updatedAt = generatedChapter.updatedAt ?? generatedChapter.generatedAt
     const generatedChapters = didacticUnit.generatedChapters ?? []
     const existingChapterIndex = generatedChapters.findIndex(
         (chapter) => chapter.chapterIndex === chapterIndex
@@ -70,6 +71,7 @@ export async function generateDidacticUnitChapter(
                     chapter: generatedChapter,
                 }),
             ],
+            updatedAt,
             status: resolveDidacticUnitStatus({
                 ...didacticUnit,
                 generatedChapters: updatedChapters,
@@ -88,6 +90,7 @@ export async function generateDidacticUnitChapter(
                 chapter: generatedChapter,
             }),
         ],
+        updatedAt,
         generatedChapters: [...generatedChapters, generatedChapter].sort(
             (left, right) => left.chapterIndex - right.chapterIndex
         ),

@@ -10,13 +10,8 @@ import { createApp, type CreateAppOptions } from '../../src/app.js'
 import type { MongoHealthStatus } from '../../src/mongo/mongo-connection.js'
 import type { ChapterGenerator } from '../../src/providers/chapter-generator.js'
 import type { SyllabusGenerator } from '../../src/providers/syllabus-generator.js'
-import {
-    InMemoryUnitInitStore,
-    type UnitInitStore,
-} from '../../src/unit-init/unit-init-store.js'
 
 interface CreateTestAppOptions {
-    unitInitStore?: UnitInitStore
     didacticUnitStore?: DidacticUnitStore
     generationRunStore?: GenerationRunStore
     syllabusGenerator?: SyllabusGenerator
@@ -26,7 +21,6 @@ interface CreateTestAppOptions {
 
 export function createTestApp(options: CreateTestAppOptions = {}) {
     const appOptions: CreateAppOptions = {
-        unitInitStore: options.unitInitStore ?? new InMemoryUnitInitStore(),
         didacticUnitStore: options.didacticUnitStore ?? new InMemoryDidacticUnitStore(),
         generationRunStore: options.generationRunStore ?? new InMemoryGenerationRunStore(),
         syllabusGenerator: options.syllabusGenerator,

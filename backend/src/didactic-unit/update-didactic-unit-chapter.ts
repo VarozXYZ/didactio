@@ -43,5 +43,6 @@ export function updateDidacticUnitChapter(
             }),
         ],
         generatedChapters: updatedChapters,
+        updatedAt: updatedChapter.updatedAt as string,
     }
 }

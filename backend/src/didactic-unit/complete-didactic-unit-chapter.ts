@@ -21,14 +21,17 @@ export function completeDidacticUnitChapter(
         return didacticUnit
     }
 
+    const completedAt = new Date().toISOString()
+
     return {
         ...didacticUnit,
         completedChapters: [
             ...completedChapters,
             {
                 chapterIndex,
-                completedAt: new Date().toISOString(),
+                completedAt,
             },
         ].sort((left, right) => left.chapterIndex - right.chapterIndex),
+        updatedAt: completedAt,
     }
 }

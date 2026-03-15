@@ -5,12 +5,12 @@ import type { DidacticUnit } from '../src/didactic-unit/create-didactic-unit.js'
 function createStoredDidacticUnit(): DidacticUnit {
     return {
         id: 'didactic-unit-1',
-        unitInitId: 'unit-init-1',
         ownerId: 'mock-user',
         title: 'Next.js Learning Path',
         topic: 'next.js framework',
         provider: 'openai',
         status: 'ready_for_content_generation',
+        nextAction: 'view_didactic_unit',
         overview: 'A focused syllabus.',
         learningGoals: ['Understand routing'],
         chapters: [
@@ -27,6 +27,7 @@ function createStoredDidacticUnit(): DidacticUnit {
             },
         ],
         createdAt: '2026-03-12T00:00:00.000Z',
+        updatedAt: '2026-03-12T00:00:00.000Z',
     }
 }
 
@@ -65,7 +66,7 @@ describe('MongoDidacticUnitStore', () => {
         expect(find).toHaveBeenCalledWith({
             ownerId: 'mock-user',
         })
-        expect(sort).toHaveBeenCalledWith({ createdAt: -1 })
+        expect(sort).toHaveBeenCalledWith({ updatedAt: -1 })
         expect(didacticUnitById).toEqual(didacticUnit)
         expect(listedDidacticUnits).toEqual([didacticUnit])
     })

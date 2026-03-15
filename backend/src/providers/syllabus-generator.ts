@@ -1,25 +1,25 @@
 import { getAppEnv } from '../config/env.js'
-import type { UnitInitProvider } from '../unit-init/create-unit-init.js'
-import type { UnitInitQuestionAnswer } from '../unit-init/answer-questionnaire.js'
+import type {
+    DidacticUnitProvider,
+    DidacticUnitQuestionAnswer,
+    DidacticUnitSyllabus,
+    DidacticUnitSyllabusChapter,
+} from '../didactic-unit/planning.js'
 import { DeepSeekSyllabusGenerator } from './deepseek-syllabus-generator.js'
 import { OpenAiSyllabusGenerator } from './openai-syllabus-generator.js'
-import type {
-    UnitInitSyllabus,
-    UnitInitSyllabusChapter,
-} from '../unit-init/generate-syllabus.js'
 
 export interface SyllabusGenerationSource {
     topic: string
-    provider: UnitInitProvider
-    questionnaireAnswers?: UnitInitQuestionAnswer[]
+    provider: DidacticUnitProvider
+    questionnaireAnswers?: DidacticUnitQuestionAnswer[]
     syllabusPrompt?: string
 }
 
 export interface SyllabusGenerator {
-    generate(source: SyllabusGenerationSource): Promise<UnitInitSyllabus>
+    generate(source: SyllabusGenerationSource): Promise<DidacticUnitSyllabus>
 }
 
-export function resolveSyllabusGeneratorModel(provider: UnitInitProvider): string {
+export function resolveSyllabusGeneratorModel(provider: DidacticUnitProvider): string {
     const env = getAppEnv()
 
     if (provider === 'openai') {
@@ -60,7 +60,7 @@ function buildDeepSeekLearningGoals(source: SyllabusGenerationSource): string[] 
     ]
 }
 
-function buildOpenAiChapters(source: SyllabusGenerationSource): UnitInitSyllabusChapter[] {
+function buildOpenAiChapters(source: SyllabusGenerationSource): DidacticUnitSyllabusChapter[] {
     return [
         {
             title: `Foundations of ${source.topic}`,
@@ -92,7 +92,7 @@ function buildOpenAiChapters(source: SyllabusGenerationSource): UnitInitSyllabus
     ]
 }
 
-function buildDeepSeekChapters(source: SyllabusGenerationSource): UnitInitSyllabusChapter[] {
+function buildDeepSeekChapters(source: SyllabusGenerationSource): DidacticUnitSyllabusChapter[] {
     return [
         {
             title: `${source.topic} mental model`,
@@ -125,7 +125,7 @@ function buildDeepSeekChapters(source: SyllabusGenerationSource): UnitInitSyllab
 }
 
 class OpenAiFakeSyllabusGenerator implements SyllabusGenerator {
-    async generate(source: SyllabusGenerationSource): Promise<UnitInitSyllabus> {
+    async generate(source: SyllabusGenerationSource): Promise<DidacticUnitSyllabus> {
         const preferredLength = findAnswerValue(source, 'preferred_length')
         const learningGoal = findAnswerValue(source, 'learning_goal')
 
@@ -139,7 +139,7 @@ class OpenAiFakeSyllabusGenerator implements SyllabusGenerator {
 }
 
 class DeepSeekFakeSyllabusGenerator implements SyllabusGenerator {
-    async generate(source: SyllabusGenerationSource): Promise<UnitInitSyllabus> {
+    async generate(source: SyllabusGenerationSource): Promise<DidacticUnitSyllabus> {
         const preferredLength = findAnswerValue(source, 'preferred_length')
         const learningGoal = findAnswerValue(source, 'learning_goal')
 
@@ -153,7 +153,7 @@ class DeepSeekFakeSyllabusGenerator implements SyllabusGenerator {
 }
 
 export class ProviderBackedFakeSyllabusGenerator implements SyllabusGenerator {
-    private readonly generators: Record<UnitInitProvider, SyllabusGenerator>
+    private readonly generators: Record<DidacticUnitProvider, SyllabusGenerator>
 
     constructor() {
         const env = getAppEnv()
@@ -174,7 +174,7 @@ export class ProviderBackedFakeSyllabusGenerator implements SyllabusGenerator {
         }
     }
 
-    async generate(source: SyllabusGenerationSource): Promise<UnitInitSyllabus> {
+    async generate(source: SyllabusGenerationSource): Promise<DidacticUnitSyllabus> {
         return this.generators[source.provider].generate(source)
     }
 }

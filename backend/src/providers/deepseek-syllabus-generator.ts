@@ -1,4 +1,4 @@
-import type { UnitInitSyllabus } from '../unit-init/generate-syllabus.js'
+import type { DidacticUnitSyllabus } from '../didactic-unit/planning.js'
 import type { SyllabusGenerationSource } from './syllabus-generator.js'
 
 type FetchImplementation = typeof fetch
@@ -58,7 +58,7 @@ function parseStringArray(value: unknown, fieldName: string): string[] {
     )
 }
 
-function parseSyllabusResponse(content: string): UnitInitSyllabus {
+function parseSyllabusResponse(content: string): DidacticUnitSyllabus {
     let parsedValue: unknown
 
     try {
@@ -154,7 +154,7 @@ export class DeepSeekSyllabusGenerator {
         this.fetchImplementation = options.fetchImplementation ?? fetch
     }
 
-    async generate(source: SyllabusGenerationSource): Promise<UnitInitSyllabus> {
+    async generate(source: SyllabusGenerationSource): Promise<DidacticUnitSyllabus> {
         const response = await this.fetchImplementation(
             'https://api.deepseek.com/chat/completions',
             {

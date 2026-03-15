@@ -1,6 +1,6 @@
 import express from 'express'
 import {
-    createDidacticUnitFromApprovedUnitInit,
+    createDidacticUnit,
     type DidacticUnit,
 } from './didactic-unit/create-didactic-unit.js'
 import { completeDidacticUnitChapter } from './didactic-unit/complete-didactic-unit-chapter.js'
@@ -11,6 +11,15 @@ import {
     hasGeneratedDidacticUnitChapter,
 } from './didactic-unit/generate-didactic-unit-chapter.js'
 import { listDidacticUnitChapters } from './didactic-unit/list-didactic-unit-chapters.js'
+import {
+    answerDidacticUnitQuestionnaire,
+    approveDidacticUnitSyllabus,
+    generateDidacticUnitQuestionnaire,
+    generateDidacticUnitSyllabus,
+    generateDidacticUnitSyllabusPrompt,
+    moderateDidacticUnitPlanning,
+    updateDidacticUnitSyllabus,
+} from './didactic-unit/planning-lifecycle.js'
 import {
     summarizeDidacticUnit,
     summarizeDidacticUnitStudyProgress,
@@ -46,30 +55,13 @@ import {
     resolveSyllabusGeneratorModel,
     type SyllabusGenerator,
 } from './providers/syllabus-generator.js'
-import { approveSyllabus } from './unit-init/approve-syllabus.js'
 import {
-    answerQuestionnaire,
+    parseCreateDidacticUnitInput,
     parseQuestionnaireAnswersInput,
-} from './unit-init/answer-questionnaire.js'
-import {
-    type CreatedUnitInit,
-    createUnitInit,
-    linkDidacticUnitToUnitInit,
-    moderateUnitInit,
-    parseCreateUnitInitInput,
-} from './unit-init/create-unit-init.js'
-import { generateQuestionnaire } from './unit-init/generate-questionnaire.js'
-import { generateSyllabus } from './unit-init/generate-syllabus.js'
-import { generateSyllabusPrompt } from './unit-init/generate-syllabus-prompt.js'
-import { summarizeUnitInit } from './unit-init/summarize-unit-init.js'
-import {
-    parseUpdateSyllabusInput,
-    updateSyllabus,
-} from './unit-init/update-syllabus.js'
-import type { UnitInitStore } from './unit-init/unit-init-store.js'
+    parseUpdateDidacticUnitSyllabusInput,
+} from './didactic-unit/planning.js'
 
 export interface CreateAppOptions {
-    unitInitStore: UnitInitStore
     didacticUnitStore: DidacticUnitStore
     generationRunStore: GenerationRunStore
     syllabusGenerator?: SyllabusGenerator
@@ -91,24 +83,21 @@ function parseChapterIndex(value: string): number {
     return chapterIndex
 }
 
-function canCreateSyllabusGenerationRun(unitInit: {
+function canCreateSyllabusGenerationRun(didacticUnit: {
     status: string
     syllabusPrompt?: string
 }): boolean {
-    return unitInit.status === 'syllabus_prompt_ready' && Boolean(unitInit.syllabusPrompt?.trim())
+    return (
+        didacticUnit.status === 'syllabus_prompt_ready' &&
+        Boolean(didacticUnit.syllabusPrompt?.trim())
+    )
 }
 
 function canBuildChapterGenerationPrompt(
-    unitInit: { syllabus?: { chapters?: unknown[] } | undefined },
+    didacticUnit: { syllabus?: { chapters?: unknown[] } | undefined },
     chapterIndex: number
 ): boolean {
-    return Boolean(unitInit.syllabus?.chapters?.[chapterIndex])
-}
-
-function isSyllabusGenerationRun(
-    run: SyllabusGenerationRunRecord | ChapterGenerationRunRecord
-): run is SyllabusGenerationRunRecord {
-    return run.stage === 'syllabus'
+    return Boolean(didacticUnit.syllabus?.chapters?.[chapterIndex])
 }
 
 function compareRunsByCreatedAtDesc(
@@ -118,55 +107,43 @@ function compareRunsByCreatedAtDesc(
     return right.createdAt.localeCompare(left.createdAt)
 }
 
-function isPlanningUnitInit(unitInit: { didacticUnitId?: string }): boolean {
-    return !unitInit.didacticUnitId
-}
-
-function buildUnitInitResponse(
-    unitInit: CreatedUnitInit,
-    syllabusRuns: SyllabusGenerationRunRecord[] = []
-) {
-    if (!unitInit.didacticUnitId || unitInit.status !== 'syllabus_approved') {
-        const summary = summarizeUnitInit(unitInit)
-        const latestSyllabusRun = syllabusRuns[0]
-
-        return {
-            ...unitInit,
-            planning: {
-                progressPercent: summary.progressPercent,
-                lastActivityAt: summary.lastActivityAt,
-                isInProgress: true,
-                syllabusRunCount: syllabusRuns.length,
-                latestSyllabusRunStatus: latestSyllabusRun?.status,
-                latestSyllabusRunAt: latestSyllabusRun?.createdAt,
-            },
-        }
-    }
-
-    return {
-        ...unitInit,
-        handoff: {
-            didacticUnitId: unitInit.didacticUnitId,
-            nextRoute: `/api/didactic-unit/${unitInit.didacticUnitId}`,
-        },
-    }
-}
-
-function setAdvancedPlanningHistoryHeaders(response: express.Response) {
-    response.setHeader('X-Didactio-Endpoint-Tier', 'advanced')
-    response.setHeader('X-Didactio-Endpoint-Purpose', 'planning-history')
-}
-
 function buildDidacticUnitResponse(didacticUnit: DidacticUnit) {
+    const { ...restDidacticUnit } = didacticUnit
+
     return {
-        ...didacticUnit,
+        ...restDidacticUnit,
         studyProgress: summarizeDidacticUnitStudyProgress(didacticUnit),
     }
 }
 
+type DidacticUnitChapterState = 'pending' | 'ready' | 'failed'
+
+function resolveDidacticUnitChapterState(input: {
+    didacticUnit: DidacticUnit
+    chapterIndex: number
+    chapterRuns: ChapterGenerationRunRecord[]
+}): DidacticUnitChapterState {
+    const generatedChapter = input.didacticUnit.generatedChapters?.find(
+        (chapter) => chapter.chapterIndex === input.chapterIndex
+    )
+
+    if (generatedChapter) {
+        return 'ready'
+    }
+
+    const latestRun = input.chapterRuns
+        .filter((run) => run.chapterIndex === input.chapterIndex)
+        .sort(compareRunsByCreatedAtDesc)[0]
+
+    if (latestRun?.status === 'failed') {
+        return 'failed'
+    }
+
+    return 'pending'
+}
+
 export function createApp(options: CreateAppOptions) {
     const app = express()
-    const unitInitStore = options.unitInitStore
     const didacticUnitStore = options.didacticUnitStore
     const generationRunStore = options.generationRunStore
     const syllabusGenerator =
@@ -189,32 +166,20 @@ export function createApp(options: CreateAppOptions) {
         })
     })
 
-    app.post('/api/unit-init', async (request, response) => {
+    app.post('/api/didactic-unit', async (request, response) => {
         const requestWithMockOwner = asRequestWithMockOwner(request)
 
         try {
-            const input = parseCreateUnitInitInput(request.body)
-            const unitInit = createUnitInit(input, requestWithMockOwner.mockOwner.id)
-            await unitInitStore.save(unitInit)
+            const input = parseCreateDidacticUnitInput(request.body)
+            const didacticUnit = createDidacticUnit(input, requestWithMockOwner.mockOwner.id)
+            await didacticUnitStore.save(didacticUnit)
 
-            response.status(201).json(unitInit)
+            response.status(201).json(buildDidacticUnitResponse(didacticUnit))
         } catch (error) {
             response.status(400).json({
-                error: error instanceof Error ? error.message : 'Invalid unit-init request.',
+                error: error instanceof Error ? error.message : 'Invalid didactic unit request.',
             })
         }
-    })
-
-    app.get('/api/unit-init', async (request, response) => {
-        const requestWithMockOwner = asRequestWithMockOwner(request)
-
-        response.json({
-            unitInits: (
-                await unitInitStore.listByOwner(requestWithMockOwner.mockOwner.id)
-            )
-                .filter(isPlanningUnitInit)
-                .map(summarizeUnitInit),
-        })
     })
 
     app.get('/api/didactic-unit', async (request, response) => {
@@ -244,6 +209,263 @@ export function createApp(options: CreateAppOptions) {
         response.json(buildDidacticUnitResponse(didacticUnit))
     })
 
+    app.post('/api/didactic-unit/:id/moderate', async (request, response) => {
+        const requestWithMockOwner = asRequestWithMockOwner(request)
+        const didacticUnit = await didacticUnitStore.getById(
+            requestWithMockOwner.mockOwner.id,
+            request.params.id
+        )
+
+        if (!didacticUnit) {
+            response.status(404).json({
+                error: 'Didactic unit not found.',
+            })
+            return
+        }
+
+        try {
+            const moderatedDidacticUnit = moderateDidacticUnitPlanning(didacticUnit)
+            await didacticUnitStore.save(moderatedDidacticUnit)
+            response.json(buildDidacticUnitResponse(moderatedDidacticUnit))
+        } catch (error) {
+            response.status(409).json({
+                error:
+                    error instanceof Error ? error.message : 'Didactic unit moderation failed.',
+            })
+        }
+    })
+
+    app.post('/api/didactic-unit/:id/questionnaire/generate', async (request, response) => {
+        const requestWithMockOwner = asRequestWithMockOwner(request)
+        const didacticUnit = await didacticUnitStore.getById(
+            requestWithMockOwner.mockOwner.id,
+            request.params.id
+        )
+
+        if (!didacticUnit) {
+            response.status(404).json({
+                error: 'Didactic unit not found.',
+            })
+            return
+        }
+
+        try {
+            const updatedDidacticUnit = generateDidacticUnitQuestionnaire(didacticUnit)
+            await didacticUnitStore.save(updatedDidacticUnit)
+            response.json(buildDidacticUnitResponse(updatedDidacticUnit))
+        } catch (error) {
+            response.status(409).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : 'Didactic unit questionnaire generation failed.',
+            })
+        }
+    })
+
+    app.patch('/api/didactic-unit/:id/questionnaire/answers', async (request, response) => {
+        const requestWithMockOwner = asRequestWithMockOwner(request)
+        const didacticUnit = await didacticUnitStore.getById(
+            requestWithMockOwner.mockOwner.id,
+            request.params.id
+        )
+
+        if (!didacticUnit) {
+            response.status(404).json({
+                error: 'Didactic unit not found.',
+            })
+            return
+        }
+
+        let parsedInput
+        try {
+            parsedInput = parseQuestionnaireAnswersInput(request.body)
+        } catch (error) {
+            response.status(400).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : 'Invalid questionnaire answers request.',
+            })
+            return
+        }
+
+        try {
+            const updatedDidacticUnit = answerDidacticUnitQuestionnaire(
+                didacticUnit,
+                parsedInput
+            )
+            await didacticUnitStore.save(updatedDidacticUnit)
+            response.json(buildDidacticUnitResponse(updatedDidacticUnit))
+        } catch (error) {
+            response.status(409).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : 'Didactic unit questionnaire answer submission failed.',
+            })
+        }
+    })
+
+    app.post('/api/didactic-unit/:id/syllabus-prompt/generate', async (request, response) => {
+        const requestWithMockOwner = asRequestWithMockOwner(request)
+        const didacticUnit = await didacticUnitStore.getById(
+            requestWithMockOwner.mockOwner.id,
+            request.params.id
+        )
+
+        if (!didacticUnit) {
+            response.status(404).json({
+                error: 'Didactic unit not found.',
+            })
+            return
+        }
+
+        try {
+            const updatedDidacticUnit = generateDidacticUnitSyllabusPrompt(didacticUnit)
+            await didacticUnitStore.save(updatedDidacticUnit)
+            response.json(buildDidacticUnitResponse(updatedDidacticUnit))
+        } catch (error) {
+            response.status(409).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : 'Didactic unit syllabus prompt generation failed.',
+            })
+        }
+    })
+
+    app.post('/api/didactic-unit/:id/syllabus/generate', async (request, response) => {
+        const requestWithMockOwner = asRequestWithMockOwner(request)
+        const didacticUnit = await didacticUnitStore.getById(
+            requestWithMockOwner.mockOwner.id,
+            request.params.id
+        )
+
+        if (!didacticUnit) {
+            response.status(404).json({
+                error: 'Didactic unit not found.',
+            })
+            return
+        }
+
+        try {
+            const updatedDidacticUnit = await generateDidacticUnitSyllabus(
+                didacticUnit,
+                syllabusGenerator
+            )
+            await didacticUnitStore.save(updatedDidacticUnit)
+            await generationRunStore.save(
+                createCompletedSyllabusGenerationRunRecord({
+                    didacticUnitId: updatedDidacticUnit.id,
+                    ownerId: updatedDidacticUnit.ownerId,
+                    provider: updatedDidacticUnit.provider,
+                    model: resolveSyllabusGeneratorModel(updatedDidacticUnit.provider),
+                    prompt: updatedDidacticUnit.syllabusPrompt ?? '',
+                    syllabus: updatedDidacticUnit.syllabus!,
+                    createdAt:
+                        updatedDidacticUnit.syllabusGeneratedAt ?? new Date().toISOString(),
+                })
+            )
+            response.json(buildDidacticUnitResponse(updatedDidacticUnit))
+        } catch (error) {
+            if (canCreateSyllabusGenerationRun(didacticUnit)) {
+                await generationRunStore.save(
+                    createFailedSyllabusGenerationRunRecord({
+                        didacticUnitId: didacticUnit.id,
+                        ownerId: didacticUnit.ownerId,
+                        provider: didacticUnit.provider,
+                        model: resolveSyllabusGeneratorModel(didacticUnit.provider),
+                        prompt: didacticUnit.syllabusPrompt ?? '',
+                        rawOutput:
+                            error instanceof OpenAiSyllabusGenerationError ||
+                            error instanceof DeepSeekSyllabusGenerationError
+                                ? error.rawOutput
+                                : undefined,
+                        error:
+                            error instanceof Error
+                                ? error.message
+                                : 'Didactic unit syllabus generation failed.',
+                        createdAt: new Date().toISOString(),
+                    })
+                )
+            }
+
+            response.status(409).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : 'Didactic unit syllabus generation failed.',
+            })
+        }
+    })
+
+    app.patch('/api/didactic-unit/:id/syllabus', async (request, response) => {
+        const requestWithMockOwner = asRequestWithMockOwner(request)
+        const didacticUnit = await didacticUnitStore.getById(
+            requestWithMockOwner.mockOwner.id,
+            request.params.id
+        )
+
+        if (!didacticUnit) {
+            response.status(404).json({
+                error: 'Didactic unit not found.',
+            })
+            return
+        }
+
+        let parsedInput
+        try {
+            parsedInput = parseUpdateDidacticUnitSyllabusInput(request.body)
+        } catch (error) {
+            response.status(400).json({
+                error: error instanceof Error ? error.message : 'Invalid syllabus update request.',
+            })
+            return
+        }
+
+        try {
+            const updatedDidacticUnit = updateDidacticUnitSyllabus(didacticUnit, parsedInput)
+            await didacticUnitStore.save(updatedDidacticUnit)
+            response.json(buildDidacticUnitResponse(updatedDidacticUnit))
+        } catch (error) {
+            response.status(409).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : 'Didactic unit syllabus update failed.',
+            })
+        }
+    })
+
+    app.post('/api/didactic-unit/:id/approve-syllabus', async (request, response) => {
+        const requestWithMockOwner = asRequestWithMockOwner(request)
+        const didacticUnit = await didacticUnitStore.getById(
+            requestWithMockOwner.mockOwner.id,
+            request.params.id
+        )
+
+        if (!didacticUnit) {
+            response.status(404).json({
+                error: 'Didactic unit not found.',
+            })
+            return
+        }
+
+        try {
+            const approvedDidacticUnit = approveDidacticUnitSyllabus(didacticUnit)
+            await didacticUnitStore.save(approvedDidacticUnit)
+            response.json(buildDidacticUnitResponse(approvedDidacticUnit))
+        } catch (error) {
+            response.status(409).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : 'Didactic unit syllabus approval failed.',
+            })
+        }
+    })
+
     app.get('/api/didactic-unit/:id/chapters', async (request, response) => {
         const requestWithMockOwner = asRequestWithMockOwner(request)
         const didacticUnit = await didacticUnitStore.getById(
@@ -258,8 +480,22 @@ export function createApp(options: CreateAppOptions) {
             return
         }
 
+        const chapterRuns = (
+            await generationRunStore.listByDidacticUnit(
+                requestWithMockOwner.mockOwner.id,
+                didacticUnit.id
+            )
+        ).filter((run): run is ChapterGenerationRunRecord => run.stage === 'chapter')
+
         response.json({
-            chapters: listDidacticUnitChapters(didacticUnit),
+            chapters: listDidacticUnitChapters(didacticUnit).map((chapter) => ({
+                ...chapter,
+                state: resolveDidacticUnitChapterState({
+                    didacticUnit,
+                    chapterIndex: chapter.chapterIndex,
+                    chapterRuns,
+                }),
+            })),
         })
     })
 
@@ -290,23 +526,41 @@ export function createApp(options: CreateAppOptions) {
             return
         }
 
-        const generatedChapter = didacticUnit.generatedChapters?.find(
-            (chapter) => chapter.chapterIndex === chapterIndex
-        )
-
-        if (!generatedChapter) {
+        const plannedChapter = didacticUnit.chapters[chapterIndex]
+        if (!plannedChapter) {
             response.status(404).json({
-                error: 'Generated didactic unit chapter not found.',
+                error: 'Didactic unit chapter not found.',
             })
             return
         }
+
+        const generatedChapter = didacticUnit.generatedChapters?.find(
+            (chapter) => chapter.chapterIndex === chapterIndex
+        )
+        const chapterRuns = (
+            await generationRunStore.listByDidacticUnit(
+                requestWithMockOwner.mockOwner.id,
+                didacticUnit.id
+            )
+        ).filter((run): run is ChapterGenerationRunRecord => run.stage === 'chapter')
 
         const completedChapter = didacticUnit.completedChapters?.find(
             (chapter) => chapter.chapterIndex === chapterIndex
         )
 
         response.json({
-            ...generatedChapter,
+            chapterIndex,
+            title: generatedChapter?.title ?? plannedChapter.title,
+            overview: generatedChapter?.overview ?? plannedChapter.overview,
+            content: generatedChapter?.content ?? null,
+            keyTakeaways: generatedChapter?.keyTakeaways ?? [],
+            generatedAt: generatedChapter?.generatedAt,
+            updatedAt: generatedChapter?.updatedAt,
+            state: resolveDidacticUnitChapterState({
+                didacticUnit,
+                chapterIndex,
+                chapterRuns,
+            }),
             isCompleted: completedChapter !== undefined,
             completedAt: completedChapter?.completedAt,
         })
@@ -536,7 +790,6 @@ export function createApp(options: CreateAppOptions) {
             if (generatedChapter) {
                 await generationRunStore.save(
                     createCompletedChapterGenerationRunRecord({
-                        unitInitId: updatedDidacticUnit.unitInitId,
                         didacticUnitId: updatedDidacticUnit.id,
                         ownerId: updatedDidacticUnit.ownerId,
                         chapterIndex,
@@ -561,7 +814,6 @@ export function createApp(options: CreateAppOptions) {
             if (canBuildChapterGenerationPrompt(promptSource, chapterIndex)) {
                 await generationRunStore.save(
                     createFailedChapterGenerationRunRecord({
-                        unitInitId: didacticUnit.unitInitId,
                         didacticUnitId: didacticUnit.id,
                         ownerId: didacticUnit.ownerId,
                         chapterIndex,
@@ -647,7 +899,6 @@ export function createApp(options: CreateAppOptions) {
             if (regeneratedChapter) {
                 await generationRunStore.save(
                     createCompletedChapterGenerationRunRecord({
-                        unitInitId: updatedDidacticUnit.unitInitId,
                         didacticUnitId: updatedDidacticUnit.id,
                         ownerId: updatedDidacticUnit.ownerId,
                         chapterIndex,
@@ -672,7 +923,6 @@ export function createApp(options: CreateAppOptions) {
             if (canBuildChapterGenerationPrompt(promptSource, chapterIndex)) {
                 await generationRunStore.save(
                     createFailedChapterGenerationRunRecord({
-                        unitInitId: didacticUnit.unitInitId,
                         didacticUnitId: didacticUnit.id,
                         ownerId: didacticUnit.ownerId,
                         chapterIndex,
@@ -704,337 +954,6 @@ export function createApp(options: CreateAppOptions) {
                     : 409
             ).json({
                 error: message,
-            })
-        }
-    })
-
-    app.get('/api/unit-init/:id', async (request, response) => {
-        const requestWithMockOwner = asRequestWithMockOwner(request)
-        const unitInit = await unitInitStore.getById(
-            requestWithMockOwner.mockOwner.id,
-            request.params.id
-        )
-
-        if (!unitInit) {
-            response.status(404).json({
-                error: 'Unit init not found.',
-            })
-            return
-        }
-
-        const syllabusRuns = (
-            await generationRunStore.listByUnitInit(
-                requestWithMockOwner.mockOwner.id,
-                request.params.id
-            )
-        ).filter(isSyllabusGenerationRun)
-
-        response.json(buildUnitInitResponse(unitInit, syllabusRuns))
-    })
-
-    app.get('/api/unit-init/:id/syllabus/runs', async (request, response) => {
-        const requestWithMockOwner = asRequestWithMockOwner(request)
-        const unitInit = await unitInitStore.getById(
-            requestWithMockOwner.mockOwner.id,
-            request.params.id
-        )
-
-        if (!unitInit) {
-            response.status(404).json({
-                error: 'Unit init not found.',
-            })
-            return
-        }
-
-        setAdvancedPlanningHistoryHeaders(response)
-        response.json({
-            runs: (
-                await generationRunStore.listByUnitInit(
-                    requestWithMockOwner.mockOwner.id,
-                    request.params.id
-                )
-            ).filter(isSyllabusGenerationRun),
-        })
-    })
-
-    app.get('/api/unit-init/:id/runs', async (request, response) => {
-        const requestWithMockOwner = asRequestWithMockOwner(request)
-        const unitInit = await unitInitStore.getById(
-            requestWithMockOwner.mockOwner.id,
-            request.params.id
-        )
-
-        if (!unitInit) {
-            response.status(404).json({
-                error: 'Unit init not found.',
-            })
-            return
-        }
-
-        setAdvancedPlanningHistoryHeaders(response)
-        response.json({
-            runs: (
-                await generationRunStore.listByUnitInit(
-                    requestWithMockOwner.mockOwner.id,
-                    request.params.id
-                )
-            ).filter(isSyllabusGenerationRun),
-        })
-    })
-
-    app.post('/api/unit-init/:id/moderate', async (request, response) => {
-        const requestWithMockOwner = asRequestWithMockOwner(request)
-        const unitInit = await unitInitStore.getById(
-            requestWithMockOwner.mockOwner.id,
-            request.params.id
-        )
-
-        if (!unitInit) {
-            response.status(404).json({
-                error: 'Unit init not found.',
-            })
-            return
-        }
-
-        try {
-            const moderatedUnitInit = moderateUnitInit(unitInit)
-            await unitInitStore.save(moderatedUnitInit)
-            response.json(moderatedUnitInit)
-        } catch (error) {
-            response.status(409).json({
-                error: error instanceof Error ? error.message : 'Unit init moderation failed.',
-            })
-        }
-    })
-
-    app.post('/api/unit-init/:id/questionnaire/generate', async (request, response) => {
-        const requestWithMockOwner = asRequestWithMockOwner(request)
-        const unitInit = await unitInitStore.getById(
-            requestWithMockOwner.mockOwner.id,
-            request.params.id
-        )
-
-        if (!unitInit) {
-            response.status(404).json({
-                error: 'Unit init not found.',
-            })
-            return
-        }
-
-        try {
-            const updatedUnitInit = generateQuestionnaire(unitInit)
-            await unitInitStore.save(updatedUnitInit)
-            response.json(updatedUnitInit)
-        } catch (error) {
-            response.status(409).json({
-                error:
-                    error instanceof Error
-                        ? error.message
-                        : 'Unit init questionnaire generation failed.',
-            })
-        }
-    })
-
-    app.patch('/api/unit-init/:id/questionnaire/answers', async (request, response) => {
-        const requestWithMockOwner = asRequestWithMockOwner(request)
-        const unitInit = await unitInitStore.getById(
-            requestWithMockOwner.mockOwner.id,
-            request.params.id
-        )
-
-        if (!unitInit) {
-            response.status(404).json({
-                error: 'Unit init not found.',
-            })
-            return
-        }
-
-        let parsedInput
-        try {
-            parsedInput = parseQuestionnaireAnswersInput(request.body)
-        } catch (error) {
-            response.status(400).json({
-                error:
-                    error instanceof Error
-                        ? error.message
-                        : 'Invalid questionnaire answers request.',
-            })
-            return
-        }
-
-        try {
-            const updatedUnitInit = answerQuestionnaire(unitInit, parsedInput)
-            await unitInitStore.save(updatedUnitInit)
-            response.json(updatedUnitInit)
-        } catch (error) {
-            response.status(409).json({
-                error:
-                    error instanceof Error
-                        ? error.message
-                        : 'Unit init questionnaire answer submission failed.',
-            })
-        }
-    })
-
-    app.post('/api/unit-init/:id/syllabus-prompt/generate', async (request, response) => {
-        const requestWithMockOwner = asRequestWithMockOwner(request)
-        const unitInit = await unitInitStore.getById(
-            requestWithMockOwner.mockOwner.id,
-            request.params.id
-        )
-
-        if (!unitInit) {
-            response.status(404).json({
-                error: 'Unit init not found.',
-            })
-            return
-        }
-
-        try {
-            const updatedUnitInit = generateSyllabusPrompt(unitInit)
-            await unitInitStore.save(updatedUnitInit)
-            response.json(updatedUnitInit)
-        } catch (error) {
-            response.status(409).json({
-                error:
-                    error instanceof Error
-                        ? error.message
-                        : 'Unit init syllabus prompt generation failed.',
-            })
-        }
-    })
-
-    app.post('/api/unit-init/:id/syllabus/generate', async (request, response) => {
-        const requestWithMockOwner = asRequestWithMockOwner(request)
-        const unitInit = await unitInitStore.getById(
-            requestWithMockOwner.mockOwner.id,
-            request.params.id
-        )
-
-        if (!unitInit) {
-            response.status(404).json({
-                error: 'Unit init not found.',
-            })
-            return
-        }
-
-        try {
-            const updatedUnitInit = await generateSyllabus(unitInit, syllabusGenerator)
-            await unitInitStore.save(updatedUnitInit)
-            await generationRunStore.save(
-                createCompletedSyllabusGenerationRunRecord({
-                    unitInitId: updatedUnitInit.id,
-                    ownerId: updatedUnitInit.ownerId,
-                    provider: updatedUnitInit.provider,
-                    model: resolveSyllabusGeneratorModel(updatedUnitInit.provider),
-                    prompt: updatedUnitInit.syllabusPrompt ?? '',
-                    syllabus: updatedUnitInit.syllabus!,
-                    createdAt: updatedUnitInit.syllabusGeneratedAt ?? new Date().toISOString(),
-                })
-            )
-            response.json(updatedUnitInit)
-        } catch (error) {
-            if (canCreateSyllabusGenerationRun(unitInit)) {
-                await generationRunStore.save(
-                    createFailedSyllabusGenerationRunRecord({
-                        unitInitId: unitInit.id,
-                        ownerId: unitInit.ownerId,
-                        provider: unitInit.provider,
-                        model: resolveSyllabusGeneratorModel(unitInit.provider),
-                        prompt: unitInit.syllabusPrompt ?? '',
-                        rawOutput:
-                            error instanceof OpenAiSyllabusGenerationError ||
-                            error instanceof DeepSeekSyllabusGenerationError
-                                ? error.rawOutput
-                                : undefined,
-                        error:
-                            error instanceof Error
-                                ? error.message
-                                : 'Unit init syllabus generation failed.',
-                        createdAt: new Date().toISOString(),
-                    })
-                )
-            }
-
-            response.status(409).json({
-                error:
-                    error instanceof Error
-                        ? error.message
-                        : 'Unit init syllabus generation failed.',
-            })
-        }
-    })
-
-    app.patch('/api/unit-init/:id/syllabus', async (request, response) => {
-        const requestWithMockOwner = asRequestWithMockOwner(request)
-        const unitInit = await unitInitStore.getById(
-            requestWithMockOwner.mockOwner.id,
-            request.params.id
-        )
-
-        if (!unitInit) {
-            response.status(404).json({
-                error: 'Unit init not found.',
-            })
-            return
-        }
-
-        let parsedInput
-        try {
-            parsedInput = parseUpdateSyllabusInput(request.body)
-        } catch (error) {
-            response.status(400).json({
-                error: error instanceof Error ? error.message : 'Invalid syllabus update request.',
-            })
-            return
-        }
-
-        try {
-            const updatedUnitInit = updateSyllabus(unitInit, parsedInput)
-            await unitInitStore.save(updatedUnitInit)
-            response.json(updatedUnitInit)
-        } catch (error) {
-            response.status(409).json({
-                error:
-                    error instanceof Error
-                        ? error.message
-                        : 'Unit init syllabus update failed.',
-            })
-        }
-    })
-
-    app.post('/api/unit-init/:id/approve-syllabus', async (request, response) => {
-        const requestWithMockOwner = asRequestWithMockOwner(request)
-        const unitInit = await unitInitStore.getById(
-            requestWithMockOwner.mockOwner.id,
-            request.params.id
-        )
-
-        if (!unitInit) {
-            response.status(404).json({
-                error: 'Unit init not found.',
-            })
-            return
-        }
-
-        try {
-            const approvedUnitInit = approveSyllabus(unitInit)
-            const didacticUnit = createDidacticUnitFromApprovedUnitInit(approvedUnitInit)
-            const linkedUnitInit = linkDidacticUnitToUnitInit(approvedUnitInit, didacticUnit.id)
-            await unitInitStore.save(linkedUnitInit)
-            await didacticUnitStore.save(didacticUnit)
-            await generationRunStore.linkUnitInitRunsToDidacticUnit(
-                linkedUnitInit.ownerId,
-                linkedUnitInit.id,
-                didacticUnit.id
-            )
-            response.json(linkedUnitInit)
-        } catch (error) {
-            response.status(409).json({
-                error:
-                    error instanceof Error
-                        ? error.message
-                        : 'Unit init syllabus approval failed.',
             })
         }
     })

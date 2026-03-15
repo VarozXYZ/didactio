@@ -26,6 +26,6 @@ export class InMemoryDidacticUnitStore implements DidacticUnitStore {
     async listByOwner(ownerId: string): Promise<DidacticUnit[]> {
         return [...this.didacticUnits.values()]
             .filter((didacticUnit) => didacticUnit.ownerId === ownerId)
-            .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+            .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
     }
 }

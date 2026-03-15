@@ -42,7 +42,7 @@ export class MongoDidacticUnitStore implements DidacticUnitStore {
     async listByOwner(ownerId: string): Promise<DidacticUnit[]> {
         const documents = await this.collection
             .find({ ownerId })
-            .sort({ createdAt: -1 })
+            .sort({ updatedAt: -1 })
             .toArray()
 
         return documents

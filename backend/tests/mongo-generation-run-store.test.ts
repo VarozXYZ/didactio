@@ -1,7 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import {
-    MongoGenerationRunStore,
-} from '../src/generation-runs/mongo-generation-run-store.js'
+import { MongoGenerationRunStore } from '../src/generation-runs/mongo-generation-run-store.js'
 import type { GenerationRun } from '../src/generation-runs/generation-run-store.js'
 
 function createStoredRuns(): GenerationRun[] {
@@ -9,7 +7,6 @@ function createStoredRuns(): GenerationRun[] {
         {
             id: 'run-2',
             stage: 'chapter',
-            unitInitId: 'unit-init-1',
             didacticUnitId: 'didactic-unit-1',
             ownerId: 'mock-user',
             chapterIndex: 0,
@@ -30,7 +27,7 @@ function createStoredRuns(): GenerationRun[] {
         {
             id: 'run-1',
             stage: 'syllabus',
-            unitInitId: 'unit-init-1',
+            didacticUnitId: 'didactic-unit-1',
             ownerId: 'mock-user',
             provider: 'openai',
             model: 'gpt-4o-mini',
@@ -54,16 +51,14 @@ function createStoredRuns(): GenerationRun[] {
 }
 
 describe('MongoGenerationRunStore', () => {
-    it('saves and lists mixed generation runs through one collection', async () => {
+    it('saves and lists generation runs through the didactic-unit collection key', async () => {
         const runs = createStoredRuns()
         const updateOne = vi.fn().mockResolvedValue(undefined)
-        const updateMany = vi.fn().mockResolvedValue(undefined)
         const toArray = vi.fn().mockResolvedValue(runs.map((run, index) => ({ ...run, _id: index })))
         const sort = vi.fn().mockReturnValue({ toArray })
         const find = vi.fn().mockReturnValue({ sort })
         const collection = {
             updateOne,
-            updateMany,
             find,
         }
         const database = {
@@ -73,16 +68,7 @@ describe('MongoGenerationRunStore', () => {
         const store = new MongoGenerationRunStore(database as never)
 
         await store.save(runs[0]!)
-        const storedRuns = await store.listByUnitInit('mock-user', 'unit-init-1')
-        const didacticUnitRuns = await store.listByDidacticUnit(
-            'mock-user',
-            'didactic-unit-1'
-        )
-        await store.linkUnitInitRunsToDidacticUnit(
-            'mock-user',
-            'unit-init-1',
-            'didactic-unit-2'
-        )
+        const storedRuns = await store.listByDidacticUnit('mock-user', 'didactic-unit-1')
 
         expect(updateOne).toHaveBeenCalledWith(
             { id: runs[0]!.id },
@@ -91,26 +77,9 @@ describe('MongoGenerationRunStore', () => {
         )
         expect(find).toHaveBeenCalledWith({
             ownerId: 'mock-user',
-            unitInitId: 'unit-init-1',
-        })
-        expect(find).toHaveBeenCalledWith({
-            ownerId: 'mock-user',
             didacticUnitId: 'didactic-unit-1',
         })
-        expect(updateOne).toHaveBeenCalledTimes(1)
         expect(sort).toHaveBeenCalledWith({ createdAt: -1 })
         expect(storedRuns).toEqual(runs)
-        expect(didacticUnitRuns).toEqual(runs)
-        expect(collection.updateMany).toHaveBeenCalledWith(
-            {
-                ownerId: 'mock-user',
-                unitInitId: 'unit-init-1',
-            },
-            {
-                $set: {
-                    didacticUnitId: 'didactic-unit-2',
-                },
-            }
-        )
     })
 })
