@@ -995,14 +995,6 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                                     <ChevronRightIcon size={20} className="text-[#1D1D1F]" />
                                 </button>
 
-                                <div
-                                    className="absolute inset-y-0 left-0 w-[12%] cursor-w-resize"
-                                    onClick={canGoPrev ? goToPrevSpread : undefined}
-                                />
-                                <div
-                                    className="absolute inset-y-0 right-0 w-[12%] cursor-e-resize"
-                                    onClick={canGoNext ? goToNextSpread : undefined}
-                                />
                             </div>
 
                             <div
