@@ -1,0 +1,32 @@
+import {
+    InMemoryDidacticUnitStore,
+    type DidacticUnitStore,
+} from '../../src/didactic-unit/didactic-unit-store.js'
+import {
+    InMemoryGenerationRunStore,
+    type GenerationRunStore,
+} from '../../src/generation-runs/generation-run-store.js'
+import { createApp, type CreateAppOptions } from '../../src/app.js'
+import type { MongoHealthStatus } from '../../src/mongo/mongo-connection.js'
+import type { ChapterGenerator } from '../../src/providers/chapter-generator.js'
+import type { SyllabusGenerator } from '../../src/providers/syllabus-generator.js'
+
+interface CreateTestAppOptions {
+    didacticUnitStore?: DidacticUnitStore
+    generationRunStore?: GenerationRunStore
+    syllabusGenerator?: SyllabusGenerator
+    chapterGenerator?: ChapterGenerator
+    mongoHealth?: MongoHealthStatus
+}
+
+export function createTestApp(options: CreateTestAppOptions = {}) {
+    const appOptions: CreateAppOptions = {
+        didacticUnitStore: options.didacticUnitStore ?? new InMemoryDidacticUnitStore(),
+        generationRunStore: options.generationRunStore ?? new InMemoryGenerationRunStore(),
+        syllabusGenerator: options.syllabusGenerator,
+        chapterGenerator: options.chapterGenerator,
+        mongoHealth: options.mongoHealth,
+    }
+
+    return createApp(appOptions)
+}
