@@ -80,6 +80,9 @@ describe('DeepSeekChapterGenerator', () => {
         expect(parsedBody.response_format).toEqual({
             type: 'json_object',
         })
+        expect(parsedBody.messages[1].content).toContain(
+            'The "content" field must be valid markdown.'
+        )
         expect(chapter).toMatchObject({
             chapterIndex: 0,
             title: 'Rendering Foundations',

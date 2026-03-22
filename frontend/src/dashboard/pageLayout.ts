@@ -1,4 +1,5 @@
 import type { DidacticUnitEditorChapter as UnitChapter } from './types'
+import { extractMarkdownBlocks, markdownToHtml, type MarkdownPageBlock } from './utils/markdown'
 
 const MOBILE_BREAKPOINT = 768
 const HEADER_HEIGHT = 64
@@ -6,10 +7,6 @@ const OPEN_SIDEBAR_WIDTH = 260
 const CLOSED_SIDEBAR_WIDTH = 80
 export const ACTIVITIES_PAGE = '__ACTIVITIES_PAGE__'
 const PAGE_WIDTH_RATIO = 0.72
-
-type PageBlock =
-    | { type: 'paragraph'; text: string; continued: boolean }
-    | { type: 'html'; html: string }
 
 function escapeHtml(value: string): string {
     return value
@@ -20,50 +17,36 @@ function escapeHtml(value: string): string {
         .replaceAll("'", '&#39;')
 }
 
-function extractBlocks(content: string): PageBlock[] {
-    const parser = new DOMParser()
-    const doc = parser.parseFromString(content, 'text/html')
-    const blocks: PageBlock[] = []
-
-    Array.from(doc.body.children).forEach((element) => {
-        if (element.tagName === 'P') {
-            const text = element.textContent?.replace(/\s+/g, ' ').trim()
-            if (text) {
-                blocks.push({ type: 'paragraph', text, continued: false })
-            }
-            return
-        }
-
-        blocks.push({ type: 'html', html: element.outerHTML })
-    })
-
-    return blocks
-}
-
-function renderParagraph(
+function renderParagraphMarkdown(
     text: string,
     { continued = false, continuesNext = false }: { continued?: boolean; continuesNext?: boolean } = {}
 ): string {
-    const classes: string[] = []
+    const normalizedText = text.trim()
+
+    if (!normalizedText) {
+        return ''
+    }
 
     if (continued || continuesNext) {
-        classes.push('paragraph-fragment')
+        return normalizedText
     }
 
-    if (continued && !continuesNext) {
-        classes.push('paragraph-fragment-last')
-    }
-
-    const className = classes.length ? ` class="${classes.join(' ')}"` : ''
-    return `<p${className}>${escapeHtml(text)}</p>`
+    return normalizedText
 }
 
 function renderBlock(
-    block: PageBlock,
+    block: MarkdownPageBlock,
     options: { continued?: boolean; continuesNext?: boolean } = {}
 ): string {
-    if (block.type === 'html') return block.html
-    return renderParagraph(block.text, { continued: block.continued, ...options })
+    if (block.type === 'markdown') {
+        return block.markdown
+    }
+
+    if (!block.continued && !options.continued && !options.continuesNext) {
+        return block.markdown
+    }
+
+    return renderParagraphMarkdown(block.text, { continued: block.continued, ...options })
 }
 
 function splitParagraphToFit({
@@ -72,13 +55,13 @@ function splitParagraphToFit({
     currentLimit,
     fitsWithinLimit,
 }: {
-    block: Extract<PageBlock, { type: 'paragraph' }>
+    block: Extract<MarkdownPageBlock, { type: 'paragraph' }>
     currentBlocks: string[]
     currentLimit: number
     fitsWithinLimit: (blocksToMeasure: string[], limit: number) => boolean
 }): {
     fittingHtml: string | null
-    remainder: Extract<PageBlock, { type: 'paragraph' }> | null
+    remainder: Extract<MarkdownPageBlock, { type: 'paragraph' }> | null
 } {
     const words = block.text.split(/\s+/).filter(Boolean)
     if (words.length <= 1) {
@@ -100,12 +83,12 @@ function splitParagraphToFit({
     while (low <= high) {
         const middle = Math.floor((low + high) / 2)
         const candidateText = words.slice(0, middle).join(' ')
-        const candidateHtml = renderParagraph(candidateText, {
+        const candidateMarkdown = renderParagraphMarkdown(candidateText, {
             continued: block.continued,
             continuesNext: middle < words.length,
         })
 
-        if (fitsWithinLimit([...currentBlocks, candidateHtml], currentLimit)) {
+        if (fitsWithinLimit([...currentBlocks, candidateMarkdown], currentLimit)) {
             bestIndex = middle
             low = middle + 1
             continue
@@ -126,12 +109,17 @@ function splitParagraphToFit({
     const remainderText = words.slice(splitIndex).join(' ')
 
     return {
-        fittingHtml: renderParagraph(fittingText, {
+        fittingHtml: renderParagraphMarkdown(fittingText, {
             continued: block.continued,
             continuesNext: Boolean(remainderText),
         }),
         remainder: remainderText
-            ? { type: 'paragraph', text: remainderText, continued: true }
+            ? {
+                  type: 'paragraph',
+                  markdown: remainderText,
+                  text: remainderText,
+                  continued: true,
+              }
             : null,
     }
 }
@@ -143,6 +131,8 @@ export function getStatusPillClass(status: UnitChapter['status']): string {
 }
 
 function createHeaderMarkup(activeChapter: UnitChapter, chapterIndex: number): string {
+    const overviewHtml = markdownToHtml(activeChapter.summary)
+
     return `
     <div class="mb-4 flex-shrink-0 space-y-2">
       <div class="flex items-center gap-2">
@@ -156,9 +146,9 @@ function createHeaderMarkup(activeChapter: UnitChapter, chapterIndex: number): s
       <h2 class="text-xl font-bold leading-tight tracking-tight text-[#1D1D1F] md:text-2xl">
         ${escapeHtml(activeChapter.title)}
       </h2>
-      <p class="text-xs font-medium italic leading-relaxed text-[#86868B] md:text-sm">
-        ${escapeHtml(activeChapter.summary)}
-      </p>
+      <div class="text-xs font-medium italic leading-relaxed text-[#86868B] md:text-sm">
+        ${overviewHtml}
+      </div>
       <div class="flex items-center gap-3 pt-1 text-[10px] text-[#86868B]">
         <div class="flex items-center gap-1">
           <span>${escapeHtml(activeChapter.readingTime)}</span>
@@ -222,13 +212,13 @@ export function measurePages({
         contentLimit - headerMeasure.scrollHeight - measurementBuffer
     )
     const regularPageLimit = Math.max(140, contentLimit - measurementBuffer)
-    const blocks = extractBlocks(content)
+    const blocks = extractMarkdownBlocks(content)
     const pages: string[] = []
     let currentBlocks: string[] = []
     let blockIndex = 0
 
     const fitsWithinLimit = (blocksToMeasure: string[], limit: number) => {
-        proseMeasure.innerHTML = blocksToMeasure.join('')
+        proseMeasure.innerHTML = markdownToHtml(blocksToMeasure.join('\n\n'))
         return proseMeasure.scrollHeight <= limit + 1
     }
 
@@ -253,7 +243,7 @@ export function measurePages({
             })
 
             if (fittingHtml) {
-                pages.push([...currentBlocks, fittingHtml].join(''))
+                pages.push([...currentBlocks, fittingHtml].join('\n\n'))
                 currentBlocks = []
 
                 if (remainder?.text && remainder.text !== block.text) {
@@ -267,7 +257,7 @@ export function measurePages({
         }
 
         if (currentBlocks.length > 0) {
-            pages.push(currentBlocks.join(''))
+            pages.push(currentBlocks.join('\n\n'))
             currentBlocks = []
             continue
         }
@@ -296,12 +286,111 @@ export function measurePages({
     }
 
     if (currentBlocks.length > 0) {
-        pages.push(currentBlocks.join(''))
+        pages.push(currentBlocks.join('\n\n'))
     }
 
     document.body.removeChild(sandbox)
 
     return [...pages, ACTIVITIES_PAGE]
+}
+
+export function paginateMarkdownContent({
+    content,
+    pageWidth,
+    pageHeight,
+}: {
+    content: string
+    pageWidth: number
+    pageHeight: number
+}): string[] {
+    if (!content || !pageWidth || !pageHeight) return []
+
+    const isMobile = pageWidth < 420
+    const horizontalPadding = isMobile ? 24 : 32
+    const topPadding = isMobile ? 24 : 32
+    const bottomPadding = isMobile ? 48 : 56
+    const measurementBuffer = isMobile ? 10 : 14
+    const contentWidth = Math.max(240, pageWidth - horizontalPadding * 2)
+    const contentLimit = Math.max(160, pageHeight - topPadding - bottomPadding)
+    const regularPageLimit = Math.max(140, contentLimit - measurementBuffer)
+
+    const sandbox = document.createElement('div')
+    sandbox.style.position = 'fixed'
+    sandbox.style.left = '-10000px'
+    sandbox.style.top = '0'
+    sandbox.style.visibility = 'hidden'
+    sandbox.style.pointerEvents = 'none'
+    sandbox.style.opacity = '0'
+    sandbox.style.zIndex = '-1'
+
+    const proseMeasure = document.createElement('div')
+    proseMeasure.className =
+        'prose prose-neutral max-w-none text-sm leading-[1.9] text-[#1D1D1F] md:text-base'
+    proseMeasure.style.width = `${contentWidth}px`
+
+    sandbox.appendChild(proseMeasure)
+    document.body.appendChild(sandbox)
+
+    const blocks = extractMarkdownBlocks(content)
+    const pages: string[] = []
+    let currentBlocks: string[] = []
+    let blockIndex = 0
+
+    const fitsWithinLimit = (blocksToMeasure: string[], limit: number) => {
+        proseMeasure.innerHTML = markdownToHtml(blocksToMeasure.join('\n\n'))
+        return proseMeasure.scrollHeight <= limit + 1
+    }
+
+    while (blockIndex < blocks.length) {
+        const block = blocks[blockIndex]
+        const candidateHtml = renderBlock(block)
+        const candidateBlocks = [...currentBlocks, candidateHtml]
+
+        if (fitsWithinLimit(candidateBlocks, regularPageLimit)) {
+            currentBlocks = candidateBlocks
+            blockIndex += 1
+            continue
+        }
+
+        if (block.type === 'paragraph') {
+            const { fittingHtml, remainder } = splitParagraphToFit({
+                block,
+                currentBlocks,
+                currentLimit: regularPageLimit,
+                fitsWithinLimit,
+            })
+
+            if (fittingHtml) {
+                pages.push([...currentBlocks, fittingHtml].join('\n\n'))
+                currentBlocks = []
+
+                if (remainder?.text && remainder.text !== block.text) {
+                    blocks.splice(blockIndex, 1, remainder)
+                } else {
+                    blockIndex += 1
+                }
+
+                continue
+            }
+        }
+
+        if (currentBlocks.length > 0) {
+            pages.push(currentBlocks.join('\n\n'))
+            currentBlocks = []
+            continue
+        }
+
+        pages.push(candidateHtml)
+        blockIndex += 1
+    }
+
+    if (currentBlocks.length > 0) {
+        pages.push(currentBlocks.join('\n\n'))
+    }
+
+    document.body.removeChild(sandbox)
+
+    return pages
 }
 
 export function calculateSpreadMetrics({

@@ -3,7 +3,10 @@ import type {
     DidacticUnitGeneratedChapter,
     UpdateDidacticUnitChapterInput,
 } from './didactic-unit-chapter.js'
-import { createDidacticUnitChapterRevision } from './didactic-unit-chapter.js'
+import {
+    createDidacticUnitChapterRevision,
+    resolveDidacticUnitChapterPresentationSettings,
+} from './didactic-unit-chapter.js'
 
 export function updateDidacticUnitChapter(
     didacticUnit: DidacticUnit,
@@ -26,6 +29,9 @@ export function updateDidacticUnitChapter(
         overview: input.chapter.overview,
         content: input.chapter.content,
         keyTakeaways: input.chapter.keyTakeaways,
+        presentationSettings: resolveDidacticUnitChapterPresentationSettings(
+            input.chapter.presentationSettings ?? currentChapter.presentationSettings
+        ),
         updatedAt: new Date().toISOString(),
     }
 

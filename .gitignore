@@ -1,3 +1,4 @@
+node_modules
 frontend/node_modules
 frontend/dist
 frontend/dist-ssr
@@ -7,3 +8,4 @@ backend/dist
 backend/.env
 app-spec.md
 DEVELOPMENT_WORKFLOW.md
+CURRENT_STATUS.md

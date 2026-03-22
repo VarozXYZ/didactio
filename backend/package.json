@@ -7,8 +7,8 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
-    "test": "vitest run",
-    "test:collection": "newman run ..\\postman\\didactio-backend.postman_collection.json -e ..\\postman\\didactio-backend.newman_environment.json"
+    "test": "vitest run --exclude tests/**/*.live.test.ts",
+    "test:live": "vitest run tests/didactic-unit.live.test.ts"
   },
   "dependencies": {
     "dotenv": "^17.3.1",
@@ -19,7 +19,6 @@
     "@types/express": "^5.0.3",
     "@types/node": "^24.5.2",
     "@types/supertest": "^6.0.3",
-    "newman": "^6.2.2",
     "supertest": "^7.1.4",
     "tsx": "^4.20.5",
     "typescript": "^5.9.3",

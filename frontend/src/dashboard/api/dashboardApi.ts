@@ -10,6 +10,11 @@ export class DashboardApiError extends Error {
 }
 
 type BackendProvider = 'openai' | 'deepseek'
+export type BackendChapterPresentationSettings = {
+    paragraphFontFamily: 'sans' | 'serif' | 'mono'
+    paragraphFontSize: '14px' | '16px' | '18px' | '20px'
+    paragraphAlign: 'left' | 'center' | 'right' | 'justify'
+}
 
 export interface BackendDidacticUnitSummary {
     id: string
@@ -84,6 +89,7 @@ export interface BackendDidacticUnitChapterDetail {
     overview: string
     content: string | null
     keyTakeaways: string[]
+    presentationSettings: BackendChapterPresentationSettings
     state: 'pending' | 'ready' | 'failed'
     isCompleted: boolean
     generatedAt?: string
@@ -98,6 +104,10 @@ export interface BackendDidacticUnitChapterRevision {
     createdAt: string
     chapter: {
         title: string
+        overview: string
+        content: string
+        keyTakeaways: string[]
+        presentationSettings?: BackendChapterPresentationSettings
     }
 }
 
@@ -217,6 +227,7 @@ export const dashboardApi = {
             overview: string
             content: string
             keyTakeaways: string[]
+            presentationSettings?: BackendChapterPresentationSettings
         }
     ) {
         return requestJson<BackendDidacticUnitChapterDetail>(

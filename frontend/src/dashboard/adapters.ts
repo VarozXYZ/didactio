@@ -1,4 +1,5 @@
 import type {
+    BackendChapterPresentationSettings,
     BackendDidacticUnitChapterDetail,
     BackendDidacticUnitChapterRevision,
     BackendDidacticUnitChapterSummary,
@@ -6,6 +7,7 @@ import type {
     BackendDidacticUnitSummary,
 } from './api/dashboardApi'
 import type {
+    ChapterPresentationSettings,
     DashboardFolder,
     DashboardListItem,
     DidacticUnitEditorChapter,
@@ -19,24 +21,8 @@ import {
     estimateReadingTimeFromText,
     formatRelativeTimestamp,
 } from './utils/topicMetadata'
+import { markdownToPlainText, normalizeStoredMarkdown } from './utils/markdown'
 import { getSubjectStyle } from './utils/subjectStyles'
-
-function asHtmlContent(value: string | null): string | null {
-    if (!value) {
-        return null
-    }
-
-    if (value.includes('<p') || value.includes('<h2') || value.includes('<h3')) {
-        return value
-    }
-
-    return value
-        .split(/\n{2,}/)
-        .map((paragraph) => paragraph.trim())
-        .filter(Boolean)
-        .map((paragraph) => `<p>${paragraph}</p>`)
-        .join('')
-}
 
 function resolveDisplayStatus(status: string): string {
     switch (status) {
@@ -87,6 +73,16 @@ function resolveActivityDate(value: string | undefined, fallback: string): strin
 
 function buildCoverColor(subject: string): string {
     return getSubjectStyle(subject).accentColor
+}
+
+function resolvePresentationSettings(
+    settings?: BackendChapterPresentationSettings
+): ChapterPresentationSettings {
+    return {
+        paragraphFontFamily: settings?.paragraphFontFamily ?? 'sans',
+        paragraphFontSize: settings?.paragraphFontSize ?? '16px',
+        paragraphAlign: settings?.paragraphAlign ?? 'left',
+    }
 }
 
 export function adaptDidacticUnitSummaryToDashboardItem(
@@ -199,8 +195,8 @@ function buildEditorChapter(
     summary: BackendDidacticUnitChapterSummary,
     detail: BackendDidacticUnitChapterDetail | undefined
 ): DidacticUnitEditorChapter {
-    const content = asHtmlContent(detail?.content ?? null)
-    const readingTime = estimateReadingTimeFromText(content)
+    const content = normalizeStoredMarkdown(detail?.content ?? '')
+    const readingTime = estimateReadingTimeFromText(markdownToPlainText(content))
 
     return {
         chapterIndex: summary.chapterIndex,
@@ -217,6 +213,7 @@ function buildEditorChapter(
         effort: deriveEffortFromReadingTime(readingTime),
         isCompleted: detail?.isCompleted ?? summary.isCompleted,
         completedAt: detail?.completedAt ?? summary.completedAt,
+        presentationSettings: resolvePresentationSettings(detail?.presentationSettings),
     }
 }
 
@@ -252,5 +249,14 @@ export function adaptDidacticUnitRevisions(
         source: revision.source,
         createdAt: formatRelativeTimestamp(revision.createdAt),
         title: revision.chapter.title,
+        chapter: {
+            title: revision.chapter.title,
+            overview: revision.chapter.overview,
+            content: normalizeStoredMarkdown(revision.chapter.content),
+            keyTakeaways: [...revision.chapter.keyTakeaways],
+            presentationSettings: resolvePresentationSettings(
+                revision.chapter.presentationSettings
+            ),
+        },
     }))
 }

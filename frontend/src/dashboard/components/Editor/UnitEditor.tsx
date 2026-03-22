@@ -1,14 +1,17 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import {
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from 'react'
 import {
     AlertCircle,
     ArrowLeft,
-    BookOpen,
     CheckCheck,
     CheckCircle2,
     ChevronLeft,
-    ChevronLeftIcon,
     ChevronRight,
-    ChevronRightIcon,
     Clock,
     Edit3,
     FileText,
@@ -24,6 +27,7 @@ import {
     WandSparkles,
     X,
 } from 'lucide-react'
+import type { LexicalEditor } from 'lexical'
 import { AnimatePresence, motion as Motion } from 'motion/react'
 import { clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
@@ -39,17 +43,26 @@ import {
     adaptDidacticUnitRevisions,
 } from '../../adapters'
 import {
-    ACTIVITIES_PAGE,
     calculateSpreadMetrics,
     getStatusPillClass,
-    measurePages,
+    paginateMarkdownContent,
 } from '../../pageLayout'
+import { LexicalMarkdownEditor } from './LexicalMarkdownEditor'
+import { ChapterStyleMenu } from './ChapterStyleMenu'
+import { LexicalToolbar } from './LexicalToolbar'
 import type {
+    ChapterPresentationSettings,
     DidacticUnitEditorChapter,
     DidacticUnitEditorViewModel,
     DidacticUnitRevisionViewModel,
 } from '../../types'
 import { formatRelativeTimestamp } from '../../utils/topicMetadata'
+import {
+    keyTakeawaysToMarkdown,
+    markdownToKeyTakeaways,
+    normalizeMarkdownForStorage,
+    normalizeStoredMarkdown,
+} from '../../utils/markdown'
 
 type UnitEditorProps = {
     didacticUnitId: string
@@ -58,36 +71,14 @@ type UnitEditorProps = {
 
 type ChapterDraft = {
     title: string
-    overview: string
-    content: string
-    keyTakeawaysText: string
+    overviewMarkdown: string
+    contentMarkdown: string
+    keyTakeawaysMarkdown: string
+    presentationSettings: ChapterPresentationSettings
 }
 
 function cn(...inputs: Array<string | false | null | undefined>) {
     return twMerge(clsx(inputs))
-}
-
-function toEditableText(value: string | null): string {
-    if (!value) {
-        return ''
-    }
-
-    if (!value.includes('<')) {
-        return value
-    }
-
-    const parser = new DOMParser()
-    const document = parser.parseFromString(value, 'text/html')
-    const blocks = Array.from(document.body.children)
-
-    if (blocks.length === 0) {
-        return document.body.textContent?.trim() ?? ''
-    }
-
-    return blocks
-        .map((element) => element.textContent?.trim() ?? '')
-        .filter(Boolean)
-        .join('\n\n')
 }
 
 function buildDraft(
@@ -96,9 +87,12 @@ function buildDraft(
 ): ChapterDraft {
     return {
         title: detail?.title ?? chapter.title,
-        overview: detail?.overview ?? chapter.summary,
-        content: toEditableText(detail?.content ?? chapter.content),
-        keyTakeawaysText: (detail?.keyTakeaways ?? chapter.keyPoints).join('\n'),
+        overviewMarkdown: normalizeStoredMarkdown(detail?.overview ?? chapter.summary),
+        contentMarkdown: normalizeStoredMarkdown(detail?.content ?? chapter.content),
+        keyTakeawaysMarkdown: keyTakeawaysToMarkdown(
+            detail?.keyTakeaways ?? chapter.keyPoints
+        ),
+        presentationSettings: detail?.presentationSettings ?? chapter.presentationSettings,
     }
 }
 
@@ -125,7 +119,6 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
     const navigate = useNavigate()
     const [workspace, setWorkspace] = useState<DidacticUnitEditorViewModel | null>(null)
     const [chapterDetails, setChapterDetails] = useState<Record<number, BackendDidacticUnitChapterDetail>>({})
-    const [runs, setRuns] = useState<BackendGenerationRun[]>([])
     const [revisions, setRevisions] = useState<DidacticUnitRevisionViewModel[]>([])
     const [activeChapterIndex, setActiveChapterIndex] = useState(0)
     const [draft, setDraft] = useState<ChapterDraft | null>(null)
@@ -135,7 +128,8 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
     const [isEditMode, setIsEditMode] = useState(false)
     const [isHistoryOpen, setIsHistoryOpen] = useState(false)
     const [currentSpread, setCurrentSpread] = useState(0)
-    const [pages, setPages] = useState<string[]>([])
+    const [contentPageDrafts, setContentPageDrafts] = useState<string[]>([])
+    const [activeLexicalEditor, setActiveLexicalEditor] = useState<LexicalEditor | null>(null)
     const [error, setError] = useState<string | null>(null)
     const [isLoading, setIsLoading] = useState(true)
     const [viewport, setViewport] = useState(() => ({
@@ -144,9 +138,6 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
     }))
     const saveTimeoutRef = useRef<number | null>(null)
     const preserveViewOnNextWorkspaceRef = useRef(false)
-    const titleRef = useRef<HTMLDivElement | null>(null)
-    const overviewRef = useRef<HTMLDivElement | null>(null)
-    const pageContentRefs = useRef<Record<number, HTMLDivElement | null>>({})
 
     const activeChapter = useMemo(
         () =>
@@ -158,18 +149,7 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
     const activeChapterDetail = activeChapter
         ? chapterDetails[activeChapter.chapterIndex]
         : undefined
-    const activeRuns = useMemo(
-        () =>
-            runs
-                .filter(
-                    (run) =>
-                        run.stage === 'syllabus' ||
-                        (run.stage === 'chapter' &&
-                            run.chapterIndex === activeChapter?.chapterIndex)
-                )
-                .slice(0, 8),
-        [activeChapter?.chapterIndex, runs]
-    )
+    const activeRuns = [] as BackendGenerationRun[]
 
     const loadRevisions = useCallback(
         async (chapterIndex: number) => {
@@ -202,10 +182,9 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
             setError(null)
 
             try {
-                const [unit, chaptersResponse, runsResponse] = await Promise.all([
+                const [unit, chaptersResponse] = await Promise.all([
                     dashboardApi.getDidacticUnit(didacticUnitId),
                     dashboardApi.listDidacticUnitChapters(didacticUnitId),
-                    dashboardApi.listDidacticUnitRuns(didacticUnitId),
                 ])
 
                 const detailResponses = await Promise.all(
@@ -236,12 +215,10 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
 
                 setWorkspace(nextWorkspace)
                 setChapterDetails(detailsRecord)
-                setRuns(runsResponse.runs)
                 setActiveChapterIndex(nextActiveChapter?.chapterIndex ?? 0)
+                preserveViewOnNextWorkspaceRef.current = Boolean(options.preserveSpread)
 
-                if (options.preserveSpread) {
-                    preserveViewOnNextWorkspaceRef.current = true
-                } else {
+                if (!options.preserveSpread) {
                     setCurrentSpread(0)
                 }
 
@@ -289,6 +266,7 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
         }
 
         setIsEditMode(false)
+        setActiveLexicalEditor(null)
         setCurrentSpread(0)
     }, [activeChapter, activeChapterDetail, workspace])
 
@@ -324,29 +302,28 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
             }),
         [isSidebarOpen, viewport.height, viewport.width]
     )
+    const paginatedContentPages = useMemo(
+        () =>
+            draft
+                ? paginateMarkdownContent({
+                      content: draft.contentMarkdown,
+                      pageHeight: spreadMetrics.pageHeight,
+                      pageWidth: spreadMetrics.pageWidth,
+                  })
+                : [],
+        [draft, spreadMetrics.pageHeight, spreadMetrics.pageWidth]
+    )
+    const visibleContentPages =
+        isEditMode && contentPageDrafts.length > 0 ? contentPageDrafts : paginatedContentPages
 
-    useLayoutEffect(() => {
-        let frameId = 0
-
-        if (!activeChapter?.content) {
-            frameId = window.requestAnimationFrame(() => setPages([]))
-            return () => window.cancelAnimationFrame(frameId)
+    useEffect(() => {
+        if (!isEditMode) {
+            setContentPageDrafts([])
+            return
         }
 
-        frameId = window.requestAnimationFrame(() => {
-            setPages(
-                measurePages({
-                    activeChapter,
-                    chapterIndex: activeChapter.chapterIndex,
-                    content: activeChapter.content ?? '',
-                    pageHeight: spreadMetrics.pageHeight,
-                    pageWidth: spreadMetrics.pageWidth,
-                })
-            )
-        })
-
-        return () => window.cancelAnimationFrame(frameId)
-    }, [activeChapter, spreadMetrics.pageHeight, spreadMetrics.pageWidth])
+        setContentPageDrafts(paginatedContentPages.length > 0 ? paginatedContentPages : [''])
+    }, [isEditMode, activeChapter?.chapterIndex, spreadMetrics.pageHeight, spreadMetrics.pageWidth])
 
     const runAction = async (
         action: () => Promise<unknown>,
@@ -414,21 +391,10 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
             return
         }
 
-        const nextTitle = titleRef.current?.textContent?.trim() || draft.title.trim()
-        const nextOverview = overviewRef.current?.textContent?.trim() || draft.overview.trim()
-        const nextContent = pages
-            .map((pageContent, index) => {
-                if (pageContent === ACTIVITIES_PAGE) {
-                    return null
-                }
-
-                const pageElement = pageContentRefs.current[index]
-                const pageText = pageElement?.innerText?.trim()
-                return pageText && pageText.length > 0 ? pageText : toEditableText(pageContent)
-            })
-            .filter((value): value is string => Boolean(value))
-            .join('\n\n')
-            .trim()
+        const nextTitle = draft.title.trim()
+        const nextOverview = normalizeMarkdownForStorage(draft.overviewMarkdown)
+        const nextContent = normalizeMarkdownForStorage(draft.contentMarkdown)
+        const nextKeyTakeaways = markdownToKeyTakeaways(draft.keyTakeawaysMarkdown)
 
         await runAction(
             () =>
@@ -437,12 +403,13 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                     activeChapter.chapterIndex,
                     {
                         title: nextTitle,
-                        overview: nextOverview,
-                        content: nextContent || draft.content.trim(),
-                        keyTakeaways: draft.keyTakeawaysText
-                            .split('\n')
-                            .map((value) => value.trim())
-                            .filter(Boolean),
+                        overview: nextOverview || activeChapter.summary,
+                        content: nextContent || activeChapter.content || '',
+                        keyTakeaways:
+                            nextKeyTakeaways.length > 0
+                                ? nextKeyTakeaways
+                                : [...activeChapter.keyPoints],
+                        presentationSettings: draft.presentationSettings,
                     }
                 ),
             {
@@ -455,6 +422,7 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
     }
 
     const enterEditMode = () => {
+        setActiveLexicalEditor(null)
         setIsEditMode(true)
     }
 
@@ -464,6 +432,7 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
         }
 
         setDraft(buildDraft(activeChapter, activeChapterDetail))
+        setActiveLexicalEditor(null)
         setIsEditMode(false)
     }
 
@@ -482,15 +451,70 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
         )
     }
 
+    const isRevisionCurrent = (revision: DidacticUnitRevisionViewModel) => {
+        if (!activeChapterDetail) {
+            return false
+        }
+
+        return (
+            activeChapterDetail.title === revision.chapter.title &&
+            normalizeStoredMarkdown(activeChapterDetail.overview) ===
+                normalizeStoredMarkdown(revision.chapter.overview) &&
+            normalizeStoredMarkdown(activeChapterDetail.content ?? '') ===
+                normalizeStoredMarkdown(revision.chapter.content) &&
+            JSON.stringify(activeChapterDetail.presentationSettings) ===
+                JSON.stringify(revision.chapter.presentationSettings) &&
+            JSON.stringify(activeChapterDetail.keyTakeaways) ===
+                JSON.stringify(revision.chapter.keyTakeaways)
+        )
+    }
+
+    const handleRestoreRevision = async (revision: DidacticUnitRevisionViewModel) => {
+        if (!activeChapter) {
+            return
+        }
+
+        await runAction(
+            () =>
+                dashboardApi.updateDidacticUnitChapter(
+                    didacticUnitId,
+                    activeChapter.chapterIndex,
+                    {
+                        title: revision.chapter.title,
+                        overview: revision.chapter.overview,
+                        content: revision.chapter.content,
+                        keyTakeaways: [...revision.chapter.keyTakeaways],
+                        presentationSettings: revision.chapter.presentationSettings,
+                    }
+                ),
+            {
+                chapterIndex: activeChapter.chapterIndex,
+                closeEditMode: true,
+                silentRefresh: true,
+                preserveSpread: true,
+            }
+        )
+    }
+
+    const totalSpreads = Math.max(1, 1 + Math.ceil(Math.max(visibleContentPages.length - 1, 0) / 2))
+    const canGoPrev = currentSpread > 0
+    const canGoNext = currentSpread < totalSpreads - 1
+
     const goToNextSpread = useCallback(() => {
         setCurrentSpread((previousSpread) =>
-            previousSpread < Math.ceil(pages.length / 2) - 1 ? previousSpread + 1 : previousSpread
+            previousSpread < totalSpreads - 1 ? previousSpread + 1 : previousSpread
         )
-    }, [pages.length])
+    }, [totalSpreads])
 
     const goToPrevSpread = useCallback(() => {
         setCurrentSpread((previousSpread) => (previousSpread > 0 ? previousSpread - 1 : 0))
     }, [])
+
+    useEffect(() => {
+        if (currentSpread > totalSpreads - 1) {
+            setCurrentSpread(Math.max(0, totalSpreads - 1))
+        }
+    }, [currentSpread, totalSpreads])
 
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
@@ -523,13 +547,6 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
         )
     }
 
-    const totalPages = pages.length
-    const totalSpreads = Math.ceil(totalPages / 2)
-    const leftPageIndex = currentSpread * 2
-    const rightPageIndex = currentSpread * 2 + 1
-    const canGoPrev = currentSpread > 0
-    const canGoNext = currentSpread < totalSpreads - 1
-
     const getStatusIcon = (status: DidacticUnitEditorChapter['status']) => {
         switch (status) {
             case 'ready':
@@ -543,142 +560,316 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
 
     const isPendingChapter = activeChapter.status === 'pending'
     const isFailedChapter = activeChapter.status === 'failed'
-    const renderPage = (pageContent: string | undefined, pageNumber: number) => {
-        if (!pageContent) {
-            return null
-        }
+    const contentPageOffset = currentSpread === 0 ? 0 : 1 + (currentSpread - 1) * 2
+    const leftContentPage =
+        currentSpread === 0 ? undefined : visibleContentPages[contentPageOffset]
+    const rightContentPage =
+        currentSpread === 0
+            ? visibleContentPages[0]
+            : visibleContentPages[contentPageOffset + 1]
+    const spreadPageLabel =
+        currentSpread === 0
+            ? 'Pages 1-2'
+            : `Pages ${contentPageOffset + 2}-${contentPageOffset + 3}`
 
-        if (pageContent === ACTIVITIES_PAGE) {
-            return (
-                <div className="flex h-full flex-col items-center justify-center space-y-8 overflow-y-auto p-8">
-                    <div className="mb-8 space-y-3 text-center">
-                        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#4ADE80]/10">
-                            <Sparkles size={32} className="text-[#4ADE80]" />
-                        </div>
-                        <h3 className="text-2xl font-bold">Learning Activities</h3>
-                        <p className="mx-auto max-w-[300px] text-sm text-[#86868B]">
-                            Reinforce your understanding with AI-powered exercises
-                        </p>
-                    </div>
+    const updatePaginatedContentPage = (pageIndex: number, markdown: string) => {
+        setContentPageDrafts((previous) => {
+            const nextPages =
+                previous.length > 0 ? [...previous] : [...visibleContentPages]
 
-                    <div className="w-full max-w-[400px] space-y-3">
-                        {[
-                            {
-                                icon: Target,
-                                title: 'Generate Quiz',
-                                desc: 'Test your knowledge with 5 questions',
-                            },
-                            {
-                                icon: Sparkles,
-                                title: 'Create Flashcards',
-                                desc: 'Key concepts for quick review',
-                            },
-                            {
-                                icon: FileText,
-                                title: 'Practice Problems',
-                                desc: "Apply what you've learned",
-                            },
-                        ].map((item) => (
-                            <button
-                                key={item.title}
-                                className="group flex w-full items-center gap-4 rounded-2xl border border-[#E5E5E7] p-5 text-left transition-all hover:border-[#4ADE80] hover:bg-[#4ADE80]/5"
-                                type="button"
-                            >
-                                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#F5F5F7] transition-all group-hover:bg-[#4ADE80]/10">
-                                    <item.icon
-                                        size={20}
-                                        className="text-[#86868B] transition-all group-hover:text-[#4ADE80]"
-                                    />
-                                </div>
-                                <div className="flex-1">
-                                    <div className="text-[15px] font-semibold">{item.title}</div>
-                                    <div className="text-[12px] text-[#86868B]">{item.desc}</div>
-                                </div>
-                                <ChevronRight
-                                    size={18}
-                                    className="text-[#86868B] opacity-0 transition-all group-hover:opacity-100"
-                                />
-                            </button>
-                        ))}
-                    </div>
-                </div>
+            while (pageIndex >= nextPages.length) {
+                nextPages.push('')
+            }
+
+            nextPages[pageIndex] = markdown
+
+            setDraft((currentDraft) =>
+                currentDraft
+                    ? {
+                          ...currentDraft,
+                          contentMarkdown: normalizeMarkdownForStorage(
+                              nextPages.filter((page) => page.trim().length > 0).join('\n\n')
+                          ),
+                      }
+                    : currentDraft
             )
-        }
 
-        const pageIndex = pageNumber - 1
+            return nextPages
+        })
+    }
 
-        return (
+    const renderContentPage = ({
+        editable,
+        markdown,
+        pageIndex,
+        pageNumber,
+    }: {
+        editable: boolean
+        markdown: string | undefined
+        pageIndex: number
+        pageNumber: number
+    }) => (
+        <div
+            className="relative overflow-hidden rounded-[16px] border border-[#E5E5E7] bg-white shadow-[0_8px_60px_rgba(0,0,0,0.08)] md:rounded-[24px]"
+            style={{
+                height: `${spreadMetrics.pageHeight}px`,
+                width: `${spreadMetrics.pageWidth}px`,
+            }}
+        >
             <div className="flex h-full flex-col overflow-hidden p-6 pb-12 md:p-8 md:pb-14">
-                {pageNumber === 1 && (
-                    <div className="mb-4 flex-shrink-0 space-y-2">
-                        <div className="flex items-center gap-2">
-                            <span className="rounded-full bg-[#F5F5F7] px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-[#86868B]">
-                                Chapter {activeChapter.chapterIndex + 1}
-                            </span>
-                            <span
-                                className={cn(
-                                    'rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest',
-                                    getStatusPillClass(activeChapter.status)
-                                )}
-                            >
-                                {activeChapter.status}
-                            </span>
-                        </div>
-                        <h2
-                            ref={titleRef}
-                            className={cn(
-                                'text-xl font-bold leading-tight tracking-tight text-[#1D1D1F] md:text-2xl',
-                                isEditMode && 'focus:outline-none'
-                            )}
-                            contentEditable={isEditMode}
-                            suppressContentEditableWarning
-                        >
-                            {draft.title}
-                        </h2>
-                        <p
-                            ref={overviewRef}
-                            className={cn(
-                                'text-xs font-medium italic leading-relaxed text-[#86868B] md:text-sm',
-                                isEditMode && 'focus:outline-none'
-                            )}
-                            contentEditable={isEditMode}
-                            suppressContentEditableWarning
-                        >
-                            {draft.overview}
-                        </p>
-                        <div className="flex items-center gap-3 pt-1 text-[10px] text-[#86868B]">
-                            <div className="flex items-center gap-1">
-                                <Clock size={12} strokeWidth={1.5} />
-                                <span>{activeChapter.readingTime}</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                                <Target size={12} strokeWidth={1.5} />
-                                <span>{activeChapter.level}</span>
-                            </div>
-                        </div>
-                        <div className="my-3 h-[1px] w-full bg-[#E5E5E7]" />
-                    </div>
-                )}
-
-                <div
-                    ref={(node) => {
-                        pageContentRefs.current[pageIndex] = node
-                    }}
-                    className={cn(
-                        'prose prose-neutral max-w-none min-h-0 flex-1 overflow-hidden text-sm leading-[1.9] text-[#1D1D1F] md:text-base',
-                        isEditMode && 'focus:outline-none'
-                    )}
-                    contentEditable={isEditMode}
-                    dangerouslySetInnerHTML={{ __html: pageContent }}
-                    suppressContentEditableWarning
-                />
+                <div className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-[#86868B]">
+                    Chapter Content
+                </div>
+                <div className="relative min-h-0 flex-1 overflow-hidden">
+                    <LexicalMarkdownEditor
+                        key={`content-${didacticUnitId}-${activeChapter.chapterIndex}-${pageIndex}`}
+                        contentClassName="h-full min-h-full overflow-hidden leading-[1.9] text-[#1D1D1F] outline-none"
+                        baseTextStyle={draft.presentationSettings}
+                        editable={editable}
+                        editorId={`content-${didacticUnitId}-${activeChapter.chapterIndex}-${pageIndex}`}
+                        initialMarkdown={markdown ?? ''}
+                        onFocusEditor={setActiveLexicalEditor}
+                        onMarkdownChange={
+                            editable
+                                ? (nextMarkdown) =>
+                                      updatePaginatedContentPage(pageIndex, nextMarkdown)
+                                : undefined
+                        }
+                        placeholder="Write the chapter content here..."
+                    />
+                </div>
 
                 <div className="absolute bottom-4 right-6 text-[10px] font-medium text-[#86868B] md:bottom-6 md:right-10">
                     {pageNumber}
                 </div>
             </div>
-        )
-    }
+        </div>
+    )
+
+    const renderLexicalSpread = (editable: boolean) => (
+        <>
+            <div
+                className="relative flex items-center justify-center"
+                style={{
+                    height: `${spreadMetrics.spreadHeight}px`,
+                    width: `${spreadMetrics.spreadWidth}px`,
+                }}
+            >
+                <button
+                    className="absolute left-[-56px] top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-[#E5E5E7] bg-white transition-all hover:scale-110 hover:bg-[#F5F5F7] disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:scale-100 md:left-[-76px] md:h-12 md:w-12"
+                    disabled={!canGoPrev}
+                    onClick={goToPrevSpread}
+                    type="button"
+                >
+                    <ChevronLeft size={20} className="text-[#1D1D1F]" />
+                </button>
+
+                <AnimatePresence mode="wait">
+                    <Motion.div
+                        key={`spread-${currentSpread}-${spreadMetrics.pageWidth}-${spreadMetrics.pageHeight}`}
+                        animate={{ opacity: 1, x: 0 }}
+                        className="flex h-full w-full gap-4 md:gap-8"
+                        exit={{ opacity: 0, x: -72 }}
+                        initial={{ opacity: 0, x: 72 }}
+                        transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
+                    >
+                        {currentSpread === 0 ? (
+                            <div
+                                className="relative overflow-hidden rounded-[16px] border border-[#E5E5E7] bg-white shadow-[0_8px_60px_rgba(0,0,0,0.08)] md:rounded-[24px]"
+                                style={{
+                                    height: `${spreadMetrics.pageHeight}px`,
+                                    width: `${spreadMetrics.pageWidth}px`,
+                                }}
+                            >
+                                <div className="flex h-full flex-col overflow-hidden p-6 pb-12 md:p-8 md:pb-14">
+                                    <div className="mb-4 flex-shrink-0 space-y-2">
+                                        <div className="flex items-center gap-2">
+                                            <span className="rounded-full bg-[#F5F5F7] px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-[#86868B]">
+                                                Chapter {activeChapter.chapterIndex + 1}
+                                            </span>
+                                            <span
+                                                className={cn(
+                                                    'rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest',
+                                                    getStatusPillClass(activeChapter.status)
+                                                )}
+                                            >
+                                                {activeChapter.status}
+                                            </span>
+                                        </div>
+                                        <h2
+                                            className="min-h-[2.5rem] text-xl font-bold leading-tight tracking-tight text-[#1D1D1F] outline-none md:text-2xl"
+                                            contentEditable={editable}
+                                            onInput={(event) =>
+                                                setDraft((previous) =>
+                                                    previous
+                                                        ? {
+                                                              ...previous,
+                                                              title:
+                                                                  event.currentTarget.textContent ??
+                                                                  '',
+                                                          }
+                                                        : previous
+                                                )
+                                            }
+                                            spellCheck={editable}
+                                            suppressContentEditableWarning
+                                        >
+                                            {draft.title}
+                                        </h2>
+                                        <div className="relative min-h-[88px]">
+                                            <LexicalMarkdownEditor
+                                                key={`overview-${didacticUnitId}-${activeChapter.chapterIndex}`}
+                                                contentClassName="min-h-[88px] font-medium italic leading-relaxed text-[#86868B] outline-none"
+                                                baseTextStyle={draft.presentationSettings}
+                                                editable={editable}
+                                                editorId={`overview-${didacticUnitId}-${activeChapter.chapterIndex}`}
+                                                initialMarkdown={draft.overviewMarkdown}
+                                                onFocusEditor={setActiveLexicalEditor}
+                                                onMarkdownChange={
+                                                    editable
+                                                        ? (markdown) =>
+                                                              setDraft((previous) =>
+                                                                  previous
+                                                                      ? {
+                                                                            ...previous,
+                                                                            overviewMarkdown:
+                                                                                markdown,
+                                                                        }
+                                                                      : previous
+                                                              )
+                                                        : undefined
+                                                }
+                                                placeholder="Write a short overview for this chapter..."
+                                                placeholderClassName="pointer-events-none absolute inset-0 italic text-[#B0B0B5]"
+                                            />
+                                        </div>
+                                        <div className="flex items-center gap-3 pt-1 text-[10px] text-[#86868B]">
+                                            <div className="flex items-center gap-1">
+                                                <Clock size={12} strokeWidth={1.5} />
+                                                <span>{activeChapter.readingTime}</span>
+                                            </div>
+                                            <div className="flex items-center gap-1">
+                                                <Target size={12} strokeWidth={1.5} />
+                                                <span>{activeChapter.level}</span>
+                                            </div>
+                                        </div>
+                                        <div className="my-3 h-[1px] w-full bg-[#E5E5E7]" />
+                                    </div>
+
+                                    <div className="min-h-0 flex-1 overflow-hidden">
+                                        <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[#86868B]">
+                                            Key Takeaways
+                                        </div>
+                                        <div className="relative min-h-[180px]">
+                                            <LexicalMarkdownEditor
+                                                key={`takeaways-${didacticUnitId}-${activeChapter.chapterIndex}`}
+                                                contentClassName="min-h-[180px] leading-[1.9] text-[#1D1D1F] outline-none"
+                                                baseTextStyle={draft.presentationSettings}
+                                                editable={editable}
+                                                editorId={`takeaways-${didacticUnitId}-${activeChapter.chapterIndex}`}
+                                                initialMarkdown={draft.keyTakeawaysMarkdown}
+                                                onFocusEditor={setActiveLexicalEditor}
+                                                onMarkdownChange={
+                                                    editable
+                                                        ? (markdown) =>
+                                                              setDraft((previous) =>
+                                                                  previous
+                                                                      ? {
+                                                                            ...previous,
+                                                                            keyTakeawaysMarkdown:
+                                                                                markdown,
+                                                                        }
+                                                                      : previous
+                                                              )
+                                                        : undefined
+                                                }
+                                                placeholder="- Summarize the main outcomes here"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="absolute bottom-4 right-6 text-[10px] font-medium text-[#86868B] md:bottom-6 md:right-10">
+                                        1
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            renderContentPage({
+                                editable,
+                                markdown: leftContentPage,
+                                pageIndex: contentPageOffset,
+                                pageNumber: contentPageOffset + 2,
+                            })
+                        )}
+
+                        {renderContentPage({
+                            editable,
+                            markdown: rightContentPage,
+                            pageIndex: currentSpread === 0 ? 0 : contentPageOffset + 1,
+                            pageNumber: currentSpread === 0 ? 2 : contentPageOffset + 3,
+                        })}
+                    </Motion.div>
+                </AnimatePresence>
+
+                <button
+                    className="absolute right-[-56px] top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-[#E5E5E7] bg-white transition-all hover:scale-110 hover:bg-[#F5F5F7] disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:scale-100 md:right-[-76px] md:h-12 md:w-12"
+                    disabled={!canGoNext}
+                    onClick={goToNextSpread}
+                    type="button"
+                >
+                    <ChevronRight size={20} className="text-[#1D1D1F]" />
+                </button>
+            </div>
+
+            <div
+                className="mt-3 rounded-full border border-[#E5E5E7] bg-white/90 px-4 py-2 shadow-lg backdrop-blur-sm md:px-6 md:py-3"
+                style={{ marginTop: `${spreadMetrics.indicatorGap}px` }}
+            >
+                <AnimatePresence initial={false} mode="wait">
+                    {editable ? (
+                        <Motion.div
+                            key="toolbar-pill"
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            className="flex flex-wrap items-center justify-center gap-2 md:gap-3"
+                            exit={{ opacity: 0, scale: 0.97, y: 6 }}
+                            initial={{ opacity: 0, scale: 0.97, y: 6 }}
+                            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                        >
+                            <ChapterStyleMenu
+                                value={draft.presentationSettings}
+                                onChange={(presentationSettings) =>
+                                    setDraft((previous) =>
+                                        previous
+                                            ? { ...previous, presentationSettings }
+                                            : previous
+                                    )
+                                }
+                            />
+                            <div className="hidden h-6 w-px bg-[#E5DED0] md:block" />
+                            <LexicalToolbar activeEditor={activeLexicalEditor} />
+                        </Motion.div>
+                    ) : (
+                        <Motion.div
+                            key="status-pill"
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            className="flex items-center gap-2 md:gap-3"
+                            exit={{ opacity: 0, scale: 0.97, y: -6 }}
+                            initial={{ opacity: 0, scale: 0.97, y: -6 }}
+                            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                        >
+                            <FileText size={16} className="text-[#86868B]" />
+                            <span className="text-[11px] font-medium text-[#1D1D1F] md:text-[13px]">
+                                Chapter workspace
+                            </span>
+                            <span className="text-[11px] text-[#86868B] md:text-[13px]">
+                                {spreadPageLabel}
+                            </span>
+                        </Motion.div>
+                    )}
+                </AnimatePresence>
+            </div>
+        </>
+    )
 
     return (
         <div className="flex h-screen overflow-hidden bg-[#F5F5F7] font-sans text-[#1D1D1F]">
@@ -935,85 +1126,12 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                 )}
 
                 <div className="relative flex flex-1 flex-col items-center justify-center bg-[#F5F5F7] px-4 py-4 md:px-8 md:py-6">
-                    {activeChapter.content ? (
-                        <>
-                            <div
-                                className="relative flex items-center justify-center"
-                                style={{
-                                    height: `${spreadMetrics.spreadHeight}px`,
-                                    width: `${spreadMetrics.spreadWidth}px`,
-                                }}
-                            >
-                                <button
-                                    className="absolute left-[-56px] top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-[#E5E5E7] bg-white transition-all hover:scale-110 hover:bg-[#F5F5F7] disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:scale-100 md:left-[-76px] md:h-12 md:w-12"
-                                    disabled={!canGoPrev}
-                                    onClick={goToPrevSpread}
-                                    type="button"
-                                >
-                                    <ChevronLeftIcon size={20} className="text-[#1D1D1F]" />
-                                </button>
-
-                                <AnimatePresence mode="wait">
-                                    <Motion.div
-                                        key={`spread-${currentSpread}-${spreadMetrics.pageWidth}-${spreadMetrics.pageHeight}`}
-                                        animate={{ opacity: 1, x: 0 }}
-                                        className="flex h-full w-full gap-4 md:gap-8"
-                                        exit={{ opacity: 0, x: -72 }}
-                                        initial={{ opacity: 0, x: 72 }}
-                                        transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
-                                    >
-                                        <div
-                                            className="relative overflow-hidden rounded-[16px] border border-[#E5E5E7] bg-white shadow-[0_8px_60px_rgba(0,0,0,0.08)] md:rounded-[24px]"
-                                            style={{
-                                                height: `${spreadMetrics.pageHeight}px`,
-                                                width: `${spreadMetrics.pageWidth}px`,
-                                            }}
-                                        >
-                                            {leftPageIndex < totalPages &&
-                                                renderPage(pages[leftPageIndex], leftPageIndex + 1)}
-                                        </div>
-
-                                        <div
-                                            className="relative overflow-hidden rounded-[16px] border border-[#E5E5E7] bg-white shadow-[0_8px_60px_rgba(0,0,0,0.08)] md:rounded-[24px]"
-                                            style={{
-                                                height: `${spreadMetrics.pageHeight}px`,
-                                                width: `${spreadMetrics.pageWidth}px`,
-                                            }}
-                                        >
-                                            {rightPageIndex < totalPages &&
-                                                renderPage(pages[rightPageIndex], rightPageIndex + 1)}
-                                        </div>
-                                    </Motion.div>
-                                </AnimatePresence>
-
-                                <button
-                                    className="absolute right-[-56px] top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-[#E5E5E7] bg-white transition-all hover:scale-110 hover:bg-[#F5F5F7] disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:scale-100 md:right-[-76px] md:h-12 md:w-12"
-                                    disabled={!canGoNext}
-                                    onClick={goToNextSpread}
-                                    type="button"
-                                >
-                                    <ChevronRightIcon size={20} className="text-[#1D1D1F]" />
-                                </button>
-
-                            </div>
-
-                            <div
-                                className="mt-3 rounded-full border border-[#E5E5E7] bg-white/90 px-4 py-2 shadow-lg backdrop-blur-sm md:px-6 md:py-3"
-                                style={{ marginTop: `${spreadMetrics.indicatorGap}px` }}
-                            >
-                                <div className="flex items-center gap-2 md:gap-3">
-                                    <BookOpen size={16} className="text-[#86868B]" />
-                                    <span className="text-[11px] font-medium text-[#1D1D1F] md:text-[13px]">
-                                        Pages {leftPageIndex + 1}-{Math.min(rightPageIndex + 1, totalPages)} of{' '}
-                                        {totalPages}
-                                    </span>
-                                </div>
-                            </div>
-                        </>
+                    {activeChapter.status === 'ready' ? (
+                        renderLexicalSpread(isEditMode)
                     ) : (
-                        <div className="flex flex-col items-center justify-center space-y-6 text-center">
+                        <>
                             {isPendingChapter ? (
-                                <>
+                                <div className="flex flex-col items-center justify-center space-y-6 text-center">
                                     <div className="relative">
                                         <Sparkles
                                             size={56}
@@ -1040,11 +1158,11 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                                         onClick={() => void handlePrimaryGeneration()}
                                         type="button"
                                     >
-                                        Generate Chapter
-                                    </button>
-                                </>
+                                            Generate Chapter
+                                        </button>
+                                </div>
                             ) : isFailedChapter ? (
-                                <>
+                                <div className="flex flex-col items-center justify-center space-y-6 text-center">
                                     <div className="flex h-16 w-16 items-center justify-center rounded-full bg-red-50">
                                         <AlertCircle
                                             size={32}
@@ -1063,11 +1181,11 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                                         onClick={() => void handlePrimaryGeneration()}
                                         type="button"
                                     >
-                                        Try Again
-                                    </button>
-                                </>
+                                            Try Again
+                                        </button>
+                                </div>
                             ) : (
-                                <>
+                                <div className="flex flex-col items-center justify-center space-y-6 text-center">
                                     <div className="relative">
                                         <Loader2
                                             size={56}
@@ -1081,9 +1199,9 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                                             We are preparing the current chapter workspace.
                                         </p>
                                     </div>
-                                </>
+                                </div>
                             )}
-                        </div>
+                        </>
                     )}
                 </div>
 
@@ -1119,27 +1237,60 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                                         No revisions yet for this chapter.
                                     </div>
                                 )}
-                                {revisions.map((revision) => (
-                                    <div
-                                        key={revision.id}
-                                        className="rounded-2xl border border-[#E5E5E7] p-4"
-                                    >
-                                        <div className="flex items-center justify-between gap-3">
-                                            <span className="text-[12px] font-semibold text-[#1D1D1F]">
-                                                {sourceLabel(revision.source)}
-                                            </span>
-                                            <span className="text-[11px] text-[#86868B]">
-                                                {revision.createdAt}
-                                            </span>
+                                {revisions.map((revision) => {
+                                    const isCurrentRevision = isRevisionCurrent(revision)
+
+                                    return (
+                                        <div
+                                            key={revision.id}
+                                            className="rounded-2xl border border-[#E5E5E7] p-4"
+                                        >
+                                            <div className="flex items-center justify-between gap-3">
+                                                <span className="text-[12px] font-semibold text-[#1D1D1F]">
+                                                    {sourceLabel(revision.source)}
+                                                </span>
+                                                <span className="text-[11px] text-[#86868B]">
+                                                    {revision.createdAt}
+                                                </span>
+                                            </div>
+                                            <div className="mt-1 text-[13px] text-[#5A5A60]">
+                                                {revision.title}
+                                            </div>
+                                            <div className="mt-4 flex items-center justify-between gap-3">
+                                                <div className="text-[11px] text-[#86868B]">
+                                                    {isCurrentRevision
+                                                        ? 'Current version'
+                                                        : 'Restore this snapshot'}
+                                                </div>
+                                                <button
+                                                    className={cn(
+                                                        'rounded-full px-3 py-1.5 text-[12px] font-medium transition-all',
+                                                        isCurrentRevision
+                                                            ? 'bg-[#F5F5F7] text-[#86868B]'
+                                                            : 'bg-[#1D1D1F] text-white hover:bg-[#333333]'
+                                                    )}
+                                                    disabled={isCurrentRevision || isSubmitting}
+                                                    onClick={() =>
+                                                        void handleRestoreRevision(revision)
+                                                    }
+                                                    type="button"
+                                                >
+                                                    {isCurrentRevision ? 'Current' : 'Restore'}
+                                                </button>
+                                            </div>
+                                            {!isCurrentRevision && (
+                                                <div className="mt-2 text-[11px] text-[#86868B]">
+                                                    You can switch back to this version at any
+                                                    time.
+                                                </div>
+                                            )}
                                         </div>
-                                        <div className="mt-1 text-[13px] text-[#5A5A60]">
-                                            {revision.title}
-                                        </div>
-                                    </div>
-                                ))}
+                                    )
+                                })}
                             </div>
 
-                            <div className="mt-8 border-t border-[#E5E5E7] pt-6">
+                            {false && (
+                                <div className="mt-8 border-t border-[#E5E5E7] pt-6">
                                 <div className="mb-3 flex items-center gap-2 text-[12px] font-medium uppercase tracking-wide text-[#86868B]">
                                     <WandSparkles size={14} />
                                     Recent runs
@@ -1167,7 +1318,8 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                                         </div>
                                     ))}
                                 </div>
-                            </div>
+                                </div>
+                            )}
                         </Motion.div>
                     )}
                 </AnimatePresence>

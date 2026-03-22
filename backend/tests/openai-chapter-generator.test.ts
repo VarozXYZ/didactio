@@ -74,6 +74,11 @@ describe('OpenAiChapterGenerator', () => {
         const chapter = await generator.generate(createChapterGenerationSource(), 0)
 
         expect(fetchImplementation).toHaveBeenCalledOnce()
+        const requestInit = fetchImplementation.mock.calls[0]?.[1]
+        const parsedBody = JSON.parse(String(requestInit?.body))
+        expect(parsedBody.messages[1].content).toContain(
+            'The "content" field must be valid markdown.'
+        )
         expect(chapter).toMatchObject({
             chapterIndex: 0,
             title: 'Rendering Foundations',

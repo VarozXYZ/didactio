@@ -8,6 +8,7 @@ import {
 } from './create-didactic-unit.js'
 import {
     createDidacticUnitChapterRevision,
+    resolveDidacticUnitChapterPresentationSettings,
     type DidacticUnitChapterRevisionSource,
 } from './didactic-unit-chapter.js'
 
@@ -47,10 +48,16 @@ export async function generateDidacticUnitChapter(
     const chapterGenerationSource = createChapterGenerationSourceFromDidacticUnit(
         didacticUnit
     )
-    const generatedChapter = await chapterGenerator.generate(
+    const rawGeneratedChapter = await chapterGenerator.generate(
         chapterGenerationSource,
         chapterIndex
     )
+    const generatedChapter = {
+        ...rawGeneratedChapter,
+        presentationSettings: resolveDidacticUnitChapterPresentationSettings(
+            rawGeneratedChapter.presentationSettings
+        ),
+    }
     const updatedAt = generatedChapter.updatedAt ?? generatedChapter.generatedAt
     const generatedChapters = didacticUnit.generatedChapters ?? []
     const existingChapterIndex = generatedChapters.findIndex(

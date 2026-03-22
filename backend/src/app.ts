@@ -4,7 +4,10 @@ import {
     type DidacticUnit,
 } from './didactic-unit/create-didactic-unit.js'
 import { completeDidacticUnitChapter } from './didactic-unit/complete-didactic-unit-chapter.js'
-import { parseUpdateDidacticUnitChapterInput } from './didactic-unit/didactic-unit-chapter.js'
+import {
+    parseUpdateDidacticUnitChapterInput,
+    resolveDidacticUnitChapterPresentationSettings,
+} from './didactic-unit/didactic-unit-chapter.js'
 import {
     createChapterGenerationSourceFromDidacticUnit,
     generateDidacticUnitChapter,
@@ -554,6 +557,9 @@ export function createApp(options: CreateAppOptions) {
             overview: generatedChapter?.overview ?? plannedChapter.overview,
             content: generatedChapter?.content ?? null,
             keyTakeaways: generatedChapter?.keyTakeaways ?? [],
+            presentationSettings: resolveDidacticUnitChapterPresentationSettings(
+                generatedChapter?.presentationSettings
+            ),
             generatedAt: generatedChapter?.generatedAt,
             updatedAt: generatedChapter?.updatedAt,
             state: resolveDidacticUnitChapterState({

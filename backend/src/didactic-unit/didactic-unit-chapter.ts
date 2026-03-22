@@ -1,11 +1,18 @@
 import { randomUUID } from 'node:crypto'
 
+export interface DidacticUnitChapterPresentationSettings {
+    paragraphFontFamily: 'sans' | 'serif' | 'mono'
+    paragraphFontSize: '14px' | '16px' | '18px' | '20px'
+    paragraphAlign: 'left' | 'center' | 'right' | 'justify'
+}
+
 export interface DidacticUnitGeneratedChapter {
     chapterIndex: number
     title: string
     overview: string
     content: string
     keyTakeaways: string[]
+    presentationSettings?: DidacticUnitChapterPresentationSettings
     generatedAt: string
     updatedAt?: string
 }
@@ -34,6 +41,28 @@ export interface UpdateDidacticUnitChapterInput {
         overview: string
         content: string
         keyTakeaways: string[]
+        presentationSettings?: DidacticUnitChapterPresentationSettings
+    }
+}
+
+export function createDefaultDidacticUnitChapterPresentationSettings(): DidacticUnitChapterPresentationSettings {
+    return {
+        paragraphFontFamily: 'sans',
+        paragraphFontSize: '16px',
+        paragraphAlign: 'left',
+    }
+}
+
+export function resolveDidacticUnitChapterPresentationSettings(
+    settings?: Partial<DidacticUnitChapterPresentationSettings> | null
+): DidacticUnitChapterPresentationSettings {
+    const defaults = createDefaultDidacticUnitChapterPresentationSettings()
+
+    return {
+        paragraphFontFamily:
+            settings?.paragraphFontFamily ?? defaults.paragraphFontFamily,
+        paragraphFontSize: settings?.paragraphFontSize ?? defaults.paragraphFontSize,
+        paragraphAlign: settings?.paragraphAlign ?? defaults.paragraphAlign,
     }
 }
 
@@ -55,6 +84,53 @@ function parseStringArray(value: unknown, fieldName: string): string[] {
     return value.map((item, index) =>
         parseNonEmptyString(item, `${fieldName}[${index}]`)
     )
+}
+
+function parsePresentationSettings(
+    value: unknown,
+    fieldName: string
+): DidacticUnitChapterPresentationSettings | undefined {
+    if (value === undefined) {
+        return undefined
+    }
+
+    if (!value || typeof value !== 'object') {
+        throw new Error(`${fieldName} must be a JSON object.`)
+    }
+
+    const settings = value as Record<string, unknown>
+    const paragraphFontFamily = parseNonEmptyString(
+        settings.paragraphFontFamily,
+        `${fieldName}.paragraphFontFamily`
+    )
+    const paragraphFontSize = parseNonEmptyString(
+        settings.paragraphFontSize,
+        `${fieldName}.paragraphFontSize`
+    )
+    const paragraphAlign = parseNonEmptyString(
+        settings.paragraphAlign,
+        `${fieldName}.paragraphAlign`
+    )
+
+    if (!['sans', 'serif', 'mono'].includes(paragraphFontFamily)) {
+        throw new Error(`${fieldName}.paragraphFontFamily must be one of: sans, serif, mono.`)
+    }
+
+    if (!['14px', '16px', '18px', '20px'].includes(paragraphFontSize)) {
+        throw new Error(`${fieldName}.paragraphFontSize must be one of: 14px, 16px, 18px, 20px.`)
+    }
+
+    if (!['left', 'center', 'right', 'justify'].includes(paragraphAlign)) {
+        throw new Error(
+            `${fieldName}.paragraphAlign must be one of: left, center, right, justify.`
+        )
+    }
+
+    return {
+        paragraphFontFamily: paragraphFontFamily as DidacticUnitChapterPresentationSettings['paragraphFontFamily'],
+        paragraphFontSize: paragraphFontSize as DidacticUnitChapterPresentationSettings['paragraphFontSize'],
+        paragraphAlign: paragraphAlign as DidacticUnitChapterPresentationSettings['paragraphAlign'],
+    }
 }
 
 export function parseUpdateDidacticUnitChapterInput(
@@ -86,6 +162,10 @@ export function parseUpdateDidacticUnitChapterInput(
                 chapterPayload.keyTakeaways,
                 'chapter.keyTakeaways'
             ),
+            presentationSettings: parsePresentationSettings(
+                (chapterPayload as { presentationSettings?: unknown }).presentationSettings,
+                'chapter.presentationSettings'
+            ),
         },
     }
 }
@@ -102,6 +182,9 @@ export function createDidacticUnitChapterRevision(input: {
         chapter: {
             ...input.chapter,
             keyTakeaways: [...input.chapter.keyTakeaways],
+            presentationSettings: resolveDidacticUnitChapterPresentationSettings(
+                input.chapter.presentationSettings
+            ),
         },
         createdAt: input.chapter.updatedAt ?? input.chapter.generatedAt,
     }

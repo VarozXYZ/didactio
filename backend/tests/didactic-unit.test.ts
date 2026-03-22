@@ -178,8 +178,36 @@ describe('didactic-unit lifecycle', () => {
             chapterIndex: 0,
             state: 'ready',
             isCompleted: false,
+            presentationSettings: {
+                paragraphFontFamily: 'sans',
+                paragraphFontSize: '16px',
+                paragraphAlign: 'left',
+            },
         })
         expect(typeof chapterResponse.body.content).toBe('string')
+
+        const updateResponse = await request(app)
+            .patch(`/api/didactic-unit/${approved.id}/chapters/0`)
+            .send({
+                chapter: {
+                    title: chapterResponse.body.title,
+                    overview: chapterResponse.body.overview,
+                    content: chapterResponse.body.content,
+                    keyTakeaways: chapterResponse.body.keyTakeaways,
+                    presentationSettings: {
+                        paragraphFontFamily: 'serif',
+                        paragraphFontSize: '18px',
+                        paragraphAlign: 'justify',
+                    },
+                },
+            })
+
+        expect(updateResponse.status).toBe(200)
+        expect(updateResponse.body.presentationSettings).toEqual({
+            paragraphFontFamily: 'serif',
+            paragraphFontSize: '18px',
+            paragraphAlign: 'justify',
+        })
 
         const completionResponse = await request(app)
             .post(`/api/didactic-unit/${approved.id}/chapters/0/complete`)
@@ -196,9 +224,15 @@ describe('didactic-unit lifecycle', () => {
         )
 
         expect(revisionsResponse.status).toBe(200)
+        expect(
+            revisionsResponse.body.revisions.some(
+                (revision: { chapterIndex: number; source: string }) =>
+                    revision.chapterIndex === 0 && revision.source === 'ai_generation'
+            )
+        ).toBe(true)
         expect(revisionsResponse.body.revisions[0]).toMatchObject({
             chapterIndex: 0,
-            source: 'ai_generation',
+            source: 'manual_edit',
         })
 
         const runsResponse = await request(app).get(`/api/didactic-unit/${approved.id}/runs`)

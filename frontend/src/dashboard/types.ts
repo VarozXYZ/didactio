@@ -85,6 +85,12 @@ export interface PlanningDetailViewModel {
 
 export type EditorChapterStatus = 'pending' | 'ready' | 'failed'
 
+export interface ChapterPresentationSettings {
+    paragraphFontFamily: 'sans' | 'serif' | 'mono'
+    paragraphFontSize: '14px' | '16px' | '18px' | '20px'
+    paragraphAlign: 'left' | 'center' | 'right' | 'justify'
+}
+
 export interface DidacticUnitEditorChapter {
     chapterIndex: number
     title: string
@@ -98,6 +104,7 @@ export interface DidacticUnitEditorChapter {
     effort: string
     isCompleted: boolean
     completedAt?: string
+    presentationSettings: ChapterPresentationSettings
 }
 
 export interface DidacticUnitEditorViewModel {
@@ -119,4 +126,11 @@ export interface DidacticUnitRevisionViewModel {
     source: 'ai_generation' | 'ai_regeneration' | 'manual_edit'
     createdAt: string
     title: string
+    chapter: {
+        title: string
+        overview: string
+        content: string
+        keyTakeaways: string[]
+        presentationSettings: ChapterPresentationSettings
+    }
 }
