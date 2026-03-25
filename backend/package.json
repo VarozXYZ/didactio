@@ -11,9 +11,11 @@
     "test:live": "vitest run tests/didactic-unit.live.test.ts"
   },
   "dependencies": {
+    "ai": "^6.0.138",
     "dotenv": "^17.3.1",
     "express": "^5.1.0",
-    "mongodb": "^7.1.0"
+    "mongodb": "^7.1.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/express": "^5.0.3",

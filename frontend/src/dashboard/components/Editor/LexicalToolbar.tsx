@@ -169,9 +169,6 @@ export function LexicalToolbar({ activeEditor }: LexicalToolbarProps) {
 
     useEffect(() => {
         if (!activeEditor) {
-            setCanUndo(false)
-            setCanRedo(false)
-            setBlockType('paragraph')
             return
         }
 
@@ -212,6 +209,10 @@ export function LexicalToolbar({ activeEditor }: LexicalToolbarProps) {
             document.removeEventListener('mousedown', handleClickOutside)
         }
     }, [])
+
+    const resolvedCanUndo = activeEditor ? canUndo : false
+    const resolvedCanRedo = activeEditor ? canRedo : false
+    const resolvedBlockType = activeEditor ? blockType : 'paragraph'
 
     const applyBlockType = (nextType: BlockType) => {
         if (!activeEditor) {
@@ -275,13 +276,13 @@ export function LexicalToolbar({ activeEditor }: LexicalToolbarProps) {
             className="flex flex-wrap items-center justify-center gap-1.5"
         >
             <ToolbarButton
-                disabled={!activeEditor || !canUndo}
+                disabled={!activeEditor || !resolvedCanUndo}
                 icon={<Undo2 size={15} />}
                 label="Undo"
                 onClick={() => activeEditor?.dispatchCommand(UNDO_COMMAND, undefined)}
             />
             <ToolbarButton
-                disabled={!activeEditor || !canRedo}
+                disabled={!activeEditor || !resolvedCanRedo}
                 icon={<Redo2 size={15} />}
                 label="Redo"
                 onClick={() => activeEditor?.dispatchCommand(REDO_COMMAND, undefined)}
@@ -294,7 +295,7 @@ export function LexicalToolbar({ activeEditor }: LexicalToolbarProps) {
                 anchor={
                     <ToolbarMenuButton
                         icon={<Type size={15} />}
-                        label={BLOCK_TYPE_OPTIONS.find((option) => option.value === blockType)?.label ?? 'Paragraph'}
+                        label={BLOCK_TYPE_OPTIONS.find((option) => option.value === resolvedBlockType)?.label ?? 'Paragraph'}
                         isOpen={openMenu === 'blockType'}
                         onClick={() =>
                             setOpenMenu((current) => (current === 'blockType' ? null : 'blockType'))
@@ -305,7 +306,7 @@ export function LexicalToolbar({ activeEditor }: LexicalToolbarProps) {
                 {BLOCK_TYPE_OPTIONS.map((option) => (
                     <ToolbarMenuItem
                         key={option.value}
-                        active={option.value === blockType}
+                        active={option.value === resolvedBlockType}
                         label={option.label}
                         onClick={() => applyBlockType(option.value)}
                     />

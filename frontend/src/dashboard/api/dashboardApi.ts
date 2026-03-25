@@ -9,11 +9,25 @@ export class DashboardApiError extends Error {
     }
 }
 
-type BackendProvider = 'openai' | 'deepseek'
+type BackendProvider = string
+
 export type BackendChapterPresentationSettings = {
     paragraphFontFamily: 'sans' | 'serif' | 'mono'
     paragraphFontSize: '14px' | '16px' | '18px' | '20px'
     paragraphAlign: 'left' | 'center' | 'right' | 'justify'
+}
+
+export type BackendAiStageConfig = {
+    provider: string
+    model: string
+}
+
+export type BackendAiConfig = {
+    moderation: BackendAiStageConfig
+    questionnaire: BackendAiStageConfig
+    syllabus: BackendAiStageConfig
+    summary: BackendAiStageConfig
+    chapter: BackendAiStageConfig
 }
 
 export interface BackendDidacticUnitSummary {
@@ -123,6 +137,20 @@ export interface BackendGenerationRun {
     chapterIndex?: number
 }
 
+type NdjsonEvent =
+    | { type: 'start'; stage: string; provider: string; model: string }
+    | { type: 'partial_markdown'; delta: string; markdown: string }
+    | { type: 'partial_structured'; data: unknown }
+    | { type: 'complete'; data: unknown }
+    | { type: 'error'; message: string }
+
+type StreamHandlers = {
+    signal?: AbortSignal
+    onStart?: (event: Extract<NdjsonEvent, { type: 'start' }>) => void
+    onPartialMarkdown?: (event: Extract<NdjsonEvent, { type: 'partial_markdown' }>) => void
+    onPartialStructured?: (event: Extract<NdjsonEvent, { type: 'partial_structured' }>) => void
+}
+
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
     const response = await fetch(path, {
         headers: {
@@ -154,13 +182,111 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
     return (await response.json()) as T
 }
 
+async function streamNdjson<T>(
+    path: string,
+    handlers: StreamHandlers,
+    init?: RequestInit
+): Promise<T> {
+    const response = await fetch(path, {
+        headers: {
+            'Content-Type': 'application/json',
+            ...(init?.headers ?? {}),
+        },
+        method: 'POST',
+        body: JSON.stringify({}),
+        ...init,
+        signal: handlers.signal,
+    })
+
+    if (!response.ok) {
+        let message = `Request failed with status ${response.status}.`
+
+        try {
+            const body = (await response.json()) as { error?: string }
+            if (body.error) {
+                message = body.error
+            }
+        } catch {
+            // Keep default message.
+        }
+
+        throw new DashboardApiError(message, response.status)
+    }
+
+    if (!response.body) {
+        throw new DashboardApiError('Streaming response body was not available.', 500)
+    }
+
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let completedData: T | null = null
+
+    while (true) {
+        const { done, value } = await reader.read()
+
+        if (done) {
+            break
+        }
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() ?? ''
+
+        for (const line of lines) {
+            const trimmed = line.trim()
+            if (!trimmed) {
+                continue
+            }
+
+            const event = JSON.parse(trimmed) as NdjsonEvent
+
+            if (event.type === 'start') {
+                handlers.onStart?.(event)
+                continue
+            }
+
+            if (event.type === 'partial_markdown') {
+                handlers.onPartialMarkdown?.(event)
+                continue
+            }
+
+            if (event.type === 'partial_structured') {
+                handlers.onPartialStructured?.(event)
+                continue
+            }
+
+            if (event.type === 'error') {
+                throw new DashboardApiError(event.message, 500)
+            }
+
+            completedData = event.data as T
+        }
+    }
+
+    if (completedData === null) {
+        throw new DashboardApiError('Streaming response ended without a complete payload.', 500)
+    }
+
+    return completedData
+}
+
 export const dashboardApi = {
     listDidacticUnits() {
         return requestJson<{ didacticUnits: BackendDidacticUnitSummary[] }>('/api/didactic-unit')
     },
-    createDidacticUnit(input: { topic: string; provider: BackendProvider }) {
+    createDidacticUnit(input: { topic: string }) {
         return requestJson<BackendDidacticUnitDetail>('/api/didactic-unit', {
             method: 'POST',
+            body: JSON.stringify(input),
+        })
+    },
+    getAiConfig() {
+        return requestJson<BackendAiConfig>('/api/ai-config')
+    },
+    updateAiConfig(input: Partial<BackendAiConfig>) {
+        return requestJson<BackendAiConfig>('/api/ai-config', {
+            method: 'PATCH',
             body: JSON.stringify(input),
         })
     },
@@ -196,6 +322,12 @@ export const dashboardApi = {
             method: 'POST',
             body: JSON.stringify({}),
         })
+    },
+    streamDidacticUnitSyllabus(id: string, handlers: StreamHandlers) {
+        return streamNdjson<BackendDidacticUnitDetail>(
+            `/api/didactic-unit/${id}/syllabus/generate/stream`,
+            handlers
+        )
     },
     updateDidacticUnitSyllabus(id: string, syllabus: PlanningSyllabus) {
         return requestJson<BackendDidacticUnitDetail>(`/api/didactic-unit/${id}/syllabus`, {
@@ -247,6 +379,16 @@ export const dashboardApi = {
             }
         )
     },
+    streamGenerateDidacticUnitChapter(
+        id: string,
+        chapterIndex: number,
+        handlers: StreamHandlers
+    ) {
+        return streamNdjson<BackendDidacticUnitDetail>(
+            `/api/didactic-unit/${id}/chapters/${chapterIndex}/generate/stream`,
+            handlers
+        )
+    },
     regenerateDidacticUnitChapter(id: string, chapterIndex: number) {
         return requestJson<BackendDidacticUnitDetail>(
             `/api/didactic-unit/${id}/chapters/${chapterIndex}/regenerate`,
@@ -254,6 +396,16 @@ export const dashboardApi = {
                 method: 'POST',
                 body: JSON.stringify({}),
             }
+        )
+    },
+    streamRegenerateDidacticUnitChapter(
+        id: string,
+        chapterIndex: number,
+        handlers: StreamHandlers
+    ) {
+        return streamNdjson<BackendDidacticUnitDetail>(
+            `/api/didactic-unit/${id}/chapters/${chapterIndex}/regenerate/stream`,
+            handlers
         )
     },
     completeDidacticUnitChapter(id: string, chapterIndex: number) {

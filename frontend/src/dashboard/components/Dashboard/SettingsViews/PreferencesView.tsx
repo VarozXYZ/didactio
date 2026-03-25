@@ -1,100 +1,142 @@
-import { Check, ChevronDown } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { Loader2, Save } from 'lucide-react'
+import {
+    type BackendAiConfig,
+    type BackendAiStageConfig,
+    dashboardApi,
+} from '../../../api/dashboardApi'
 
-type SelectOption = {
-    label: string
-    value: string
+type StageKey = keyof BackendAiConfig
+
+const stageLabels: Record<StageKey, { title: string; description: string }> = {
+    moderation: {
+        title: 'Moderation',
+        description: 'Topic validation and normalization',
+    },
+    questionnaire: {
+        title: 'Questionnaire',
+        description: 'Learner discovery questions',
+    },
+    syllabus: {
+        title: 'Syllabus',
+        description: 'Syllabus planning and structure generation',
+    },
+    summary: {
+        title: 'Summary',
+        description: 'Future unit summary generation',
+    },
+    chapter: {
+        title: 'Chapter',
+        description: 'Chapter writing and regeneration',
+    },
 }
 
-type CustomSelectProps = {
-    options: SelectOption[]
-    value: string
-    onChange: (value: string) => void
-}
-
-function CustomSelect({ options, value, onChange }: CustomSelectProps) {
-    const [isOpen, setIsOpen] = useState(false)
-    const containerRef = useRef<HTMLDivElement | null>(null)
-    const selectedOption = options.find((option) => option.value === value) ?? options[0]
-
-    useEffect(() => {
-        const handlePointerDown = (event: MouseEvent) => {
-            if (!containerRef.current?.contains(event.target as Node)) {
-                setIsOpen(false)
-            }
-        }
-
-        window.addEventListener('mousedown', handlePointerDown)
-        return () => window.removeEventListener('mousedown', handlePointerDown)
-    }, [])
+function StageConfigCard(props: {
+    stage: StageKey
+    value: BackendAiStageConfig
+    onChange: (next: BackendAiStageConfig) => void
+}) {
+    const meta = stageLabels[props.stage]
 
     return (
-        <div ref={containerRef} className="relative">
-            <button
-                type="button"
-                onClick={() => setIsOpen((current) => !current)}
-                className={`flex w-full items-center justify-between rounded-[8px] border px-4 py-3 text-left text-[14px] transition-colors ${
-                    isOpen
-                        ? 'border-[#4ADE80] bg-[#F8FFF9]'
-                        : 'border-[#E5E5E7] bg-white hover:border-[#D4D4D8]'
-                }`}
-                aria-haspopup="listbox"
-                aria-expanded={isOpen}
-            >
-                <span className="text-[#1D1D1F]">{selectedOption.label}</span>
-                <ChevronDown
-                    size={16}
-                    className={`text-[#86868B] transition-transform ${isOpen ? 'rotate-180' : ''}`}
-                />
-            </button>
+        <div className="rounded-[14px] border border-[#E5E5E7] bg-white p-5">
+            <div className="mb-4">
+                <h3 className="text-[16px] font-semibold text-[#1D1D1F]">{meta.title}</h3>
+                <p className="mt-1 text-[12px] text-[#86868B]">{meta.description}</p>
+            </div>
 
-            {isOpen && (
-                <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-20 overflow-hidden rounded-[10px] border border-[#E5E5E7] bg-white shadow-[0_16px_40px_rgba(0,0,0,0.08)]">
-                    <div role="listbox" className="py-1">
-                        {options.map((option) => {
-                            const isSelected = option.value === value
-
-                            return (
-                                <button
-                                    key={option.value}
-                                    type="button"
-                                    onClick={() => {
-                                        onChange(option.value)
-                                        setIsOpen(false)
-                                    }}
-                                    className={`flex w-full items-center justify-between px-4 py-2.5 text-left text-[14px] transition-colors ${
-                                        isSelected
-                                            ? 'bg-[#F1FBF3] text-[#1D1D1F]'
-                                            : 'text-[#4B5563] hover:bg-[#F5F5F7] hover:text-[#1D1D1F]'
-                                    }`}
-                                >
-                                    <span>{option.label}</span>
-                                    {isSelected && <Check size={16} className="text-[#4ADE80]" />}
-                                </button>
-                            )
-                        })}
-                    </div>
+            <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                    <label className="mb-2 block text-[12px] font-semibold uppercase tracking-wide text-[#6B7280]">
+                        Provider
+                    </label>
+                    <input
+                        type="text"
+                        value={props.value.provider}
+                        onChange={(event) =>
+                            props.onChange({
+                                ...props.value,
+                                provider: event.target.value,
+                            })
+                        }
+                        placeholder="e.g. openai"
+                        className="w-full rounded-[12px] border border-[#E5E5E7] px-4 py-3 text-[14px] focus:border-[#4ADE80] focus:outline-none"
+                    />
                 </div>
-            )}
+
+                <div>
+                    <label className="mb-2 block text-[12px] font-semibold uppercase tracking-wide text-[#6B7280]">
+                        Model
+                    </label>
+                    <input
+                        type="text"
+                        value={props.value.model}
+                        onChange={(event) =>
+                            props.onChange({
+                                ...props.value,
+                                model: event.target.value,
+                            })
+                        }
+                        placeholder="e.g. gpt-4o-mini"
+                        className="w-full rounded-[12px] border border-[#E5E5E7] px-4 py-3 text-[14px] focus:border-[#4ADE80] focus:outline-none"
+                    />
+                </div>
+            </div>
         </div>
     )
 }
 
-const modelOptions: SelectOption[] = [
-    { value: 'gpt-4', label: 'GPT-4 (Recommended)' },
-    { value: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo' },
-    { value: 'claude-3', label: 'Claude 3' },
-]
-
-const toneOptions: SelectOption[] = [
-    { value: 'professional', label: 'Professional' },
-    { value: 'conversational', label: 'Conversational' },
-    { value: 'academic', label: 'Academic' },
-]
-
 export function PreferencesView() {
-    const [selectedModel, setSelectedModel] = useState(modelOptions[0].value)
-    const [selectedTone, setSelectedTone] = useState(toneOptions[0].value)
+    const [config, setConfig] = useState<BackendAiConfig | null>(null)
+    const [isLoading, setIsLoading] = useState(true)
+    const [isSaving, setIsSaving] = useState(false)
+    const [error, setError] = useState<string | null>(null)
+    const [savedNotice, setSavedNotice] = useState<string | null>(null)
+
+    useEffect(() => {
+        const loadConfig = async () => {
+            setIsLoading(true)
+            setError(null)
+
+            try {
+                setConfig(await dashboardApi.getAiConfig())
+            } catch (loadError) {
+                setError(
+                    loadError instanceof Error
+                        ? loadError.message
+                        : 'Failed to load AI configuration.'
+                )
+            } finally {
+                setIsLoading(false)
+            }
+        }
+
+        void loadConfig()
+    }, [])
+
+    const handleSave = async () => {
+        if (!config) {
+            return
+        }
+
+        setIsSaving(true)
+        setError(null)
+        setSavedNotice(null)
+
+        try {
+            const nextConfig = await dashboardApi.updateAiConfig(config)
+            setConfig(nextConfig)
+            setSavedNotice('AI profile saved in memory for this session.')
+        } catch (saveError) {
+            setError(
+                saveError instanceof Error
+                    ? saveError.message
+                    : 'Failed to save AI configuration.'
+            )
+        } finally {
+            setIsSaving(false)
+        }
+    }
 
     return (
         <div className="flex min-w-0 flex-1 flex-col">
@@ -104,84 +146,74 @@ export function PreferencesView() {
                         Preferences
                     </h1>
                     <p className="mt-0.5 text-[13px] text-[#86868B]">
-                        Customize your Didactio experience
+                        Configure the provider and model used at each AI stage
                     </p>
                 </div>
             </header>
 
             <div className="p-8">
-                <div className="max-w-[700px] space-y-6">
-                    <div className="rounded-[12px] border border-[#E5E5E7] bg-white p-8">
-                        <h2 className="mb-6 text-[18px] font-bold text-[#1D1D1F]">
-                            Content Generation
-                        </h2>
-                        <div className="space-y-5">
+                <div className="max-w-[920px] space-y-6">
+                    {error && (
+                        <div className="rounded-[12px] border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-600">
+                            {error}
+                        </div>
+                    )}
+                    {savedNotice && (
+                        <div className="rounded-[12px] border border-[#D6F3DB] bg-[#F4FFF6] px-4 py-3 text-[13px] text-[#2F7A45]">
+                            {savedNotice}
+                        </div>
+                    )}
+
+                    <div className="rounded-[12px] border border-[#E5E5E7] bg-[#FAFAFB] p-6">
+                        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                             <div>
-                                <label className="mb-2 block text-[13px] font-semibold text-[#1D1D1F]">
-                                    Default AI Model
-                                </label>
-                                <CustomSelect
-                                    options={modelOptions}
-                                    value={selectedModel}
-                                    onChange={setSelectedModel}
-                                />
+                                <h2 className="text-[18px] font-bold text-[#1D1D1F]">
+                                    AI Profile
+                                </h2>
+                                <p className="mt-1 text-[13px] text-[#6B7280]">
+                                    These settings default from `.env`, and right now they are stored
+                                    in backend memory for the current server session.
+                                </p>
                             </div>
-                            <div>
-                                <label className="mb-2 block text-[13px] font-semibold text-[#1D1D1F]">
-                                    Writing Tone
-                                </label>
-                                <CustomSelect
-                                    options={toneOptions}
-                                    value={selectedTone}
-                                    onChange={setSelectedTone}
-                                />
-                            </div>
-                            <div>
-                                <label className="mb-2 block text-[13px] font-semibold text-[#1D1D1F]">
-                                    Content Verbosity
-                                </label>
-                                <div className="flex items-center gap-4">
-                                    <input type="range" min="1" max="3" defaultValue="2" className="flex-1" />
-                                    <span className="min-w-[80px] text-[13px] text-[#86868B]">
-                                        Medium
-                                    </span>
-                                </div>
-                            </div>
+                            <button
+                                type="button"
+                                onClick={() => void handleSave()}
+                                disabled={!config || isLoading || isSaving}
+                                className="inline-flex items-center justify-center gap-2 rounded-[12px] bg-[#1D1D1F] px-5 py-3 text-[14px] font-semibold text-white disabled:opacity-50"
+                            >
+                                {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                                {isSaving ? 'Saving...' : 'Save AI Profile'}
+                            </button>
                         </div>
                     </div>
 
-                    <div className="rounded-[12px] border border-[#E5E5E7] bg-white p-8">
-                        <h2 className="mb-6 text-[18px] font-bold text-[#1D1D1F]">
-                            Editor Settings
-                        </h2>
-                        <div className="space-y-4">
-                            {[
-                                { label: 'Auto-save changes', desc: 'Automatically save your edits' },
-                                { label: 'Dark mode for editor', desc: 'Use dark theme in the book view' },
-                                { label: 'Show reading time estimates', desc: 'Display time to read each chapter' },
-                            ].map((setting, index) => (
-                                <div
-                                    key={setting.label}
-                                    className="flex items-center justify-between rounded-[10px] border border-[#E5E5E7] p-4"
-                                >
-                                    <div>
-                                        <div className="text-[14px] font-semibold text-[#1D1D1F]">
-                                            {setting.label}
-                                        </div>
-                                        <div className="text-[12px] text-[#86868B]">{setting.desc}</div>
-                                    </div>
-                                    <label className="relative inline-flex cursor-pointer items-center">
-                                        <input
-                                            type="checkbox"
-                                            defaultChecked={index === 0}
-                                            className="peer sr-only"
-                                        />
-                                        <div className="peer h-6 w-11 rounded-full bg-[#E5E5E7] after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-[#4ADE80] peer-checked:after:translate-x-full peer-checked:after:border-white" />
-                                    </label>
-                                </div>
+                    {isLoading && (
+                        <div className="flex min-h-[240px] items-center justify-center rounded-[12px] border border-[#E5E5E7] bg-white text-[#86868B]">
+                            Loading AI configuration...
+                        </div>
+                    )}
+
+                    {config && (
+                        <div className="grid gap-5">
+                            {(Object.keys(stageLabels) as StageKey[]).map((stage) => (
+                                <StageConfigCard
+                                    key={stage}
+                                    stage={stage}
+                                    value={config[stage]}
+                                    onChange={(nextValue) =>
+                                        setConfig((previous) =>
+                                            previous
+                                                ? {
+                                                      ...previous,
+                                                      [stage]: nextValue,
+                                                  }
+                                                : previous
+                                        )
+                                    }
+                                />
                             ))}
                         </div>
-                    </div>
+                    )}
                 </div>
             </div>
         </div>

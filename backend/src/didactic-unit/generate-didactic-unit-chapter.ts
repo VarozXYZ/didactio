@@ -1,7 +1,4 @@
-import type {
-    ChapterGenerationSource,
-    ChapterGenerator,
-} from '../providers/chapter-generator.js'
+import type { ChapterGenerator, ChapterGenerationSource } from '../providers/chapter-generator.js'
 import {
     resolveDidacticUnitStatus,
     type DidacticUnit,
@@ -48,10 +45,23 @@ export async function generateDidacticUnitChapter(
     const chapterGenerationSource = createChapterGenerationSourceFromDidacticUnit(
         didacticUnit
     )
-    const rawGeneratedChapter = await chapterGenerator.generate(
-        chapterGenerationSource,
-        chapterIndex
+    const rawGeneratedChapter = await chapterGenerator.generate(chapterGenerationSource, chapterIndex)
+    return applyGeneratedDidacticUnitChapter(
+        didacticUnit,
+        chapterIndex,
+        rawGeneratedChapter,
+        revisionSource
     )
+}
+
+export function applyGeneratedDidacticUnitChapter(
+    didacticUnit: DidacticUnit,
+    chapterIndex: number,
+    rawGeneratedChapter: ReturnType<ChapterGenerator['generate']> extends Promise<infer Result>
+        ? Result
+        : never,
+    revisionSource: DidacticUnitChapterRevisionSource = 'ai_generation'
+): DidacticUnit {
     const generatedChapter = {
         ...rawGeneratedChapter,
         presentationSettings: resolveDidacticUnitChapterPresentationSettings(

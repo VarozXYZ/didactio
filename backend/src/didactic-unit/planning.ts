@@ -1,4 +1,4 @@
-export type DidacticUnitProvider = 'openai' | 'deepseek'
+export type DidacticUnitProvider = string
 
 export type DidacticUnitNextAction =
     | 'moderate_topic'
@@ -79,10 +79,6 @@ function parseStringArray(value: unknown, fieldName: string): string[] {
     )
 }
 
-function isSupportedProvider(value: unknown): value is DidacticUnitProvider {
-    return value === 'openai' || value === 'deepseek'
-}
-
 export function parseCreateDidacticUnitInput(body: unknown): CreateDidacticUnitInput {
     if (!body || typeof body !== 'object') {
         throw new Error('Request body must be a JSON object.')
@@ -95,13 +91,12 @@ export function parseCreateDidacticUnitInput(body: unknown): CreateDidacticUnitI
         throw new Error('Topic is required.')
     }
 
-    if (payload.provider !== undefined && !isSupportedProvider(payload.provider)) {
-        throw new Error('Provider must be either "openai" or "deepseek".')
-    }
-
     return {
         topic,
-        provider: payload.provider ?? 'openai',
+        provider:
+            typeof payload.provider === 'string' && payload.provider.trim()
+                ? payload.provider.trim()
+                : 'profile-config',
     }
 }
 

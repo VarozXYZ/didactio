@@ -65,7 +65,7 @@ export interface PlanningDetailViewModel {
     id: string
     topic: string
     subject: string
-    provider: 'openai' | 'deepseek'
+    provider: string
     status: string
     nextAction: string
     progressPercent: number
@@ -116,7 +116,7 @@ export interface DidacticUnitEditorViewModel {
     coverColor: string
     status: string
     overview: string
-    provider: 'openai' | 'deepseek'
+    provider: string
     chapters: DidacticUnitEditorChapter[]
 }
 

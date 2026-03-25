@@ -209,7 +209,7 @@ function buildEditorChapter(
         keyPoints: detail?.keyTakeaways?.length
             ? [...detail.keyTakeaways]
             : [...unit.chapters[summary.chapterIndex].keyPoints],
-        level: unit.provider === 'deepseek' ? 'Advanced' : 'Balanced',
+        level: unit.provider === 'profile-config' ? 'Configured' : 'Adaptive',
         effort: deriveEffortFromReadingTime(readingTime),
         isCompleted: detail?.isCompleted ?? summary.isCompleted,
         completedAt: detail?.completedAt ?? summary.completedAt,

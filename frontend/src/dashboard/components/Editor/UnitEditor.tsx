@@ -30,6 +30,7 @@ import {
 import type { LexicalEditor } from 'lexical'
 import { AnimatePresence, motion as Motion } from 'motion/react'
 import { clsx } from 'clsx'
+import { Streamdown } from 'streamdown'
 import { twMerge } from 'tailwind-merge'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -132,6 +133,8 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
     const [activeLexicalEditor, setActiveLexicalEditor] = useState<LexicalEditor | null>(null)
     const [error, setError] = useState<string | null>(null)
     const [isLoading, setIsLoading] = useState(true)
+    const [streamingMarkdown, setStreamingMarkdown] = useState('')
+    const [isStreamingGeneration, setIsStreamingGeneration] = useState(false)
     const [viewport, setViewport] = useState(() => ({
         height: typeof window !== 'undefined' ? window.innerHeight : 900,
         width: typeof window !== 'undefined' ? window.innerWidth : 1440,
@@ -323,7 +326,13 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
         }
 
         setContentPageDrafts(paginatedContentPages.length > 0 ? paginatedContentPages : [''])
-    }, [isEditMode, activeChapter?.chapterIndex, spreadMetrics.pageHeight, spreadMetrics.pageWidth])
+    }, [
+        isEditMode,
+        activeChapter?.chapterIndex,
+        paginatedContentPages,
+        spreadMetrics.pageHeight,
+        spreadMetrics.pageWidth,
+    ])
 
     const runAction = async (
         action: () => Promise<unknown>,
@@ -371,19 +380,53 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
             return
         }
 
-        await runAction(
-            () =>
-                activeChapter.status === 'ready'
-                    ? dashboardApi.regenerateDidacticUnitChapter(
-                          didacticUnitId,
-                          activeChapter.chapterIndex
-                      )
-                    : dashboardApi.generateDidacticUnitChapter(
-                          didacticUnitId,
-                          activeChapter.chapterIndex
-                      ),
-            { chapterIndex: activeChapter.chapterIndex }
-        )
+        setIsSubmitting(true)
+        setIsStreamingGeneration(true)
+        setStreamingMarkdown('')
+        setError(null)
+
+        try {
+            if (activeChapter.status === 'ready') {
+                await dashboardApi.streamRegenerateDidacticUnitChapter(
+                    didacticUnitId,
+                    activeChapter.chapterIndex,
+                    {
+                        onPartialMarkdown: (event) => {
+                            setStreamingMarkdown(event.markdown)
+                        },
+                    }
+                )
+            } else {
+                await dashboardApi.streamGenerateDidacticUnitChapter(
+                    didacticUnitId,
+                    activeChapter.chapterIndex,
+                    {
+                        onPartialMarkdown: (event) => {
+                            setStreamingMarkdown(event.markdown)
+                        },
+                    }
+                )
+            }
+
+            onDataChanged()
+            await loadWorkspace(activeChapter.chapterIndex)
+            setIsSaving(true)
+            if (saveTimeoutRef.current) {
+                window.clearTimeout(saveTimeoutRef.current)
+            }
+            saveTimeoutRef.current = window.setTimeout(() => setIsSaving(false), 1200)
+        } catch (actionError) {
+            setError(
+                actionError instanceof Error
+                    ? actionError.message
+                    : 'Didactic unit action failed.'
+            )
+            setIsSaving(false)
+        } finally {
+            setIsSubmitting(false)
+            setIsStreamingGeneration(false)
+            setStreamingMarkdown('')
+        }
     }
 
     const handleSave = async () => {
@@ -560,6 +603,7 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
 
     const isPendingChapter = activeChapter.status === 'pending'
     const isFailedChapter = activeChapter.status === 'failed'
+    const isShowingStreamingPreview = isStreamingGeneration
     const contentPageOffset = currentSpread === 0 ? 0 : 1 + (currentSpread - 1) * 2
     const leftContentPage =
         currentSpread === 0 ? undefined : visibleContentPages[contentPageOffset]
@@ -1126,7 +1170,34 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                 )}
 
                 <div className="relative flex flex-1 flex-col items-center justify-center bg-[#F5F5F7] px-4 py-4 md:px-8 md:py-6">
-                    {activeChapter.status === 'ready' ? (
+                    {isShowingStreamingPreview ? (
+                        <div className="flex h-full w-full max-w-[920px] flex-col overflow-hidden rounded-[28px] border border-[#DCE8E0] bg-white shadow-[0_30px_80px_rgba(0,0,0,0.08)]">
+                            <div className="flex items-center justify-between border-b border-[#E5E5E7] px-6 py-4">
+                                <div>
+                                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#4E8B63]">
+                                        Live Generation
+                                    </div>
+                                    <h3 className="mt-1 text-[18px] font-semibold text-[#1D1D1F]">
+                                        {activeChapter.status === 'ready'
+                                            ? 'Regenerating chapter'
+                                            : 'Generating chapter'}
+                                    </h3>
+                                </div>
+                                <div className="flex items-center gap-2 text-[13px] font-medium text-[#4E8B63]">
+                                    <Loader2 size={16} className="animate-spin" />
+                                    Streaming markdown
+                                </div>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto px-6 py-6">
+                                <div className="rounded-[20px] border border-[#E8EFEA] bg-[#FBFDFC] p-6">
+                                    <Streamdown className="text-[15px] leading-7 text-[#1D1D1F]">
+                                        {streamingMarkdown || 'Waiting for the first markdown tokens...'}
+                                    </Streamdown>
+                                </div>
+                            </div>
+                        </div>
+                    ) : activeChapter.status === 'ready' ? (
                         renderLexicalSpread(isEditMode)
                     ) : (
                         <>
@@ -1289,7 +1360,7 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                                 })}
                             </div>
 
-                            {false && (
+                            {activeRuns.length > 0 && (
                                 <div className="mt-8 border-t border-[#E5E5E7] pt-6">
                                 <div className="mb-3 flex items-center gap-2 text-[12px] font-medium uppercase tracking-wide text-[#86868B]">
                                     <WandSparkles size={14} />

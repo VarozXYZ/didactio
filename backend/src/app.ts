@@ -1,28 +1,48 @@
 import express from 'express'
 import {
+    type AiConfigStore,
+    type AiStageConfig,
+    AiConfigValidationError,
+    InMemoryAiConfigStore,
+    parseAiConfigPatch,
+} from './ai/config.js'
+import { openNdjsonStream, writeNdjsonEvent } from './ai/ndjson.js'
+import {
+    AiGatewayConfigurationError,
+    GatewayAiService,
+    type AiService,
+    type ChapterResult,
+    type SyllabusResult,
+} from './ai/service.js'
+import { completeDidacticUnitChapter } from './didactic-unit/complete-didactic-unit-chapter.js'
+import {
     createDidacticUnit,
     type DidacticUnit,
 } from './didactic-unit/create-didactic-unit.js'
-import { completeDidacticUnitChapter } from './didactic-unit/complete-didactic-unit-chapter.js'
 import {
     parseUpdateDidacticUnitChapterInput,
     resolveDidacticUnitChapterPresentationSettings,
 } from './didactic-unit/didactic-unit-chapter.js'
 import {
+    applyGeneratedDidacticUnitChapter,
     createChapterGenerationSourceFromDidacticUnit,
-    generateDidacticUnitChapter,
     hasGeneratedDidacticUnitChapter,
 } from './didactic-unit/generate-didactic-unit-chapter.js'
 import { listDidacticUnitChapters } from './didactic-unit/list-didactic-unit-chapters.js'
 import {
     answerDidacticUnitQuestionnaire,
+    applyGeneratedDidacticUnitQuestionnaire,
+    applyGeneratedDidacticUnitSyllabus,
     approveDidacticUnitSyllabus,
-    generateDidacticUnitQuestionnaire,
-    generateDidacticUnitSyllabus,
     generateDidacticUnitSyllabusPrompt,
     moderateDidacticUnitPlanning,
     updateDidacticUnitSyllabus,
 } from './didactic-unit/planning-lifecycle.js'
+import {
+    parseCreateDidacticUnitInput,
+    parseQuestionnaireAnswersInput,
+    parseUpdateDidacticUnitSyllabusInput,
+} from './didactic-unit/planning.js'
 import {
     summarizeDidacticUnit,
     summarizeDidacticUnitStudyProgress,
@@ -38,37 +58,18 @@ import {
     type GenerationRunStore,
     type SyllabusGenerationRunRecord,
 } from './generation-runs/generation-run-store.js'
-import { DeepSeekChapterGenerationError } from './providers/deepseek-chapter-generator.js'
-import { DeepSeekSyllabusGenerationError } from './providers/deepseek-syllabus-generator.js'
-import { OpenAiSyllabusGenerationError } from './providers/openai-syllabus-generator.js'
-import {
-    buildChapterGenerationPrompt,
-    ProviderBackedFakeChapterGenerator,
-    resolveChapterGeneratorModel,
-    type ChapterGenerator,
-} from './providers/chapter-generator.js'
-import { OpenAiChapterGenerationError } from './providers/openai-chapter-generator.js'
 import { attachMockOwner, type RequestWithMockOwner } from './middleware/mock-owner.js'
 import {
     disconnectedMongoHealthStatus,
     type MongoHealthStatus,
 } from './mongo/mongo-connection.js'
-import {
-    ProviderBackedFakeSyllabusGenerator,
-    resolveSyllabusGeneratorModel,
-    type SyllabusGenerator,
-} from './providers/syllabus-generator.js'
-import {
-    parseCreateDidacticUnitInput,
-    parseQuestionnaireAnswersInput,
-    parseUpdateDidacticUnitSyllabusInput,
-} from './didactic-unit/planning.js'
+import { buildChapterGenerationPrompt } from './providers/chapter-generator.js'
 
 export interface CreateAppOptions {
     didacticUnitStore: DidacticUnitStore
     generationRunStore: GenerationRunStore
-    syllabusGenerator?: SyllabusGenerator
-    chapterGenerator?: ChapterGenerator
+    aiConfigStore?: AiConfigStore
+    aiService?: AiService
     mongoHealth?: MongoHealthStatus
 }
 
@@ -86,23 +87,6 @@ function parseChapterIndex(value: string): number {
     return chapterIndex
 }
 
-function canCreateSyllabusGenerationRun(didacticUnit: {
-    status: string
-    syllabusPrompt?: string
-}): boolean {
-    return (
-        didacticUnit.status === 'syllabus_prompt_ready' &&
-        Boolean(didacticUnit.syllabusPrompt?.trim())
-    )
-}
-
-function canBuildChapterGenerationPrompt(
-    didacticUnit: { syllabus?: { chapters?: unknown[] } | undefined },
-    chapterIndex: number
-): boolean {
-    return Boolean(didacticUnit.syllabus?.chapters?.[chapterIndex])
-}
-
 function compareRunsByCreatedAtDesc(
     left: SyllabusGenerationRunRecord | ChapterGenerationRunRecord,
     right: SyllabusGenerationRunRecord | ChapterGenerationRunRecord
@@ -111,10 +95,8 @@ function compareRunsByCreatedAtDesc(
 }
 
 function buildDidacticUnitResponse(didacticUnit: DidacticUnit) {
-    const { ...restDidacticUnit } = didacticUnit
-
     return {
-        ...restDidacticUnit,
+        ...didacticUnit,
         studyProgress: summarizeDidacticUnitStudyProgress(didacticUnit),
     }
 }
@@ -145,14 +127,141 @@ function resolveDidacticUnitChapterState(input: {
     return 'pending'
 }
 
+function resolveCompatibilityProvider(
+    configuredProvider: string,
+    requestedProvider: string
+): string {
+    return requestedProvider === 'profile-config' ? configuredProvider : requestedProvider
+}
+
+function resolveStageConfigError(
+    error: unknown,
+    fallbackMessage: string
+): { status: number; message: string } {
+    if (error instanceof AiGatewayConfigurationError || error instanceof AiConfigValidationError) {
+        return { status: 500, message: error.message }
+    }
+
+    return {
+        status: 409,
+        message: error instanceof Error ? error.message : fallbackMessage,
+    }
+}
+
+function createAbortSignal(request: express.Request): AbortSignal {
+    const controller = new AbortController()
+    request.on('close', () => controller.abort())
+    return controller.signal
+}
+
+async function recordCompletedSyllabusRun(
+    generationRunStore: GenerationRunStore,
+    didacticUnit: DidacticUnit,
+    result: SyllabusResult
+): Promise<void> {
+    await generationRunStore.save(
+        createCompletedSyllabusGenerationRunRecord({
+            didacticUnitId: didacticUnit.id,
+            ownerId: didacticUnit.ownerId,
+            provider: result.provider,
+            model: result.model,
+            prompt: result.prompt,
+            syllabus: didacticUnit.syllabus!,
+            createdAt: didacticUnit.syllabusGeneratedAt ?? new Date().toISOString(),
+        })
+    )
+}
+
+async function recordFailedSyllabusRun(
+    generationRunStore: GenerationRunStore,
+    didacticUnit: DidacticUnit,
+    stageConfig: AiStageConfig,
+    error: unknown
+): Promise<void> {
+    if (didacticUnit.status !== 'syllabus_prompt_ready' || !didacticUnit.syllabusPrompt) {
+        return
+    }
+
+    await generationRunStore.save(
+        createFailedSyllabusGenerationRunRecord({
+            didacticUnitId: didacticUnit.id,
+            ownerId: didacticUnit.ownerId,
+            provider: stageConfig.provider,
+            model: stageConfig.model,
+            prompt: didacticUnit.syllabusPrompt,
+            error:
+                error instanceof Error
+                    ? error.message
+                    : 'Didactic unit syllabus generation failed.',
+            createdAt: new Date().toISOString(),
+        })
+    )
+}
+
+async function recordCompletedChapterRun(
+    generationRunStore: GenerationRunStore,
+    didacticUnit: DidacticUnit,
+    chapterIndex: number,
+    result: ChapterResult
+): Promise<void> {
+    const generatedChapter = didacticUnit.generatedChapters?.find(
+        (chapter) => chapter.chapterIndex === chapterIndex
+    )
+
+    if (!generatedChapter) {
+        return
+    }
+
+    await generationRunStore.save(
+        createCompletedChapterGenerationRunRecord({
+            didacticUnitId: didacticUnit.id,
+            ownerId: didacticUnit.ownerId,
+            chapterIndex,
+            provider: result.provider,
+            model: result.model,
+            prompt: result.prompt,
+            chapter: generatedChapter,
+            createdAt: generatedChapter.generatedAt,
+        })
+    )
+}
+
+async function recordFailedChapterRun(
+    generationRunStore: GenerationRunStore,
+    didacticUnit: DidacticUnit,
+    chapterIndex: number,
+    stageConfig: AiStageConfig,
+    error: unknown
+): Promise<void> {
+    const promptSource = createChapterGenerationSourceFromDidacticUnit(didacticUnit)
+
+    if (!promptSource.syllabus?.chapters?.[chapterIndex]) {
+        return
+    }
+
+    await generationRunStore.save(
+        createFailedChapterGenerationRunRecord({
+            didacticUnitId: didacticUnit.id,
+            ownerId: didacticUnit.ownerId,
+            chapterIndex,
+            provider: stageConfig.provider,
+            model: stageConfig.model,
+            prompt: buildChapterGenerationPrompt(promptSource, chapterIndex),
+            error:
+                error instanceof Error
+                    ? error.message
+                    : 'Didactic unit chapter generation failed.',
+            createdAt: new Date().toISOString(),
+        })
+    )
+}
+
 export function createApp(options: CreateAppOptions) {
     const app = express()
     const didacticUnitStore = options.didacticUnitStore
     const generationRunStore = options.generationRunStore
-    const syllabusGenerator =
-        options.syllabusGenerator ?? new ProviderBackedFakeSyllabusGenerator()
-    const chapterGenerator =
-        options.chapterGenerator ?? new ProviderBackedFakeChapterGenerator()
+    const aiConfigStore = options.aiConfigStore ?? new InMemoryAiConfigStore()
+    const aiService = options.aiService ?? new GatewayAiService()
     const mongoHealth = options.mongoHealth ?? disconnectedMongoHealthStatus
 
     app.use(express.json())
@@ -169,14 +278,45 @@ export function createApp(options: CreateAppOptions) {
         })
     })
 
+    app.get('/api/ai-config', async (request, response) => {
+        const requestWithMockOwner = asRequestWithMockOwner(request)
+        response.json(await aiConfigStore.get(requestWithMockOwner.mockOwner.id))
+    })
+
+    app.patch('/api/ai-config', async (request, response) => {
+        const requestWithMockOwner = asRequestWithMockOwner(request)
+
+        try {
+            const patch = parseAiConfigPatch(request.body)
+            response.json(await aiConfigStore.update(requestWithMockOwner.mockOwner.id, patch))
+        } catch (error) {
+            response.status(400).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : 'Invalid AI config update request.',
+            })
+        }
+    })
+
     app.post('/api/didactic-unit', async (request, response) => {
         const requestWithMockOwner = asRequestWithMockOwner(request)
 
         try {
             const input = parseCreateDidacticUnitInput(request.body)
-            const didacticUnit = createDidacticUnit(input, requestWithMockOwner.mockOwner.id)
-            await didacticUnitStore.save(didacticUnit)
+            const config = await aiConfigStore.get(requestWithMockOwner.mockOwner.id)
+            const didacticUnit = createDidacticUnit(
+                {
+                    ...input,
+                    provider: resolveCompatibilityProvider(
+                        config.syllabus.provider,
+                        input.provider
+                    ),
+                },
+                requestWithMockOwner.mockOwner.id
+            )
 
+            await didacticUnitStore.save(didacticUnit)
             response.status(201).json(buildDidacticUnitResponse(didacticUnit))
         } catch (error) {
             response.status(400).json({
@@ -203,9 +343,7 @@ export function createApp(options: CreateAppOptions) {
         )
 
         if (!didacticUnit) {
-            response.status(404).json({
-                error: 'Didactic unit not found.',
-            })
+            response.status(404).json({ error: 'Didactic unit not found.' })
             return
         }
 
@@ -220,22 +358,122 @@ export function createApp(options: CreateAppOptions) {
         )
 
         if (!didacticUnit) {
-            response.status(404).json({
-                error: 'Didactic unit not found.',
-            })
+            response.status(404).json({ error: 'Didactic unit not found.' })
+            return
+        }
+
+        if (didacticUnit.status !== 'submitted') {
+            response.json(buildDidacticUnitResponse(didacticUnit))
             return
         }
 
         try {
-            const moderatedDidacticUnit = moderateDidacticUnitPlanning(didacticUnit)
+            const config = await aiConfigStore.get(requestWithMockOwner.mockOwner.id)
+            const moderation = await aiService.moderateTopic({
+                topic: didacticUnit.topic,
+                config,
+                abortSignal: createAbortSignal(request),
+            })
+
+            if (!moderation.approved) {
+                response.status(409).json({ error: moderation.notes })
+                return
+            }
+
+            const moderatedDidacticUnit = moderateDidacticUnitPlanning({
+                ...didacticUnit,
+                topic: moderation.normalizedTopic,
+                title: moderation.normalizedTopic,
+            })
             await didacticUnitStore.save(moderatedDidacticUnit)
             response.json(buildDidacticUnitResponse(moderatedDidacticUnit))
         } catch (error) {
-            response.status(409).json({
-                error:
-                    error instanceof Error ? error.message : 'Didactic unit moderation failed.',
-            })
+            const resolved = resolveStageConfigError(
+                error,
+                'Didactic unit moderation failed.'
+            )
+            response.status(resolved.status).json({ error: resolved.message })
         }
+    })
+
+    app.post('/api/didactic-unit/:id/moderate/stream', async (request, response) => {
+        const requestWithMockOwner = asRequestWithMockOwner(request)
+        const didacticUnit = await didacticUnitStore.getById(
+            requestWithMockOwner.mockOwner.id,
+            request.params.id
+        )
+
+        if (!didacticUnit) {
+            response.status(404).json({ error: 'Didactic unit not found.' })
+            return
+        }
+
+        if (didacticUnit.status !== 'submitted') {
+            openNdjsonStream(response)
+            writeNdjsonEvent(response, {
+                type: 'complete',
+                data: buildDidacticUnitResponse(didacticUnit),
+            })
+            response.end()
+            return
+        }
+
+        openNdjsonStream(response)
+
+        try {
+            const config = await aiConfigStore.get(requestWithMockOwner.mockOwner.id)
+            const moderation = await aiService.streamModeration(
+                {
+                    topic: didacticUnit.topic,
+                    config,
+                    abortSignal: createAbortSignal(request),
+                },
+                {
+                    onStart: async (selection) => {
+                        writeNdjsonEvent(response, {
+                            type: 'start',
+                            stage: 'moderation',
+                            provider: selection.provider,
+                            model: selection.model,
+                        })
+                    },
+                    onPartial: async (partial) => {
+                        writeNdjsonEvent(response, {
+                            type: 'partial_structured',
+                            data: partial,
+                        })
+                    },
+                }
+            )
+
+            if (!moderation.approved) {
+                writeNdjsonEvent(response, {
+                    type: 'error',
+                    message: moderation.notes,
+                })
+                response.end()
+                return
+            }
+
+            const moderatedDidacticUnit = moderateDidacticUnitPlanning({
+                ...didacticUnit,
+                topic: moderation.normalizedTopic,
+                title: moderation.normalizedTopic,
+            })
+            await didacticUnitStore.save(moderatedDidacticUnit)
+            writeNdjsonEvent(response, {
+                type: 'complete',
+                data: buildDidacticUnitResponse(moderatedDidacticUnit),
+            })
+        } catch (error) {
+            const resolved = resolveStageConfigError(
+                error,
+                'Didactic unit moderation failed.'
+            )
+            writeNdjsonEvent(response, { type: 'error', message: resolved.message })
+        }
+
+        response.end()
     })
 
     app.post('/api/didactic-unit/:id/questionnaire/generate', async (request, response) => {
@@ -246,24 +484,92 @@ export function createApp(options: CreateAppOptions) {
         )
 
         if (!didacticUnit) {
-            response.status(404).json({
-                error: 'Didactic unit not found.',
-            })
+            response.status(404).json({ error: 'Didactic unit not found.' })
             return
         }
 
         try {
-            const updatedDidacticUnit = generateDidacticUnitQuestionnaire(didacticUnit)
+            const config = await aiConfigStore.get(requestWithMockOwner.mockOwner.id)
+            const result = await aiService.generateQuestionnaire({
+                topic: didacticUnit.topic,
+                config,
+                abortSignal: createAbortSignal(request),
+            })
+            const updatedDidacticUnit = applyGeneratedDidacticUnitQuestionnaire(
+                didacticUnit,
+                result.questionnaire
+            )
+            updatedDidacticUnit.provider = result.provider
             await didacticUnitStore.save(updatedDidacticUnit)
             response.json(buildDidacticUnitResponse(updatedDidacticUnit))
         } catch (error) {
-            response.status(409).json({
-                error:
-                    error instanceof Error
-                        ? error.message
-                        : 'Didactic unit questionnaire generation failed.',
-            })
+            const resolved = resolveStageConfigError(
+                error,
+                'Didactic unit questionnaire generation failed.'
+            )
+            response.status(resolved.status).json({ error: resolved.message })
         }
+    })
+
+    app.post('/api/didactic-unit/:id/questionnaire/generate/stream', async (request, response) => {
+        const requestWithMockOwner = asRequestWithMockOwner(request)
+        const didacticUnit = await didacticUnitStore.getById(
+            requestWithMockOwner.mockOwner.id,
+            request.params.id
+        )
+
+        if (!didacticUnit) {
+            response.status(404).json({ error: 'Didactic unit not found.' })
+            return
+        }
+
+        openNdjsonStream(response)
+
+        try {
+            const config = await aiConfigStore.get(requestWithMockOwner.mockOwner.id)
+            const result = await aiService.streamQuestionnaire(
+                {
+                    topic: didacticUnit.topic,
+                    config,
+                    abortSignal: createAbortSignal(request),
+                },
+                {
+                    onStart: async (selection) => {
+                        writeNdjsonEvent(response, {
+                            type: 'start',
+                            stage: 'questionnaire',
+                            provider: selection.provider,
+                            model: selection.model,
+                        })
+                    },
+                    onPartial: async (partial) => {
+                        writeNdjsonEvent(response, {
+                            type: 'partial_structured',
+                            data: partial,
+                        })
+                    },
+                }
+            )
+
+            const updatedDidacticUnit = applyGeneratedDidacticUnitQuestionnaire(
+                didacticUnit,
+                result.questionnaire
+            )
+            updatedDidacticUnit.provider = result.provider
+            await didacticUnitStore.save(updatedDidacticUnit)
+            writeNdjsonEvent(response, {
+                type: 'complete',
+                data: buildDidacticUnitResponse(updatedDidacticUnit),
+            })
+        } catch (error) {
+            const resolved = resolveStageConfigError(
+                error,
+                'Didactic unit questionnaire generation failed.'
+            )
+            writeNdjsonEvent(response, { type: 'error', message: resolved.message })
+        }
+
+        response.end()
     })
 
     app.patch('/api/didactic-unit/:id/questionnaire/answers', async (request, response) => {
@@ -274,9 +580,7 @@ export function createApp(options: CreateAppOptions) {
         )
 
         if (!didacticUnit) {
-            response.status(404).json({
-                error: 'Didactic unit not found.',
-            })
+            response.status(404).json({ error: 'Didactic unit not found.' })
             return
         }
 
@@ -318,9 +622,7 @@ export function createApp(options: CreateAppOptions) {
         )
 
         if (!didacticUnit) {
-            response.status(404).json({
-                error: 'Didactic unit not found.',
-            })
+            response.status(404).json({ error: 'Didactic unit not found.' })
             return
         }
 
@@ -346,61 +648,120 @@ export function createApp(options: CreateAppOptions) {
         )
 
         if (!didacticUnit) {
-            response.status(404).json({
-                error: 'Didactic unit not found.',
-            })
+            response.status(404).json({ error: 'Didactic unit not found.' })
             return
         }
 
+        const config = await aiConfigStore.get(requestWithMockOwner.mockOwner.id)
+
         try {
-            const updatedDidacticUnit = await generateDidacticUnitSyllabus(
+            const result = await aiService.generateSyllabus({
+                topic: didacticUnit.topic,
+                syllabusPrompt: didacticUnit.syllabusPrompt ?? '',
+                questionnaireAnswers: didacticUnit.questionnaireAnswers,
+                config,
+                abortSignal: createAbortSignal(request),
+            })
+            const updatedDidacticUnit = applyGeneratedDidacticUnitSyllabus(
                 didacticUnit,
-                syllabusGenerator
+                result.syllabus
             )
+            updatedDidacticUnit.provider = result.provider
             await didacticUnitStore.save(updatedDidacticUnit)
-            await generationRunStore.save(
-                createCompletedSyllabusGenerationRunRecord({
-                    didacticUnitId: updatedDidacticUnit.id,
-                    ownerId: updatedDidacticUnit.ownerId,
-                    provider: updatedDidacticUnit.provider,
-                    model: resolveSyllabusGeneratorModel(updatedDidacticUnit.provider),
-                    prompt: updatedDidacticUnit.syllabusPrompt ?? '',
-                    syllabus: updatedDidacticUnit.syllabus!,
-                    createdAt:
-                        updatedDidacticUnit.syllabusGeneratedAt ?? new Date().toISOString(),
-                })
+            await recordCompletedSyllabusRun(
+                generationRunStore,
+                updatedDidacticUnit,
+                result
             )
             response.json(buildDidacticUnitResponse(updatedDidacticUnit))
         } catch (error) {
-            if (canCreateSyllabusGenerationRun(didacticUnit)) {
-                await generationRunStore.save(
-                    createFailedSyllabusGenerationRunRecord({
-                        didacticUnitId: didacticUnit.id,
-                        ownerId: didacticUnit.ownerId,
-                        provider: didacticUnit.provider,
-                        model: resolveSyllabusGeneratorModel(didacticUnit.provider),
-                        prompt: didacticUnit.syllabusPrompt ?? '',
-                        rawOutput:
-                            error instanceof OpenAiSyllabusGenerationError ||
-                            error instanceof DeepSeekSyllabusGenerationError
-                                ? error.rawOutput
-                                : undefined,
-                        error:
-                            error instanceof Error
-                                ? error.message
-                                : 'Didactic unit syllabus generation failed.',
-                        createdAt: new Date().toISOString(),
-                    })
-                )
-            }
-
-            response.status(409).json({
-                error:
-                    error instanceof Error
-                        ? error.message
-                        : 'Didactic unit syllabus generation failed.',
-            })
+            await recordFailedSyllabusRun(
+                generationRunStore,
+                didacticUnit,
+                config.syllabus,
+                error
+            )
+            const resolved = resolveStageConfigError(
+                error,
+                'Didactic unit syllabus generation failed.'
+            )
+            response.status(resolved.status).json({ error: resolved.message })
         }
+    })
+
+    app.post('/api/didactic-unit/:id/syllabus/generate/stream', async (request, response) => {
+        const requestWithMockOwner = asRequestWithMockOwner(request)
+        const didacticUnit = await didacticUnitStore.getById(
+            requestWithMockOwner.mockOwner.id,
+            request.params.id
+        )
+
+        if (!didacticUnit) {
+            response.status(404).json({ error: 'Didactic unit not found.' })
+            return
+        }
+
+        openNdjsonStream(response)
+        const config = await aiConfigStore.get(requestWithMockOwner.mockOwner.id)
+
+        try {
+            const result = await aiService.streamSyllabus(
+                {
+                    topic: didacticUnit.topic,
+                    syllabusPrompt: didacticUnit.syllabusPrompt ?? '',
+                    questionnaireAnswers: didacticUnit.questionnaireAnswers,
+                    config,
+                    abortSignal: createAbortSignal(request),
+                },
+                {
+                    onStart: async (selection) => {
+                        writeNdjsonEvent(response, {
+                            type: 'start',
+                            stage: 'syllabus',
+                            provider: selection.provider,
+                            model: selection.model,
+                        })
+                    },
+                    onMarkdown: async (delta, markdown) => {
+                        writeNdjsonEvent(response, {
+                            type: 'partial_markdown',
+                            delta,
+                            markdown,
+                        })
+                    },
+                }
+            )
+
+            const updatedDidacticUnit = applyGeneratedDidacticUnitSyllabus(
+                didacticUnit,
+                result.syllabus
+            )
+            updatedDidacticUnit.provider = result.provider
+            await didacticUnitStore.save(updatedDidacticUnit)
+            await recordCompletedSyllabusRun(
+                generationRunStore,
+                updatedDidacticUnit,
+                result
+            )
+            writeNdjsonEvent(response, {
+                type: 'complete',
+                data: buildDidacticUnitResponse(updatedDidacticUnit),
+            })
+        } catch (error) {
+            await recordFailedSyllabusRun(
+                generationRunStore,
+                didacticUnit,
+                config.syllabus,
+                error
+            )
+            const resolved = resolveStageConfigError(
+                error,
+                'Didactic unit syllabus generation failed.'
+            )
+            writeNdjsonEvent(response, { type: 'error', message: resolved.message })
+        }
+
+        response.end()
     })
 
     app.patch('/api/didactic-unit/:id/syllabus', async (request, response) => {
@@ -411,9 +772,7 @@ export function createApp(options: CreateAppOptions) {
         )
 
         if (!didacticUnit) {
-            response.status(404).json({
-                error: 'Didactic unit not found.',
-            })
+            response.status(404).json({ error: 'Didactic unit not found.' })
             return
         }
 
@@ -449,9 +808,7 @@ export function createApp(options: CreateAppOptions) {
         )
 
         if (!didacticUnit) {
-            response.status(404).json({
-                error: 'Didactic unit not found.',
-            })
+            response.status(404).json({ error: 'Didactic unit not found.' })
             return
         }
 
@@ -469,6 +826,65 @@ export function createApp(options: CreateAppOptions) {
         }
     })
 
+    app.post('/api/didactic-unit/:id/summary/generate/stream', async (request, response) => {
+        const requestWithMockOwner = asRequestWithMockOwner(request)
+        const didacticUnit = await didacticUnitStore.getById(
+            requestWithMockOwner.mockOwner.id,
+            request.params.id
+        )
+
+        if (!didacticUnit) {
+            response.status(404).json({ error: 'Didactic unit not found.' })
+            return
+        }
+
+        const sourceMarkdown = (didacticUnit.generatedChapters ?? [])
+            .map((chapter) => `# ${chapter.title}\n\n${chapter.content}`)
+            .join('\n\n')
+
+        openNdjsonStream(response)
+
+        try {
+            const config = await aiConfigStore.get(requestWithMockOwner.mockOwner.id)
+            const result = await aiService.streamSummary(
+                {
+                    topic: didacticUnit.topic,
+                    chapterTitle: didacticUnit.title,
+                    chapterMarkdown: sourceMarkdown || didacticUnit.overview,
+                    config,
+                    abortSignal: createAbortSignal(request),
+                },
+                {
+                    onStart: async (selection) => {
+                        writeNdjsonEvent(response, {
+                            type: 'start',
+                            stage: 'summary',
+                            provider: selection.provider,
+                            model: selection.model,
+                        })
+                    },
+                    onMarkdown: async (delta, markdown) => {
+                        writeNdjsonEvent(response, {
+                            type: 'partial_markdown',
+                            delta,
+                            markdown,
+                        })
+                    },
+                }
+            )
+
+            writeNdjsonEvent(response, { type: 'complete', data: result })
+        } catch (error) {
+            const resolved = resolveStageConfigError(
+                error,
+                'Didactic unit summary generation failed.'
+            )
+            writeNdjsonEvent(response, { type: 'error', message: resolved.message })
+        }
+
+        response.end()
+    })
+
     app.get('/api/didactic-unit/:id/chapters', async (request, response) => {
         const requestWithMockOwner = asRequestWithMockOwner(request)
         const didacticUnit = await didacticUnitStore.getById(
@@ -477,9 +893,7 @@ export function createApp(options: CreateAppOptions) {
         )
 
         if (!didacticUnit) {
-            response.status(404).json({
-                error: 'Didactic unit not found.',
-            })
+            response.status(404).json({ error: 'Didactic unit not found.' })
             return
         }
 
@@ -510,9 +924,7 @@ export function createApp(options: CreateAppOptions) {
         )
 
         if (!didacticUnit) {
-            response.status(404).json({
-                error: 'Didactic unit not found.',
-            })
+            response.status(404).json({ error: 'Didactic unit not found.' })
             return
         }
 
@@ -531,9 +943,7 @@ export function createApp(options: CreateAppOptions) {
 
         const plannedChapter = didacticUnit.chapters[chapterIndex]
         if (!plannedChapter) {
-            response.status(404).json({
-                error: 'Didactic unit chapter not found.',
-            })
+            response.status(404).json({ error: 'Didactic unit chapter not found.' })
             return
         }
 
@@ -546,7 +956,6 @@ export function createApp(options: CreateAppOptions) {
                 didacticUnit.id
             )
         ).filter((run): run is ChapterGenerationRunRecord => run.stage === 'chapter')
-
         const completedChapter = didacticUnit.completedChapters?.find(
             (chapter) => chapter.chapterIndex === chapterIndex
         )
@@ -580,9 +989,7 @@ export function createApp(options: CreateAppOptions) {
         )
 
         if (!didacticUnit) {
-            response.status(404).json({
-                error: 'Didactic unit not found.',
-            })
+            response.status(404).json({ error: 'Didactic unit not found.' })
             return
         }
 
@@ -604,15 +1011,11 @@ export function createApp(options: CreateAppOptions) {
             .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
 
         if (revisions.length === 0) {
-            response.status(404).json({
-                error: 'Didactic unit chapter revisions not found.',
-            })
+            response.status(404).json({ error: 'Didactic unit chapter revisions not found.' })
             return
         }
 
-        response.json({
-            revisions,
-        })
+        response.json({ revisions })
     })
 
     app.get('/api/didactic-unit/:id/runs', async (request, response) => {
@@ -623,9 +1026,7 @@ export function createApp(options: CreateAppOptions) {
         )
 
         if (!didacticUnit) {
-            response.status(404).json({
-                error: 'Didactic unit not found.',
-            })
+            response.status(404).json({ error: 'Didactic unit not found.' })
             return
         }
 
@@ -647,9 +1048,7 @@ export function createApp(options: CreateAppOptions) {
         )
 
         if (!didacticUnit) {
-            response.status(404).json({
-                error: 'Didactic unit not found.',
-            })
+            response.status(404).json({ error: 'Didactic unit not found.' })
             return
         }
 
@@ -678,12 +1077,9 @@ export function createApp(options: CreateAppOptions) {
                 error instanceof Error
                     ? error.message
                     : 'Didactic unit chapter completion failed.'
-
             response.status(
                 message === 'Generated didactic unit chapter not found.' ? 404 : 409
-            ).json({
-                error: message,
-            })
+            ).json({ error: message })
         }
     })
 
@@ -695,9 +1091,7 @@ export function createApp(options: CreateAppOptions) {
         )
 
         if (!didacticUnit) {
-            response.status(404).json({
-                error: 'Didactic unit not found.',
-            })
+            response.status(404).json({ error: 'Didactic unit not found.' })
             return
         }
 
@@ -744,225 +1138,181 @@ export function createApp(options: CreateAppOptions) {
                 error instanceof Error
                     ? error.message
                     : 'Didactic unit chapter update failed.'
-
             response.status(
                 message === 'Generated didactic unit chapter not found.' ? 404 : 409
-            ).json({
-                error: message,
-            })
+            ).json({ error: message })
         }
     })
 
-    app.post('/api/didactic-unit/:id/chapters/:chapterIndex/generate', async (request, response) => {
+    const runChapterGeneration = async (
+        request: express.Request,
+        response: express.Response,
+        revisionSource: 'ai_generation' | 'ai_regeneration',
+        isStreaming: boolean
+    ) => {
         const requestWithMockOwner = asRequestWithMockOwner(request)
+        const didacticUnitId = String(request.params.id)
+        const chapterIndexParam = String(request.params.chapterIndex)
         const didacticUnit = await didacticUnitStore.getById(
             requestWithMockOwner.mockOwner.id,
-            request.params.id
+            didacticUnitId
         )
 
         if (!didacticUnit) {
-            response.status(404).json({
-                error: 'Didactic unit not found.',
-            })
+            response.status(404).json({ error: 'Didactic unit not found.' })
             return
         }
 
         let chapterIndex
         try {
-            chapterIndex = parseChapterIndex(request.params.chapterIndex)
+            chapterIndex = parseChapterIndex(chapterIndexParam)
         } catch (error) {
             response.status(400).json({
                 error:
                     error instanceof Error
                         ? error.message
-                        : 'Invalid didactic unit chapter generation request.',
+                        : `Invalid didactic unit chapter ${revisionSource} request.`,
             })
             return
         }
 
-        try {
-            const updatedDidacticUnit = await generateDidacticUnitChapter(
-                didacticUnit,
-                chapterIndex,
-                chapterGenerator,
-                'ai_generation'
-            )
-            await didacticUnitStore.save(updatedDidacticUnit)
-
-            const generatedChapter = updatedDidacticUnit.generatedChapters?.find(
-                (chapter) => chapter.chapterIndex === chapterIndex
-            )
-
-            if (generatedChapter) {
-                await generationRunStore.save(
-                    createCompletedChapterGenerationRunRecord({
-                        didacticUnitId: updatedDidacticUnit.id,
-                        ownerId: updatedDidacticUnit.ownerId,
-                        chapterIndex,
-                        provider: updatedDidacticUnit.provider,
-                        model: resolveChapterGeneratorModel(updatedDidacticUnit.provider),
-                        prompt: buildChapterGenerationPrompt(
-                            createChapterGenerationSourceFromDidacticUnit(
-                                updatedDidacticUnit
-                            ),
-                            chapterIndex
-                        ),
-                        chapter: generatedChapter,
-                        createdAt: generatedChapter.generatedAt,
-                    })
-                )
-            }
-
-            response.json(buildDidacticUnitResponse(updatedDidacticUnit))
-        } catch (error) {
-            const promptSource = createChapterGenerationSourceFromDidacticUnit(didacticUnit)
-
-            if (canBuildChapterGenerationPrompt(promptSource, chapterIndex)) {
-                await generationRunStore.save(
-                    createFailedChapterGenerationRunRecord({
-                        didacticUnitId: didacticUnit.id,
-                        ownerId: didacticUnit.ownerId,
-                        chapterIndex,
-                        provider: didacticUnit.provider,
-                        model: resolveChapterGeneratorModel(didacticUnit.provider),
-                        prompt: buildChapterGenerationPrompt(promptSource, chapterIndex),
-                        rawOutput:
-                            error instanceof OpenAiChapterGenerationError ||
-                            error instanceof DeepSeekChapterGenerationError
-                                ? error.rawOutput
-                                : undefined,
-                        error:
-                            error instanceof Error
-                                ? error.message
-                                : 'Didactic unit chapter generation failed.',
-                        createdAt: new Date().toISOString(),
-                    })
-                )
-            }
-
-            const message =
-                error instanceof Error
-                    ? error.message
-                    : 'Didactic unit chapter generation failed.'
-
-            response.status(
-                message === 'Chapter index is out of range for the approved syllabus.'
-                    ? 400
-                    : 409
-            ).json({
-                error: message,
-            })
-        }
-    })
-
-    app.post('/api/didactic-unit/:id/chapters/:chapterIndex/regenerate', async (request, response) => {
-        const requestWithMockOwner = asRequestWithMockOwner(request)
-        const didacticUnit = await didacticUnitStore.getById(
-            requestWithMockOwner.mockOwner.id,
-            request.params.id
-        )
-
-        if (!didacticUnit) {
-            response.status(404).json({
-                error: 'Didactic unit not found.',
-            })
+        if (
+            revisionSource === 'ai_regeneration' &&
+            !hasGeneratedDidacticUnitChapter(didacticUnit, chapterIndex)
+        ) {
+            response.status(404).json({ error: 'Generated didactic unit chapter not found.' })
             return
         }
 
-        let chapterIndex
-        try {
-            chapterIndex = parseChapterIndex(request.params.chapterIndex)
-        } catch (error) {
+        const plannedChapter = didacticUnit.chapters[chapterIndex]
+        if (!plannedChapter) {
             response.status(400).json({
-                error:
-                    error instanceof Error
-                        ? error.message
-                        : 'Invalid didactic unit chapter regeneration request.',
+                error: 'Chapter index is out of range for the approved syllabus.',
             })
             return
         }
 
-        if (!hasGeneratedDidacticUnitChapter(didacticUnit, chapterIndex)) {
-            response.status(404).json({
-                error: 'Generated didactic unit chapter not found.',
-            })
-            return
+        const config = await aiConfigStore.get(requestWithMockOwner.mockOwner.id)
+
+        if (isStreaming) {
+            openNdjsonStream(response)
         }
 
         try {
-            const updatedDidacticUnit = await generateDidacticUnitChapter(
+            const result = isStreaming
+                ? await aiService.streamChapter(
+                      {
+                          topic: didacticUnit.topic,
+                          chapterIndex,
+                          chapterTitle: plannedChapter.title,
+                          chapterOverview: plannedChapter.overview,
+                          chapterKeyPoints: plannedChapter.keyPoints,
+                          questionnaireAnswers: didacticUnit.questionnaireAnswers,
+                          config,
+                          abortSignal: createAbortSignal(request),
+                      },
+                      {
+                          onStart: async (selection) => {
+                              writeNdjsonEvent(response, {
+                                  type: 'start',
+                                  stage: 'chapter',
+                                  provider: selection.provider,
+                                  model: selection.model,
+                              })
+                          },
+                          onMarkdown: async (delta, markdown) => {
+                              writeNdjsonEvent(response, {
+                                  type: 'partial_markdown',
+                                  delta,
+                                  markdown,
+                              })
+                          },
+                      }
+                  )
+                : await aiService.generateChapter({
+                      topic: didacticUnit.topic,
+                      chapterIndex,
+                      chapterTitle: plannedChapter.title,
+                      chapterOverview: plannedChapter.overview,
+                      chapterKeyPoints: plannedChapter.keyPoints,
+                      questionnaireAnswers: didacticUnit.questionnaireAnswers,
+                      config,
+                      abortSignal: createAbortSignal(request),
+                  })
+
+            const updatedDidacticUnit = applyGeneratedDidacticUnitChapter(
                 didacticUnit,
                 chapterIndex,
-                chapterGenerator,
-                'ai_regeneration'
+                result.chapter,
+                revisionSource
             )
+            updatedDidacticUnit.provider = result.provider
             await didacticUnitStore.save(updatedDidacticUnit)
-
-            const regeneratedChapter = updatedDidacticUnit.generatedChapters?.find(
-                (chapter) => chapter.chapterIndex === chapterIndex
+            await recordCompletedChapterRun(
+                generationRunStore,
+                updatedDidacticUnit,
+                chapterIndex,
+                result
             )
 
-            if (regeneratedChapter) {
-                await generationRunStore.save(
-                    createCompletedChapterGenerationRunRecord({
-                        didacticUnitId: updatedDidacticUnit.id,
-                        ownerId: updatedDidacticUnit.ownerId,
-                        chapterIndex,
-                        provider: updatedDidacticUnit.provider,
-                        model: resolveChapterGeneratorModel(updatedDidacticUnit.provider),
-                        prompt: buildChapterGenerationPrompt(
-                            createChapterGenerationSourceFromDidacticUnit(
-                                updatedDidacticUnit
-                            ),
-                            chapterIndex
-                        ),
-                        chapter: regeneratedChapter,
-                        createdAt: regeneratedChapter.generatedAt,
-                    })
-                )
+            if (isStreaming) {
+                writeNdjsonEvent(response, {
+                    type: 'complete',
+                    data: buildDidacticUnitResponse(updatedDidacticUnit),
+                })
+                response.end()
+                return
             }
 
             response.json(buildDidacticUnitResponse(updatedDidacticUnit))
         } catch (error) {
-            const promptSource = createChapterGenerationSourceFromDidacticUnit(didacticUnit)
+            await recordFailedChapterRun(
+                generationRunStore,
+                didacticUnit,
+                chapterIndex,
+                config.chapter,
+                error
+            )
+            const resolved = resolveStageConfigError(
+                error,
+                'Didactic unit chapter generation failed.'
+            )
 
-            if (canBuildChapterGenerationPrompt(promptSource, chapterIndex)) {
-                await generationRunStore.save(
-                    createFailedChapterGenerationRunRecord({
-                        didacticUnitId: didacticUnit.id,
-                        ownerId: didacticUnit.ownerId,
-                        chapterIndex,
-                        provider: didacticUnit.provider,
-                        model: resolveChapterGeneratorModel(didacticUnit.provider),
-                        prompt: buildChapterGenerationPrompt(promptSource, chapterIndex),
-                        rawOutput:
-                            error instanceof OpenAiChapterGenerationError ||
-                            error instanceof DeepSeekChapterGenerationError
-                                ? error.rawOutput
-                                : undefined,
-                        error:
-                            error instanceof Error
-                                ? error.message
-                                : 'Didactic unit chapter regeneration failed.',
-                        createdAt: new Date().toISOString(),
-                    })
-                )
+            if (isStreaming) {
+                writeNdjsonEvent(response, { type: 'error', message: resolved.message })
+                response.end()
+                return
             }
 
-            const message =
-                error instanceof Error
-                    ? error.message
-                    : 'Didactic unit chapter regeneration failed.'
-
             response.status(
-                message === 'Chapter index is out of range for the approved syllabus.'
+                resolved.message === 'Chapter index is out of range for the approved syllabus.'
                     ? 400
-                    : 409
-            ).json({
-                error: message,
-            })
+                    : resolved.status
+            ).json({ error: resolved.message })
         }
-    })
+    }
+
+    app.post('/api/didactic-unit/:id/chapters/:chapterIndex/generate', async (request, response) =>
+        runChapterGeneration(request, response, 'ai_generation', false)
+    )
+
+    app.post(
+        '/api/didactic-unit/:id/chapters/:chapterIndex/generate/stream',
+        async (request, response) =>
+            runChapterGeneration(request, response, 'ai_generation', true)
+    )
+
+    app.post(
+        '/api/didactic-unit/:id/chapters/:chapterIndex/regenerate',
+        async (request, response) =>
+            runChapterGeneration(request, response, 'ai_regeneration', false)
+    )
+
+    app.post(
+        '/api/didactic-unit/:id/chapters/:chapterIndex/regenerate/stream',
+        async (request, response) =>
+            runChapterGeneration(request, response, 'ai_regeneration', true)
+    )
 
     return app
 }

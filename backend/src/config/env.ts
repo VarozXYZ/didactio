@@ -4,12 +4,18 @@ let envLoaded = false
 
 export interface AppEnv {
     port: number
-    openAiApiKey: string | null
-    openAiSyllabusModel: string
-    openAiChapterModel: string
-    deepSeekApiKey: string | null
-    deepSeekSyllabusModel: string
-    deepSeekChapterModel: string
+    aiGatewayApiKey: string | null
+    aiGatewayBaseUrl: string
+    aiModerationProvider: string
+    aiModerationModel: string
+    aiQuestionnaireProvider: string
+    aiQuestionnaireModel: string
+    aiSyllabusProvider: string
+    aiSyllabusModel: string
+    aiSummaryProvider: string
+    aiSummaryModel: string
+    aiChapterProvider: string
+    aiChapterModel: string
     mongoDbUri: string | null
     mongoDbName: string
 }
@@ -45,14 +51,26 @@ export function loadEnv(): void {
 export function getAppEnv(): AppEnv {
     return {
         port: parsePort(process.env.PORT),
-        openAiApiKey: parseOptionalString(process.env.OPENAI_API_KEY),
-        openAiSyllabusModel: parseOptionalString(process.env.OPENAI_SYLLABUS_MODEL) ?? 'gpt-4o-mini',
-        openAiChapterModel: parseOptionalString(process.env.OPENAI_CHAPTER_MODEL) ?? 'gpt-4o-mini',
-        deepSeekApiKey: parseOptionalString(process.env.DEEPSEEK_API_KEY),
-        deepSeekSyllabusModel:
-            parseOptionalString(process.env.DEEPSEEK_SYLLABUS_MODEL) ?? 'deepseek-chat',
-        deepSeekChapterModel:
-            parseOptionalString(process.env.DEEPSEEK_CHAPTER_MODEL) ?? 'deepseek-chat',
+        aiGatewayApiKey: parseOptionalString(process.env.AI_GATEWAY_API_KEY),
+        aiGatewayBaseUrl:
+            parseOptionalString(process.env.AI_GATEWAY_BASE_URL) ??
+            'https://ai-gateway.vercel.sh/v1/ai',
+        aiModerationProvider:
+            parseOptionalString(process.env.AI_MODERATION_PROVIDER) ?? 'openai',
+        aiModerationModel:
+            parseOptionalString(process.env.AI_MODERATION_MODEL) ?? 'gpt-4o-mini',
+        aiQuestionnaireProvider:
+            parseOptionalString(process.env.AI_QUESTIONNAIRE_PROVIDER) ?? 'openai',
+        aiQuestionnaireModel:
+            parseOptionalString(process.env.AI_QUESTIONNAIRE_MODEL) ?? 'gpt-4o-mini',
+        aiSyllabusProvider:
+            parseOptionalString(process.env.AI_SYLLABUS_PROVIDER) ?? 'openai',
+        aiSyllabusModel: parseOptionalString(process.env.AI_SYLLABUS_MODEL) ?? 'gpt-4o-mini',
+        aiSummaryProvider:
+            parseOptionalString(process.env.AI_SUMMARY_PROVIDER) ?? 'openai',
+        aiSummaryModel: parseOptionalString(process.env.AI_SUMMARY_MODEL) ?? 'gpt-4o-mini',
+        aiChapterProvider: parseOptionalString(process.env.AI_CHAPTER_PROVIDER) ?? 'openai',
+        aiChapterModel: parseOptionalString(process.env.AI_CHAPTER_MODEL) ?? 'gpt-4o-mini',
         mongoDbUri: parseOptionalString(process.env.MONGODB_URI),
         mongoDbName: parseOptionalString(process.env.MONGODB_DB_NAME) ?? 'didactio',
     }

@@ -1,10 +1,11 @@
 import type {
     DidacticUnitQuestionAnswer,
     DidacticUnitQuestionnaireAnswersInput,
+    DidacticUnitQuestionnaire,
+    DidacticUnitSyllabus,
     UpdateDidacticUnitSyllabusInput,
 } from './planning.js'
 import { buildQuestionnaireForDidacticUnit } from './planning.js'
-import type { SyllabusGenerator } from '../providers/syllabus-generator.js'
 import type { DidacticUnit } from './create-didactic-unit.js'
 
 function withUpdatedAt<T extends DidacticUnit>(didacticUnit: T): T {
@@ -78,6 +79,28 @@ export function generateDidacticUnitQuestionnaire(didacticUnit: DidacticUnit): D
     })
 }
 
+export function applyGeneratedDidacticUnitQuestionnaire(
+    didacticUnit: DidacticUnit,
+    questionnaire: DidacticUnitQuestionnaire
+): DidacticUnit {
+    if (didacticUnit.status !== 'moderation_completed') {
+        throw new Error('Questionnaire cannot be generated from the current didactic unit state.')
+    }
+
+    return withUpdatedAt({
+        ...didacticUnit,
+        status: 'questionnaire_ready',
+        nextAction: 'answer_questionnaire',
+        questionnaire: {
+            questions: questionnaire.questions.map((question) => ({
+                ...question,
+                options: question.options ? [...question.options] : undefined,
+            })),
+        },
+        questionnaireGeneratedAt: new Date().toISOString(),
+    })
+}
+
 export function answerDidacticUnitQuestionnaire(
     didacticUnit: DidacticUnit,
     input: DidacticUnitQuestionnaireAnswersInput
@@ -126,20 +149,13 @@ export function generateDidacticUnitSyllabusPrompt(didacticUnit: DidacticUnit): 
     })
 }
 
-export async function generateDidacticUnitSyllabus(
+export function applyGeneratedDidacticUnitSyllabus(
     didacticUnit: DidacticUnit,
-    syllabusGenerator: SyllabusGenerator
-): Promise<DidacticUnit> {
+    syllabus: DidacticUnitSyllabus
+): DidacticUnit {
     if (didacticUnit.status !== 'syllabus_prompt_ready' || !didacticUnit.syllabusPrompt) {
         throw new Error('Syllabus cannot be generated from the current didactic unit state.')
     }
-
-    const syllabus = await syllabusGenerator.generate({
-        topic: didacticUnit.topic,
-        provider: didacticUnit.provider,
-        questionnaireAnswers: didacticUnit.questionnaireAnswers,
-        syllabusPrompt: didacticUnit.syllabusPrompt,
-    })
 
     return withUpdatedAt({
         ...didacticUnit,

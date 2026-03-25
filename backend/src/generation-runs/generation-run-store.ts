@@ -1,9 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { DidacticUnitGeneratedChapter } from '../didactic-unit/didactic-unit-chapter.js'
-import type {
-    DidacticUnitProvider,
-    DidacticUnitSyllabus,
-} from '../didactic-unit/planning.js'
+import type { DidacticUnitSyllabus } from '../didactic-unit/planning.js'
 
 export type GenerationRunStage = 'syllabus' | 'chapter'
 export type GenerationRunStatus = 'completed' | 'failed'
@@ -12,7 +9,7 @@ interface GenerationRunBase {
     id: string
     didacticUnitId: string
     ownerId: string
-    provider: DidacticUnitProvider
+    provider: string
     model: string
     prompt: string
     status: GenerationRunStatus
@@ -59,7 +56,7 @@ export class InMemoryGenerationRunStore implements GenerationRunStore {
 interface CreateCompletedSyllabusGenerationRunInput {
     didacticUnitId: string
     ownerId: string
-    provider: DidacticUnitProvider
+    provider: string
     model: string
     prompt: string
     syllabus: DidacticUnitSyllabus
@@ -69,7 +66,7 @@ interface CreateCompletedSyllabusGenerationRunInput {
 interface CreateFailedSyllabusGenerationRunInput {
     didacticUnitId: string
     ownerId: string
-    provider: DidacticUnitProvider
+    provider: string
     model: string
     prompt: string
     rawOutput?: string
@@ -81,7 +78,7 @@ interface CreateCompletedChapterGenerationRunInput {
     didacticUnitId: string
     ownerId: string
     chapterIndex: number
-    provider: DidacticUnitProvider
+    provider: string
     model: string
     prompt: string
     chapter: DidacticUnitGeneratedChapter
@@ -92,7 +89,7 @@ interface CreateFailedChapterGenerationRunInput {
     didacticUnitId: string
     ownerId: string
     chapterIndex: number
-    provider: DidacticUnitProvider
+    provider: string
     model: string
     prompt: string
     rawOutput?: string

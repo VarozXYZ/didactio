@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Sparkles, X } from 'lucide-react'
+import { Streamdown } from 'streamdown'
 import { dashboardApi } from '../../api/dashboardApi'
 import { adaptDidacticUnitPlanning } from '../../adapters'
 import type { PlanningDetailViewModel, PlanningSyllabus } from '../../types'
@@ -32,7 +33,6 @@ export function DidacticUnitSetupModal({
 }: DidacticUnitSetupModalProps) {
     const [planning, setPlanning] = useState<PlanningDetailViewModel | null>(null)
     const [draftTopic, setDraftTopic] = useState('')
-    const [provider, setProvider] = useState<'openai' | 'deepseek'>('openai')
     const [questionnaireAnswers, setQuestionnaireAnswers] = useState<Record<string, string>>({})
     const [draftSyllabus, setDraftSyllabus] = useState<PlanningSyllabus | null>(null)
     const [isLoading, setIsLoading] = useState(Boolean(didacticUnitId))
@@ -41,6 +41,8 @@ export function DidacticUnitSetupModal({
     const [activeDidacticUnitId, setActiveDidacticUnitId] = useState<string | null>(
         didacticUnitId ?? null
     )
+    const [streamedSyllabusMarkdown, setStreamedSyllabusMarkdown] = useState('')
+    const [isStreamingSyllabus, setIsStreamingSyllabus] = useState(false)
 
     const loadPlanning = async (id: string) => {
         setIsLoading(true)
@@ -49,7 +51,6 @@ export function DidacticUnitSetupModal({
         try {
             let detail = await dashboardApi.getDidacticUnit(id)
 
-            // Older local data may still require the legacy manual moderation step.
             if (detail.nextAction === 'moderate_topic') {
                 detail = await dashboardApi.moderateDidacticUnit(id)
             }
@@ -110,7 +111,7 @@ export function DidacticUnitSetupModal({
     const handleCreate = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault()
         await runAction(async () =>
-            dashboardApi.createDidacticUnit({ topic: draftTopic.trim(), provider })
+            dashboardApi.createDidacticUnit({ topic: draftTopic.trim() })
         )
     }
 
@@ -119,12 +120,10 @@ export function DidacticUnitSetupModal({
             return
         }
 
-        const questionnaire = planning.questionnaire
-
         await runAction(async () => {
             await dashboardApi.answerDidacticUnitQuestionnaire(
                 planning.id,
-                questionnaire.questions.map((question) => ({
+                planning.questionnaire!.questions.map((question) => ({
                     questionId: question.id,
                     value: questionnaireAnswers[question.id]?.trim() ?? '',
                 }))
@@ -140,6 +139,37 @@ export function DidacticUnitSetupModal({
         await runAction(async () => {
             await dashboardApi.updateDidacticUnitSyllabus(planning.id, draftSyllabus)
         })
+    }
+
+    const handleGenerateSyllabus = async () => {
+        if (!planning) {
+            return
+        }
+
+        setIsSubmitting(true)
+        setIsStreamingSyllabus(true)
+        setStreamedSyllabusMarkdown('')
+        setError(null)
+
+        try {
+            const detail = await dashboardApi.streamDidacticUnitSyllabus(planning.id, {
+                onPartialMarkdown: (event) => {
+                    setStreamedSyllabusMarkdown(event.markdown)
+                },
+            })
+
+            const planningDetail = adaptDidacticUnitPlanning(detail)
+            setPlanning(planningDetail)
+            setDraftSyllabus(
+                planningDetail.syllabus ? cloneSyllabus(planningDetail.syllabus) : null
+            )
+            onDataChanged()
+        } catch (actionError) {
+            setError(actionError instanceof Error ? actionError.message : 'Action failed.')
+        } finally {
+            setIsSubmitting(false)
+            setIsStreamingSyllabus(false)
+        }
     }
 
     const handleApproveAndStart = async () => {
@@ -158,7 +188,6 @@ export function DidacticUnitSetupModal({
                 workingUnitId = approved.id
             }
 
-            await dashboardApi.generateDidacticUnitChapter(workingUnitId, 0)
             onDataChanged()
             onOpenEditor(workingUnitId)
         } catch (actionError) {
@@ -185,40 +214,13 @@ export function DidacticUnitSetupModal({
                         />
                     </div>
 
-                    <div>
-                        <label className="mb-2 block text-[13px] font-semibold text-[#1D1D1F]">
-                            Provider
-                        </label>
-                        <div className="grid grid-cols-2 gap-3">
-                            {(['openai', 'deepseek'] as const).map((value) => (
-                                <button
-                                    key={value}
-                                    type="button"
-                                    onClick={() => setProvider(value)}
-                                    className={`rounded-[14px] border px-4 py-3 text-left text-[14px] transition-all ${
-                                        provider === value
-                                            ? 'border-[#4ADE80] bg-[#4ADE80]/5 text-[#1D1D1F]'
-                                            : 'border-[#E5E5E7] text-[#86868B] hover:border-[#4ADE80]/40'
-                                    }`}
-                                >
-                                    <div className="font-semibold capitalize">{value}</div>
-                                    <div className="mt-1 text-[12px]">
-                                        {value === 'openai'
-                                            ? 'Balanced default provider'
-                                            : 'Alternative reasoning-oriented provider'}
-                                    </div>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
                     <div className="rounded-[16px] border border-[#E5E5E7] bg-[#F9F9FA] p-4 text-[13px] text-[#86868B]">
                         <div className="font-semibold text-[#1D1D1F]">What happens next?</div>
                         <div className="mt-2 space-y-1">
-                            <div>- AI validates the topic automatically</div>
+                            <div>- AI profile settings choose provider and model</div>
                             <div>- Questionnaire generation</div>
-                            <div>- Syllabus generation and review</div>
-                            <div>- Editor unlocks once chapter generation starts</div>
+                            <div>- Streaming syllabus generation and review</div>
+                            <div>- Editor unlocks after syllabus approval</div>
                         </div>
                     </div>
 
@@ -259,8 +261,7 @@ export function DidacticUnitSetupModal({
                                 {planning.topic}
                             </h2>
                             <p className="mt-1 text-[13px] text-[#86868B]">
-                                {planning.provider.toUpperCase()} setup flow -{' '}
-                                {planning.progressPercent}% complete
+                                {planning.provider} setup flow - {planning.progressPercent}% complete
                             </p>
                         </div>
                         <div className="min-w-[180px]">
@@ -355,6 +356,29 @@ export function DidacticUnitSetupModal({
                     </section>
                 )}
 
+                {(isStreamingSyllabus || streamedSyllabusMarkdown) && (
+                    <section className="rounded-[18px] border border-[#DCEEDD] bg-[#F7FFF8] p-5">
+                        <div className="flex items-center justify-between gap-3">
+                            <div>
+                                <h3 className="text-[16px] font-semibold text-[#1D1D1F]">
+                                    Live syllabus generation
+                                </h3>
+                                <p className="text-[12px] text-[#5F6B63]">
+                                    Markdown is rendered as it streams in.
+                                </p>
+                            </div>
+                            <div className="text-[12px] font-semibold text-[#4DA56A]">
+                                {isStreamingSyllabus ? 'Streaming...' : 'Complete'}
+                            </div>
+                        </div>
+                        <div className="mt-4 rounded-[14px] border border-[#E3EFE6] bg-white p-4">
+                            <Streamdown className="text-[14px] leading-7 text-[#1D1D1F]">
+                                {streamedSyllabusMarkdown || 'Waiting for markdown...'}
+                            </Streamdown>
+                        </div>
+                    </section>
+                )}
+
                 {draftSyllabus && (
                     <section className="space-y-4 rounded-[18px] border border-[#E5E5E7] bg-[#FAFAFB] p-5">
                         <div className="flex items-center justify-between">
@@ -408,13 +432,13 @@ export function DidacticUnitSetupModal({
                         {planning.nextAction === 'generate_syllabus_prompt' &&
                             'Generate the syllabus prompt from the answers.'}
                         {planning.nextAction === 'review_syllabus_prompt' &&
-                            'Trigger AI syllabus generation.'}
+                            'Stream the syllabus generation preview.'}
                         {planning.nextAction === 'review_syllabus' &&
                             'Review and refine the generated syllabus.'}
                         {planning.nextAction === 'approve_syllabus' &&
-                            'Approve the syllabus, then start chapter generation.'}
+                            'Approve the syllabus, then continue into the editor.'}
                         {planning.nextAction === 'view_didactic_unit' &&
-                            'Start chapter generation to unlock the editor.'}
+                            'Open the editor and start chapter generation there.'}
                     </div>
                 </div>
 
@@ -455,14 +479,10 @@ export function DidacticUnitSetupModal({
                         <button
                             type="button"
                             disabled={isSubmitting}
-                            onClick={() =>
-                                void runAction(async () => {
-                                    await dashboardApi.generateDidacticUnitSyllabus(planning.id)
-                                })
-                            }
+                            onClick={() => void handleGenerateSyllabus()}
                             className="rounded-[12px] bg-[#1D1D1F] px-5 py-3 text-[14px] font-semibold text-white disabled:opacity-50"
                         >
-                            AI GEN Generate Syllabus
+                            {isStreamingSyllabus ? 'Streaming Syllabus...' : 'Generate Syllabus'}
                         </button>
                     )}
                     {(planning.nextAction === 'approve_syllabus' ||
@@ -474,8 +494,8 @@ export function DidacticUnitSetupModal({
                             className="rounded-[12px] bg-[#1D1D1F] px-5 py-3 text-[14px] font-semibold text-white disabled:opacity-50"
                         >
                             {planning.nextAction === 'approve_syllabus'
-                                ? 'Approve and Start Chapters'
-                                : 'Start Chapters'}
+                                ? 'Approve and Open Editor'
+                                : 'Open Editor'}
                         </button>
                     )}
                 </div>
@@ -485,7 +505,7 @@ export function DidacticUnitSetupModal({
 
     return (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 px-4 py-10 backdrop-blur-[2px]">
-            <div className="max-h-[92vh] w-full max-w-[820px] overflow-hidden rounded-[22px] bg-white shadow-[0_30px_100px_rgba(0,0,0,0.2)]">
+            <div className="max-h-[92vh] w-full max-w-[920px] overflow-hidden rounded-[22px] bg-white shadow-[0_30px_100px_rgba(0,0,0,0.2)]">
                 <div className="flex items-start justify-between border-b border-[#E5E5E7] px-8 py-7">
                     <div className="flex items-start gap-4">
                         <div className="flex h-14 w-14 items-center justify-center rounded-[16px] bg-[#EAF9EF]">
@@ -493,9 +513,7 @@ export function DidacticUnitSetupModal({
                         </div>
                         <div>
                             <h1 className="text-[18px] font-bold text-[#1D1D1F]">
-                                {activeDidacticUnitId
-                                    ? 'Continue Didactic Unit'
-                                    : 'Create New Unit'}
+                                {activeDidacticUnitId ? 'Continue Didactic Unit' : 'Create New Unit'}
                             </h1>
                             <p className="mt-1 text-[13px] text-[#86868B]">
                                 AI will guide the unit from topic to generated chapters.

@@ -7,15 +7,19 @@ import {
     type GenerationRunStore,
 } from '../../src/generation-runs/generation-run-store.js'
 import { createApp, type CreateAppOptions } from '../../src/app.js'
+import {
+    InMemoryAiConfigStore,
+    type AiConfigStore,
+} from '../../src/ai/config.js'
+import type { AiService } from '../../src/ai/service.js'
 import type { MongoHealthStatus } from '../../src/mongo/mongo-connection.js'
-import type { ChapterGenerator } from '../../src/providers/chapter-generator.js'
-import type { SyllabusGenerator } from '../../src/providers/syllabus-generator.js'
+import { createMockAiService } from './mock-ai-service.js'
 
 interface CreateTestAppOptions {
     didacticUnitStore?: DidacticUnitStore
     generationRunStore?: GenerationRunStore
-    syllabusGenerator?: SyllabusGenerator
-    chapterGenerator?: ChapterGenerator
+    aiConfigStore?: AiConfigStore
+    aiService?: AiService
     mongoHealth?: MongoHealthStatus
 }
 
@@ -23,8 +27,8 @@ export function createTestApp(options: CreateTestAppOptions = {}) {
     const appOptions: CreateAppOptions = {
         didacticUnitStore: options.didacticUnitStore ?? new InMemoryDidacticUnitStore(),
         generationRunStore: options.generationRunStore ?? new InMemoryGenerationRunStore(),
-        syllabusGenerator: options.syllabusGenerator,
-        chapterGenerator: options.chapterGenerator,
+        aiConfigStore: options.aiConfigStore ?? new InMemoryAiConfigStore(),
+        aiService: options.aiService ?? createMockAiService(),
         mongoHealth: options.mongoHealth,
     }
 
