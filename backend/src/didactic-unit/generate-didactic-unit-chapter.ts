@@ -20,6 +20,8 @@ export function createChapterGenerationSourceFromDidacticUnit(
             title: didacticUnit.title,
             overview: didacticUnit.overview,
             learningGoals: didacticUnit.learningGoals,
+            keywords: didacticUnit.keywords,
+            estimatedDurationMinutes: didacticUnit.estimatedDurationMinutes ?? 0,
             chapters: didacticUnit.chapters,
         },
     }
@@ -60,7 +62,8 @@ export function applyGeneratedDidacticUnitChapter(
     rawGeneratedChapter: ReturnType<ChapterGenerator['generate']> extends Promise<infer Result>
         ? Result
         : never,
-    revisionSource: DidacticUnitChapterRevisionSource = 'ai_generation'
+    revisionSource: DidacticUnitChapterRevisionSource = 'ai_generation',
+    continuitySummary?: string
 ): DidacticUnit {
     const generatedChapter = {
         ...rawGeneratedChapter,
@@ -70,6 +73,10 @@ export function applyGeneratedDidacticUnitChapter(
     }
     const updatedAt = generatedChapter.updatedAt ?? generatedChapter.generatedAt
     const generatedChapters = didacticUnit.generatedChapters ?? []
+    const nextContinuitySummaries = [...(didacticUnit.continuitySummaries ?? [])]
+    if (continuitySummary?.trim()) {
+        nextContinuitySummaries[chapterIndex] = continuitySummary.trim()
+    }
     const existingChapterIndex = generatedChapters.findIndex(
         (chapter) => chapter.chapterIndex === chapterIndex
     )
@@ -93,6 +100,7 @@ export function applyGeneratedDidacticUnitChapter(
                 ...didacticUnit,
                 generatedChapters: updatedChapters,
             }),
+            continuitySummaries: nextContinuitySummaries,
             generatedChapters: updatedChapters,
         }
     }
@@ -108,6 +116,7 @@ export function applyGeneratedDidacticUnitChapter(
             }),
         ],
         updatedAt,
+        continuitySummaries: nextContinuitySummaries,
         generatedChapters: [...generatedChapters, generatedChapter].sort(
             (left, right) => left.chapterIndex - right.chapterIndex
         ),

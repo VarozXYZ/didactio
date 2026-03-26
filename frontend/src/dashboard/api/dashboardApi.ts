@@ -10,6 +10,7 @@ export class DashboardApiError extends Error {
 }
 
 type BackendProvider = string
+export type BackendAiModelTier = 'cheap' | 'premium'
 
 export type BackendChapterPresentationSettings = {
     paragraphFontFamily: 'sans' | 'serif' | 'mono'
@@ -17,17 +18,20 @@ export type BackendChapterPresentationSettings = {
     paragraphAlign: 'left' | 'center' | 'right' | 'justify'
 }
 
-export type BackendAiStageConfig = {
+export type BackendAiModelConfig = {
     provider: string
     model: string
 }
 
+export type BackendAuthoringConfig = {
+    language: string
+    tone: 'friendly' | 'neutral' | 'professional'
+}
+
 export type BackendAiConfig = {
-    moderation: BackendAiStageConfig
-    questionnaire: BackendAiStageConfig
-    syllabus: BackendAiStageConfig
-    summary: BackendAiStageConfig
-    chapter: BackendAiStageConfig
+    cheap: BackendAiModelConfig
+    premium: BackendAiModelConfig
+    authoring: BackendAuthoringConfig
 }
 
 export interface BackendDidacticUnitSummary {
@@ -67,6 +71,13 @@ export interface BackendDidacticUnitDetail {
     createdAt: string
     updatedAt: string
     moderatedAt?: string
+    improvedTopicBrief?: string
+    reasoningNotes?: string
+    additionalContext?: string
+    depth: 'basic' | 'intermediate' | 'technical'
+    length: 'intro' | 'short' | 'long' | 'textbook'
+    generationTier?: BackendAiModelTier
+    questionnaireEnabled: boolean
     questionnaire?: BackendQuestionnaire
     questionnaireAnswers?: BackendQuestionAnswer[]
     syllabusPrompt?: string
@@ -275,7 +286,13 @@ export const dashboardApi = {
     listDidacticUnits() {
         return requestJson<{ didacticUnits: BackendDidacticUnitSummary[] }>('/api/didactic-unit')
     },
-    createDidacticUnit(input: { topic: string }) {
+    createDidacticUnit(input: {
+        topic: string
+        additionalContext?: string
+        depth?: 'basic' | 'intermediate' | 'technical'
+        length?: 'intro' | 'short' | 'long' | 'textbook'
+        questionnaireEnabled?: boolean
+    }) {
         return requestJson<BackendDidacticUnitDetail>('/api/didactic-unit', {
             method: 'POST',
             body: JSON.stringify(input),
@@ -299,10 +316,10 @@ export const dashboardApi = {
             body: JSON.stringify({}),
         })
     },
-    generateDidacticUnitQuestionnaire(id: string) {
+    generateDidacticUnitQuestionnaire(id: string, tier: BackendAiModelTier) {
         return requestJson<BackendDidacticUnitDetail>(`/api/didactic-unit/${id}/questionnaire/generate`, {
             method: 'POST',
-            body: JSON.stringify({}),
+            body: JSON.stringify({ tier }),
         })
     },
     answerDidacticUnitQuestionnaire(id: string, answers: BackendQuestionAnswer[]) {
@@ -317,16 +334,34 @@ export const dashboardApi = {
             body: JSON.stringify({}),
         })
     },
-    generateDidacticUnitSyllabus(id: string) {
+    generateDidacticUnitSyllabus(
+        id: string,
+        tier: BackendAiModelTier,
+        input?: { context?: string }
+    ) {
         return requestJson<BackendDidacticUnitDetail>(`/api/didactic-unit/${id}/syllabus/generate`, {
             method: 'POST',
-            body: JSON.stringify({}),
+            body: JSON.stringify({
+                tier,
+                ...(input ?? {}),
+            }),
         })
     },
-    streamDidacticUnitSyllabus(id: string, handlers: StreamHandlers) {
+    streamDidacticUnitSyllabus(
+        id: string,
+        tier: BackendAiModelTier,
+        handlers: StreamHandlers,
+        input?: { context?: string }
+    ) {
         return streamNdjson<BackendDidacticUnitDetail>(
             `/api/didactic-unit/${id}/syllabus/generate/stream`,
-            handlers
+            handlers,
+            {
+                body: JSON.stringify({
+                    tier,
+                    ...(input ?? {}),
+                }),
+            }
         )
     },
     updateDidacticUnitSyllabus(id: string, syllabus: PlanningSyllabus) {
@@ -335,10 +370,10 @@ export const dashboardApi = {
             body: JSON.stringify({ syllabus }),
         })
     },
-    approveDidacticUnitSyllabus(id: string) {
+    approveDidacticUnitSyllabus(id: string, tier?: BackendAiModelTier) {
         return requestJson<BackendDidacticUnitDetail>(`/api/didactic-unit/${id}/approve-syllabus`, {
             method: 'POST',
-            body: JSON.stringify({}),
+            body: JSON.stringify(tier ? { tier } : {}),
         })
     },
     listDidacticUnitChapters(id: string) {
@@ -370,42 +405,66 @@ export const dashboardApi = {
             }
         )
     },
-    generateDidacticUnitChapter(id: string, chapterIndex: number) {
+    generateDidacticUnitChapter(
+        id: string,
+        chapterIndex: number,
+        tier: BackendAiModelTier
+    ) {
         return requestJson<BackendDidacticUnitDetail>(
             `/api/didactic-unit/${id}/chapters/${chapterIndex}/generate`,
             {
                 method: 'POST',
-                body: JSON.stringify({}),
+                body: JSON.stringify({ tier }),
             }
         )
     },
     streamGenerateDidacticUnitChapter(
         id: string,
         chapterIndex: number,
+        tier: BackendAiModelTier,
         handlers: StreamHandlers
     ) {
         return streamNdjson<BackendDidacticUnitDetail>(
             `/api/didactic-unit/${id}/chapters/${chapterIndex}/generate/stream`,
-            handlers
+            handlers,
+            {
+                body: JSON.stringify({ tier }),
+            }
         )
     },
-    regenerateDidacticUnitChapter(id: string, chapterIndex: number) {
+    regenerateDidacticUnitChapter(
+        id: string,
+        chapterIndex: number,
+        tier: BackendAiModelTier,
+        input?: { instruction?: string }
+    ) {
         return requestJson<BackendDidacticUnitDetail>(
             `/api/didactic-unit/${id}/chapters/${chapterIndex}/regenerate`,
             {
                 method: 'POST',
-                body: JSON.stringify({}),
+                body: JSON.stringify({
+                    tier,
+                    ...(input ?? {}),
+                }),
             }
         )
     },
     streamRegenerateDidacticUnitChapter(
         id: string,
         chapterIndex: number,
-        handlers: StreamHandlers
+        tier: BackendAiModelTier,
+        handlers: StreamHandlers,
+        input?: { instruction?: string }
     ) {
         return streamNdjson<BackendDidacticUnitDetail>(
             `/api/didactic-unit/${id}/chapters/${chapterIndex}/regenerate/stream`,
-            handlers
+            handlers,
+            {
+                body: JSON.stringify({
+                    tier,
+                    ...(input ?? {}),
+                }),
+            }
         )
     },
     completeDidacticUnitChapter(id: string, chapterIndex: number) {

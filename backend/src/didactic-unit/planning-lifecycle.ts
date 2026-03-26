@@ -7,6 +7,7 @@ import type {
 } from './planning.js'
 import { buildQuestionnaireForDidacticUnit } from './planning.js'
 import type { DidacticUnit } from './create-didactic-unit.js'
+import type { AuthoringConfig } from '../ai/config.js'
 
 function withUpdatedAt<T extends DidacticUnit>(didacticUnit: T): T {
     return {
@@ -22,7 +23,10 @@ function findAnswerValue(
     return answers?.find((answer) => answer.questionId === questionId)?.value ?? 'not provided'
 }
 
-function buildSyllabusPrompt(didacticUnit: DidacticUnit): string {
+function buildSyllabusPrompt(
+    didacticUnit: DidacticUnit,
+    authoring: AuthoringConfig
+): string {
     const topicKnowledge = findAnswerValue(
         didacticUnit.questionnaireAnswers,
         'topic_knowledge_level'
@@ -32,36 +36,73 @@ function buildSyllabusPrompt(didacticUnit: DidacticUnit): string {
         'related_knowledge_level'
     )
     const learningGoal = findAnswerValue(didacticUnit.questionnaireAnswers, 'learning_goal')
-    const preferredDepth = findAnswerValue(
-        didacticUnit.questionnaireAnswers,
-        'preferred_depth'
-    )
-    const preferredLength = findAnswerValue(
-        didacticUnit.questionnaireAnswers,
-        'preferred_length'
-    )
+    const continuityBrief = didacticUnit.improvedTopicBrief ?? didacticUnit.topic
+    const additionalContext = didacticUnit.additionalContext?.trim()
 
     return [
-        `Create a didactic unit about ${didacticUnit.topic}.`,
+        'Create a didactic syllabus from this generation brief.',
+        '',
+        'Generation brief:',
+        continuityBrief,
+        '',
+        `Normalized topic: ${didacticUnit.topic}.`,
         `Learner current knowledge of the topic: ${topicKnowledge}.`,
         `Learner knowledge of related concepts: ${relatedKnowledge}.`,
         `Learning goal: ${learningGoal}.`,
-        `Preferred depth: ${preferredDepth}.`,
-        `Preferred length: ${preferredLength}.`,
-        'Return a structured syllabus with a title, overview, learning goals, and ordered chapter outline.',
+        `Requested unit depth: ${didacticUnit.depth}.`,
+        `Requested unit length: ${didacticUnit.length}.`,
+        `Authoring language: ${authoring.language}.`,
+        `Authoring tone: ${authoring.tone}.`,
+        additionalContext ? `Additional learner/context notes: ${additionalContext}.` : '',
+        'Return a structured syllabus with a title, overview, learning goals, keywords, total estimated duration, and ordered chapter outline with lesson plans.',
     ].join('\n')
 }
 
-export function moderateDidacticUnitPlanning(didacticUnit: DidacticUnit): DidacticUnit {
+function mergeAdditionalContext(
+    existingContext: string | undefined,
+    extraContext: string | undefined
+): string | undefined {
+    const normalizedExisting = existingContext?.trim()
+    const normalizedExtra = extraContext?.trim()
+
+    if (!normalizedExisting && !normalizedExtra) {
+        return undefined
+    }
+
+    if (!normalizedExisting) {
+        return normalizedExtra
+    }
+
+    if (!normalizedExtra || normalizedExtra === normalizedExisting) {
+        return normalizedExisting
+    }
+
+    return `${normalizedExisting}\n\nAdditional syllabus guidance:\n${normalizedExtra}`
+}
+
+export function moderateDidacticUnitPlanning(
+    didacticUnit: DidacticUnit,
+    input: {
+        normalizedTopic: string
+        improvedTopicBrief: string
+        reasoningNotes: string
+    }
+): DidacticUnit {
     if (didacticUnit.status !== 'submitted') {
         throw new Error('Didactic unit cannot be moderated from its current state.')
     }
 
     return withUpdatedAt({
         ...didacticUnit,
+        title: input.normalizedTopic,
+        topic: input.normalizedTopic,
         status: 'moderation_completed',
-        nextAction: 'generate_questionnaire',
+        nextAction: didacticUnit.questionnaireEnabled
+            ? 'generate_questionnaire'
+            : 'generate_syllabus_prompt',
         moderatedAt: new Date().toISOString(),
+        improvedTopicBrief: input.improvedTopicBrief,
+        reasoningNotes: input.reasoningNotes,
     })
 }
 
@@ -135,16 +176,46 @@ export function answerDidacticUnitQuestionnaire(
     })
 }
 
-export function generateDidacticUnitSyllabusPrompt(didacticUnit: DidacticUnit): DidacticUnit {
-    if (didacticUnit.status !== 'questionnaire_answered' || !didacticUnit.questionnaireAnswers) {
+export function generateDidacticUnitSyllabusPrompt(
+    didacticUnit: DidacticUnit,
+    authoring: AuthoringConfig
+): DidacticUnit {
+    return prepareDidacticUnitSyllabusGeneration(didacticUnit, authoring)
+}
+
+export function prepareDidacticUnitSyllabusGeneration(
+    didacticUnit: DidacticUnit,
+    authoring: AuthoringConfig,
+    extraContext?: string
+): DidacticUnit {
+    const canGenerateFromAnsweredQuestionnaire =
+        didacticUnit.status === 'questionnaire_answered' && didacticUnit.questionnaireAnswers
+    const canGenerateWithoutQuestionnaire =
+        didacticUnit.status === 'moderation_completed' && !didacticUnit.questionnaireEnabled
+    const canGenerateFromPreparedPrompt =
+        didacticUnit.status === 'syllabus_prompt_ready' && Boolean(didacticUnit.syllabusPrompt)
+    const canRegenerateExistingSyllabus =
+        didacticUnit.status === 'syllabus_ready' || didacticUnit.status === 'syllabus_approved'
+
+    if (
+        !canGenerateFromAnsweredQuestionnaire &&
+        !canGenerateWithoutQuestionnaire &&
+        !canGenerateFromPreparedPrompt &&
+        !canRegenerateExistingSyllabus
+    ) {
         throw new Error('Syllabus prompt cannot be generated from the current didactic unit state.')
     }
 
-    return withUpdatedAt({
+    const preparedDidacticUnit = {
         ...didacticUnit,
+        additionalContext: mergeAdditionalContext(didacticUnit.additionalContext, extraContext),
+    }
+
+    return withUpdatedAt({
+        ...preparedDidacticUnit,
         status: 'syllabus_prompt_ready',
         nextAction: 'review_syllabus_prompt',
-        syllabusPrompt: buildSyllabusPrompt(didacticUnit),
+        syllabusPrompt: buildSyllabusPrompt(preparedDidacticUnit, authoring),
         syllabusPromptGeneratedAt: new Date().toISOString(),
     })
 }
@@ -162,10 +233,17 @@ export function applyGeneratedDidacticUnitSyllabus(
         title: syllabus.title,
         overview: syllabus.overview,
         learningGoals: [...syllabus.learningGoals],
+        keywords: [...syllabus.keywords],
+        estimatedDurationMinutes: syllabus.estimatedDurationMinutes,
         chapters: syllabus.chapters.map((chapter) => ({
             title: chapter.title,
             overview: chapter.overview,
             keyPoints: [...chapter.keyPoints],
+            estimatedDurationMinutes: chapter.estimatedDurationMinutes,
+            lessons: chapter.lessons.map((lesson) => ({
+                title: lesson.title,
+                contentOutline: [...lesson.contentOutline],
+            })),
         })),
         status: 'syllabus_ready',
         nextAction: 'review_syllabus',
@@ -187,10 +265,17 @@ export function updateDidacticUnitSyllabus(
         title: input.syllabus.title,
         overview: input.syllabus.overview,
         learningGoals: [...input.syllabus.learningGoals],
+        keywords: [...input.syllabus.keywords],
+        estimatedDurationMinutes: input.syllabus.estimatedDurationMinutes,
         chapters: input.syllabus.chapters.map((chapter) => ({
             title: chapter.title,
             overview: chapter.overview,
             keyPoints: [...chapter.keyPoints],
+            estimatedDurationMinutes: chapter.estimatedDurationMinutes,
+            lessons: chapter.lessons.map((lesson) => ({
+                title: lesson.title,
+                contentOutline: [...lesson.contentOutline],
+            })),
         })),
         nextAction: 'approve_syllabus',
         syllabus: input.syllabus,
@@ -198,7 +283,10 @@ export function updateDidacticUnitSyllabus(
     })
 }
 
-export function approveDidacticUnitSyllabus(didacticUnit: DidacticUnit): DidacticUnit {
+export function approveDidacticUnitSyllabus(
+    didacticUnit: DidacticUnit,
+    generationTier?: 'cheap' | 'premium'
+): DidacticUnit {
     if (didacticUnit.status !== 'syllabus_ready' || !didacticUnit.syllabus) {
         throw new Error('Syllabus cannot be approved from the current didactic unit state.')
     }
@@ -207,6 +295,7 @@ export function approveDidacticUnitSyllabus(didacticUnit: DidacticUnit): Didacti
         ...didacticUnit,
         status: 'syllabus_approved',
         nextAction: 'view_didactic_unit',
+        generationTier: generationTier ?? didacticUnit.generationTier,
         syllabusApprovedAt: new Date().toISOString(),
     })
 }

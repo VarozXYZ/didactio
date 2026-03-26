@@ -9,33 +9,43 @@ describe('AI config API', () => {
         const initialResponse = await request(app).get('/api/ai-config')
         expect(initialResponse.status).toBe(200)
         expect(initialResponse.body).toMatchObject({
-            moderation: expect.any(Object),
-            questionnaire: expect.any(Object),
-            syllabus: expect.any(Object),
-            summary: expect.any(Object),
-            chapter: expect.any(Object),
+            cheap: expect.any(Object),
+            premium: expect.any(Object),
+            authoring: expect.any(Object),
         })
 
         const updateResponse = await request(app)
             .patch('/api/ai-config')
             .send({
-                chapter: {
+                premium: {
                     provider: 'anthropic',
                     model: 'claude-sonnet-4',
+                },
+                authoring: {
+                    language: 'Spanish',
+                    tone: 'professional',
                 },
             })
 
         expect(updateResponse.status).toBe(200)
-        expect(updateResponse.body.chapter).toEqual({
+        expect(updateResponse.body.premium).toEqual({
             provider: 'anthropic',
             model: 'claude-sonnet-4',
+        })
+        expect(updateResponse.body.authoring).toMatchObject({
+            language: 'Spanish',
+            tone: 'professional',
         })
 
         const refreshedResponse = await request(app).get('/api/ai-config')
         expect(refreshedResponse.status).toBe(200)
-        expect(refreshedResponse.body.chapter).toEqual({
+        expect(refreshedResponse.body.premium).toEqual({
             provider: 'anthropic',
             model: 'claude-sonnet-4',
+        })
+        expect(refreshedResponse.body.authoring).toMatchObject({
+            language: 'Spanish',
+            tone: 'professional',
         })
     })
 })

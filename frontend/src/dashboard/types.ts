@@ -52,12 +52,21 @@ export interface PlanningSyllabusChapter {
     title: string
     overview: string
     keyPoints: string[]
+    estimatedDurationMinutes: number
+    lessons: PlanningSyllabusLesson[]
+}
+
+export interface PlanningSyllabusLesson {
+    title: string
+    contentOutline: string[]
 }
 
 export interface PlanningSyllabus {
     title: string
     overview: string
     learningGoals: string[]
+    keywords: string[]
+    estimatedDurationMinutes: number
     chapters: PlanningSyllabusChapter[]
 }
 
@@ -70,6 +79,12 @@ export interface PlanningDetailViewModel {
     nextAction: string
     progressPercent: number
     lastActivityAt: string
+    additionalContext?: string
+    improvedTopicBrief?: string
+    reasoningNotes?: string
+    depth: 'basic' | 'intermediate' | 'technical'
+    length: 'intro' | 'short' | 'long' | 'textbook'
+    questionnaireEnabled: boolean
     questionnaire?: {
         questions: PlanningQuestion[]
         answers: Record<string, string>

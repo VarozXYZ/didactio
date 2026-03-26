@@ -20,7 +20,7 @@ describe('streaming generation routes', () => {
 
         const response = await request(app)
             .post(`/api/didactic-unit/${created.id}/syllabus/generate/stream`)
-            .send({})
+            .send({ tier: 'cheap' })
 
         expect(response.status).toBe(200)
         expect(response.headers['content-type']).toContain('application/x-ndjson')

@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import type {
     CreateDidacticUnitInput,
+    DidacticUnitDepth,
+    DidacticUnitLength,
     DidacticUnitNextAction,
     DidacticUnitProvider,
     DidacticUnitQuestionAnswer,
@@ -36,7 +38,15 @@ export interface DidacticUnit {
     nextAction: DidacticUnitNextAction
     overview: string
     learningGoals: string[]
+    keywords: string[]
+    estimatedDurationMinutes?: number
     chapters: DidacticUnitSyllabusChapter[]
+    additionalContext?: string
+    depth: DidacticUnitDepth
+    length: DidacticUnitLength
+    questionnaireEnabled: boolean
+    improvedTopicBrief?: string
+    reasoningNotes?: string
     questionnaire?: DidacticUnitQuestionnaire
     questionnaireGeneratedAt?: string
     questionnaireAnswers?: DidacticUnitQuestionAnswer[]
@@ -51,6 +61,8 @@ export interface DidacticUnit {
     generatedChapters?: DidacticUnitGeneratedChapter[]
     completedChapters?: DidacticUnitChapterCompletion[]
     chapterRevisions?: DidacticUnitChapterRevision[]
+    continuitySummaries?: string[]
+    generationTier?: 'cheap' | 'premium'
     createdAt: string
     updatedAt: string
 }
@@ -68,12 +80,16 @@ export function createDidacticUnit(
         title: input.topic,
         topic: input.topic,
         provider: input.provider,
-        status: 'moderation_completed',
-        nextAction: 'generate_questionnaire',
+        status: 'submitted',
+        nextAction: 'moderate_topic',
         overview: '',
         learningGoals: [],
+        keywords: [],
         chapters: [],
-        moderatedAt: createdAt,
+        additionalContext: input.additionalContext,
+        depth: input.depth,
+        length: input.length,
+        questionnaireEnabled: input.questionnaireEnabled,
         createdAt,
         updatedAt: createdAt,
     }

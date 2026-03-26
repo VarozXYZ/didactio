@@ -18,6 +18,7 @@ import { SubscriptionView } from './components/Dashboard/SettingsViews/Subscript
 import { Sidebar } from './components/Dashboard/Sidebar/Sidebar'
 import { UnitEditor } from './components/Editor/UnitEditor'
 import { DidacticUnitSetupModal } from './components/Setup/DidacticUnitSetupModal'
+import { DidacticUnitSyllabusModal } from './components/Setup/DidacticUnitSyllabusModal'
 import type { DashboardListItem, DashboardSection } from './types'
 
 function renderSettingsView(section: DashboardSection) {
@@ -69,13 +70,28 @@ export default function DashboardApp() {
     const [isLoadingIndex, setIsLoadingIndex] = useState(true)
     const [indexError, setIndexError] = useState<string | null>(null)
     const [refreshKey, setRefreshKey] = useState(0)
-    const [setupModalState, setSetupModalState] = useState<{
-        isOpen: boolean
-        didacticUnitId: string | null
-    }>({
+    const [modalState, setModalState] = useState<
+        | {
+              isOpen: false
+              didacticUnitId: null
+              kind: null
+          }
+        | {
+              isOpen: true
+              didacticUnitId: string | null
+              kind: 'setup' | 'syllabus'
+          }
+    >({
         isOpen: false,
         didacticUnitId: null,
+        kind: null,
     })
+
+    const isSyllabusStage = (nextAction: string) =>
+        nextAction === 'generate_syllabus_prompt' ||
+        nextAction === 'review_syllabus_prompt' ||
+        nextAction === 'review_syllabus' ||
+        nextAction === 'approve_syllabus'
 
     useEffect(() => {
         if (location.pathname !== '/dashboard' && activeSection !== 'all-units') {
@@ -145,7 +161,7 @@ export default function DashboardApp() {
         setRefreshKey((previous) => previous + 1)
     }
 
-    const openItem = (itemId: string) => {
+    const openItem = async (itemId: string) => {
         const item = items.find((entry) => entry.id === itemId)
         if (!item) {
             return
@@ -157,17 +173,26 @@ export default function DashboardApp() {
             return
         }
 
-        setSetupModalState({
-            isOpen: true,
-            didacticUnitId: item.id,
-        })
+        try {
+            const detail = await dashboardApi.getDidacticUnit(item.id)
+            setModalState({
+                isOpen: true,
+                didacticUnitId: item.id,
+                kind: isSyllabusStage(detail.nextAction) ? 'syllabus' : 'setup',
+            })
+        } catch (loadError) {
+            setIndexError(
+                loadError instanceof Error ? loadError.message : 'Failed to open didactic unit.'
+            )
+        }
     }
 
     const openCreateView = () => {
         setActiveSection('all-units')
-        setSetupModalState({
+        setModalState({
             isOpen: true,
             didacticUnitId: null,
+            kind: 'setup',
         })
     }
 
@@ -238,20 +263,51 @@ export default function DashboardApp() {
                 <Route path="*" element={<Navigate replace to="/dashboard" />} />
             </Routes>
 
-            {setupModalState.isOpen && (
+            {modalState.isOpen && modalState.kind === 'setup' && (
                 <DidacticUnitSetupModal
-                    didacticUnitId={setupModalState.didacticUnitId}
+                    didacticUnitId={modalState.didacticUnitId}
                     onClose={() =>
-                        setSetupModalState({
+                        setModalState({
                             isOpen: false,
                             didacticUnitId: null,
+                            kind: null,
                         })
                     }
                     onDataChanged={refreshDashboard}
-                    onOpenEditor={(didacticUnitId) => {
-                        setSetupModalState({
+                    onOpenSyllabusReview={(didacticUnitId) => {
+                        setModalState({
+                            isOpen: true,
+                            didacticUnitId,
+                            kind: 'syllabus',
+                        })
+                        refreshDashboard()
+                    }}
+                />
+            )}
+
+            {modalState.isOpen && modalState.kind === 'syllabus' && modalState.didacticUnitId && (
+                <DidacticUnitSyllabusModal
+                    didacticUnitId={modalState.didacticUnitId}
+                    onClose={() =>
+                        setModalState({
                             isOpen: false,
                             didacticUnitId: null,
+                            kind: null,
+                        })
+                    }
+                    onDataChanged={refreshDashboard}
+                    onOpenSetup={(didacticUnitId) => {
+                        setModalState({
+                            isOpen: true,
+                            didacticUnitId,
+                            kind: 'setup',
+                        })
+                    }}
+                    onOpenEditor={(didacticUnitId) => {
+                        setModalState({
+                            isOpen: false,
+                            didacticUnitId: null,
+                            kind: null,
                         })
                         refreshDashboard()
                         navigate(`/dashboard/unit/${didacticUnitId}`)

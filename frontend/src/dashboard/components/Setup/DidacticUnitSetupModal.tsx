@@ -1,81 +1,89 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Sparkles, X } from 'lucide-react'
-import { Streamdown } from 'streamdown'
 import { dashboardApi } from '../../api/dashboardApi'
 import { adaptDidacticUnitPlanning } from '../../adapters'
-import type { PlanningDetailViewModel, PlanningSyllabus } from '../../types'
+import type { PlanningDetailViewModel } from '../../types'
 
 type DidacticUnitSetupModalProps = {
     didacticUnitId?: string | null
     onClose: () => void
     onDataChanged: () => void
-    onOpenEditor: (didacticUnitId: string) => void
+    onOpenSyllabusReview: (didacticUnitId: string) => void
 }
 
-function cloneSyllabus(syllabus: PlanningSyllabus): PlanningSyllabus {
-    return {
-        title: syllabus.title,
-        overview: syllabus.overview,
-        learningGoals: [...syllabus.learningGoals],
-        chapters: syllabus.chapters.map((chapter) => ({
-            title: chapter.title,
-            overview: chapter.overview,
-            keyPoints: [...chapter.keyPoints],
-        })),
-    }
+const depthOptions = [
+    {
+        value: 'basic' as const,
+        label: 'Basic',
+        description: 'More guided explanations and simpler terminology.',
+    },
+    {
+        value: 'intermediate' as const,
+        label: 'Intermediate',
+        description: 'Balanced detail with accessible technical language.',
+    },
+    {
+        value: 'technical' as const,
+        label: 'Technical',
+        description: 'Deeper coverage with stronger technical rigor.',
+    },
+]
+
+const lengthOptions = [
+    {
+        value: 'intro' as const,
+        label: 'Intro',
+        description: 'Compact introduction.',
+    },
+    {
+        value: 'short' as const,
+        label: 'Short',
+        description: 'Focused but useful coverage.',
+    },
+    {
+        value: 'long' as const,
+        label: 'Long',
+        description: 'Substantial teaching sequence.',
+    },
+    {
+        value: 'textbook' as const,
+        label: 'Textbook',
+        description: 'Comprehensive, extended treatment.',
+    },
+]
+
+function isSyllabusStage(nextAction: string): boolean {
+    return (
+        nextAction === 'generate_syllabus_prompt' ||
+        nextAction === 'review_syllabus_prompt' ||
+        nextAction === 'review_syllabus' ||
+        nextAction === 'approve_syllabus'
+    )
 }
 
 export function DidacticUnitSetupModal({
     didacticUnitId,
     onClose,
     onDataChanged,
-    onOpenEditor,
+    onOpenSyllabusReview,
 }: DidacticUnitSetupModalProps) {
     const [planning, setPlanning] = useState<PlanningDetailViewModel | null>(null)
     const [draftTopic, setDraftTopic] = useState('')
+    const [draftAdditionalContext, setDraftAdditionalContext] = useState('')
+    const [draftDepth, setDraftDepth] = useState<'basic' | 'intermediate' | 'technical'>(
+        'intermediate'
+    )
+    const [draftLength, setDraftLength] = useState<'intro' | 'short' | 'long' | 'textbook'>(
+        'short'
+    )
+    const [draftQuestionnaireEnabled, setDraftQuestionnaireEnabled] = useState(true)
     const [questionnaireAnswers, setQuestionnaireAnswers] = useState<Record<string, string>>({})
-    const [draftSyllabus, setDraftSyllabus] = useState<PlanningSyllabus | null>(null)
     const [isLoading, setIsLoading] = useState(Boolean(didacticUnitId))
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [activeDidacticUnitId, setActiveDidacticUnitId] = useState<string | null>(
         didacticUnitId ?? null
     )
-    const [streamedSyllabusMarkdown, setStreamedSyllabusMarkdown] = useState('')
-    const [isStreamingSyllabus, setIsStreamingSyllabus] = useState(false)
-
-    const loadPlanning = async (id: string) => {
-        setIsLoading(true)
-        setError(null)
-
-        try {
-            let detail = await dashboardApi.getDidacticUnit(id)
-
-            if (detail.nextAction === 'moderate_topic') {
-                detail = await dashboardApi.moderateDidacticUnit(id)
-            }
-
-            const planningDetail = adaptDidacticUnitPlanning(detail)
-            setPlanning(planningDetail)
-            setQuestionnaireAnswers(planningDetail.questionnaire?.answers ?? {})
-            setDraftSyllabus(
-                planningDetail.syllabus ? cloneSyllabus(planningDetail.syllabus) : null
-            )
-            setActiveDidacticUnitId(id)
-        } catch (loadError) {
-            setError(loadError instanceof Error ? loadError.message : 'Failed to load unit.')
-        } finally {
-            setIsLoading(false)
-        }
-    }
-
-    useEffect(() => {
-        if (!didacticUnitId) {
-            return
-        }
-
-        void loadPlanning(didacticUnitId)
-    }, [didacticUnitId])
 
     const questionnaireCompletion = useMemo(() => {
         const questions = planning?.questionnaire?.questions ?? []
@@ -90,17 +98,78 @@ export function DidacticUnitSetupModal({
         return Math.round((answeredCount / questions.length) * 100)
     }, [planning?.questionnaire?.questions, questionnaireAnswers])
 
-    const runAction = async (action: () => Promise<{ id: string } | void>) => {
+    const isQuestionnaireComplete = useMemo(() => {
+        const questions = planning?.questionnaire?.questions ?? []
+        return questions.length > 0 && questions.every((question) => questionnaireAnswers[question.id]?.trim())
+    }, [planning?.questionnaire?.questions, questionnaireAnswers])
+
+    const applyPlanningState = useCallback(
+        (detail: Awaited<ReturnType<typeof dashboardApi.getDidacticUnit>>) => {
+            const planningDetail = adaptDidacticUnitPlanning(detail)
+
+            if (isSyllabusStage(planningDetail.nextAction)) {
+                onOpenSyllabusReview(planningDetail.id)
+                return
+            }
+
+            setPlanning(planningDetail)
+            setQuestionnaireAnswers(planningDetail.questionnaire?.answers ?? {})
+            setDraftAdditionalContext(planningDetail.additionalContext ?? '')
+            setDraftDepth(planningDetail.depth)
+            setDraftLength(planningDetail.length)
+            setDraftQuestionnaireEnabled(planningDetail.questionnaireEnabled)
+            setActiveDidacticUnitId(planningDetail.id)
+        },
+        [onOpenSyllabusReview]
+    )
+
+    useEffect(() => {
+        if (!didacticUnitId) {
+            return
+        }
+
+        void (async () => {
+            setIsLoading(true)
+            setError(null)
+
+            try {
+                let detail = await dashboardApi.getDidacticUnit(didacticUnitId)
+
+                if (detail.nextAction === 'moderate_topic') {
+                    detail = await dashboardApi.moderateDidacticUnit(didacticUnitId)
+                }
+
+                applyPlanningState(detail)
+            } catch (loadError) {
+                setError(loadError instanceof Error ? loadError.message : 'Failed to load unit.')
+            } finally {
+                setIsLoading(false)
+            }
+        })()
+    }, [applyPlanningState, didacticUnitId])
+
+    const handleCreate = async (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault()
         setIsSubmitting(true)
         setError(null)
 
         try {
-            const result = await action()
-            const nextId = (result as { id?: string } | undefined)?.id ?? activeDidacticUnitId
-            if (nextId) {
-                await loadPlanning(nextId)
+            const created = await dashboardApi.createDidacticUnit({
+                topic: draftTopic.trim(),
+                additionalContext: draftAdditionalContext.trim() || undefined,
+                depth: draftDepth,
+                length: draftLength,
+                questionnaireEnabled: draftQuestionnaireEnabled,
+            })
+
+            let detail = await dashboardApi.moderateDidacticUnit(created.id)
+
+            if (draftQuestionnaireEnabled && detail.nextAction === 'generate_questionnaire') {
+                detail = await dashboardApi.generateDidacticUnitQuestionnaire(created.id, 'cheap')
             }
+
             onDataChanged()
+            applyPlanningState(detail)
         } catch (actionError) {
             setError(actionError instanceof Error ? actionError.message : 'Action failed.')
         } finally {
@@ -108,88 +177,44 @@ export function DidacticUnitSetupModal({
         }
     }
 
-    const handleCreate = async (event: FormEvent<HTMLFormElement>) => {
-        event.preventDefault()
-        await runAction(async () =>
-            dashboardApi.createDidacticUnit({ topic: draftTopic.trim() })
-        )
+    const handleGenerateQuestionnaire = async () => {
+        if (!planning) {
+            return
+        }
+
+        setIsSubmitting(true)
+        setError(null)
+
+        try {
+            const detail = await dashboardApi.generateDidacticUnitQuestionnaire(planning.id, 'cheap')
+            onDataChanged()
+            applyPlanningState(detail)
+        } catch (actionError) {
+            setError(actionError instanceof Error ? actionError.message : 'Action failed.')
+        } finally {
+            setIsSubmitting(false)
+        }
     }
 
-    const handleSaveAnswers = async () => {
+    const handleQuestionnaireNextStep = async () => {
         if (!planning?.questionnaire) {
             return
         }
 
-        await runAction(async () => {
-            await dashboardApi.answerDidacticUnitQuestionnaire(
+        setIsSubmitting(true)
+        setError(null)
+
+        try {
+            const detail = await dashboardApi.answerDidacticUnitQuestionnaire(
                 planning.id,
-                planning.questionnaire!.questions.map((question) => ({
+                planning.questionnaire.questions.map((question) => ({
                     questionId: question.id,
                     value: questionnaireAnswers[question.id]?.trim() ?? '',
                 }))
             )
-        })
-    }
-
-    const handleSaveSyllabus = async () => {
-        if (!planning || !draftSyllabus) {
-            return
-        }
-
-        await runAction(async () => {
-            await dashboardApi.updateDidacticUnitSyllabus(planning.id, draftSyllabus)
-        })
-    }
-
-    const handleGenerateSyllabus = async () => {
-        if (!planning) {
-            return
-        }
-
-        setIsSubmitting(true)
-        setIsStreamingSyllabus(true)
-        setStreamedSyllabusMarkdown('')
-        setError(null)
-
-        try {
-            const detail = await dashboardApi.streamDidacticUnitSyllabus(planning.id, {
-                onPartialMarkdown: (event) => {
-                    setStreamedSyllabusMarkdown(event.markdown)
-                },
-            })
-
-            const planningDetail = adaptDidacticUnitPlanning(detail)
-            setPlanning(planningDetail)
-            setDraftSyllabus(
-                planningDetail.syllabus ? cloneSyllabus(planningDetail.syllabus) : null
-            )
-            onDataChanged()
-        } catch (actionError) {
-            setError(actionError instanceof Error ? actionError.message : 'Action failed.')
-        } finally {
-            setIsSubmitting(false)
-            setIsStreamingSyllabus(false)
-        }
-    }
-
-    const handleApproveAndStart = async () => {
-        if (!planning) {
-            return
-        }
-
-        setIsSubmitting(true)
-        setError(null)
-
-        try {
-            let workingUnitId = planning.id
-
-            if (planning.nextAction === 'approve_syllabus') {
-                const approved = await dashboardApi.approveDidacticUnitSyllabus(planning.id)
-                workingUnitId = approved.id
-            }
 
             onDataChanged()
-            onOpenEditor(workingUnitId)
+            onOpenSyllabusReview(detail.id)
         } catch (actionError) {
             setError(actionError instanceof Error ? actionError.message : 'Action failed.')
         } finally {
@@ -214,12 +239,101 @@ export function DidacticUnitSetupModal({
                         />
                     </div>
 
+                    <div>
+                        <label className="mb-2 block text-[13px] font-semibold text-[#1D1D1F]">
+                            Additional context
+                        </label>
+                        <textarea
+                            rows={5}
+                            value={draftAdditionalContext}
+                            onChange={(event) => setDraftAdditionalContext(event.target.value)}
+                            placeholder="Optional: learner goals, domain constraints, course angle, or audience notes."
+                            className="w-full rounded-[14px] border border-[#E5E5E7] px-4 py-3 text-[14px] focus:border-[#4ADE80] focus:outline-none"
+                        />
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <div>
+                            <label className="mb-2 block text-[13px] font-semibold text-[#1D1D1F]">
+                                Unit depth
+                            </label>
+                            <select
+                                value={draftDepth}
+                                onChange={(event) =>
+                                    setDraftDepth(
+                                        event.target.value as
+                                            | 'basic'
+                                            | 'intermediate'
+                                            | 'technical'
+                                    )
+                                }
+                                className="w-full rounded-[14px] border border-[#E5E5E7] px-4 py-3 text-[14px] focus:border-[#4ADE80] focus:outline-none"
+                            >
+                                {depthOptions.map((option) => (
+                                    <option key={option.value} value={option.value}>
+                                        {option.label} - {option.description}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="mb-2 block text-[13px] font-semibold text-[#1D1D1F]">
+                                Unit length
+                            </label>
+                            <select
+                                value={draftLength}
+                                onChange={(event) =>
+                                    setDraftLength(
+                                        event.target.value as
+                                            | 'intro'
+                                            | 'short'
+                                            | 'long'
+                                            | 'textbook'
+                                    )
+                                }
+                                className="w-full rounded-[14px] border border-[#E5E5E7] px-4 py-3 text-[14px] focus:border-[#4ADE80] focus:outline-none"
+                            >
+                                {lengthOptions.map((option) => (
+                                    <option key={option.value} value={option.value}>
+                                        {option.label} - {option.description}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+
+                    <label className="flex items-start gap-3 rounded-[16px] border border-[#E5E5E7] bg-white px-4 py-4">
+                        <input
+                            type="checkbox"
+                            checked={draftQuestionnaireEnabled}
+                            onChange={(event) => setDraftQuestionnaireEnabled(event.target.checked)}
+                            className="mt-1 h-4 w-4 rounded border-[#D1D5DB] text-[#1D1D1F] focus:ring-[#4ADE80]"
+                        />
+                        <div>
+                            <div className="text-[14px] font-semibold text-[#1D1D1F]">
+                                Use learner questionnaire
+                            </div>
+                            <div className="mt-1 text-[13px] text-[#6B7280]">
+                                Enabled by default. We will automatically moderate the topic and,
+                                if enabled, generate a cheap-model questionnaire before syllabus
+                                review.
+                            </div>
+                        </div>
+                    </label>
+
                     <div className="rounded-[16px] border border-[#E5E5E7] bg-[#F9F9FA] p-4 text-[13px] text-[#86868B]">
                         <div className="font-semibold text-[#1D1D1F]">What happens next?</div>
                         <div className="mt-2 space-y-1">
-                            <div>- AI profile settings choose provider and model</div>
-                            <div>- Questionnaire generation</div>
-                            <div>- Streaming syllabus generation and review</div>
+                            <div>- AI profile settings choose provider, model, and tone</div>
+                            <div>- This unit keeps its own depth and length targets</div>
+                            <div>- Topic moderation happens automatically with the cheap model</div>
+                            <div>
+                                - {draftQuestionnaireEnabled
+                                    ? 'A learner questionnaire is generated automatically with the cheap model'
+                                    : 'Questionnaire generation is skipped for this unit'}
+                            </div>
+                            <div>- Syllabus review happens in a separate modal</div>
                             <div>- Editor unlocks after syllabus approval</div>
                         </div>
                     </div>
@@ -237,7 +351,7 @@ export function DidacticUnitSetupModal({
                             disabled={!draftTopic.trim() || isSubmitting}
                             className="rounded-[12px] bg-[#1D1D1F] px-5 py-3 text-[14px] font-semibold text-white disabled:opacity-50"
                         >
-                            {isSubmitting ? 'Creating...' : 'Create Unit'}
+                            {isSubmitting ? 'Preparing...' : 'Next Step'}
                         </button>
                     </div>
                 </form>
@@ -279,6 +393,40 @@ export function DidacticUnitSetupModal({
                     </div>
                 </div>
 
+                {(planning.improvedTopicBrief || planning.reasoningNotes || planning.additionalContext) && (
+                    <section className="rounded-[18px] border border-[#E5E5E7] bg-[#FAFAFB] p-5">
+                        <h3 className="text-[16px] font-semibold text-[#1D1D1F]">
+                            Generation brief
+                        </h3>
+                        <div className="mt-4 flex flex-wrap gap-2">
+                            <div className="rounded-full border border-[#DCEBDD] bg-white px-3 py-1 text-[12px] font-semibold text-[#34614A]">
+                                Depth: {planning.depth}
+                            </div>
+                            <div className="rounded-full border border-[#DCEBDD] bg-white px-3 py-1 text-[12px] font-semibold text-[#34614A]">
+                                Length: {planning.length}
+                            </div>
+                        </div>
+                        {planning.improvedTopicBrief && (
+                            <p className="mt-4 text-[14px] leading-7 text-[#1D1D1F]">
+                                {planning.improvedTopicBrief}
+                            </p>
+                        )}
+                        {planning.reasoningNotes && (
+                            <p className="mt-3 text-[13px] text-[#6B7280]">
+                                {planning.reasoningNotes}
+                            </p>
+                        )}
+                        {planning.additionalContext && (
+                            <div className="mt-4 rounded-[12px] border border-[#E5E5E7] bg-white px-4 py-3 text-[13px] text-[#4B5563]">
+                                <div className="mb-1 font-semibold text-[#1D1D1F]">
+                                    Additional context
+                                </div>
+                                <div>{planning.additionalContext}</div>
+                            </div>
+                        )}
+                    </section>
+                )}
+
                 {planning.questionnaire && (
                     <section className="space-y-4 rounded-[18px] border border-[#E5E5E7] bg-[#FAFAFB] p-5">
                         <div className="flex items-center justify-between">
@@ -290,14 +438,9 @@ export function DidacticUnitSetupModal({
                                     Completion: {questionnaireCompletion}%
                                 </p>
                             </div>
-                            <button
-                                type="button"
-                                disabled={isSubmitting}
-                                onClick={handleSaveAnswers}
-                                className="rounded-[10px] border border-[#E5E5E7] px-4 py-2 text-[13px] font-semibold text-[#1D1D1F] disabled:opacity-50"
-                            >
-                                Save Answers
-                            </button>
+                            <div className="rounded-full border border-[#E5E5E7] bg-white px-3 py-1 text-[12px] font-semibold text-[#1D1D1F]">
+                                Answers save on Next Step
+                            </div>
                         </div>
                         <div className="space-y-4">
                             {planning.questionnaire.questions.map((question) => (
@@ -342,103 +485,13 @@ export function DidacticUnitSetupModal({
                     </section>
                 )}
 
-                {planning.syllabusPrompt && (
-                    <section className="rounded-[18px] border border-[#E5E5E7] bg-[#FAFAFB] p-5">
-                        <h3 className="text-[16px] font-semibold text-[#1D1D1F]">
-                            Syllabus prompt
-                        </h3>
-                        <textarea
-                            readOnly
-                            rows={8}
-                            value={planning.syllabusPrompt}
-                            className="mt-4 w-full rounded-[12px] border border-[#E5E5E7] bg-white px-4 py-3 text-[13px] text-[#1D1D1F]"
-                        />
-                    </section>
-                )}
-
-                {(isStreamingSyllabus || streamedSyllabusMarkdown) && (
-                    <section className="rounded-[18px] border border-[#DCEEDD] bg-[#F7FFF8] p-5">
-                        <div className="flex items-center justify-between gap-3">
-                            <div>
-                                <h3 className="text-[16px] font-semibold text-[#1D1D1F]">
-                                    Live syllabus generation
-                                </h3>
-                                <p className="text-[12px] text-[#5F6B63]">
-                                    Markdown is rendered as it streams in.
-                                </p>
-                            </div>
-                            <div className="text-[12px] font-semibold text-[#4DA56A]">
-                                {isStreamingSyllabus ? 'Streaming...' : 'Complete'}
-                            </div>
-                        </div>
-                        <div className="mt-4 rounded-[14px] border border-[#E3EFE6] bg-white p-4">
-                            <Streamdown className="text-[14px] leading-7 text-[#1D1D1F]">
-                                {streamedSyllabusMarkdown || 'Waiting for markdown...'}
-                            </Streamdown>
-                        </div>
-                    </section>
-                )}
-
-                {draftSyllabus && (
-                    <section className="space-y-4 rounded-[18px] border border-[#E5E5E7] bg-[#FAFAFB] p-5">
-                        <div className="flex items-center justify-between">
-                            <h3 className="text-[16px] font-semibold text-[#1D1D1F]">
-                                Syllabus
-                            </h3>
-                            <button
-                                type="button"
-                                disabled={isSubmitting}
-                                onClick={handleSaveSyllabus}
-                                className="rounded-[10px] border border-[#E5E5E7] px-4 py-2 text-[13px] font-semibold text-[#1D1D1F] disabled:opacity-50"
-                            >
-                                Save Syllabus
-                            </button>
-                        </div>
-
-                        <input
-                            type="text"
-                            value={draftSyllabus.title}
-                            onChange={(event) =>
-                                setDraftSyllabus((previous) =>
-                                    previous ? { ...previous, title: event.target.value } : previous
-                                )
-                            }
-                            className="w-full rounded-[12px] border border-[#E5E5E7] px-4 py-3 text-[14px] focus:border-[#4ADE80] focus:outline-none"
-                        />
-                        <textarea
-                            rows={4}
-                            value={draftSyllabus.overview}
-                            onChange={(event) =>
-                                setDraftSyllabus((previous) =>
-                                    previous
-                                        ? { ...previous, overview: event.target.value }
-                                        : previous
-                                )
-                            }
-                            className="w-full rounded-[12px] border border-[#E5E5E7] px-4 py-3 text-[14px] focus:border-[#4ADE80] focus:outline-none"
-                        />
-                    </section>
-                )}
-
                 <div className="rounded-[16px] border border-[#E5E5E7] bg-[#F9F9FA] p-4 text-[13px] text-[#86868B]">
                     <div className="font-semibold text-[#1D1D1F]">What happens next?</div>
                     <div className="mt-2">
-                        {planning.nextAction === 'moderate_topic' &&
-                            'AI is validating the requested topic automatically.'}
                         {planning.nextAction === 'generate_questionnaire' &&
-                            'Generate the learner questionnaire.'}
+                            'Generate the learner questionnaire with the cheap model.'}
                         {planning.nextAction === 'answer_questionnaire' &&
-                            'Complete and save all questionnaire answers.'}
-                        {planning.nextAction === 'generate_syllabus_prompt' &&
-                            'Generate the syllabus prompt from the answers.'}
-                        {planning.nextAction === 'review_syllabus_prompt' &&
-                            'Stream the syllabus generation preview.'}
-                        {planning.nextAction === 'review_syllabus' &&
-                            'Review and refine the generated syllabus.'}
-                        {planning.nextAction === 'approve_syllabus' &&
-                            'Approve the syllabus, then continue into the editor.'}
-                        {planning.nextAction === 'view_didactic_unit' &&
-                            'Open the editor and start chapter generation there.'}
+                            'Press Next Step to save the answers and move into syllabus review.'}
                     </div>
                 </div>
 
@@ -447,55 +500,20 @@ export function DidacticUnitSetupModal({
                         <button
                             type="button"
                             disabled={isSubmitting}
-                            onClick={() =>
-                                void runAction(async () => {
-                                    await dashboardApi.generateDidacticUnitQuestionnaire(
-                                        planning.id
-                                    )
-                                })
-                            }
+                            onClick={() => void handleGenerateQuestionnaire()}
                             className="rounded-[12px] bg-[#1D1D1F] px-5 py-3 text-[14px] font-semibold text-white disabled:opacity-50"
                         >
-                            Generate Questionnaire
+                            {isSubmitting ? 'Generating...' : 'Generate Questionnaire'}
                         </button>
                     )}
-                    {planning.nextAction === 'generate_syllabus_prompt' && (
+                    {planning.nextAction === 'answer_questionnaire' && (
                         <button
                             type="button"
-                            disabled={isSubmitting}
-                            onClick={() =>
-                                void runAction(async () => {
-                                    await dashboardApi.generateDidacticUnitSyllabusPrompt(
-                                        planning.id
-                                    )
-                                })
-                            }
+                            disabled={isSubmitting || !isQuestionnaireComplete}
+                            onClick={() => void handleQuestionnaireNextStep()}
                             className="rounded-[12px] bg-[#1D1D1F] px-5 py-3 text-[14px] font-semibold text-white disabled:opacity-50"
                         >
-                            Generate Syllabus Prompt
-                        </button>
-                    )}
-                    {planning.nextAction === 'review_syllabus_prompt' && (
-                        <button
-                            type="button"
-                            disabled={isSubmitting}
-                            onClick={() => void handleGenerateSyllabus()}
-                            className="rounded-[12px] bg-[#1D1D1F] px-5 py-3 text-[14px] font-semibold text-white disabled:opacity-50"
-                        >
-                            {isStreamingSyllabus ? 'Streaming Syllabus...' : 'Generate Syllabus'}
-                        </button>
-                    )}
-                    {(planning.nextAction === 'approve_syllabus' ||
-                        planning.nextAction === 'view_didactic_unit') && (
-                        <button
-                            type="button"
-                            disabled={isSubmitting}
-                            onClick={() => void handleApproveAndStart()}
-                            className="rounded-[12px] bg-[#1D1D1F] px-5 py-3 text-[14px] font-semibold text-white disabled:opacity-50"
-                        >
-                            {planning.nextAction === 'approve_syllabus'
-                                ? 'Approve and Open Editor'
-                                : 'Open Editor'}
+                            {isSubmitting ? 'Saving...' : 'Next Step'}
                         </button>
                     )}
                 </div>
@@ -516,7 +534,7 @@ export function DidacticUnitSetupModal({
                                 {activeDidacticUnitId ? 'Continue Didactic Unit' : 'Create New Unit'}
                             </h1>
                             <p className="mt-1 text-[13px] text-[#86868B]">
-                                AI will guide the unit from topic to generated chapters.
+                                Create the unit and gather learner input before syllabus review.
                             </p>
                         </div>
                     </div>

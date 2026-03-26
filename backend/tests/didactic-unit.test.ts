@@ -15,9 +15,15 @@ async function advanceToQuestionnaireAnswered(
     app: ReturnType<typeof createTestApp>,
     didacticUnitId: string
 ) {
+    const moderationResponse = await request(app)
+        .post(`/api/didactic-unit/${didacticUnitId}/moderate`)
+        .send({ tier: 'cheap' })
+
+    expect(moderationResponse.status).toBe(200)
+
     const questionnaireResponse = await request(app)
         .post(`/api/didactic-unit/${didacticUnitId}/questionnaire/generate`)
-        .send({})
+        .send({ tier: 'cheap' })
 
     expect(questionnaireResponse.status).toBe(200)
 
@@ -46,7 +52,7 @@ async function createApprovedDidacticUnit(app: ReturnType<typeof createTestApp>)
 
     const syllabusResponse = await request(app)
         .post(`/api/didactic-unit/${created.id}/syllabus/generate`)
-        .send({})
+        .send({ tier: 'cheap' })
 
     expect(syllabusResponse.status).toBe(200)
 
@@ -73,12 +79,11 @@ describe('didactic-unit lifecycle', () => {
             topic: 'next.js framework',
             title: 'next.js framework',
             provider: 'deepseek',
-            status: 'moderation_completed',
-            nextAction: 'generate_questionnaire',
+            status: 'submitted',
+            nextAction: 'moderate_topic',
             overview: '',
             chapters: [],
         })
-        expect(typeof response.body.moderatedAt).toBe('string')
         expect(typeof response.body.id).toBe('string')
         expect(response.body.studyProgress).toEqual({
             chapterCount: 0,
@@ -99,10 +104,10 @@ describe('didactic-unit lifecycle', () => {
             id: created.id,
             title: 'next.js framework',
             topic: 'next.js framework',
-            status: 'moderation_completed',
-            nextAction: 'generate_questionnaire',
+            status: 'submitted',
+            nextAction: 'moderate_topic',
             chapterCount: 0,
-            progressPercent: 17,
+            progressPercent: 0,
         })
         expect(response.body.didacticUnits[0]).not.toHaveProperty('legacyPlanningId')
     })
@@ -126,7 +131,7 @@ describe('didactic-unit lifecycle', () => {
 
         const syllabusResponse = await request(app)
             .post(`/api/didactic-unit/${created.id}/syllabus/generate`)
-            .send({})
+            .send({ tier: 'cheap' })
 
         expect(syllabusResponse.status).toBe(200)
         expect(syllabusResponse.body).toMatchObject({
@@ -155,13 +160,49 @@ describe('didactic-unit lifecycle', () => {
         })
     })
 
+    it('can skip questionnaire onboarding and move directly to syllabus prompt generation', async () => {
+        const app = createTestApp()
+
+        const createdResponse = await request(app)
+            .post('/api/didactic-unit')
+            .send({
+                topic: 'python scripting',
+                questionnaireEnabled: false,
+            })
+
+        expect(createdResponse.status).toBe(201)
+        expect(createdResponse.body.questionnaireEnabled).toBe(false)
+
+        const moderatedResponse = await request(app)
+            .post(`/api/didactic-unit/${createdResponse.body.id}/moderate`)
+            .send({})
+
+        expect(moderatedResponse.status).toBe(200)
+        expect(moderatedResponse.body).toMatchObject({
+            status: 'moderation_completed',
+            nextAction: 'generate_syllabus_prompt',
+            questionnaireEnabled: false,
+        })
+
+        const syllabusPromptResponse = await request(app)
+            .post(`/api/didactic-unit/${createdResponse.body.id}/syllabus-prompt/generate`)
+            .send({})
+
+        expect(syllabusPromptResponse.status).toBe(200)
+        expect(syllabusPromptResponse.body).toMatchObject({
+            status: 'syllabus_prompt_ready',
+            nextAction: 'review_syllabus_prompt',
+            questionnaireEnabled: false,
+        })
+    })
+
     it('generates, reads, completes, and tracks a chapter on the same didactic unit', async () => {
         const app = createTestApp()
         const approved = await createApprovedDidacticUnit(app)
 
         const generateResponse = await request(app)
             .post(`/api/didactic-unit/${approved.id}/chapters/0/generate`)
-            .send({})
+            .send({ tier: 'cheap' })
 
         expect(generateResponse.status).toBe(200)
         expect(generateResponse.body).toMatchObject({

@@ -26,28 +26,61 @@ function syllabusMarkdown(topic: string): string {
         '- Build topic confidence',
         '- Practice real decision making',
         '- Ship a working outcome',
+        '## Keywords',
+        '- foundations',
+        '- workflow',
+        '- application',
+        '## Estimated Duration',
+        '180',
         '## Chapters',
         '### 1. Foundations',
         '#### Overview',
         'Learn the core ideas and shared vocabulary.',
+        '#### Estimated Duration',
+        '60',
         '#### Key Points',
         '- Concepts',
         '- Terminology',
         '- Mental model',
+        '#### Lessons',
+        '##### 1. Shared Vocabulary',
+        '- Define core terms',
+        '- Explain the main mental model',
+        '##### 2. First Concepts',
+        '- Identify the core parts',
+        '- Relate each part to the overall topic',
         '### 2. Workflow',
         '#### Overview',
         'Move through a practical workflow.',
+        '#### Estimated Duration',
+        '60',
         '#### Key Points',
         '- Setup',
         '- Execution',
         '- Iteration',
+        '#### Lessons',
+        '##### 1. Setup',
+        '- Prepare the environment',
+        '- Understand the inputs',
+        '##### 2. Execution Loop',
+        '- Follow the core workflow',
+        '- Evaluate each step',
         '### 3. Application',
         '#### Overview',
         'Apply the topic in realistic scenarios.',
+        '#### Estimated Duration',
+        '60',
         '#### Key Points',
         '- Tradeoffs',
         '- Examples',
         '- Next steps',
+        '#### Lessons',
+        '##### 1. Applied Scenario',
+        '- Walk through a realistic case',
+        '- Compare two approaches',
+        '##### 2. Next Practice',
+        '- Choose a next project',
+        '- Reflect on tradeoffs',
     ].join('\n')
 }
 
@@ -87,6 +120,8 @@ export function createMockAiService(): AiService {
                 approved: true,
                 notes: 'Approved.',
                 normalizedTopic: input.topic.trim(),
+                improvedTopicBrief: `Create a practical didactic unit about ${input.topic.trim()} with clear progression from fundamentals to real application.`,
+                reasoningNotes: 'Topic is safe, coherent, and appropriate for educational generation.',
             }
         },
         async streamModeration(input, callbacks): Promise<ModerationResult> {
@@ -95,6 +130,8 @@ export function createMockAiService(): AiService {
                 approved: true,
                 notes: 'Approved.',
                 normalizedTopic: input.topic.trim(),
+                improvedTopicBrief: `Create a practical didactic unit about ${input.topic.trim()} with clear progression from fundamentals to real application.`,
+                reasoningNotes: 'Topic is safe, coherent, and appropriate for educational generation.',
             })
             const result = await this.moderateTopic(input)
             await callbacks.onComplete?.(result)
@@ -129,21 +166,74 @@ export function createMockAiService(): AiService {
                         'Practice real decision making',
                         'Ship a working outcome',
                     ],
+                    keywords: ['foundations', 'workflow', 'application'],
+                    estimatedDurationMinutes: 180,
                     chapters: [
                         {
                             title: 'Foundations',
                             overview: 'Learn the core ideas and shared vocabulary.',
                             keyPoints: ['Concepts', 'Terminology', 'Mental model'],
+                            estimatedDurationMinutes: 60,
+                            lessons: [
+                                {
+                                    title: 'Shared Vocabulary',
+                                    contentOutline: [
+                                        'Define core terms',
+                                        'Explain the main mental model',
+                                    ],
+                                },
+                                {
+                                    title: 'First Concepts',
+                                    contentOutline: [
+                                        'Identify the core parts',
+                                        'Relate each part to the overall topic',
+                                    ],
+                                },
+                            ],
                         },
                         {
                             title: 'Workflow',
                             overview: 'Move through a practical workflow.',
                             keyPoints: ['Setup', 'Execution', 'Iteration'],
+                            estimatedDurationMinutes: 60,
+                            lessons: [
+                                {
+                                    title: 'Setup',
+                                    contentOutline: [
+                                        'Prepare the environment',
+                                        'Understand the inputs',
+                                    ],
+                                },
+                                {
+                                    title: 'Execution Loop',
+                                    contentOutline: [
+                                        'Follow the core workflow',
+                                        'Evaluate each step',
+                                    ],
+                                },
+                            ],
                         },
                         {
                             title: 'Application',
                             overview: 'Apply the topic in realistic scenarios.',
                             keyPoints: ['Tradeoffs', 'Examples', 'Next steps'],
+                            estimatedDurationMinutes: 60,
+                            lessons: [
+                                {
+                                    title: 'Applied Scenario',
+                                    contentOutline: [
+                                        'Walk through a realistic case',
+                                        'Compare two approaches',
+                                    ],
+                                },
+                                {
+                                    title: 'Next Practice',
+                                    contentOutline: [
+                                        'Choose a next project',
+                                        'Reflect on tradeoffs',
+                                    ],
+                                },
+                            ],
                         },
                     ],
                 },
@@ -161,7 +251,10 @@ export function createMockAiService(): AiService {
                 provider,
                 model,
                 prompt: `Summary ${input.chapterTitle}`,
-                markdown: '## Recap\nA short recap.\n\n## What To Practice\n- Practice one\n- Practice two',
+                markdown:
+                    input.kind === 'continuity'
+                        ? '- Concepts introduced\n- Workflow explained\n- Safe to assume the learner knows the basics'
+                        : '## Recap\nA short recap.\n\n## What To Practice\n- Practice one\n- Practice two',
             }
         },
         async streamSummary(input, callbacks): Promise<SummaryResult> {
@@ -174,22 +267,25 @@ export function createMockAiService(): AiService {
         async generateChapter(input): Promise<ChapterResult> {
             const markdown = chapterMarkdown({
                 topic: input.topic,
-                chapterTitle: input.chapterTitle,
-                chapterOverview: input.chapterOverview,
+                chapterTitle: input.syllabus.chapters[input.chapterIndex].title,
+                chapterOverview: input.syllabus.chapters[input.chapterIndex].overview,
                 answers: input.questionnaireAnswers,
             })
+            const chapter = input.syllabus.chapters[input.chapterIndex]
 
             return {
                 provider,
                 model,
-                prompt: `Chapter ${input.chapterTitle}`,
+                prompt: `Chapter ${chapter.title}`,
                 markdown,
+                continuitySummary:
+                    '- Concepts introduced\n- Workflow explained\n- Safe to assume the learner knows the basics',
                 chapter: {
                     chapterIndex: input.chapterIndex,
-                    title: input.chapterTitle,
-                    overview: input.chapterOverview,
+                    title: chapter.title,
+                    overview: chapter.overview,
                     content: [
-                        `This chapter explores ${input.chapterTitle} in the context of ${input.topic}.`,
+                        `This chapter explores ${chapter.title} in the context of ${input.topic}.`,
                         `It keeps the learner goal in view: ${findAnswerValue(input.questionnaireAnswers, 'learning_goal')}.`,
                         'Use the concepts, examples, and checkpoints to build confidence progressively.',
                     ].join(' '),

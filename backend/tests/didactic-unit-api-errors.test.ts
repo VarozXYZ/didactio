@@ -40,11 +40,20 @@ describe('didactic-unit API errors', () => {
                     title: 'Should fail',
                     overview: 'This update should be rejected.',
                     learningGoals: ['One goal'],
+                    keywords: ['one'],
+                    estimatedDurationMinutes: 60,
                     chapters: [
                         {
                             title: 'Chapter',
                             overview: 'Overview',
                             keyPoints: ['Point'],
+                            estimatedDurationMinutes: 60,
+                            lessons: [
+                                {
+                                    title: 'Lesson',
+                                    contentOutline: ['Outline item'],
+                                },
+                            ],
                         },
                     ],
                 },
@@ -62,7 +71,7 @@ describe('didactic-unit API errors', () => {
 
         const response = await request(app)
             .post(`/api/didactic-unit/${approved.id}/chapters/0/regenerate`)
-            .send({})
+            .send({ tier: 'cheap' })
 
         expect(response.status).toBe(404)
         expect(response.body).toEqual({
@@ -76,7 +85,7 @@ describe('didactic-unit API errors', () => {
 
         const response = await request(app)
             .post(`/api/didactic-unit/${approved.id}/chapters/99/generate`)
-            .send({})
+            .send({ tier: 'cheap' })
 
         expect(response.status).toBe(400)
         expect(response.body).toEqual({

@@ -1,7 +1,9 @@
 import express from 'express'
 import {
+    type AiConfig,
     type AiConfigStore,
-    type AiStageConfig,
+    type AiModelConfig,
+    type AiModelTier,
     AiConfigValidationError,
     InMemoryAiConfigStore,
     parseAiConfigPatch,
@@ -36,6 +38,7 @@ import {
     approveDidacticUnitSyllabus,
     generateDidacticUnitSyllabusPrompt,
     moderateDidacticUnitPlanning,
+    prepareDidacticUnitSyllabusGeneration,
     updateDidacticUnitSyllabus,
 } from './didactic-unit/planning-lifecycle.js'
 import {
@@ -87,6 +90,85 @@ function parseChapterIndex(value: string): number {
     return chapterIndex
 }
 
+function parseChapterGenerationInstruction(body: unknown): string | undefined {
+    if (body === undefined || body === null) {
+        return undefined
+    }
+
+    if (typeof body !== 'object') {
+        throw new Error('Request body must be a JSON object.')
+    }
+
+    const payload = body as { instruction?: unknown }
+    if (payload.instruction === undefined) {
+        return undefined
+    }
+
+    if (typeof payload.instruction !== 'string') {
+        throw new Error('instruction must be a string.')
+    }
+
+    const normalized = payload.instruction.trim()
+    return normalized || undefined
+}
+
+function parseAiModelTier(body: unknown): AiModelTier {
+    if (!body || typeof body !== 'object') {
+        throw new Error('Request body must be a JSON object.')
+    }
+
+    const payload = body as { tier?: unknown }
+
+    if (payload.tier !== 'cheap' && payload.tier !== 'premium') {
+        throw new Error('tier must be either "cheap" or "premium".')
+    }
+
+    return payload.tier
+}
+
+function parseOptionalAiModelTier(body: unknown): AiModelTier | undefined {
+    if (body === undefined || body === null) {
+        return undefined
+    }
+
+    if (typeof body !== 'object') {
+        throw new Error('Request body must be a JSON object.')
+    }
+
+    const payload = body as { tier?: unknown }
+    if (payload.tier === undefined) {
+        return undefined
+    }
+
+    if (payload.tier !== 'cheap' && payload.tier !== 'premium') {
+        throw new Error('tier must be either "cheap" or "premium".')
+    }
+
+    return payload.tier
+}
+
+function parseOptionalSyllabusContext(body: unknown): string | undefined {
+    if (body === undefined || body === null) {
+        return undefined
+    }
+
+    if (typeof body !== 'object') {
+        throw new Error('Request body must be a JSON object.')
+    }
+
+    const payload = body as { context?: unknown }
+    if (payload.context === undefined) {
+        return undefined
+    }
+
+    if (typeof payload.context !== 'string') {
+        throw new Error('context must be a string.')
+    }
+
+    const normalized = payload.context.trim()
+    return normalized || undefined
+}
+
 function compareRunsByCreatedAtDesc(
     left: SyllabusGenerationRunRecord | ChapterGenerationRunRecord,
     right: SyllabusGenerationRunRecord | ChapterGenerationRunRecord
@@ -127,11 +209,8 @@ function resolveDidacticUnitChapterState(input: {
     return 'pending'
 }
 
-function resolveCompatibilityProvider(
-    configuredProvider: string,
-    requestedProvider: string
-): string {
-    return requestedProvider === 'profile-config' ? configuredProvider : requestedProvider
+function resolveCompatibilityProvider(config: AiConfig, requestedProvider: string): string {
+    return requestedProvider === 'profile-config' ? config.cheap.provider : requestedProvider
 }
 
 function resolveStageConfigError(
@@ -175,10 +254,11 @@ async function recordCompletedSyllabusRun(
 async function recordFailedSyllabusRun(
     generationRunStore: GenerationRunStore,
     didacticUnit: DidacticUnit,
-    stageConfig: AiStageConfig,
+    prompt: string,
+    modelConfig: AiModelConfig,
     error: unknown
 ): Promise<void> {
-    if (didacticUnit.status !== 'syllabus_prompt_ready' || !didacticUnit.syllabusPrompt) {
+    if (!prompt.trim()) {
         return
     }
 
@@ -186,9 +266,9 @@ async function recordFailedSyllabusRun(
         createFailedSyllabusGenerationRunRecord({
             didacticUnitId: didacticUnit.id,
             ownerId: didacticUnit.ownerId,
-            provider: stageConfig.provider,
-            model: stageConfig.model,
-            prompt: didacticUnit.syllabusPrompt,
+            provider: modelConfig.provider,
+            model: modelConfig.model,
+            prompt,
             error:
                 error instanceof Error
                     ? error.message
@@ -230,7 +310,7 @@ async function recordFailedChapterRun(
     generationRunStore: GenerationRunStore,
     didacticUnit: DidacticUnit,
     chapterIndex: number,
-    stageConfig: AiStageConfig,
+    modelConfig: AiModelConfig,
     error: unknown
 ): Promise<void> {
     const promptSource = createChapterGenerationSourceFromDidacticUnit(didacticUnit)
@@ -244,8 +324,8 @@ async function recordFailedChapterRun(
             didacticUnitId: didacticUnit.id,
             ownerId: didacticUnit.ownerId,
             chapterIndex,
-            provider: stageConfig.provider,
-            model: stageConfig.model,
+            provider: modelConfig.provider,
+            model: modelConfig.model,
             prompt: buildChapterGenerationPrompt(promptSource, chapterIndex),
             error:
                 error instanceof Error
@@ -308,10 +388,7 @@ export function createApp(options: CreateAppOptions) {
             const didacticUnit = createDidacticUnit(
                 {
                     ...input,
-                    provider: resolveCompatibilityProvider(
-                        config.syllabus.provider,
-                        input.provider
-                    ),
+                    provider: resolveCompatibilityProvider(config, input.provider),
                 },
                 requestWithMockOwner.mockOwner.id
             )
@@ -372,6 +449,7 @@ export function createApp(options: CreateAppOptions) {
             const moderation = await aiService.moderateTopic({
                 topic: didacticUnit.topic,
                 config,
+                tier: 'cheap',
                 abortSignal: createAbortSignal(request),
             })
 
@@ -380,10 +458,10 @@ export function createApp(options: CreateAppOptions) {
                 return
             }
 
-            const moderatedDidacticUnit = moderateDidacticUnitPlanning({
-                ...didacticUnit,
-                topic: moderation.normalizedTopic,
-                title: moderation.normalizedTopic,
+            const moderatedDidacticUnit = moderateDidacticUnitPlanning(didacticUnit, {
+                normalizedTopic: moderation.normalizedTopic,
+                improvedTopicBrief: moderation.improvedTopicBrief,
+                reasoningNotes: moderation.reasoningNotes,
             })
             await didacticUnitStore.save(moderatedDidacticUnit)
             response.json(buildDidacticUnitResponse(moderatedDidacticUnit))
@@ -426,6 +504,7 @@ export function createApp(options: CreateAppOptions) {
                 {
                     topic: didacticUnit.topic,
                     config,
+                    tier: 'cheap',
                     abortSignal: createAbortSignal(request),
                 },
                 {
@@ -455,10 +534,10 @@ export function createApp(options: CreateAppOptions) {
                 return
             }
 
-            const moderatedDidacticUnit = moderateDidacticUnitPlanning({
-                ...didacticUnit,
-                topic: moderation.normalizedTopic,
-                title: moderation.normalizedTopic,
+            const moderatedDidacticUnit = moderateDidacticUnitPlanning(didacticUnit, {
+                normalizedTopic: moderation.normalizedTopic,
+                improvedTopicBrief: moderation.improvedTopicBrief,
+                reasoningNotes: moderation.reasoningNotes,
             })
             await didacticUnitStore.save(moderatedDidacticUnit)
             writeNdjsonEvent(response, {
@@ -488,11 +567,26 @@ export function createApp(options: CreateAppOptions) {
             return
         }
 
+        let tier: AiModelTier
+        try {
+            tier = parseAiModelTier(request.body)
+        } catch (error) {
+            response.status(400).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : 'Invalid didactic unit questionnaire generation request.',
+            })
+            return
+        }
+
         try {
             const config = await aiConfigStore.get(requestWithMockOwner.mockOwner.id)
             const result = await aiService.generateQuestionnaire({
                 topic: didacticUnit.topic,
+                improvedTopicBrief: didacticUnit.improvedTopicBrief,
                 config,
+                tier,
                 abortSignal: createAbortSignal(request),
             })
             const updatedDidacticUnit = applyGeneratedDidacticUnitQuestionnaire(
@@ -525,12 +619,29 @@ export function createApp(options: CreateAppOptions) {
 
         openNdjsonStream(response)
 
+        let tier: AiModelTier
+        try {
+            tier = parseAiModelTier(request.body)
+        } catch (error) {
+            writeNdjsonEvent(response, {
+                type: 'error',
+                message:
+                    error instanceof Error
+                        ? error.message
+                        : 'Invalid didactic unit questionnaire generation request.',
+            })
+            response.end()
+            return
+        }
+
         try {
             const config = await aiConfigStore.get(requestWithMockOwner.mockOwner.id)
             const result = await aiService.streamQuestionnaire(
                 {
                     topic: didacticUnit.topic,
+                    improvedTopicBrief: didacticUnit.improvedTopicBrief,
                     config,
+                    tier,
                     abortSignal: createAbortSignal(request),
                 },
                 {
@@ -627,7 +738,11 @@ export function createApp(options: CreateAppOptions) {
         }
 
         try {
-            const updatedDidacticUnit = generateDidacticUnitSyllabusPrompt(didacticUnit)
+            const config = await aiConfigStore.get(requestWithMockOwner.mockOwner.id)
+            const updatedDidacticUnit = generateDidacticUnitSyllabusPrompt(
+                didacticUnit,
+                config.authoring
+            )
             await didacticUnitStore.save(updatedDidacticUnit)
             response.json(buildDidacticUnitResponse(updatedDidacticUnit))
         } catch (error) {
@@ -652,18 +767,54 @@ export function createApp(options: CreateAppOptions) {
             return
         }
 
+        let tier: AiModelTier
+        try {
+            tier = parseAiModelTier(request.body)
+        } catch (error) {
+            response.status(400).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : 'Invalid didactic unit syllabus generation request.',
+            })
+            return
+        }
+
         const config = await aiConfigStore.get(requestWithMockOwner.mockOwner.id)
+        let preparedDidacticUnit: DidacticUnit | null = null
+
+        let syllabusContext: string | undefined
+        try {
+            syllabusContext = parseOptionalSyllabusContext(request.body)
+        } catch (error) {
+            response.status(400).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : 'Invalid didactic unit syllabus generation request.',
+            })
+            return
+        }
 
         try {
+            preparedDidacticUnit = prepareDidacticUnitSyllabusGeneration(
+                didacticUnit,
+                config.authoring,
+                syllabusContext
+            )
             const result = await aiService.generateSyllabus({
-                topic: didacticUnit.topic,
-                syllabusPrompt: didacticUnit.syllabusPrompt ?? '',
-                questionnaireAnswers: didacticUnit.questionnaireAnswers,
+                topic: preparedDidacticUnit.topic,
+                improvedTopicBrief: preparedDidacticUnit.improvedTopicBrief,
+                syllabusPrompt: preparedDidacticUnit.syllabusPrompt ?? '',
+                questionnaireAnswers: preparedDidacticUnit.questionnaireAnswers,
+                depth: preparedDidacticUnit.depth,
+                length: preparedDidacticUnit.length,
                 config,
+                tier,
                 abortSignal: createAbortSignal(request),
             })
             const updatedDidacticUnit = applyGeneratedDidacticUnitSyllabus(
-                didacticUnit,
+                preparedDidacticUnit,
                 result.syllabus
             )
             updatedDidacticUnit.provider = result.provider
@@ -678,7 +829,8 @@ export function createApp(options: CreateAppOptions) {
             await recordFailedSyllabusRun(
                 generationRunStore,
                 didacticUnit,
-                config.syllabus,
+                preparedDidacticUnit?.syllabusPrompt ?? didacticUnit.syllabusPrompt ?? '',
+                config[tier],
                 error
             )
             const resolved = resolveStageConfigError(
@@ -702,15 +854,56 @@ export function createApp(options: CreateAppOptions) {
         }
 
         openNdjsonStream(response)
+
+        let tier: AiModelTier
+        try {
+            tier = parseAiModelTier(request.body)
+        } catch (error) {
+            writeNdjsonEvent(response, {
+                type: 'error',
+                message:
+                    error instanceof Error
+                        ? error.message
+                        : 'Invalid didactic unit syllabus generation request.',
+            })
+            response.end()
+            return
+        }
+
         const config = await aiConfigStore.get(requestWithMockOwner.mockOwner.id)
+        let preparedDidacticUnit: DidacticUnit | null = null
+
+        let syllabusContext: string | undefined
+        try {
+            syllabusContext = parseOptionalSyllabusContext(request.body)
+        } catch (error) {
+            writeNdjsonEvent(response, {
+                type: 'error',
+                message:
+                    error instanceof Error
+                        ? error.message
+                        : 'Invalid didactic unit syllabus generation request.',
+            })
+            response.end()
+            return
+        }
 
         try {
+            preparedDidacticUnit = prepareDidacticUnitSyllabusGeneration(
+                didacticUnit,
+                config.authoring,
+                syllabusContext
+            )
             const result = await aiService.streamSyllabus(
                 {
-                    topic: didacticUnit.topic,
-                    syllabusPrompt: didacticUnit.syllabusPrompt ?? '',
-                    questionnaireAnswers: didacticUnit.questionnaireAnswers,
+                    topic: preparedDidacticUnit.topic,
+                    improvedTopicBrief: preparedDidacticUnit.improvedTopicBrief,
+                    syllabusPrompt: preparedDidacticUnit.syllabusPrompt ?? '',
+                    questionnaireAnswers: preparedDidacticUnit.questionnaireAnswers,
+                    depth: preparedDidacticUnit.depth,
+                    length: preparedDidacticUnit.length,
                     config,
+                    tier,
                     abortSignal: createAbortSignal(request),
                 },
                 {
@@ -733,7 +926,7 @@ export function createApp(options: CreateAppOptions) {
             )
 
             const updatedDidacticUnit = applyGeneratedDidacticUnitSyllabus(
-                didacticUnit,
+                preparedDidacticUnit,
                 result.syllabus
             )
             updatedDidacticUnit.provider = result.provider
@@ -751,7 +944,8 @@ export function createApp(options: CreateAppOptions) {
             await recordFailedSyllabusRun(
                 generationRunStore,
                 didacticUnit,
-                config.syllabus,
+                preparedDidacticUnit?.syllabusPrompt ?? didacticUnit.syllabusPrompt ?? '',
+                config[tier],
                 error
             )
             const resolved = resolveStageConfigError(
@@ -813,7 +1007,11 @@ export function createApp(options: CreateAppOptions) {
         }
 
         try {
-            const approvedDidacticUnit = approveDidacticUnitSyllabus(didacticUnit)
+            const generationTier = parseOptionalAiModelTier(request.body)
+            const approvedDidacticUnit = approveDidacticUnitSyllabus(
+                didacticUnit,
+                generationTier
+            )
             await didacticUnitStore.save(approvedDidacticUnit)
             response.json(buildDidacticUnitResponse(approvedDidacticUnit))
         } catch (error) {
@@ -844,6 +1042,21 @@ export function createApp(options: CreateAppOptions) {
 
         openNdjsonStream(response)
 
+        let tier: AiModelTier
+        try {
+            tier = parseAiModelTier(request.body)
+        } catch (error) {
+            writeNdjsonEvent(response, {
+                type: 'error',
+                message:
+                    error instanceof Error
+                        ? error.message
+                        : 'Invalid didactic unit summary generation request.',
+            })
+            response.end()
+            return
+        }
+
         try {
             const config = await aiConfigStore.get(requestWithMockOwner.mockOwner.id)
             const result = await aiService.streamSummary(
@@ -852,6 +1065,7 @@ export function createApp(options: CreateAppOptions) {
                     chapterTitle: didacticUnit.title,
                     chapterMarkdown: sourceMarkdown || didacticUnit.overview,
                     config,
+                    tier,
                     abortSignal: createAbortSignal(request),
                 },
                 {
@@ -1193,6 +1407,21 @@ export function createApp(options: CreateAppOptions) {
         }
 
         const config = await aiConfigStore.get(requestWithMockOwner.mockOwner.id)
+        let tier: AiModelTier
+        let instruction: string | undefined
+
+        try {
+            tier = parseAiModelTier(request.body)
+            instruction = parseChapterGenerationInstruction(request.body)
+        } catch (error) {
+            response.status(400).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : `Invalid didactic unit chapter ${revisionSource} request.`,
+            })
+            return
+        }
 
         if (isStreaming) {
             openNdjsonStream(response)
@@ -1203,12 +1432,24 @@ export function createApp(options: CreateAppOptions) {
                 ? await aiService.streamChapter(
                       {
                           topic: didacticUnit.topic,
+                          syllabus: didacticUnit.syllabus ?? {
+                              title: didacticUnit.title,
+                              overview: didacticUnit.overview,
+                              learningGoals: didacticUnit.learningGoals,
+                              keywords: didacticUnit.keywords,
+                              estimatedDurationMinutes:
+                                  didacticUnit.estimatedDurationMinutes ?? 60,
+                              chapters: didacticUnit.chapters,
+                          },
                           chapterIndex,
-                          chapterTitle: plannedChapter.title,
-                          chapterOverview: plannedChapter.overview,
-                          chapterKeyPoints: plannedChapter.keyPoints,
                           questionnaireAnswers: didacticUnit.questionnaireAnswers,
+                          continuitySummaries: didacticUnit.continuitySummaries,
+                          depth: didacticUnit.depth,
+                          length: didacticUnit.length,
+                          additionalContext: didacticUnit.additionalContext,
+                          instruction,
                           config,
+                          tier,
                           abortSignal: createAbortSignal(request),
                       },
                       {
@@ -1229,14 +1470,25 @@ export function createApp(options: CreateAppOptions) {
                           },
                       }
                   )
-                : await aiService.generateChapter({
+                  : await aiService.generateChapter({
                       topic: didacticUnit.topic,
+                      syllabus: didacticUnit.syllabus ?? {
+                          title: didacticUnit.title,
+                          overview: didacticUnit.overview,
+                          learningGoals: didacticUnit.learningGoals,
+                          keywords: didacticUnit.keywords,
+                          estimatedDurationMinutes: didacticUnit.estimatedDurationMinutes ?? 60,
+                          chapters: didacticUnit.chapters,
+                      },
                       chapterIndex,
-                      chapterTitle: plannedChapter.title,
-                      chapterOverview: plannedChapter.overview,
-                      chapterKeyPoints: plannedChapter.keyPoints,
                       questionnaireAnswers: didacticUnit.questionnaireAnswers,
+                      continuitySummaries: didacticUnit.continuitySummaries,
+                      depth: didacticUnit.depth,
+                      length: didacticUnit.length,
+                      additionalContext: didacticUnit.additionalContext,
+                      instruction,
                       config,
+                      tier,
                       abortSignal: createAbortSignal(request),
                   })
 
@@ -1244,7 +1496,8 @@ export function createApp(options: CreateAppOptions) {
                 didacticUnit,
                 chapterIndex,
                 result.chapter,
-                revisionSource
+                revisionSource,
+                result.continuitySummary
             )
             updatedDidacticUnit.provider = result.provider
             await didacticUnitStore.save(updatedDidacticUnit)
@@ -1270,7 +1523,7 @@ export function createApp(options: CreateAppOptions) {
                 generationRunStore,
                 didacticUnit,
                 chapterIndex,
-                config.chapter,
+                config[tier],
                 error
             )
             const resolved = resolveStageConfigError(

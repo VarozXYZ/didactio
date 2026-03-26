@@ -2,41 +2,30 @@ import { useEffect, useState } from 'react'
 import { Loader2, Save } from 'lucide-react'
 import {
     type BackendAiConfig,
-    type BackendAiStageConfig,
+    type BackendAiModelConfig,
+    type BackendAuthoringConfig,
     dashboardApi,
 } from '../../../api/dashboardApi'
 
-type StageKey = keyof BackendAiConfig
+type ModelTier = 'cheap' | 'premium'
 
-const stageLabels: Record<StageKey, { title: string; description: string }> = {
-    moderation: {
-        title: 'Moderation',
-        description: 'Topic validation and normalization',
+const tierLabels: Record<ModelTier, { title: string; description: string }> = {
+    cheap: {
+        title: 'Cheap Model',
+        description: 'Faster, lower-cost default for routine generation.',
     },
-    questionnaire: {
-        title: 'Questionnaire',
-        description: 'Learner discovery questions',
-    },
-    syllabus: {
-        title: 'Syllabus',
-        description: 'Syllabus planning and structure generation',
-    },
-    summary: {
-        title: 'Summary',
-        description: 'Future unit summary generation',
-    },
-    chapter: {
-        title: 'Chapter',
-        description: 'Chapter writing and regeneration',
+    premium: {
+        title: 'Premium Model',
+        description: 'Higher-quality option for the moments when you want the best output.',
     },
 }
 
-function StageConfigCard(props: {
-    stage: StageKey
-    value: BackendAiStageConfig
-    onChange: (next: BackendAiStageConfig) => void
+function ModelConfigCard(props: {
+    tier: ModelTier
+    value: BackendAiModelConfig
+    onChange: (next: BackendAiModelConfig) => void
 }) {
-    const meta = stageLabels[props.stage]
+    const meta = tierLabels[props.tier]
 
     return (
         <div className="rounded-[14px] border border-[#E5E5E7] bg-white p-5">
@@ -59,7 +48,7 @@ function StageConfigCard(props: {
                                 provider: event.target.value,
                             })
                         }
-                        placeholder="e.g. openai"
+                        placeholder="e.g. deepseek"
                         className="w-full rounded-[12px] border border-[#E5E5E7] px-4 py-3 text-[14px] focus:border-[#4ADE80] focus:outline-none"
                     />
                 </div>
@@ -77,9 +66,65 @@ function StageConfigCard(props: {
                                 model: event.target.value,
                             })
                         }
-                        placeholder="e.g. gpt-4o-mini"
+                        placeholder="e.g. deepseek-reasoner"
                         className="w-full rounded-[12px] border border-[#E5E5E7] px-4 py-3 text-[14px] focus:border-[#4ADE80] focus:outline-none"
                     />
+                </div>
+            </div>
+        </div>
+    )
+}
+
+function AuthoringConfigCard(props: {
+    value: BackendAuthoringConfig
+    onChange: (next: BackendAuthoringConfig) => void
+}) {
+    return (
+        <div className="rounded-[14px] border border-[#E5E5E7] bg-white p-5">
+            <div className="mb-4">
+                <h3 className="text-[16px] font-semibold text-[#1D1D1F]">Authoring Style</h3>
+                <p className="mt-1 text-[12px] text-[#86868B]">
+                    These settings shape the global authoring voice used across generation.
+                </p>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                    <label className="mb-2 block text-[12px] font-semibold uppercase tracking-wide text-[#6B7280]">
+                        Language
+                    </label>
+                    <input
+                        type="text"
+                        value={props.value.language}
+                        onChange={(event) =>
+                            props.onChange({
+                                ...props.value,
+                                language: event.target.value,
+                            })
+                        }
+                        placeholder="e.g. English"
+                        className="w-full rounded-[12px] border border-[#E5E5E7] px-4 py-3 text-[14px] focus:border-[#4ADE80] focus:outline-none"
+                    />
+                </div>
+
+                <div>
+                    <label className="mb-2 block text-[12px] font-semibold uppercase tracking-wide text-[#6B7280]">
+                        Tone
+                    </label>
+                    <select
+                        value={props.value.tone}
+                        onChange={(event) =>
+                            props.onChange({
+                                ...props.value,
+                                tone: event.target.value as BackendAuthoringConfig['tone'],
+                            })
+                        }
+                        className="w-full rounded-[12px] border border-[#E5E5E7] px-4 py-3 text-[14px] focus:border-[#4ADE80] focus:outline-none"
+                    >
+                        <option value="friendly">Friendly</option>
+                        <option value="neutral">Neutral</option>
+                        <option value="professional">Professional</option>
+                    </select>
                 </div>
             </div>
         </div>
@@ -146,7 +191,7 @@ export function PreferencesView() {
                         Preferences
                     </h1>
                     <p className="mt-0.5 text-[13px] text-[#86868B]">
-                        Configure the provider and model used at each AI stage
+                        Configure the cheap/premium AI profiles and the shared authoring tone
                     </p>
                 </div>
             </header>
@@ -195,17 +240,30 @@ export function PreferencesView() {
 
                     {config && (
                         <div className="grid gap-5">
-                            {(Object.keys(stageLabels) as StageKey[]).map((stage) => (
-                                <StageConfigCard
-                                    key={stage}
-                                    stage={stage}
-                                    value={config[stage]}
+                            <AuthoringConfigCard
+                                value={config.authoring}
+                                onChange={(nextValue) =>
+                                    setConfig((previous) =>
+                                        previous
+                                            ? {
+                                                  ...previous,
+                                                  authoring: nextValue,
+                                              }
+                                            : previous
+                                    )
+                                }
+                            />
+                            {(['cheap', 'premium'] as ModelTier[]).map((tier) => (
+                                <ModelConfigCard
+                                    key={tier}
+                                    tier={tier}
+                                    value={config[tier]}
                                     onChange={(nextValue) =>
                                         setConfig((previous) =>
                                             previous
                                                 ? {
                                                       ...previous,
-                                                      [stage]: nextValue,
+                                                      [tier]: nextValue,
                                                   }
                                                 : previous
                                         )

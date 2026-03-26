@@ -4,6 +4,8 @@ import { createTestApp } from './helpers/create-test-app.js'
 import {
     createApprovedDidacticUnit,
     createSyllabusReadyDidacticUnit,
+    advanceToQuestionnaireAnswered,
+    createDidacticUnit,
     generateDidacticUnitChapter,
 } from './helpers/didactic-unit-flow.js'
 
@@ -42,16 +44,40 @@ describe('didactic-unit API coverage', () => {
                 'Build production features confidently',
                 'Choose appropriate implementation tradeoffs',
             ],
+            keywords: ['framework architecture', 'delivery', 'production'],
+            estimatedDurationMinutes: 180,
             chapters: [
                 {
                     title: 'Runtime Fundamentals',
                     overview: 'Review the core runtime model and framework primitives.',
                     keyPoints: ['Routing model', 'Rendering modes', 'Server and client boundaries'],
+                    estimatedDurationMinutes: 90,
+                    lessons: [
+                        {
+                            title: 'Core Runtime',
+                            contentOutline: ['Routing model', 'Rendering modes'],
+                        },
+                        {
+                            title: 'Boundaries',
+                            contentOutline: ['Server and client boundaries'],
+                        },
+                    ],
                 },
                 {
                     title: 'Delivery Workflow',
                     overview: 'Move from local development to production delivery.',
                     keyPoints: ['Project structure', 'Deployment pipeline', 'Operational checks'],
+                    estimatedDurationMinutes: 90,
+                    lessons: [
+                        {
+                            title: 'Project Structure',
+                            contentOutline: ['Organize the app', 'Prepare the pipeline'],
+                        },
+                        {
+                            title: 'Operational Checks',
+                            contentOutline: ['Validate deployment', 'Check production health'],
+                        },
+                    ],
                 },
             ],
         }
@@ -107,7 +133,7 @@ describe('didactic-unit API coverage', () => {
 
         const regenerateResponse = await request(app)
             .post(`/api/didactic-unit/${approved.id}/chapters/0/regenerate`)
-            .send({})
+            .send({ tier: 'cheap' })
 
         expect(regenerateResponse.status).toBe(200)
         expect(regenerateResponse.body).toMatchObject({
@@ -137,5 +163,40 @@ describe('didactic-unit API coverage', () => {
         expect(
             runsResponse.body.runs.filter((run: { stage: string }) => run.stage === 'chapter')
         ).toHaveLength(2)
+    })
+
+    it('generates and regenerates a syllabus directly without exposing the prompt step', async () => {
+        const app = createTestApp()
+        const created = await createDidacticUnit(app)
+
+        await advanceToQuestionnaireAnswered(app, created.id)
+
+        const firstGenerationResponse = await request(app)
+            .post(`/api/didactic-unit/${created.id}/syllabus/generate`)
+            .send({ tier: 'cheap' })
+
+        expect(firstGenerationResponse.status).toBe(200)
+        expect(firstGenerationResponse.body).toMatchObject({
+            id: created.id,
+            status: 'syllabus_ready',
+            nextAction: 'review_syllabus',
+        })
+
+        const regenerateResponse = await request(app)
+            .post(`/api/didactic-unit/${created.id}/syllabus/generate`)
+            .send({
+                tier: 'premium',
+                context: 'Lean further into practical exercises and project-based outcomes.',
+            })
+
+        expect(regenerateResponse.status).toBe(200)
+        expect(regenerateResponse.body).toMatchObject({
+            id: created.id,
+            status: 'syllabus_ready',
+            nextAction: 'review_syllabus',
+        })
+        expect(regenerateResponse.body.additionalContext).toContain(
+            'Lean further into practical exercises and project-based outcomes.'
+        )
     })
 })

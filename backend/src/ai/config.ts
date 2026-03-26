@@ -1,25 +1,34 @@
 import { getAppEnv } from '../config/env.js'
 
-export type AiStage = 'moderation' | 'questionnaire' | 'syllabus' | 'summary' | 'chapter'
+export type AiModelTier = 'cheap' | 'premium'
+export type AuthoringTone = 'friendly' | 'neutral' | 'professional'
 
-export interface AiStageConfig {
+export interface AiModelConfig {
     provider: string
     model: string
 }
 
+export interface AuthoringConfig {
+    language: string
+    tone: AuthoringTone
+}
+
 export interface AiConfig {
-    moderation: AiStageConfig
-    questionnaire: AiStageConfig
-    syllabus: AiStageConfig
-    summary: AiStageConfig
-    chapter: AiStageConfig
+    cheap: AiModelConfig
+    premium: AiModelConfig
+    authoring: AuthoringConfig
 }
 
 export type PartialAiConfig = Partial<{
-    [Stage in AiStage]: Partial<AiStageConfig>
+    cheap: Partial<AiModelConfig>
+    premium: Partial<AiModelConfig>
+    authoring: Partial<AuthoringConfig>
 }>
 
 export class AiConfigValidationError extends Error {}
+
+const AUTHORING_TONES: AuthoringTone[] = ['friendly', 'neutral', 'professional']
+const MODEL_TIERS: AiModelTier[] = ['cheap', 'premium']
 
 function normalizeNonEmptyString(value: unknown, fieldName: string): string {
     const normalized = typeof value === 'string' ? value.trim() : ''
@@ -31,51 +40,83 @@ function normalizeNonEmptyString(value: unknown, fieldName: string): string {
     return normalized
 }
 
-export function normalizeStageConfig(
-    stage: AiStage,
-    config: Partial<AiStageConfig> | undefined,
-    fallback?: AiStageConfig
-): AiStageConfig {
-    const provider = normalizeNonEmptyString(
-        config?.provider ?? fallback?.provider,
-        `${stage}.provider`
-    )
-    const model = normalizeNonEmptyString(
-        config?.model ?? fallback?.model,
-        `${stage}.model`
-    )
+function normalizeEnumValue<T extends string>(
+    value: unknown,
+    fieldName: string,
+    allowedValues: readonly T[],
+    fallback?: T
+): T {
+    const normalized = normalizeNonEmptyString(value ?? fallback, fieldName)
 
-    return { provider, model }
+    if (!allowedValues.includes(normalized as T)) {
+        throw new AiConfigValidationError(
+            `${fieldName} must be one of: ${allowedValues.join(', ')}.`
+        )
+    }
+
+    return normalized as T
+}
+
+export function normalizeModelConfig(
+    tier: AiModelTier,
+    config: Partial<AiModelConfig> | undefined,
+    fallback?: AiModelConfig
+): AiModelConfig {
+    return {
+        provider: normalizeNonEmptyString(
+            config?.provider ?? fallback?.provider,
+            `${tier}.provider`
+        ),
+        model: normalizeNonEmptyString(
+            config?.model ?? fallback?.model,
+            `${tier}.model`
+        ),
+    }
+}
+
+export function normalizeAuthoringConfig(
+    config: Partial<AuthoringConfig> | undefined,
+    fallback?: AuthoringConfig
+): AuthoringConfig {
+    return {
+        language: normalizeNonEmptyString(
+            config?.language ?? fallback?.language,
+            'authoring.language'
+        ),
+        tone: normalizeEnumValue(
+            config?.tone,
+            'authoring.tone',
+            AUTHORING_TONES,
+            fallback?.tone
+        ),
+    }
 }
 
 export function getDefaultAiConfig(): AiConfig {
     const env = getAppEnv()
 
     return {
-        moderation: {
-            provider: env.aiModerationProvider,
-            model: env.aiModerationModel,
+        cheap: {
+            provider: env.aiCheapProvider,
+            model: env.aiCheapModel,
         },
-        questionnaire: {
-            provider: env.aiQuestionnaireProvider,
-            model: env.aiQuestionnaireModel,
+        premium: {
+            provider: env.aiPremiumProvider,
+            model: env.aiPremiumModel,
         },
-        syllabus: {
-            provider: env.aiSyllabusProvider,
-            model: env.aiSyllabusModel,
-        },
-        summary: {
-            provider: env.aiSummaryProvider,
-            model: env.aiSummaryModel,
-        },
-        chapter: {
-            provider: env.aiChapterProvider,
-            model: env.aiChapterModel,
+        authoring: {
+            language: env.aiAuthoringLanguage,
+            tone: normalizeEnumValue(
+                env.aiAuthoringTone,
+                'authoring.tone',
+                AUTHORING_TONES,
+                'neutral'
+            ),
         },
     }
 }
 
-export function resolveGatewayModelId(config: AiStageConfig): string {
+export function resolveGatewayModelId(config: AiModelConfig): string {
     return config.model.includes('/') ? config.model : `${config.provider}/${config.model}`
 }
 
@@ -103,19 +144,9 @@ export class InMemoryAiConfigStore implements AiConfigStore {
     async update(ownerId: string, patch: PartialAiConfig): Promise<AiConfig> {
         const current = await this.get(ownerId)
         const next: AiConfig = {
-            moderation: normalizeStageConfig(
-                'moderation',
-                patch.moderation,
-                current.moderation
-            ),
-            questionnaire: normalizeStageConfig(
-                'questionnaire',
-                patch.questionnaire,
-                current.questionnaire
-            ),
-            syllabus: normalizeStageConfig('syllabus', patch.syllabus, current.syllabus),
-            summary: normalizeStageConfig('summary', patch.summary, current.summary),
-            chapter: normalizeStageConfig('chapter', patch.chapter, current.chapter),
+            cheap: normalizeModelConfig('cheap', patch.cheap, current.cheap),
+            premium: normalizeModelConfig('premium', patch.premium, current.premium),
+            authoring: normalizeAuthoringConfig(patch.authoring, current.authoring),
         }
 
         this.configs.set(ownerId, next)
@@ -129,35 +160,46 @@ export function parseAiConfigPatch(body: unknown): PartialAiConfig {
     }
 
     const payload = body as Record<string, unknown>
-    const stages: AiStage[] = [
-        'moderation',
-        'questionnaire',
-        'syllabus',
-        'summary',
-        'chapter',
-    ]
     const patch: PartialAiConfig = {}
 
-    for (const stage of stages) {
-        const value = payload[stage]
+    for (const tier of MODEL_TIERS) {
+        const value = payload[tier]
         if (value === undefined) {
             continue
         }
 
         if (!value || typeof value !== 'object') {
-            throw new AiConfigValidationError(`${stage} must be a JSON object.`)
+            throw new AiConfigValidationError(`${tier} must be a JSON object.`)
         }
 
         const rawConfig = value as Record<string, unknown>
-        patch[stage] = {
+        patch[tier] = {
             provider:
                 rawConfig.provider === undefined
                     ? undefined
-                    : normalizeNonEmptyString(rawConfig.provider, `${stage}.provider`),
+                    : normalizeNonEmptyString(rawConfig.provider, `${tier}.provider`),
             model:
                 rawConfig.model === undefined
                     ? undefined
-                    : normalizeNonEmptyString(rawConfig.model, `${stage}.model`),
+                    : normalizeNonEmptyString(rawConfig.model, `${tier}.model`),
+        }
+    }
+
+    if (payload.authoring !== undefined) {
+        if (!payload.authoring || typeof payload.authoring !== 'object') {
+            throw new AiConfigValidationError('authoring must be a JSON object.')
+        }
+
+        const rawConfig = payload.authoring as Record<string, unknown>
+        patch.authoring = {
+            language:
+                rawConfig.language === undefined
+                    ? undefined
+                    : normalizeNonEmptyString(rawConfig.language, 'authoring.language'),
+            tone:
+                rawConfig.tone === undefined
+                    ? undefined
+                    : normalizeEnumValue(rawConfig.tone, 'authoring.tone', AUTHORING_TONES),
         }
     }
 

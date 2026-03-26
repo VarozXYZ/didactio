@@ -91,6 +91,8 @@ export function adaptDidacticUnitSummaryToDashboardItem(
     const subject = deriveSubjectFromTopic(summary.topic)
     const activityDate = resolveActivityDate(summary.lastActivityAt, summary.createdAt)
     const canOpenEditor =
+        summary.status === 'syllabus_approved' ||
+        summary.status === 'ready_for_content_generation' ||
         summary.status === 'content_generation_in_progress' ||
         summary.status === 'content_generation_completed'
 
@@ -178,6 +180,12 @@ export function adaptDidacticUnitPlanning(detail: BackendDidacticUnitDetail): Pl
         nextAction: detail.nextAction,
         progressPercent: resolvePlanningProgressPercent(detail.status),
         lastActivityAt: formatRelativeTimestamp(detail.updatedAt),
+        additionalContext: detail.additionalContext,
+        improvedTopicBrief: detail.improvedTopicBrief,
+        reasoningNotes: detail.reasoningNotes,
+        depth: detail.depth,
+        length: detail.length,
+        questionnaireEnabled: detail.questionnaireEnabled,
         questionnaire: detail.questionnaire
             ? {
                   questions: detail.questionnaire.questions,

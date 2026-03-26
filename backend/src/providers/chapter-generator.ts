@@ -43,18 +43,19 @@ export function buildChapterGenerationPrompt(
     const topicKnowledgeLevel = findAnswerValue(source, 'topic_knowledge_level')
     const relatedKnowledgeLevel = findAnswerValue(source, 'related_knowledge_level')
     const learningGoal = findAnswerValue(source, 'learning_goal')
-    const preferredDepth = findAnswerValue(source, 'preferred_depth')
 
     return [
         'Write one didactic chapter in markdown.',
         `Topic: ${source.topic}`,
+        `Unit title: ${source.syllabus?.title ?? source.topic}`,
         `Chapter title: ${chapter.title}`,
         `Chapter overview: ${chapter.overview}`,
+        `Chapter estimated duration: ${chapter.estimatedDurationMinutes} minutes`,
         `Chapter key points: ${chapter.keyPoints.join(', ')}`,
+        `Chapter lessons: ${chapter.lessons.map((lesson) => lesson.title).join(', ')}`,
         `Current topic knowledge: ${topicKnowledgeLevel}`,
         `Related knowledge: ${relatedKnowledgeLevel}`,
         `Learner goal: ${learningGoal}`,
-        `Preferred depth: ${preferredDepth}`,
         'Structure:',
         '# <Chapter Title>',
         '## Overview',

@@ -1,4 +1,6 @@
 export type DidacticUnitProvider = string
+export type DidacticUnitDepth = 'basic' | 'intermediate' | 'technical'
+export type DidacticUnitLength = 'intro' | 'short' | 'long' | 'textbook'
 
 export type DidacticUnitNextAction =
     | 'moderate_topic'
@@ -13,6 +15,10 @@ export type DidacticUnitNextAction =
 export interface CreateDidacticUnitInput {
     topic: string
     provider: DidacticUnitProvider
+    additionalContext?: string
+    depth: DidacticUnitDepth
+    length: DidacticUnitLength
+    questionnaireEnabled: boolean
 }
 
 export interface DidacticUnitQuestionAnswer {
@@ -46,12 +52,21 @@ export interface DidacticUnitSyllabusChapter {
     title: string
     overview: string
     keyPoints: string[]
+    estimatedDurationMinutes: number
+    lessons: DidacticUnitSyllabusLesson[]
+}
+
+export interface DidacticUnitSyllabusLesson {
+    title: string
+    contentOutline: string[]
 }
 
 export interface DidacticUnitSyllabus {
     title: string
     overview: string
     learningGoals: string[]
+    keywords: string[]
+    estimatedDurationMinutes: number
     chapters: DidacticUnitSyllabusChapter[]
 }
 
@@ -79,12 +94,35 @@ function parseStringArray(value: unknown, fieldName: string): string[] {
     )
 }
 
+function parseEnumValue<T extends string>(
+    value: unknown,
+    fieldName: string,
+    allowedValues: readonly T[],
+    fallback: T
+): T {
+    const normalized =
+        typeof value === 'string' && value.trim() ? value.trim() : fallback
+
+    if (!allowedValues.includes(normalized as T)) {
+        throw new Error(`${fieldName} must be one of: ${allowedValues.join(', ')}.`)
+    }
+
+    return normalized as T
+}
+
 export function parseCreateDidacticUnitInput(body: unknown): CreateDidacticUnitInput {
     if (!body || typeof body !== 'object') {
         throw new Error('Request body must be a JSON object.')
     }
 
-    const payload = body as { topic?: unknown; provider?: unknown }
+    const payload = body as {
+        topic?: unknown
+        provider?: unknown
+        additionalContext?: unknown
+        depth?: unknown
+        length?: unknown
+        questionnaireEnabled?: unknown
+    }
     const topic = typeof payload.topic === 'string' ? payload.topic.trim() : ''
 
     if (!topic) {
@@ -97,6 +135,27 @@ export function parseCreateDidacticUnitInput(body: unknown): CreateDidacticUnitI
             typeof payload.provider === 'string' && payload.provider.trim()
                 ? payload.provider.trim()
                 : 'profile-config',
+        additionalContext:
+            typeof payload.additionalContext === 'string' &&
+            payload.additionalContext.trim()
+                ? payload.additionalContext.trim()
+                : undefined,
+        depth: parseEnumValue(
+            payload.depth,
+            'depth',
+            ['basic', 'intermediate', 'technical'],
+            'intermediate'
+        ),
+        length: parseEnumValue(
+            payload.length,
+            'length',
+            ['intro', 'short', 'long', 'textbook'],
+            'short'
+        ),
+        questionnaireEnabled:
+            payload.questionnaireEnabled === undefined
+                ? true
+                : Boolean(payload.questionnaireEnabled),
     }
 }
 
@@ -145,22 +204,6 @@ function buildLevelOptions(): DidacticUnitQuestionOption[] {
     ]
 }
 
-function buildDepthOptions(): DidacticUnitQuestionOption[] {
-    return [
-        { value: 'basic', label: 'Keep it basic' },
-        { value: 'balanced', label: 'Balanced depth' },
-        { value: 'advanced', label: 'Go advanced' },
-    ]
-}
-
-function buildLengthOptions(): DidacticUnitQuestionOption[] {
-    return [
-        { value: 'short', label: 'Short unit' },
-        { value: 'medium', label: 'Medium unit' },
-        { value: 'long', label: 'Long unit' },
-    ]
-}
-
 export function buildQuestionnaireForDidacticUnit(topic: string): DidacticUnitQuestionnaire {
     return {
         questions: [
@@ -181,18 +224,6 @@ export function buildQuestionnaireForDidacticUnit(topic: string): DidacticUnitQu
                 prompt: `What do you want to achieve by learning ${topic}?`,
                 type: 'long_text',
             },
-            {
-                id: 'preferred_depth',
-                prompt: `How advanced should the didactic unit for ${topic} be?`,
-                type: 'single_select',
-                options: buildDepthOptions(),
-            },
-            {
-                id: 'preferred_length',
-                prompt: `How long should the didactic unit for ${topic} be?`,
-                type: 'single_select',
-                options: buildLengthOptions(),
-            },
         ],
     }
 }
@@ -206,6 +237,8 @@ function parseChapter(value: unknown, index: number): DidacticUnitSyllabusChapte
         title?: unknown
         overview?: unknown
         keyPoints?: unknown
+        estimatedDurationMinutes?: unknown
+        lessons?: unknown
     }
 
     return {
@@ -218,7 +251,47 @@ function parseChapter(value: unknown, index: number): DidacticUnitSyllabusChapte
             payload.keyPoints,
             `syllabus.chapters[${index}].keyPoints`
         ),
+        estimatedDurationMinutes: parsePositiveNumber(
+            payload.estimatedDurationMinutes,
+            `syllabus.chapters[${index}].estimatedDurationMinutes`
+        ),
+        lessons: parseLessons(payload.lessons, `syllabus.chapters[${index}].lessons`),
     }
+}
+
+function parsePositiveNumber(value: unknown, fieldName: string): number {
+    if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+        throw new Error(`${fieldName} must be a positive number.`)
+    }
+
+    return Math.round(value)
+}
+
+function parseLesson(value: unknown, fieldName: string): DidacticUnitSyllabusLesson {
+    if (!value || typeof value !== 'object') {
+        throw new Error(`${fieldName} must be an object.`)
+    }
+
+    const payload = value as {
+        title?: unknown
+        contentOutline?: unknown
+    }
+
+    return {
+        title: parseNonEmptyString(payload.title, `${fieldName}.title`),
+        contentOutline: parseStringArray(
+            payload.contentOutline,
+            `${fieldName}.contentOutline`
+        ),
+    }
+}
+
+function parseLessons(value: unknown, fieldName: string): DidacticUnitSyllabusLesson[] {
+    if (!Array.isArray(value) || value.length === 0) {
+        throw new Error(`${fieldName} must be a non-empty array.`)
+    }
+
+    return value.map((lesson, index) => parseLesson(lesson, `${fieldName}[${index}]`))
 }
 
 export function parseUpdateDidacticUnitSyllabusInput(
@@ -238,6 +311,8 @@ export function parseUpdateDidacticUnitSyllabusInput(
         title?: unknown
         overview?: unknown
         learningGoals?: unknown
+        keywords?: unknown
+        estimatedDurationMinutes?: unknown
         chapters?: unknown
     }
 
@@ -252,6 +327,11 @@ export function parseUpdateDidacticUnitSyllabusInput(
             learningGoals: parseStringArray(
                 syllabusPayload.learningGoals,
                 'syllabus.learningGoals'
+            ),
+            keywords: parseStringArray(syllabusPayload.keywords, 'syllabus.keywords'),
+            estimatedDurationMinutes: parsePositiveNumber(
+                syllabusPayload.estimatedDurationMinutes,
+                'syllabus.estimatedDurationMinutes'
             ),
             chapters: syllabusPayload.chapters.map((chapter, index) =>
                 parseChapter(chapter, index)

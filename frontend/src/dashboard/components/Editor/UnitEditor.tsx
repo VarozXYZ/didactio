@@ -30,10 +30,10 @@ import {
 import type { LexicalEditor } from 'lexical'
 import { AnimatePresence, motion as Motion } from 'motion/react'
 import { clsx } from 'clsx'
-import { Streamdown } from 'streamdown'
 import { twMerge } from 'tailwind-merge'
 import { useNavigate } from 'react-router-dom'
 import {
+    type BackendAiModelTier,
     type BackendDidacticUnitChapterDetail,
     type BackendGenerationRun,
     DashboardApiError,
@@ -135,12 +135,21 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
     const [isLoading, setIsLoading] = useState(true)
     const [streamingMarkdown, setStreamingMarkdown] = useState('')
     const [isStreamingGeneration, setIsStreamingGeneration] = useState(false)
+    const [unitGenerationTier, setUnitGenerationTier] =
+        useState<BackendAiModelTier | null>(null)
+    const [activeGeneratingChapterIndex, setActiveGeneratingChapterIndex] = useState<number | null>(
+        null
+    )
     const [viewport, setViewport] = useState(() => ({
         height: typeof window !== 'undefined' ? window.innerHeight : 900,
         width: typeof window !== 'undefined' ? window.innerWidth : 1440,
     }))
     const saveTimeoutRef = useRef<number | null>(null)
     const preserveViewOnNextWorkspaceRef = useRef(false)
+    const activeChapterIndexRef = useRef(0)
+    const isEditModeRef = useRef(false)
+    const generationQueueBlockedRef = useRef(false)
+    const isGenerationQueueRunningRef = useRef(false)
 
     const activeChapter = useMemo(
         () =>
@@ -217,6 +226,7 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                     null
 
                 setWorkspace(nextWorkspace)
+                setUnitGenerationTier((previousTier) => unit.generationTier ?? previousTier ?? null)
                 setChapterDetails(detailsRecord)
                 setActiveChapterIndex(nextActiveChapter?.chapterIndex ?? 0)
                 preserveViewOnNextWorkspaceRef.current = Boolean(options.preserveSpread)
@@ -257,6 +267,14 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
     }, [loadWorkspace])
 
     useEffect(() => {
+        activeChapterIndexRef.current = activeChapterIndex
+    }, [activeChapterIndex])
+
+    useEffect(() => {
+        isEditModeRef.current = isEditMode
+    }, [isEditMode])
+
+    useEffect(() => {
         if (!workspace || !activeChapter) {
             return
         }
@@ -272,6 +290,30 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
         setActiveLexicalEditor(null)
         setCurrentSpread(0)
     }, [activeChapter, activeChapterDetail, workspace])
+
+    useEffect(() => {
+        if (
+            !isStreamingGeneration ||
+            activeGeneratingChapterIndex === null ||
+            activeGeneratingChapterIndex !== activeChapterIndex
+        ) {
+            return
+        }
+
+        setDraft((currentDraft) =>
+            currentDraft
+                ? {
+                      ...currentDraft,
+                      contentMarkdown: streamingMarkdown,
+                  }
+                : currentDraft
+        )
+    }, [
+        activeChapterIndex,
+        activeGeneratingChapterIndex,
+        isStreamingGeneration,
+        streamingMarkdown,
+    ])
 
     useEffect(() => {
         const updateViewport = () => {
@@ -375,13 +417,38 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
         }
     }
 
-    const handlePrimaryGeneration = async () => {
-        if (!activeChapter) {
+    const pulseSavedState = () => {
+        setIsSaving(true)
+        if (saveTimeoutRef.current) {
+            window.clearTimeout(saveTimeoutRef.current)
+        }
+        saveTimeoutRef.current = window.setTimeout(() => setIsSaving(false), 1200)
+    }
+
+    const refreshWorkspaceAfterGeneration = useCallback(async () => {
+        onDataChanged()
+
+        if (!isEditModeRef.current) {
+            await loadWorkspace(activeChapterIndexRef.current, {
+                silent: true,
+                preserveSpread: true,
+            })
+        }
+
+        pulseSavedState()
+    }, [loadWorkspace, onDataChanged])
+
+    const handlePrimaryGeneration = async (tierOverride?: BackendAiModelTier) => {
+        const tier = tierOverride ?? unitGenerationTier
+
+        if (!activeChapter || !tier) {
             return
         }
 
+        generationQueueBlockedRef.current = false
         setIsSubmitting(true)
         setIsStreamingGeneration(true)
+        setActiveGeneratingChapterIndex(activeChapter.chapterIndex)
         setStreamingMarkdown('')
         setError(null)
 
@@ -390,6 +457,7 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                 await dashboardApi.streamRegenerateDidacticUnitChapter(
                     didacticUnitId,
                     activeChapter.chapterIndex,
+                    tier,
                     {
                         onPartialMarkdown: (event) => {
                             setStreamingMarkdown(event.markdown)
@@ -400,6 +468,7 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                 await dashboardApi.streamGenerateDidacticUnitChapter(
                     didacticUnitId,
                     activeChapter.chapterIndex,
+                    tier,
                     {
                         onPartialMarkdown: (event) => {
                             setStreamingMarkdown(event.markdown)
@@ -408,13 +477,8 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                 )
             }
 
-            onDataChanged()
-            await loadWorkspace(activeChapter.chapterIndex)
-            setIsSaving(true)
-            if (saveTimeoutRef.current) {
-                window.clearTimeout(saveTimeoutRef.current)
-            }
-            saveTimeoutRef.current = window.setTimeout(() => setIsSaving(false), 1200)
+            setUnitGenerationTier((previousTier) => previousTier ?? tier)
+            await refreshWorkspaceAfterGeneration()
         } catch (actionError) {
             setError(
                 actionError instanceof Error
@@ -425,9 +489,68 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
         } finally {
             setIsSubmitting(false)
             setIsStreamingGeneration(false)
+            setActiveGeneratingChapterIndex(null)
             setStreamingMarkdown('')
         }
     }
+
+    const startUnitGenerationQueue = useCallback(async () => {
+        if (
+            !workspace ||
+            !unitGenerationTier ||
+            generationQueueBlockedRef.current ||
+            isGenerationQueueRunningRef.current
+        ) {
+            return
+        }
+
+        const pendingChapters = workspace.chapters
+            .filter((chapter) => chapter.status === 'pending')
+            .sort((left, right) => left.chapterIndex - right.chapterIndex)
+
+        if (pendingChapters.length === 0) {
+            return
+        }
+
+        isGenerationQueueRunningRef.current = true
+        setIsSubmitting(true)
+        setIsStreamingGeneration(true)
+        setError(null)
+
+        try {
+            for (const chapter of pendingChapters) {
+                setActiveGeneratingChapterIndex(chapter.chapterIndex)
+                setStreamingMarkdown('')
+
+                await dashboardApi.streamGenerateDidacticUnitChapter(
+                    didacticUnitId,
+                    chapter.chapterIndex,
+                    unitGenerationTier,
+                    {
+                        onPartialMarkdown: (event) => {
+                            setStreamingMarkdown(event.markdown)
+                        },
+                    }
+                )
+
+                await refreshWorkspaceAfterGeneration()
+            }
+        } catch (actionError) {
+            generationQueueBlockedRef.current = true
+            setError(
+                actionError instanceof Error
+                    ? actionError.message
+                    : 'Didactic unit generation failed.'
+            )
+            setIsSaving(false)
+        } finally {
+            isGenerationQueueRunningRef.current = false
+            setIsSubmitting(false)
+            setIsStreamingGeneration(false)
+            setActiveGeneratingChapterIndex(null)
+            setStreamingMarkdown('')
+        }
+    }, [didacticUnitId, refreshWorkspaceAfterGeneration, unitGenerationTier, workspace])
 
     const handleSave = async () => {
         if (!activeChapter || !draft || activeChapter.status !== 'ready') {
@@ -463,6 +586,29 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
             }
         )
     }
+
+    useEffect(() => {
+        if (
+            !workspace ||
+            !unitGenerationTier ||
+            generationQueueBlockedRef.current ||
+            isGenerationQueueRunningRef.current ||
+            isStreamingGeneration
+        ) {
+            return
+        }
+
+        const hasPendingChapters = workspace.chapters.some(
+            (chapter) => chapter.status === 'pending'
+        )
+
+        if (!hasPendingChapters) {
+            generationQueueBlockedRef.current = false
+            return
+        }
+
+        void startUnitGenerationQueue()
+    }, [isStreamingGeneration, startUnitGenerationQueue, unitGenerationTier, workspace])
 
     const enterEditMode = () => {
         setActiveLexicalEditor(null)
@@ -603,7 +749,11 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
 
     const isPendingChapter = activeChapter.status === 'pending'
     const isFailedChapter = activeChapter.status === 'failed'
-    const isShowingStreamingPreview = isStreamingGeneration
+    const isActiveChapterStreaming =
+        isStreamingGeneration &&
+        activeGeneratingChapterIndex !== null &&
+        activeGeneratingChapterIndex === activeChapter.chapterIndex
+    const hasConfiguredGenerationTier = unitGenerationTier !== null
     const contentPageOffset = currentSpread === 0 ? 0 : 1 + (currentSpread - 1) * 2
     const leftContentPage =
         currentSpread === 0 ? undefined : visibleContentPages[contentPageOffset]
@@ -905,6 +1055,15 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                             <span className="text-[11px] font-medium text-[#1D1D1F] md:text-[13px]">
                                 Chapter workspace
                             </span>
+                            {isActiveChapterStreaming && (
+                                <>
+                                    <span className="text-[11px] text-[#D1D5DB]">•</span>
+                                    <span className="flex items-center gap-1 text-[11px] font-medium text-[#4E8B63] md:text-[13px]">
+                                        <Loader2 size={12} className="animate-spin" />
+                                        Streaming
+                                    </span>
+                                </>
+                            )}
                             <span className="text-[11px] text-[#86868B] md:text-[13px]">
                                 {spreadPageLabel}
                             </span>
@@ -1102,20 +1261,22 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                                 <History size={16} className="text-[#86868B]" />
                                 <span>Version History</span>
                             </button>
-                            <button
-                                className="flex items-center gap-2 rounded-full px-3 py-1.5 text-[13px] font-medium transition-all hover:bg-[#F5F5F7]"
-                                onClick={() => void handlePrimaryGeneration()}
-                                type="button"
-                            >
-                                <RotateCcw size={16} className="text-[#86868B]" />
-                                <span>
-                                    {activeChapter.status === 'ready'
-                                        ? 'Regenerate'
-                                        : activeChapter.status === 'failed'
-                                          ? 'Try Again'
-                                          : 'Generate'}
-                                </span>
-                            </button>
+                            {hasConfiguredGenerationTier &&
+                                (activeChapter.status === 'ready' ||
+                                    activeChapter.status === 'failed') && (
+                                    <button
+                                        className="flex items-center gap-2 rounded-full border border-[#D4D7DD] bg-white px-3 py-1.5 text-[13px] font-medium text-[#1D1D1F] transition-all hover:bg-[#F5F5F7]"
+                                        onClick={() => void handlePrimaryGeneration()}
+                                        type="button"
+                                    >
+                                        <RotateCcw size={16} className="text-[#86868B]" />
+                                        <span>
+                                            {activeChapter.status === 'ready'
+                                                ? `Regenerate Chapter (${unitGenerationTier})`
+                                                : `Retry Chapter (${unitGenerationTier})`}
+                                        </span>
+                                    </button>
+                                )}
                             <button
                                 className={cn(
                                     'flex items-center gap-2 rounded-full px-4 py-1.5 text-[13px] font-medium transition-all',
@@ -1170,34 +1331,7 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                 )}
 
                 <div className="relative flex flex-1 flex-col items-center justify-center bg-[#F5F5F7] px-4 py-4 md:px-8 md:py-6">
-                    {isShowingStreamingPreview ? (
-                        <div className="flex h-full w-full max-w-[920px] flex-col overflow-hidden rounded-[28px] border border-[#DCE8E0] bg-white shadow-[0_30px_80px_rgba(0,0,0,0.08)]">
-                            <div className="flex items-center justify-between border-b border-[#E5E5E7] px-6 py-4">
-                                <div>
-                                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#4E8B63]">
-                                        Live Generation
-                                    </div>
-                                    <h3 className="mt-1 text-[18px] font-semibold text-[#1D1D1F]">
-                                        {activeChapter.status === 'ready'
-                                            ? 'Regenerating chapter'
-                                            : 'Generating chapter'}
-                                    </h3>
-                                </div>
-                                <div className="flex items-center gap-2 text-[13px] font-medium text-[#4E8B63]">
-                                    <Loader2 size={16} className="animate-spin" />
-                                    Streaming markdown
-                                </div>
-                            </div>
-
-                            <div className="flex-1 overflow-y-auto px-6 py-6">
-                                <div className="rounded-[20px] border border-[#E8EFEA] bg-[#FBFDFC] p-6">
-                                    <Streamdown className="text-[15px] leading-7 text-[#1D1D1F]">
-                                        {streamingMarkdown || 'Waiting for the first markdown tokens...'}
-                                    </Streamdown>
-                                </div>
-                            </div>
-                        </div>
-                    ) : activeChapter.status === 'ready' ? (
+                    {activeChapter.status === 'ready' || isActiveChapterStreaming ? (
                         renderLexicalSpread(isEditMode)
                     ) : (
                         <>
@@ -1219,18 +1353,37 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <h3 className="text-xl font-semibold">Chapter not generated yet</h3>
+                                        <h3 className="text-xl font-semibold">
+                                            {hasConfiguredGenerationTier
+                                                ? 'Chapter queued for generation'
+                                                : 'Chapter not generated yet'}
+                                        </h3>
                                         <p className="max-w-[300px] text-sm text-[#86868B]">
-                                            Generate this chapter to turn the syllabus outline into readable lesson content.
+                                            {hasConfiguredGenerationTier
+                                                ? isStreamingGeneration && activeGeneratingChapterIndex !== null
+                                                    ? `Chapter ${activeGeneratingChapterIndex + 1} is generating now. Open that chapter to watch the live stream, or wait here until this one begins.`
+                                                    : 'The unit generator is preparing the remaining chapters automatically.'
+                                                : 'This unit predates automatic generation startup. Pick a model once to begin generating the chapter queue.'}
                                         </p>
                                     </div>
-                                    <button
-                                        className="rounded-full bg-[#1D1D1F] px-8 py-2.5 text-sm font-semibold text-white transition-all hover:bg-[#333333] active:scale-95"
-                                        onClick={() => void handlePrimaryGeneration()}
-                                        type="button"
-                                    >
-                                            Generate Chapter
-                                        </button>
+                                    {!hasConfiguredGenerationTier && (
+                                        <div className="flex flex-wrap justify-center gap-3">
+                                            <button
+                                                className="rounded-full border border-[#D4D7DD] bg-white px-8 py-2.5 text-sm font-semibold text-[#1D1D1F] transition-all hover:bg-[#F5F5F7] active:scale-95"
+                                                onClick={() => void handlePrimaryGeneration('cheap')}
+                                                type="button"
+                                            >
+                                                Start with Cheap
+                                            </button>
+                                            <button
+                                                className="rounded-full bg-[#1D1D1F] px-8 py-2.5 text-sm font-semibold text-white transition-all hover:bg-[#333333] active:scale-95"
+                                                onClick={() => void handlePrimaryGeneration('premium')}
+                                                type="button"
+                                            >
+                                                Start with Premium
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             ) : isFailedChapter ? (
                                 <div className="flex flex-col items-center justify-center space-y-6 text-center">
@@ -1244,16 +1397,37 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                                     <div className="space-y-2">
                                         <h3 className="text-xl font-semibold">Generation Failed</h3>
                                         <p className="max-w-[300px] text-sm text-[#86868B]">
-                                            We encountered an issue generating this chapter. You can retry with the same outline.
+                                            We encountered an issue generating this chapter. Retry it to keep the unit generation moving.
                                         </p>
                                     </div>
-                                    <button
-                                        className="rounded-full bg-[#1D1D1F] px-8 py-2.5 text-sm font-semibold text-white transition-all hover:bg-[#333333] active:scale-95"
-                                        onClick={() => void handlePrimaryGeneration()}
-                                        type="button"
-                                    >
-                                            Try Again
-                                        </button>
+                                    <div className="flex flex-wrap justify-center gap-3">
+                                        {hasConfiguredGenerationTier ? (
+                                            <button
+                                                className="rounded-full bg-[#1D1D1F] px-8 py-2.5 text-sm font-semibold text-white transition-all hover:bg-[#333333] active:scale-95"
+                                                onClick={() => void handlePrimaryGeneration()}
+                                                type="button"
+                                            >
+                                                Retry Chapter
+                                            </button>
+                                        ) : (
+                                            <>
+                                                <button
+                                                    className="rounded-full border border-[#D4D7DD] bg-white px-8 py-2.5 text-sm font-semibold text-[#1D1D1F] transition-all hover:bg-[#F5F5F7] active:scale-95"
+                                                    onClick={() => void handlePrimaryGeneration('cheap')}
+                                                    type="button"
+                                                >
+                                                    Retry Cheap
+                                                </button>
+                                                <button
+                                                    className="rounded-full bg-[#1D1D1F] px-8 py-2.5 text-sm font-semibold text-white transition-all hover:bg-[#333333] active:scale-95"
+                                                    onClick={() => void handlePrimaryGeneration('premium')}
+                                                    type="button"
+                                                >
+                                                    Retry Premium
+                                                </button>
+                                            </>
+                                        )}
+                                    </div>
                                 </div>
                             ) : (
                                 <div className="flex flex-col items-center justify-center space-y-6 text-center">

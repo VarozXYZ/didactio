@@ -24,9 +24,15 @@ export async function createDidacticUnit(
 }
 
 export async function advanceToQuestionnaireAnswered(app: TestApp, didacticUnitId: string) {
+    const moderationResponse = await request(app)
+        .post(`/api/didactic-unit/${didacticUnitId}/moderate`)
+        .send({ tier: 'cheap' })
+
+    expect(moderationResponse.status).toBe(200)
+
     const questionnaireResponse = await request(app)
         .post(`/api/didactic-unit/${didacticUnitId}/questionnaire/generate`)
-        .send({})
+        .send({ tier: 'cheap' })
 
     expect(questionnaireResponse.status).toBe(200)
 
@@ -58,7 +64,7 @@ export async function createSyllabusReadyDidacticUnit(app: TestApp) {
 
     const syllabusResponse = await request(app)
         .post(`/api/didactic-unit/${created.id}/syllabus/generate`)
-        .send({})
+        .send({ tier: 'cheap' })
 
     expect(syllabusResponse.status).toBe(200)
 
@@ -84,7 +90,7 @@ export async function createSyllabusReadyDidacticUnitWithProvider(
 
     const syllabusResponse = await request(app)
         .post(`/api/didactic-unit/${created.id}/syllabus/generate`)
-        .send({})
+        .send({ tier: 'cheap' })
 
     expect(syllabusResponse.status).toBe(200)
 
@@ -120,7 +126,7 @@ export async function generateDidacticUnitChapter(
 ) {
     const response = await request(app)
         .post(`/api/didactic-unit/${didacticUnitId}/chapters/${chapterIndex}/generate`)
-        .send({})
+        .send({ tier: 'cheap' })
 
     expect(response.status).toBe(200)
 

@@ -6,16 +6,12 @@ export interface AppEnv {
     port: number
     aiGatewayApiKey: string | null
     aiGatewayBaseUrl: string
-    aiModerationProvider: string
-    aiModerationModel: string
-    aiQuestionnaireProvider: string
-    aiQuestionnaireModel: string
-    aiSyllabusProvider: string
-    aiSyllabusModel: string
-    aiSummaryProvider: string
-    aiSummaryModel: string
-    aiChapterProvider: string
-    aiChapterModel: string
+    aiCheapProvider: string
+    aiCheapModel: string
+    aiPremiumProvider: string
+    aiPremiumModel: string
+    aiAuthoringLanguage: string
+    aiAuthoringTone: string
     mongoDbUri: string | null
     mongoDbName: string
 }
@@ -55,22 +51,14 @@ export function getAppEnv(): AppEnv {
         aiGatewayBaseUrl:
             parseOptionalString(process.env.AI_GATEWAY_BASE_URL) ??
             'https://ai-gateway.vercel.sh/v1/ai',
-        aiModerationProvider:
-            parseOptionalString(process.env.AI_MODERATION_PROVIDER) ?? 'openai',
-        aiModerationModel:
-            parseOptionalString(process.env.AI_MODERATION_MODEL) ?? 'gpt-4o-mini',
-        aiQuestionnaireProvider:
-            parseOptionalString(process.env.AI_QUESTIONNAIRE_PROVIDER) ?? 'openai',
-        aiQuestionnaireModel:
-            parseOptionalString(process.env.AI_QUESTIONNAIRE_MODEL) ?? 'gpt-4o-mini',
-        aiSyllabusProvider:
-            parseOptionalString(process.env.AI_SYLLABUS_PROVIDER) ?? 'openai',
-        aiSyllabusModel: parseOptionalString(process.env.AI_SYLLABUS_MODEL) ?? 'gpt-4o-mini',
-        aiSummaryProvider:
-            parseOptionalString(process.env.AI_SUMMARY_PROVIDER) ?? 'openai',
-        aiSummaryModel: parseOptionalString(process.env.AI_SUMMARY_MODEL) ?? 'gpt-4o-mini',
-        aiChapterProvider: parseOptionalString(process.env.AI_CHAPTER_PROVIDER) ?? 'openai',
-        aiChapterModel: parseOptionalString(process.env.AI_CHAPTER_MODEL) ?? 'gpt-4o-mini',
+        aiCheapProvider: parseOptionalString(process.env.AI_CHEAP_PROVIDER) ?? 'deepseek',
+        aiCheapModel: parseOptionalString(process.env.AI_CHEAP_MODEL) ?? 'deepseek-chat',
+        aiPremiumProvider:
+            parseOptionalString(process.env.AI_PREMIUM_PROVIDER) ?? 'deepseek',
+        aiPremiumModel:
+            parseOptionalString(process.env.AI_PREMIUM_MODEL) ?? 'deepseek-reasoner',
+        aiAuthoringLanguage: parseOptionalString(process.env.AI_AUTHORING_LANGUAGE) ?? 'English',
+        aiAuthoringTone: parseOptionalString(process.env.AI_AUTHORING_TONE) ?? 'neutral',
         mongoDbUri: parseOptionalString(process.env.MONGODB_URI),
         mongoDbName: parseOptionalString(process.env.MONGODB_DB_NAME) ?? 'didactio',
     }
