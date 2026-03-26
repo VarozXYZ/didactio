@@ -9,6 +9,7 @@ import type {
     SyllabusResult,
 } from '../../src/ai/service.js'
 import { buildQuestionnaireForDidacticUnit, type DidacticUnitQuestionAnswer } from '../../src/didactic-unit/planning.js'
+import { resolveTargetChapterCount } from '../../src/ai/prompt-builders.js'
 
 function findAnswerValue(
     answers: DidacticUnitQuestionAnswer[] | undefined,
@@ -17,7 +18,40 @@ function findAnswerValue(
     return answers?.find((answer) => answer.questionId === questionId)?.value ?? 'not provided'
 }
 
-function syllabusMarkdown(topic: string): string {
+function syllabusMarkdownForLength(
+    topic: string,
+    length: 'intro' | 'short' | 'long' | 'textbook'
+): string {
+    const targetChapterCount = resolveTargetChapterCount(length)
+    const chapterBlocks = Array.from({ length: targetChapterCount }, (_, index) => {
+        const chapterNumber = index + 1
+        const chapterTitle =
+            index === 0
+                ? 'Foundations'
+                : index === targetChapterCount - 1
+                  ? 'Application'
+                  : `Workflow ${chapterNumber - 1}`
+
+        return [
+            `### ${chapterNumber}. ${chapterTitle}`,
+            '#### Overview',
+            `Learn the core ideas for ${chapterTitle.toLowerCase()}.`,
+            '#### Estimated Duration',
+            '60',
+            '#### Key Points',
+            '- Concepts',
+            '- Practice',
+            '- Application',
+            '#### Lessons',
+            '##### 1. Guided lesson',
+            '- Explain the main concept',
+            '- Apply it in context',
+            '##### 2. Practice lesson',
+            '- Reinforce the concept',
+            '- Reflect on the outcome',
+        ].join('\n')
+    })
+
     return [
         `# ${topic} Learning Path`,
         '## Overview',
@@ -31,56 +65,9 @@ function syllabusMarkdown(topic: string): string {
         '- workflow',
         '- application',
         '## Estimated Duration',
-        '180',
+        `${targetChapterCount * 60}`,
         '## Chapters',
-        '### 1. Foundations',
-        '#### Overview',
-        'Learn the core ideas and shared vocabulary.',
-        '#### Estimated Duration',
-        '60',
-        '#### Key Points',
-        '- Concepts',
-        '- Terminology',
-        '- Mental model',
-        '#### Lessons',
-        '##### 1. Shared Vocabulary',
-        '- Define core terms',
-        '- Explain the main mental model',
-        '##### 2. First Concepts',
-        '- Identify the core parts',
-        '- Relate each part to the overall topic',
-        '### 2. Workflow',
-        '#### Overview',
-        'Move through a practical workflow.',
-        '#### Estimated Duration',
-        '60',
-        '#### Key Points',
-        '- Setup',
-        '- Execution',
-        '- Iteration',
-        '#### Lessons',
-        '##### 1. Setup',
-        '- Prepare the environment',
-        '- Understand the inputs',
-        '##### 2. Execution Loop',
-        '- Follow the core workflow',
-        '- Evaluate each step',
-        '### 3. Application',
-        '#### Overview',
-        'Apply the topic in realistic scenarios.',
-        '#### Estimated Duration',
-        '60',
-        '#### Key Points',
-        '- Tradeoffs',
-        '- Examples',
-        '- Next steps',
-        '#### Lessons',
-        '##### 1. Applied Scenario',
-        '- Walk through a realistic case',
-        '- Compare two approaches',
-        '##### 2. Next Practice',
-        '- Choose a next project',
-        '- Reflect on tradeoffs',
+        ...chapterBlocks,
     ].join('\n')
 }
 
@@ -153,11 +140,48 @@ export function createMockAiService(): AiService {
             return result
         },
         async generateSyllabus(input): Promise<SyllabusResult> {
+            const targetChapterCount = resolveTargetChapterCount(input.length)
+            const chapters = Array.from({ length: targetChapterCount }, (_, index) => {
+                const chapterNumber = index + 1
+                return {
+                    title:
+                        index === 0
+                            ? 'Foundations'
+                            : index === targetChapterCount - 1
+                              ? 'Application'
+                              : `Workflow ${chapterNumber - 1}`,
+                    overview:
+                        index === 0
+                            ? 'Learn the core ideas and shared vocabulary.'
+                            : index === targetChapterCount - 1
+                              ? 'Apply the topic in realistic scenarios.'
+                              : `Move through workflow stage ${chapterNumber - 1}.`,
+                    keyPoints: ['Concepts', 'Practice', 'Application'],
+                    estimatedDurationMinutes: 60,
+                    lessons: [
+                        {
+                            title: 'Guided lesson',
+                            contentOutline: [
+                                'Explain the main concept',
+                                'Apply it in context',
+                            ],
+                        },
+                        {
+                            title: 'Practice lesson',
+                            contentOutline: [
+                                'Reinforce the concept',
+                                'Reflect on the outcome',
+                            ],
+                        },
+                    ],
+                }
+            })
+
             return {
                 provider,
                 model,
                 prompt: input.syllabusPrompt,
-                markdown: syllabusMarkdown(input.topic),
+                markdown: syllabusMarkdownForLength(input.topic, input.length),
                 syllabus: {
                     title: `${input.topic} Learning Path`,
                     overview: `A guided syllabus for ${input.topic}.`,
@@ -167,75 +191,8 @@ export function createMockAiService(): AiService {
                         'Ship a working outcome',
                     ],
                     keywords: ['foundations', 'workflow', 'application'],
-                    estimatedDurationMinutes: 180,
-                    chapters: [
-                        {
-                            title: 'Foundations',
-                            overview: 'Learn the core ideas and shared vocabulary.',
-                            keyPoints: ['Concepts', 'Terminology', 'Mental model'],
-                            estimatedDurationMinutes: 60,
-                            lessons: [
-                                {
-                                    title: 'Shared Vocabulary',
-                                    contentOutline: [
-                                        'Define core terms',
-                                        'Explain the main mental model',
-                                    ],
-                                },
-                                {
-                                    title: 'First Concepts',
-                                    contentOutline: [
-                                        'Identify the core parts',
-                                        'Relate each part to the overall topic',
-                                    ],
-                                },
-                            ],
-                        },
-                        {
-                            title: 'Workflow',
-                            overview: 'Move through a practical workflow.',
-                            keyPoints: ['Setup', 'Execution', 'Iteration'],
-                            estimatedDurationMinutes: 60,
-                            lessons: [
-                                {
-                                    title: 'Setup',
-                                    contentOutline: [
-                                        'Prepare the environment',
-                                        'Understand the inputs',
-                                    ],
-                                },
-                                {
-                                    title: 'Execution Loop',
-                                    contentOutline: [
-                                        'Follow the core workflow',
-                                        'Evaluate each step',
-                                    ],
-                                },
-                            ],
-                        },
-                        {
-                            title: 'Application',
-                            overview: 'Apply the topic in realistic scenarios.',
-                            keyPoints: ['Tradeoffs', 'Examples', 'Next steps'],
-                            estimatedDurationMinutes: 60,
-                            lessons: [
-                                {
-                                    title: 'Applied Scenario',
-                                    contentOutline: [
-                                        'Walk through a realistic case',
-                                        'Compare two approaches',
-                                    ],
-                                },
-                                {
-                                    title: 'Next Practice',
-                                    contentOutline: [
-                                        'Choose a next project',
-                                        'Reflect on tradeoffs',
-                                    ],
-                                },
-                            ],
-                        },
-                    ],
+                    estimatedDurationMinutes: targetChapterCount * 60,
+                    chapters,
                 },
             }
         },

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
     buildChapterMarkdownPrompt,
     buildModerationPrompt,
+    resolveTargetChapterCount,
     buildSyllabusMarkdownPrompt,
 } from '../src/ai/prompt-builders.js'
 import { parseSyllabusMarkdown } from '../src/ai/markdown-parsers.js'
@@ -44,9 +45,18 @@ describe('prompt quality helpers', () => {
         expect(prompt).toContain('Improved topic brief')
         expect(prompt).toContain('Requested depth: intermediate')
         expect(prompt).toContain('Requested length: long')
+        expect(prompt).toContain('Target chapter count: 9')
         expect(prompt).toContain('## Keywords')
         expect(prompt).toContain('#### Lessons')
         expect(prompt).toContain('##### 1. <Lesson Title>')
+        expect(prompt).toContain('Repeat the chapter structure for exactly 9 chapters.')
+    })
+
+    it('maps unit length to different syllabus chapter counts', () => {
+        expect(resolveTargetChapterCount('intro')).toBe(3)
+        expect(resolveTargetChapterCount('short')).toBe(6)
+        expect(resolveTargetChapterCount('long')).toBe(9)
+        expect(resolveTargetChapterCount('textbook')).toBe(12)
     })
 
     it('builds a chapter prompt with continuity, lesson plan, and regeneration guidance', () => {

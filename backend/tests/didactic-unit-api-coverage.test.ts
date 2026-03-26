@@ -199,4 +199,26 @@ describe('didactic-unit API coverage', () => {
             'Lean further into practical exercises and project-based outcomes.'
         )
     })
+
+    it('sizes syllabus chapter counts according to the requested unit length', async () => {
+        const app = createTestApp()
+
+        const createdResponse = await request(app)
+            .post('/api/didactic-unit')
+            .send({
+                topic: 'python scripting',
+                length: 'textbook',
+            })
+
+        expect(createdResponse.status).toBe(201)
+
+        await advanceToQuestionnaireAnswered(app, createdResponse.body.id)
+
+        const syllabusResponse = await request(app)
+            .post(`/api/didactic-unit/${createdResponse.body.id}/syllabus/generate`)
+            .send({ tier: 'cheap' })
+
+        expect(syllabusResponse.status).toBe(200)
+        expect(syllabusResponse.body.syllabus.chapters).toHaveLength(12)
+    })
 })

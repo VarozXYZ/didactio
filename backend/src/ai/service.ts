@@ -21,6 +21,7 @@ import {
     buildLearnerSummaryPrompt,
     buildModerationPrompt,
     buildQuestionnairePrompt,
+    resolveTargetChapterCount,
     buildSyllabusMarkdownPrompt,
     buildSyllabusRepairPrompt,
 } from './prompt-builders.js'
@@ -199,6 +200,13 @@ export interface AiService {
 
 function buildQuestionnaireSchema() {
     return questionnaireSchema
+}
+
+function validateSyllabusChapterCount(
+    syllabus: DidacticUnitSyllabus,
+    length: DidacticUnitLength
+): DidacticUnitSyllabus | null {
+    return syllabus.chapters.length === resolveTargetChapterCount(length) ? syllabus : null
 }
 
 const CONTENT_LENGTH_TOKENS: Record<DidacticUnitLength, number> = {
@@ -396,8 +404,12 @@ export class GatewayAiService implements AiService {
             syllabusSchema
         )
 
-        if (parsed) {
-            return parsed
+        const validatedParsed = parsed
+            ? validateSyllabusChapterCount(parsed, input.length)
+            : null
+
+        if (validatedParsed) {
+            return validatedParsed
         }
 
         const repaired = await generateObject({
@@ -408,13 +420,22 @@ export class GatewayAiService implements AiService {
                 markdown: input.markdown,
                 improvedTopicBrief: input.improvedTopicBrief,
                 authoring: input.config.authoring,
+                length: input.length,
             }),
             schema: syllabusSchema,
             maxOutputTokens: resolveStageMaxOutputTokens('repair_syllabus', input.length),
             abortSignal: input.abortSignal,
         })
 
-        return repaired.object
+        const validatedRepaired = validateSyllabusChapterCount(repaired.object, input.length)
+
+        if (validatedRepaired) {
+            return validatedRepaired
+        }
+
+        throw new Error(
+            `Syllabus generation returned ${repaired.object.chapters.length} chapters; expected exactly ${resolveTargetChapterCount(input.length)}.`
+        )
     }
 
     private async repairChapterFromMarkdown(input: {

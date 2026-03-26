@@ -10,6 +10,17 @@ import type {
     DidacticUnitSyllabusChapter,
 } from '../didactic-unit/planning.js'
 
+export const TARGET_CHAPTER_COUNT_BY_LENGTH: Record<DidacticUnitLength, number> = {
+    intro: 3,
+    short: 6,
+    long: 9,
+    textbook: 12,
+}
+
+export function resolveTargetChapterCount(length: DidacticUnitLength): number {
+    return TARGET_CHAPTER_COUNT_BY_LENGTH[length]
+}
+
 function findAnswerValue(
     answers: DidacticUnitQuestionAnswer[] | undefined,
     questionId: string
@@ -69,6 +80,22 @@ function contentLengthInstruction(contentLength: DidacticUnitLength): string {
         case 'short':
         default:
             return 'Keep the material focused but sufficiently detailed to be genuinely useful.'
+    }
+}
+
+function chapterCountInstruction(contentLength: DidacticUnitLength): string {
+    const targetChapterCount = resolveTargetChapterCount(contentLength)
+
+    switch (contentLength) {
+        case 'intro':
+            return `Plan exactly ${targetChapterCount} chapters so the unit stays compact and introductory.`
+        case 'long':
+            return `Plan exactly ${targetChapterCount} chapters so the unit has room for meaningful progression and practice.`
+        case 'textbook':
+            return `Plan exactly ${targetChapterCount} chapters so the unit feels comprehensive and textbook-like.`
+        case 'short':
+        default:
+            return `Plan exactly ${targetChapterCount} chapters so the unit stays focused but complete.`
     }
 }
 
@@ -210,6 +237,7 @@ export function buildSyllabusMarkdownPrompt(input: {
     length: DidacticUnitLength
 }): string {
     const learnerLevel = deriveLearnerLevel(input.questionnaireAnswers, input.depth)
+    const targetChapterCount = resolveTargetChapterCount(input.length)
 
     return [
         buildSection('Role / Contract', [
@@ -223,8 +251,10 @@ export function buildSyllabusMarkdownPrompt(input: {
             `Learning goal: ${findAnswerValue(input.questionnaireAnswers, 'learning_goal')}`,
             `Requested depth: ${input.depth}`,
             `Requested length: ${input.length}`,
+            `Target chapter count: ${targetChapterCount}`,
             depthInstruction(input.depth),
             contentLengthInstruction(input.length),
+            chapterCountInstruction(input.length),
         ]),
         buildSection('Authoring Profile', buildAuthoringContext(input.authoring)),
         buildSection('Unit Context', [
@@ -263,7 +293,7 @@ export function buildSyllabusMarkdownPrompt(input: {
             '##### 1. <Lesson Title>',
             '- outline item',
             '- outline item',
-            'Repeat the chapter structure for at least 3 chapters.',
+            `Repeat the chapter structure for exactly ${targetChapterCount} chapters.`,
             'Make the chapters progress from foundations to application to independent execution.',
         ]),
     ].join('\n\n')
@@ -274,7 +304,10 @@ export function buildSyllabusRepairPrompt(input: {
     markdown: string
     improvedTopicBrief?: string
     authoring: AuthoringConfig
+    length: DidacticUnitLength
 }): string {
+    const targetChapterCount = resolveTargetChapterCount(input.length)
+
     return [
         buildSection('Role / Contract', [
             'Convert syllabus markdown into a strict structured syllabus object that satisfies the requested schema.',
@@ -282,12 +315,14 @@ export function buildSyllabusRepairPrompt(input: {
         buildSection('Context', [
             `Topic: ${input.topic}`,
             input.improvedTopicBrief ? `Improved topic brief: ${input.improvedTopicBrief}` : '',
+            `Target chapter count: ${targetChapterCount}`,
             ...buildAuthoringContext(input.authoring),
         ]),
         buildSection('Source Markdown', [input.markdown]),
         buildSection('Output Contract', [
             'Return the best faithful structured syllabus object you can infer from the markdown.',
             'Do not invent unrelated chapters. If a field is implied but missing, fill it conservatively.',
+            `Return exactly ${targetChapterCount} chapters.`,
         ]),
     ].join('\n\n')
 }
