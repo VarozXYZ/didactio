@@ -52,7 +52,6 @@ export interface PlanningSyllabusChapter {
     title: string
     overview: string
     keyPoints: string[]
-    estimatedDurationMinutes: number
     lessons: PlanningSyllabusLesson[]
 }
 
@@ -66,7 +65,6 @@ export interface PlanningSyllabus {
     overview: string
     learningGoals: string[]
     keywords: string[]
-    estimatedDurationMinutes: number
     chapters: PlanningSyllabusChapter[]
 }
 
@@ -82,6 +80,7 @@ export interface PlanningDetailViewModel {
     additionalContext?: string
     improvedTopicBrief?: string
     reasoningNotes?: string
+    level: 'beginner' | 'intermediate' | 'advanced'
     depth: 'basic' | 'intermediate' | 'technical'
     length: 'intro' | 'short' | 'long' | 'textbook'
     questionnaireEnabled: boolean
@@ -143,9 +142,7 @@ export interface DidacticUnitRevisionViewModel {
     title: string
     chapter: {
         title: string
-        overview: string
         content: string
-        keyTakeaways: string[]
         presentationSettings: ChapterPresentationSettings
     }
 }

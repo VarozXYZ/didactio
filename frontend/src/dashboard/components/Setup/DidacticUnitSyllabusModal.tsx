@@ -3,11 +3,36 @@ import { Sparkles, X } from 'lucide-react'
 import { type BackendAiModelTier, dashboardApi } from '../../api/dashboardApi'
 import { adaptDidacticUnitPlanning } from '../../adapters'
 import type { PlanningDetailViewModel, PlanningSyllabus } from '../../types'
-import {
-    hasStructuredSyllabusPreview,
-    parsePartialSyllabusMarkdown,
-    type PartialPlanningSyllabus,
-} from '../../utils/syllabusPreview'
+
+type PartialPlanningSyllabus = {
+    title?: string
+    overview?: string
+    learningGoals?: string[]
+    keywords?: string[]
+    chapters?: Array<{
+        title?: string
+        overview?: string
+        keyPoints?: string[]
+        lessons?: Array<{
+            title?: string
+            contentOutline?: string[]
+        }>
+    }>
+}
+
+type PartialReferenceSyllabus = {
+    title?: string
+    description?: string
+    keywords?: string | string[]
+    modules?: Array<{
+        title?: string
+        overview?: string
+        lessons?: Array<{
+            title?: string
+            contentOutline?: string[]
+        }>
+    }>
+}
 
 type DidacticUnitSyllabusModalProps = {
     didacticUnitId: string
@@ -35,6 +60,114 @@ function needsInitialSyllabusGeneration(nextAction: string): boolean {
     )
 }
 
+function normalizeKeywords(value: string | string[] | undefined): string[] | undefined {
+    if (Array.isArray(value)) {
+        return value.filter((keyword) => typeof keyword === 'string' && keyword.trim())
+    }
+
+    if (typeof value === 'string') {
+        return value
+            .split(/[,\n;]/)
+            .map((keyword) => keyword.trim())
+            .filter(Boolean)
+    }
+
+    return undefined
+}
+
+function deriveKeyPointsFromLessons(
+    lessons: Array<{ title?: string; contentOutline?: string[] }> | undefined
+): string[] | undefined {
+    const outlineItems = (lessons ?? [])
+        .flatMap((lesson) => lesson.contentOutline ?? [])
+        .filter((item) => typeof item === 'string' && item.trim())
+
+    if (outlineItems.length > 0) {
+        return outlineItems.slice(0, 3)
+    }
+
+    const lessonTitles = (lessons ?? [])
+        .map((lesson) => lesson.title?.trim())
+        .filter((title): title is string => Boolean(title))
+
+    return lessonTitles.length > 0 ? lessonTitles.slice(0, 3) : undefined
+}
+
+function deriveLearningGoalsFromModules(
+    modules:
+        | Array<{
+              title?: string
+              lessons?: Array<{ title?: string; contentOutline?: string[] }>
+          }>
+        | undefined
+): string[] | undefined {
+    const outlines = (modules ?? [])
+        .flatMap((module) => module.lessons ?? [])
+        .flatMap((lesson) => lesson.contentOutline ?? [])
+        .filter((item) => typeof item === 'string' && item.trim())
+
+    if (outlines.length > 0) {
+        return outlines.slice(0, 3)
+    }
+
+    const moduleTitles = (modules ?? [])
+        .map((module) => module.title?.trim())
+        .filter((title): title is string => Boolean(title))
+        .map((title) => `Understand ${title}`)
+
+    return moduleTitles.length > 0 ? moduleTitles.slice(0, 3) : undefined
+}
+
+function normalizeStreamedSyllabusPreview(
+    value: PartialPlanningSyllabus | PartialReferenceSyllabus | null | undefined
+): PartialPlanningSyllabus | null {
+    if (!value || typeof value !== 'object') {
+        return null
+    }
+
+    if ('chapters' in value || 'overview' in value || 'learningGoals' in value) {
+        return {
+            ...value,
+            keywords: normalizeKeywords((value as PartialPlanningSyllabus).keywords),
+            chapters: (value as PartialPlanningSyllabus).chapters?.map((chapter) => ({
+                ...chapter,
+                keyPoints: Array.isArray(chapter.keyPoints)
+                    ? chapter.keyPoints.filter((point) => typeof point === 'string' && point.trim())
+                    : chapter.keyPoints,
+                lessons: chapter.lessons?.map((lesson) => ({
+                    ...lesson,
+                    contentOutline: Array.isArray(lesson.contentOutline)
+                        ? lesson.contentOutline.filter(
+                              (outline) => typeof outline === 'string' && outline.trim()
+                          )
+                        : lesson.contentOutline,
+                })),
+            })),
+        }
+    }
+
+    const reference = value as PartialReferenceSyllabus
+    const normalizedModules = reference.modules?.map((module) => ({
+        title: module.title,
+        overview: module.overview,
+        keyPoints: deriveKeyPointsFromLessons(module.lessons),
+        lessons: module.lessons?.map((lesson) => ({
+            title: lesson.title,
+            contentOutline: lesson.contentOutline?.filter(
+                (outline) => typeof outline === 'string' && outline.trim()
+            ),
+        })),
+    }))
+
+    return {
+        title: reference.title,
+        overview: reference.description,
+        keywords: normalizeKeywords(reference.keywords),
+        learningGoals: deriveLearningGoalsFromModules(reference.modules),
+        chapters: normalizedModules,
+    }
+}
+
 export function DidacticUnitSyllabusModal({
     didacticUnitId,
     onClose,
@@ -46,7 +179,8 @@ export function DidacticUnitSyllabusModal({
     const [isLoading, setIsLoading] = useState(true)
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [error, setError] = useState<string | null>(null)
-    const [streamedSyllabusMarkdown, setStreamedSyllabusMarkdown] = useState('')
+    const [streamedSyllabusPreview, setStreamedSyllabusPreview] =
+        useState<PartialPlanningSyllabus | null>(null)
     const [isStreamingSyllabus, setIsStreamingSyllabus] = useState(false)
     const [activeGenerationTier, setActiveGenerationTier] = useState<BackendAiModelTier | null>(null)
     const [selectedGenerationTier, setSelectedGenerationTier] =
@@ -55,11 +189,11 @@ export function DidacticUnitSyllabusModal({
     const [regenerationContext, setRegenerationContext] = useState('')
 
     const hasSyllabus = Boolean(planning?.syllabus)
-    const streamedSyllabusPreview = useMemo(
-        () => parsePartialSyllabusMarkdown(streamedSyllabusMarkdown),
-        [streamedSyllabusMarkdown]
+    const hasStructuredStreamPreview = Boolean(
+        streamedSyllabusPreview &&
+            ((streamedSyllabusPreview.title && streamedSyllabusPreview.title.trim()) ||
+                (streamedSyllabusPreview.chapters?.length ?? 0) > 0)
     )
-    const hasStructuredStreamPreview = hasStructuredSyllabusPreview(streamedSyllabusPreview)
     const syllabusToRender = isStreamingSyllabus && hasStructuredStreamPreview
         ? streamedSyllabusPreview
         : planning?.syllabus ?? (hasStructuredStreamPreview ? streamedSyllabusPreview : null)
@@ -79,6 +213,7 @@ export function DidacticUnitSyllabusModal({
 
             setPlanning(planningDetail)
             setRegenerationContext('')
+            setStreamedSyllabusPreview(null)
             if (planningDetail.syllabus) {
                 setReviewDecision('accept')
             }
@@ -113,7 +248,7 @@ export function DidacticUnitSyllabusModal({
             setIsSubmitting(true)
             setIsStreamingSyllabus(true)
             setActiveGenerationTier(tier)
-            setStreamedSyllabusMarkdown('')
+            setStreamedSyllabusPreview(null)
             setError(null)
 
             try {
@@ -121,8 +256,17 @@ export function DidacticUnitSyllabusModal({
                     planning.id,
                     tier,
                     {
-                        onPartialMarkdown: (event) => {
-                            setStreamedSyllabusMarkdown(event.markdown)
+                        onPartialStructured: (event) => {
+                            const partial = event.data as {
+                                syllabus?: PartialPlanningSyllabus
+                            } | PartialPlanningSyllabus
+                            setStreamedSyllabusPreview(
+                                normalizeStreamedSyllabusPreview(
+                                    'syllabus' in partial && partial.syllabus
+                                        ? partial.syllabus
+                                        : (partial as PartialPlanningSyllabus)
+                                )
+                            )
                         },
                     },
                     reviewDecision === 'reject'
@@ -188,7 +332,7 @@ export function DidacticUnitSyllabusModal({
             caption?: string
         }
     ) => {
-        if (!syllabus || !hasStructuredSyllabusPreview(syllabus)) {
+        if (!syllabus || !((syllabus.title && syllabus.title.trim()) || (syllabus.chapters?.length ?? 0) > 0)) {
             return null
         }
 
@@ -223,9 +367,9 @@ export function DidacticUnitSyllabusModal({
                         <div className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#6B7280]">
                             Learning goals
                         </div>
-                        {syllabus.learningGoals.length > 0 ? (
+                        {(syllabus.learningGoals?.length ?? 0) > 0 ? (
                             <div className="mt-3 space-y-2 text-[14px] text-[#1D1D1F]">
-                                {syllabus.learningGoals.map((goal) => (
+                                {syllabus.learningGoals?.map((goal) => (
                                     <div key={goal}>- {goal}</div>
                                 ))}
                             </div>
@@ -241,15 +385,9 @@ export function DidacticUnitSyllabusModal({
                         </div>
                         <div className="mt-3 space-y-2 text-[14px] text-[#1D1D1F]">
                             <div>
-                                Duration:{' '}
-                                {syllabus.estimatedDurationMinutes
-                                    ? `${syllabus.estimatedDurationMinutes} minutes`
-                                    : 'Calculating...'}
-                            </div>
-                            <div>
                                 Keywords:{' '}
-                                {syllabus.keywords.length > 0
-                                    ? syllabus.keywords.join(', ')
+                                {(syllabus.keywords?.length ?? 0) > 0
+                                    ? syllabus.keywords?.join(', ')
                                     : 'Still streaming...'}
                             </div>
                         </div>
@@ -257,7 +395,7 @@ export function DidacticUnitSyllabusModal({
                 </div>
 
                 <div className="space-y-4">
-                    {syllabus.chapters.map((chapter, index) => (
+                    {(syllabus.chapters ?? []).map((chapter, index) => (
                         <article
                             key={`${chapter.title}-${index}`}
                             className="rounded-[16px] border border-[#E5E5E7] bg-white p-5"
@@ -271,11 +409,6 @@ export function DidacticUnitSyllabusModal({
                                         {chapter.title || `Chapter ${index + 1}`}
                                     </h4>
                                 </div>
-                                <div className="rounded-full border border-[#E5E5E7] bg-[#FAFAFB] px-3 py-1 text-[12px] font-semibold text-[#4B5563]">
-                                    {chapter.estimatedDurationMinutes
-                                        ? `${chapter.estimatedDurationMinutes} min`
-                                        : 'Streaming...'}
-                                </div>
                             </div>
                             {chapter.overview && (
                                 <p className="mt-3 text-[14px] leading-7 text-[#4B5563]">
@@ -287,9 +420,9 @@ export function DidacticUnitSyllabusModal({
                                     <div className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#6B7280]">
                                         Key points
                                     </div>
-                                    {chapter.keyPoints.length > 0 ? (
+                                    {(chapter.keyPoints?.length ?? 0) > 0 ? (
                                         <div className="mt-2 space-y-2 text-[14px] text-[#1D1D1F]">
-                                            {chapter.keyPoints.map((point) => (
+                                            {chapter.keyPoints?.map((point) => (
                                                 <div key={point}>- {point}</div>
                                             ))}
                                         </div>
@@ -303,9 +436,9 @@ export function DidacticUnitSyllabusModal({
                                     <div className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#6B7280]">
                                         Lessons
                                     </div>
-                                    {chapter.lessons.length > 0 ? (
+                                    {(chapter.lessons?.length ?? 0) > 0 ? (
                                         <div className="mt-2 space-y-3">
-                                            {chapter.lessons.map((lesson, lessonIndex) => (
+                                            {chapter.lessons?.map((lesson, lessonIndex) => (
                                                 <div
                                                     key={`${lesson.title}-${lessonIndex}`}
                                                     className="rounded-[12px] border border-[#EEF0F2] bg-[#FAFAFB] p-3"
@@ -313,9 +446,9 @@ export function DidacticUnitSyllabusModal({
                                                     <div className="text-[13px] font-semibold text-[#1D1D1F]">
                                                         {lesson.title || `Lesson ${lessonIndex + 1}`}
                                                     </div>
-                                                    {lesson.contentOutline.length > 0 ? (
+                                                    {(lesson.contentOutline?.length ?? 0) > 0 ? (
                                                         <div className="mt-2 space-y-1 text-[13px] text-[#4B5563]">
-                                                            {lesson.contentOutline.map((outline) => (
+                                                            {lesson.contentOutline?.map((outline) => (
                                                                 <div key={outline}>- {outline}</div>
                                                             ))}
                                                         </div>
@@ -407,6 +540,9 @@ export function DidacticUnitSyllabusModal({
                             {(planning.improvedTopicBrief || planning.additionalContext) && (
                                 <section className="rounded-[18px] border border-[#E5E5E7] bg-[#FAFAFB] p-5">
                                     <div className="flex flex-wrap gap-2">
+                                        <div className="rounded-full border border-[#DCEBDD] bg-white px-3 py-1 text-[12px] font-semibold text-[#34614A]">
+                                            Level: {planning.level}
+                                        </div>
                                         <div className="rounded-full border border-[#DCEBDD] bg-white px-3 py-1 text-[12px] font-semibold text-[#34614A]">
                                             Depth: {planning.depth}
                                         </div>

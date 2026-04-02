@@ -12,12 +12,6 @@ describe('streaming generation routes', () => {
         const created = await createDidacticUnit(app)
         await advanceToQuestionnaireAnswered(app, created.id)
 
-        const promptResponse = await request(app)
-            .post(`/api/didactic-unit/${created.id}/syllabus-prompt/generate`)
-            .send({})
-
-        expect(promptResponse.status).toBe(200)
-
         const response = await request(app)
             .post(`/api/didactic-unit/${created.id}/syllabus/generate/stream`)
             .send({ tier: 'cheap' })
@@ -31,7 +25,7 @@ describe('streaming generation routes', () => {
             .map((line) => JSON.parse(line) as { type: string; data?: { status?: string } })
 
         expect(lines[0].type).toBe('start')
-        expect(lines.some((line) => line.type === 'partial_markdown')).toBe(true)
+        expect(lines.some((line) => line.type === 'partial_structured')).toBe(true)
         expect(lines.at(-1)).toMatchObject({
             type: 'complete',
             data: {

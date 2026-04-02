@@ -26,9 +26,7 @@ export function updateDidacticUnitChapter(
     const updatedChapter: DidacticUnitGeneratedChapter = {
         ...currentChapter,
         title: input.chapter.title,
-        overview: input.chapter.overview,
-        content: input.chapter.content,
-        keyTakeaways: input.chapter.keyTakeaways,
+        markdown: input.chapter.content,
         presentationSettings: resolveDidacticUnitChapterPresentationSettings(
             input.chapter.presentationSettings ?? currentChapter.presentationSettings
         ),

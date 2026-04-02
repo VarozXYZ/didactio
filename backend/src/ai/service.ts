@@ -5,17 +5,17 @@ import type { DidacticUnitGeneratedChapter } from '../didactic-unit/didactic-uni
 import type {
     DidacticUnitDepth,
     DidacticUnitLength,
+    DidacticUnitLevel,
+    DidacticUnitQuestion,
     DidacticUnitQuestionAnswer,
     DidacticUnitQuestionnaire,
-    DidacticUnitQuestion,
     DidacticUnitQuestionOption,
-    DidacticUnitSyllabus,
+    DidacticUnitReferenceSyllabus,
 } from '../didactic-unit/planning.js'
 import type { AiConfig, AiModelConfig, AiModelTier } from './config.js'
 import { resolveGatewayModelId } from './config.js'
 import {
     buildChapterMarkdownPrompt,
-    buildChapterRepairPrompt,
     buildContinuitySummaryPrompt,
     buildGatewaySystemPrompt,
     buildLearnerSummaryPrompt,
@@ -23,15 +23,13 @@ import {
     buildQuestionnairePrompt,
     resolveTargetChapterCount,
     buildSyllabusMarkdownPrompt,
-    buildSyllabusRepairPrompt,
 } from './prompt-builders.js'
 import {
-    chapterSchema,
     moderationSchema,
     questionnaireSchema,
     syllabusSchema,
 } from './schemas.js'
-import { parseChapterMarkdown, parseSyllabusMarkdown } from './markdown-parsers.js'
+import { normalizeGeneratedChapterMarkdown } from './markdown-parsers.js'
 
 export class AiGatewayConfigurationError extends Error {}
 
@@ -60,8 +58,7 @@ export interface QuestionnaireResult extends BaseStageResult {
 }
 
 export interface SyllabusResult extends BaseStageResult {
-    markdown: string
-    syllabus: DidacticUnitSyllabus
+    syllabus: DidacticUnitReferenceSyllabus
 }
 
 export interface SummaryResult extends BaseStageResult {
@@ -89,6 +86,7 @@ export interface StructuredStreamCallbacks<T> {
 export interface AiService {
     moderateTopic(input: {
         topic: string
+        level: DidacticUnitLevel
         config: AiConfig
         tier: AiModelTier
         abortSignal?: AbortSignal
@@ -96,6 +94,7 @@ export interface AiService {
     streamModeration(
         input: {
             topic: string
+            level: DidacticUnitLevel
             config: AiConfig
             tier: AiModelTier
             abortSignal?: AbortSignal
@@ -104,6 +103,7 @@ export interface AiService {
     ): Promise<ModerationResult>
     generateQuestionnaire(input: {
         topic: string
+        level: DidacticUnitLevel
         improvedTopicBrief?: string
         config: AiConfig
         tier: AiModelTier
@@ -112,6 +112,7 @@ export interface AiService {
     streamQuestionnaire(
         input: {
             topic: string
+            level: DidacticUnitLevel
             improvedTopicBrief?: string
             config: AiConfig
             tier: AiModelTier
@@ -121,6 +122,7 @@ export interface AiService {
     ): Promise<QuestionnaireResult>
     generateSyllabus(input: {
         topic: string
+        level: DidacticUnitLevel
         improvedTopicBrief?: string
         syllabusPrompt: string
         questionnaireAnswers?: DidacticUnitQuestionAnswer[]
@@ -133,6 +135,7 @@ export interface AiService {
     streamSyllabus(
         input: {
             topic: string
+            level: DidacticUnitLevel
             improvedTopicBrief?: string
             syllabusPrompt: string
             questionnaireAnswers?: DidacticUnitQuestionAnswer[]
@@ -142,7 +145,7 @@ export interface AiService {
             tier: AiModelTier
             abortSignal?: AbortSignal
         },
-        callbacks: MarkdownStreamCallbacks<SyllabusResult>
+        callbacks: StructuredStreamCallbacks<SyllabusResult>
     ): Promise<SyllabusResult>
     generateSummary(input: {
         topic: string
@@ -167,7 +170,8 @@ export interface AiService {
     ): Promise<SummaryResult>
     generateChapter(input: {
         topic: string
-        syllabus: DidacticUnitSyllabus
+        level: DidacticUnitLevel
+        syllabus: DidacticUnitReferenceSyllabus
         chapterIndex: number
         questionnaireAnswers?: DidacticUnitQuestionAnswer[]
         continuitySummaries?: string[]
@@ -182,7 +186,8 @@ export interface AiService {
     streamChapter(
         input: {
             topic: string
-            syllabus: DidacticUnitSyllabus
+            level: DidacticUnitLevel
+            syllabus: DidacticUnitReferenceSyllabus
             chapterIndex: number
             questionnaireAnswers?: DidacticUnitQuestionAnswer[]
             continuitySummaries?: string[]
@@ -198,17 +203,6 @@ export interface AiService {
     ): Promise<ChapterResult>
 }
 
-function buildQuestionnaireSchema() {
-    return questionnaireSchema
-}
-
-function validateSyllabusChapterCount(
-    syllabus: DidacticUnitSyllabus,
-    length: DidacticUnitLength
-): DidacticUnitSyllabus | null {
-    return syllabus.chapters.length === resolveTargetChapterCount(length) ? syllabus : null
-}
-
 const CONTENT_LENGTH_TOKENS: Record<DidacticUnitLength, number> = {
     intro: 1000,
     short: 6000,
@@ -217,14 +211,7 @@ const CONTENT_LENGTH_TOKENS: Record<DidacticUnitLength, number> = {
 }
 
 function resolveStageMaxOutputTokens(
-    stage:
-        | 'moderation'
-        | 'questionnaire'
-        | 'syllabus'
-        | 'summary'
-        | 'chapter'
-        | 'repair_syllabus'
-        | 'repair_chapter',
+    stage: 'moderation' | 'questionnaire' | 'syllabus' | 'summary' | 'chapter',
     length?: DidacticUnitLength
 ): number {
     switch (stage) {
@@ -236,12 +223,9 @@ function resolveStageMaxOutputTokens(
             return 1000
         case 'syllabus':
         case 'chapter':
-        case 'repair_syllabus':
-        case 'repair_chapter':
             if (!length) {
                 throw new Error(`A didactic unit length is required for the ${stage} token budget.`)
             }
-
             return CONTENT_LENGTH_TOKENS[length]
     }
 }
@@ -249,11 +233,7 @@ function resolveStageMaxOutputTokens(
 function normalizeQuestionType(rawType: string): DidacticUnitQuestion['type'] {
     const normalized = rawType.trim().toLowerCase().replace(/[\s-]+/g, '_')
 
-    if (
-        normalized === 'single_select' ||
-        normalized === 'single' ||
-        normalized === 'select'
-    ) {
+    if (normalized === 'single_select' || normalized === 'single' || normalized === 'select') {
         return 'single_select'
     }
 
@@ -313,9 +293,7 @@ function normalizeQuestionnaire(questionnaire: {
     }
 
     const ids = normalizedQuestions.map((question) => question.id)
-    const uniqueIds = new Set(ids)
-
-    if (uniqueIds.size !== ids.length) {
+    if (new Set(ids).size !== ids.length) {
         throw new Error('Questionnaire generation returned duplicate question ids.')
     }
 
@@ -332,12 +310,19 @@ function normalizeQuestionnaire(questionnaire: {
     }
 }
 
-function validateOrRepairParsedObject<T>(
-    parsedObject: unknown,
-    schema: z.ZodType<T>
-): T | null {
-    const result = schema.safeParse(parsedObject)
-    return result.success ? result.data : null
+function validateReferenceSyllabusLength(
+    syllabus: DidacticUnitReferenceSyllabus,
+    length: DidacticUnitLength
+): DidacticUnitReferenceSyllabus {
+    const expectedModuleCount = resolveTargetChapterCount(length)
+
+    if (syllabus.modules.length !== expectedModuleCount) {
+        throw new Error(
+            `Syllabus generation returned ${syllabus.modules.length} modules; expected exactly ${expectedModuleCount}.`
+        )
+    }
+
+    return syllabus
 }
 
 export class GatewayAiService implements AiService {
@@ -359,19 +344,15 @@ export class GatewayAiService implements AiService {
     }
 
     private selectModel(tier: AiModelTier, config: AiConfig): ModelSelection {
-        const tierConfig = config[tier]
-        const normalized = this.requireTierConfig(tier, tierConfig)
+        const tierConfig = this.requireTierConfig(tier, config[tier])
         return {
-            provider: normalized.provider,
-            model: normalized.model,
-            modelId: resolveGatewayModelId(normalized),
+            provider: tierConfig.provider,
+            model: tierConfig.model,
+            modelId: resolveGatewayModelId(tierConfig),
         }
     }
 
-    private requireTierConfig(
-        tier: AiModelTier,
-        config: AiModelConfig | undefined
-    ): AiModelConfig {
+    private requireTierConfig(tier: AiModelTier, config: AiModelConfig | undefined): AiModelConfig {
         if (!config?.provider?.trim() || !config.model?.trim()) {
             throw new AiGatewayConfigurationError(
                 `AI config for ${tier} must include non-empty provider and model values.`
@@ -384,103 +365,9 @@ export class GatewayAiService implements AiService {
         }
     }
 
-    private async repairSyllabusFromMarkdown(input: {
-        selection: ModelSelection
-        topic: string
-        markdown: string
-        improvedTopicBrief?: string
-        length: DidacticUnitLength
-        config: AiConfig
-        abortSignal?: AbortSignal
-    }): Promise<DidacticUnitSyllabus> {
-        const parsed = validateOrRepairParsedObject(
-            (() => {
-                try {
-                    return parseSyllabusMarkdown(input.markdown)
-                } catch {
-                    return null
-                }
-            })(),
-            syllabusSchema
-        )
-
-        const validatedParsed = parsed
-            ? validateSyllabusChapterCount(parsed, input.length)
-            : null
-
-        if (validatedParsed) {
-            return validatedParsed
-        }
-
-        const repaired = await generateObject({
-            model: this.gateway(input.selection.modelId),
-            system: buildGatewaySystemPrompt('syllabus'),
-            prompt: buildSyllabusRepairPrompt({
-                topic: input.topic,
-                markdown: input.markdown,
-                improvedTopicBrief: input.improvedTopicBrief,
-                authoring: input.config.authoring,
-                length: input.length,
-            }),
-            schema: syllabusSchema,
-            maxOutputTokens: resolveStageMaxOutputTokens('repair_syllabus', input.length),
-            abortSignal: input.abortSignal,
-        })
-
-        const validatedRepaired = validateSyllabusChapterCount(repaired.object, input.length)
-
-        if (validatedRepaired) {
-            return validatedRepaired
-        }
-
-        throw new Error(
-            `Syllabus generation returned ${repaired.object.chapters.length} chapters; expected exactly ${resolveTargetChapterCount(input.length)}.`
-        )
-    }
-
-    private async repairChapterFromMarkdown(input: {
-        selection: ModelSelection
-        topic: string
-        chapterIndex: number
-        syllabus: DidacticUnitSyllabus
-        markdown: string
-        length: DidacticUnitLength
-        abortSignal?: AbortSignal
-    }): Promise<z.infer<typeof chapterSchema>> {
-        const parsed = validateOrRepairParsedObject(
-            (() => {
-                try {
-                    return parseChapterMarkdown(input.markdown, input.chapterIndex)
-                } catch {
-                    return null
-                }
-            })(),
-            chapterSchema
-        )
-
-        if (parsed) {
-            return parsed
-        }
-
-        const repaired = await generateObject({
-            model: this.gateway(input.selection.modelId),
-            system: buildGatewaySystemPrompt('chapter'),
-            prompt: buildChapterRepairPrompt({
-                topic: input.topic,
-                chapterIndex: input.chapterIndex,
-                syllabus: input.syllabus,
-                markdown: input.markdown,
-            }),
-            schema: chapterSchema,
-            maxOutputTokens: resolveStageMaxOutputTokens('repair_chapter', input.length),
-            abortSignal: input.abortSignal,
-        })
-
-        return repaired.object
-    }
-
     async moderateTopic(input: {
         topic: string
+        level: DidacticUnitLevel
         config: AiConfig
         tier: AiModelTier
         abortSignal?: AbortSignal
@@ -488,8 +375,10 @@ export class GatewayAiService implements AiService {
         const selection = this.selectModel(input.tier, input.config)
         const prompt = buildModerationPrompt({
             topic: input.topic,
+            level: input.level,
             authoring: input.config.authoring,
         })
+
         const result = await generateObject({
             model: this.gateway(selection.modelId),
             system: buildGatewaySystemPrompt('moderation'),
@@ -514,6 +403,7 @@ export class GatewayAiService implements AiService {
     async streamModeration(
         input: {
             topic: string
+            level: DidacticUnitLevel
             config: AiConfig
             tier: AiModelTier
             abortSignal?: AbortSignal
@@ -523,6 +413,7 @@ export class GatewayAiService implements AiService {
         const selection = this.selectModel(input.tier, input.config)
         const prompt = buildModerationPrompt({
             topic: input.topic,
+            level: input.level,
             authoring: input.config.authoring,
         })
 
@@ -561,12 +452,14 @@ export class GatewayAiService implements AiService {
             improvedTopicBrief: object.improvedTopicBrief,
             reasoningNotes: object.reasoningNotes,
         }
+
         await callbacks.onComplete?.(finalResult)
         return finalResult
     }
 
     async generateQuestionnaire(input: {
         topic: string
+        level: DidacticUnitLevel
         improvedTopicBrief?: string
         config: AiConfig
         tier: AiModelTier
@@ -575,14 +468,16 @@ export class GatewayAiService implements AiService {
         const selection = this.selectModel(input.tier, input.config)
         const prompt = buildQuestionnairePrompt({
             topic: input.topic,
+            level: input.level,
             improvedTopicBrief: input.improvedTopicBrief,
             authoring: input.config.authoring,
         })
+
         const result = await generateObject({
             model: this.gateway(selection.modelId),
             system: buildGatewaySystemPrompt('questionnaire'),
             prompt,
-            schema: buildQuestionnaireSchema(),
+            schema: questionnaireSchema,
             maxOutputTokens: resolveStageMaxOutputTokens('questionnaire'),
             abortSignal: input.abortSignal,
         })
@@ -598,6 +493,7 @@ export class GatewayAiService implements AiService {
     async streamQuestionnaire(
         input: {
             topic: string
+            level: DidacticUnitLevel
             improvedTopicBrief?: string
             config: AiConfig
             tier: AiModelTier
@@ -608,6 +504,7 @@ export class GatewayAiService implements AiService {
         const selection = this.selectModel(input.tier, input.config)
         const prompt = buildQuestionnairePrompt({
             topic: input.topic,
+            level: input.level,
             improvedTopicBrief: input.improvedTopicBrief,
             authoring: input.config.authoring,
         })
@@ -618,7 +515,7 @@ export class GatewayAiService implements AiService {
             model: this.gateway(selection.modelId),
             system: buildGatewaySystemPrompt('questionnaire'),
             prompt,
-            schema: buildQuestionnaireSchema(),
+            schema: questionnaireSchema,
             maxOutputTokens: resolveStageMaxOutputTokens('questionnaire'),
             abortSignal: input.abortSignal,
         })
@@ -639,12 +536,14 @@ export class GatewayAiService implements AiService {
             prompt,
             questionnaire: normalizeQuestionnaire(object),
         }
+
         await callbacks.onComplete?.(finalResult)
         return finalResult
     }
 
     async generateSyllabus(input: {
         topic: string
+        level: DidacticUnitLevel
         improvedTopicBrief?: string
         syllabusPrompt: string
         questionnaireAnswers?: DidacticUnitQuestionAnswer[]
@@ -660,6 +559,7 @@ export class GatewayAiService implements AiService {
     async streamSyllabus(
         input: {
             topic: string
+            level: DidacticUnitLevel
             improvedTopicBrief?: string
             syllabusPrompt: string
             questionnaireAnswers?: DidacticUnitQuestionAnswer[]
@@ -669,11 +569,12 @@ export class GatewayAiService implements AiService {
             tier: AiModelTier
             abortSignal?: AbortSignal
         },
-        callbacks: MarkdownStreamCallbacks<SyllabusResult>
+        callbacks: StructuredStreamCallbacks<SyllabusResult>
     ): Promise<SyllabusResult> {
         const selection = this.selectModel(input.tier, input.config)
         const prompt = buildSyllabusMarkdownPrompt({
             topic: input.topic,
+            level: input.level,
             improvedTopicBrief: input.improvedTopicBrief,
             syllabusPrompt: input.syllabusPrompt,
             questionnaireAnswers: input.questionnaireAnswers,
@@ -681,42 +582,33 @@ export class GatewayAiService implements AiService {
             depth: input.depth,
             length: input.length,
         })
-        let markdown = ''
 
         await callbacks.onStart?.(selection)
 
-        const result = streamText({
+        const result = streamObject({
             model: this.gateway(selection.modelId),
             system: buildGatewaySystemPrompt('syllabus'),
             prompt,
+            schema: syllabusSchema,
             maxOutputTokens: resolveStageMaxOutputTokens('syllabus', input.length),
             abortSignal: input.abortSignal,
-            onChunk: async ({ chunk }) => {
-                if (chunk.type !== 'text-delta') {
-                    return
-                }
-
-                markdown += chunk.text
-                await callbacks.onMarkdown?.(chunk.text, markdown)
-            },
         })
 
-        const finalMarkdown = await result.text
-        const syllabus = await this.repairSyllabusFromMarkdown({
-            selection,
-            topic: input.topic,
-            markdown: finalMarkdown,
-            improvedTopicBrief: input.improvedTopicBrief,
-            length: input.length,
-            config: input.config,
-            abortSignal: input.abortSignal,
-        })
+        for await (const partial of result.partialObjectStream) {
+            await callbacks.onPartial?.({
+                provider: selection.provider,
+                model: selection.model,
+                prompt,
+                syllabus: partial as DidacticUnitReferenceSyllabus,
+            })
+        }
+
+        const object = await result.object
         const finalResult: SyllabusResult = {
             provider: selection.provider,
             model: selection.model,
             prompt,
-            markdown: finalMarkdown,
-            syllabus,
+            syllabus: validateReferenceSyllabusLength(object, input.length),
         }
 
         await callbacks.onComplete?.(finalResult)
@@ -754,11 +646,13 @@ export class GatewayAiService implements AiService {
                       topic: input.topic,
                       chapterTitle: input.chapterTitle,
                       chapterMarkdown: input.chapterMarkdown,
+                      authoring: input.config.authoring,
                   })
                 : buildLearnerSummaryPrompt({
                       topic: input.topic,
                       chapterTitle: input.chapterTitle,
                       chapterMarkdown: input.chapterMarkdown,
+                      authoring: input.config.authoring,
                   })
         let markdown = ''
 
@@ -793,7 +687,8 @@ export class GatewayAiService implements AiService {
 
     async generateChapter(input: {
         topic: string
-        syllabus: DidacticUnitSyllabus
+        level: DidacticUnitLevel
+        syllabus: DidacticUnitReferenceSyllabus
         chapterIndex: number
         questionnaireAnswers?: DidacticUnitQuestionAnswer[]
         continuitySummaries?: string[]
@@ -811,7 +706,8 @@ export class GatewayAiService implements AiService {
     async streamChapter(
         input: {
             topic: string
-            syllabus: DidacticUnitSyllabus
+            level: DidacticUnitLevel
+            syllabus: DidacticUnitReferenceSyllabus
             chapterIndex: number
             questionnaireAnswers?: DidacticUnitQuestionAnswer[]
             continuitySummaries?: string[]
@@ -828,6 +724,7 @@ export class GatewayAiService implements AiService {
         const selection = this.selectModel(input.tier, input.config)
         const prompt = buildChapterMarkdownPrompt({
             topic: input.topic,
+            level: input.level,
             syllabus: input.syllabus,
             chapterIndex: input.chapterIndex,
             questionnaireAnswers: input.questionnaireAnswers,
@@ -859,24 +756,19 @@ export class GatewayAiService implements AiService {
         })
 
         const finalMarkdown = await result.text
-        const parsedChapter = await this.repairChapterFromMarkdown({
-            selection,
-            topic: input.topic,
-            chapterIndex: input.chapterIndex,
-            syllabus: input.syllabus,
-            markdown: finalMarkdown,
-            length: input.length,
-            abortSignal: input.abortSignal,
+        const normalizedChapter = normalizeGeneratedChapterMarkdown(finalMarkdown, input.chapterIndex, {
+            fallbackTitle: input.syllabus.modules[input.chapterIndex]?.title,
         })
         const continuitySummary = await this.generateSummary({
             topic: input.topic,
-            chapterTitle: parsedChapter.title,
+            chapterTitle: normalizedChapter.title,
             chapterMarkdown: finalMarkdown,
             config: input.config,
             tier: input.tier,
             abortSignal: input.abortSignal,
             kind: 'continuity',
         })
+
         const finalResult: ChapterResult = {
             provider: selection.provider,
             model: selection.model,
@@ -885,10 +777,8 @@ export class GatewayAiService implements AiService {
             continuitySummary: continuitySummary.markdown,
             chapter: {
                 chapterIndex: input.chapterIndex,
-                title: parsedChapter.title,
-                overview: parsedChapter.overview,
-                content: parsedChapter.content,
-                keyTakeaways: parsedChapter.keyTakeaways,
+                title: normalizedChapter.title,
+                markdown: normalizedChapter.markdown,
                 generatedAt: new Date().toISOString(),
             },
         }

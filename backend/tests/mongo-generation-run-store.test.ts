@@ -16,9 +16,7 @@ function createStoredRuns(): GenerationRun[] {
             chapter: {
                 chapterIndex: 0,
                 title: 'Foundations',
-                overview: 'Learn the basics.',
-                content: 'Detailed content.',
-                keyTakeaways: ['Routing'],
+                markdown: 'Detailed content.',
                 generatedAt: '2026-03-12T00:01:00.000Z',
             },
             status: 'completed',

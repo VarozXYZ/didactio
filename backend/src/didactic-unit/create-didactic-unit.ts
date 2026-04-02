@@ -3,10 +3,13 @@ import type {
     CreateDidacticUnitInput,
     DidacticUnitDepth,
     DidacticUnitLength,
+    DidacticUnitLevel,
+    DidacticUnitModule,
     DidacticUnitNextAction,
     DidacticUnitProvider,
     DidacticUnitQuestionAnswer,
     DidacticUnitQuestionnaire,
+    DidacticUnitReferenceSyllabus,
     DidacticUnitSyllabus,
     DidacticUnitSyllabusChapter,
 } from './planning.js'
@@ -39,7 +42,8 @@ export interface DidacticUnit {
     overview: string
     learningGoals: string[]
     keywords: string[]
-    estimatedDurationMinutes?: number
+    level: DidacticUnitLevel
+    modules: DidacticUnitModule[]
     chapters: DidacticUnitSyllabusChapter[]
     additionalContext?: string
     depth: DidacticUnitDepth
@@ -54,6 +58,7 @@ export interface DidacticUnit {
     moderatedAt?: string
     syllabusPrompt?: string
     syllabusPromptGeneratedAt?: string
+    referenceSyllabus?: DidacticUnitReferenceSyllabus
     syllabus?: DidacticUnitSyllabus
     syllabusGeneratedAt?: string
     syllabusUpdatedAt?: string
@@ -85,6 +90,8 @@ export function createDidacticUnit(
         overview: '',
         learningGoals: [],
         keywords: [],
+        level: input.level,
+        modules: [],
         chapters: [],
         additionalContext: input.additionalContext,
         depth: input.depth,

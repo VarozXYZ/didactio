@@ -8,7 +8,10 @@ import type {
     SummaryResult,
     SyllabusResult,
 } from '../../src/ai/service.js'
-import { buildQuestionnaireForDidacticUnit, type DidacticUnitQuestionAnswer } from '../../src/didactic-unit/planning.js'
+import {
+    buildQuestionnaireForDidacticUnit,
+    type DidacticUnitQuestionAnswer,
+} from '../../src/didactic-unit/planning.js'
 import { resolveTargetChapterCount } from '../../src/ai/prompt-builders.js'
 
 function findAnswerValue(
@@ -18,57 +21,47 @@ function findAnswerValue(
     return answers?.find((answer) => answer.questionId === questionId)?.value ?? 'not provided'
 }
 
-function syllabusMarkdownForLength(
+function referenceSyllabusForLength(
     topic: string,
     length: 'intro' | 'short' | 'long' | 'textbook'
-): string {
-    const targetChapterCount = resolveTargetChapterCount(length)
-    const chapterBlocks = Array.from({ length: targetChapterCount }, (_, index) => {
-        const chapterNumber = index + 1
-        const chapterTitle =
-            index === 0
-                ? 'Foundations'
-                : index === targetChapterCount - 1
-                  ? 'Application'
-                  : `Workflow ${chapterNumber - 1}`
+) {
+    const targetModuleCount = resolveTargetChapterCount(length)
 
-        return [
-            `### ${chapterNumber}. ${chapterTitle}`,
-            '#### Overview',
-            `Learn the core ideas for ${chapterTitle.toLowerCase()}.`,
-            '#### Estimated Duration',
-            '60',
-            '#### Key Points',
-            '- Concepts',
-            '- Practice',
-            '- Application',
-            '#### Lessons',
-            '##### 1. Guided lesson',
-            '- Explain the main concept',
-            '- Apply it in context',
-            '##### 2. Practice lesson',
-            '- Reinforce the concept',
-            '- Reflect on the outcome',
-        ].join('\n')
-    })
+    return {
+        topic,
+        title: `${topic} Learning Path`,
+        description: `A guided syllabus for ${topic}.`,
+        keywords: 'foundations, workflow, application',
+        modules: Array.from({ length: targetModuleCount }, (_, index) => {
+            const moduleNumber = index + 1
+            const moduleTitle =
+                index === 0
+                    ? 'Foundations'
+                    : index === targetModuleCount - 1
+                      ? 'Application'
+                      : `Workflow ${moduleNumber - 1}`
 
-    return [
-        `# ${topic} Learning Path`,
-        '## Overview',
-        `A guided syllabus for ${topic}.`,
-        '## Learning Goals',
-        '- Build topic confidence',
-        '- Practice real decision making',
-        '- Ship a working outcome',
-        '## Keywords',
-        '- foundations',
-        '- workflow',
-        '- application',
-        '## Estimated Duration',
-        `${targetChapterCount * 60}`,
-        '## Chapters',
-        ...chapterBlocks,
-    ].join('\n')
+            return {
+                title: moduleTitle,
+                overview:
+                    index === 0
+                        ? 'Learn the core ideas and shared vocabulary.'
+                        : index === targetModuleCount - 1
+                          ? 'Apply the topic in realistic scenarios.'
+                          : `Move through workflow stage ${moduleNumber - 1}.`,
+                lessons: [
+                    {
+                        title: 'Guided lesson',
+                        contentOutline: ['Explain the main concept', 'Apply it in context'],
+                    },
+                    {
+                        title: 'Practice lesson',
+                        contentOutline: ['Reinforce the concept', 'Reflect on the outcome'],
+                    },
+                ],
+            }
+        }),
+    }
 }
 
 function chapterMarkdown(input: {
@@ -80,17 +73,14 @@ function chapterMarkdown(input: {
     const learningGoal = findAnswerValue(input.answers, 'learning_goal')
 
     return [
-        `# ${input.chapterTitle}`,
-        '## Overview',
-        input.chapterOverview,
-        '## Lesson',
-        `This chapter explores ${input.chapterTitle} in the context of ${input.topic}.`,
+        '## Core Ideas',
+        `This module explores ${input.chapterTitle} in the context of ${input.topic}.`,
         `It keeps the learner goal in view: ${learningGoal}.`,
         'Use the concepts, examples, and checkpoints to build confidence progressively.',
-        '## Key Takeaways',
-        '- Understand the core scope of the chapter',
-        '- Connect the topic to the learner goal',
-        '- Practice the main ideas deliberately',
+        '## Practice in context',
+        `Work through a realistic example related to ${input.chapterOverview.toLowerCase()}.`,
+        '## Why it works',
+        'Connect each step back to the underlying principles so the learner can transfer the skill.',
     ].join('\n')
 }
 
@@ -140,66 +130,17 @@ export function createMockAiService(): AiService {
             return result
         },
         async generateSyllabus(input): Promise<SyllabusResult> {
-            const targetChapterCount = resolveTargetChapterCount(input.length)
-            const chapters = Array.from({ length: targetChapterCount }, (_, index) => {
-                const chapterNumber = index + 1
-                return {
-                    title:
-                        index === 0
-                            ? 'Foundations'
-                            : index === targetChapterCount - 1
-                              ? 'Application'
-                              : `Workflow ${chapterNumber - 1}`,
-                    overview:
-                        index === 0
-                            ? 'Learn the core ideas and shared vocabulary.'
-                            : index === targetChapterCount - 1
-                              ? 'Apply the topic in realistic scenarios.'
-                              : `Move through workflow stage ${chapterNumber - 1}.`,
-                    keyPoints: ['Concepts', 'Practice', 'Application'],
-                    estimatedDurationMinutes: 60,
-                    lessons: [
-                        {
-                            title: 'Guided lesson',
-                            contentOutline: [
-                                'Explain the main concept',
-                                'Apply it in context',
-                            ],
-                        },
-                        {
-                            title: 'Practice lesson',
-                            contentOutline: [
-                                'Reinforce the concept',
-                                'Reflect on the outcome',
-                            ],
-                        },
-                    ],
-                }
-            })
-
             return {
                 provider,
                 model,
                 prompt: input.syllabusPrompt,
-                markdown: syllabusMarkdownForLength(input.topic, input.length),
-                syllabus: {
-                    title: `${input.topic} Learning Path`,
-                    overview: `A guided syllabus for ${input.topic}.`,
-                    learningGoals: [
-                        'Build topic confidence',
-                        'Practice real decision making',
-                        'Ship a working outcome',
-                    ],
-                    keywords: ['foundations', 'workflow', 'application'],
-                    estimatedDurationMinutes: targetChapterCount * 60,
-                    chapters,
-                },
+                syllabus: referenceSyllabusForLength(input.topic, input.length),
             }
         },
         async streamSyllabus(input, callbacks): Promise<SyllabusResult> {
             await callbacks.onStart?.({ provider, model, modelId: `${provider}/${model}` })
             const result = await this.generateSyllabus(input)
-            await callbacks.onMarkdown?.(result.markdown, result.markdown)
+            await callbacks.onPartial?.({ syllabus: result.syllabus })
             await callbacks.onComplete?.(result)
             return result
         },
@@ -224,11 +165,11 @@ export function createMockAiService(): AiService {
         async generateChapter(input): Promise<ChapterResult> {
             const markdown = chapterMarkdown({
                 topic: input.topic,
-                chapterTitle: input.syllabus.chapters[input.chapterIndex].title,
-                chapterOverview: input.syllabus.chapters[input.chapterIndex].overview,
+                chapterTitle: input.syllabus.modules[input.chapterIndex].title,
+                chapterOverview: input.syllabus.modules[input.chapterIndex].overview,
                 answers: input.questionnaireAnswers,
             })
-            const chapter = input.syllabus.chapters[input.chapterIndex]
+            const chapter = input.syllabus.modules[input.chapterIndex]
 
             return {
                 provider,
@@ -240,17 +181,7 @@ export function createMockAiService(): AiService {
                 chapter: {
                     chapterIndex: input.chapterIndex,
                     title: chapter.title,
-                    overview: chapter.overview,
-                    content: [
-                        `This chapter explores ${chapter.title} in the context of ${input.topic}.`,
-                        `It keeps the learner goal in view: ${findAnswerValue(input.questionnaireAnswers, 'learning_goal')}.`,
-                        'Use the concepts, examples, and checkpoints to build confidence progressively.',
-                    ].join(' '),
-                    keyTakeaways: [
-                        'Understand the core scope of the chapter',
-                        'Connect the topic to the learner goal',
-                        'Practice the main ideas deliberately',
-                    ],
+                    markdown,
                     generatedAt: new Date().toISOString(),
                 },
             }

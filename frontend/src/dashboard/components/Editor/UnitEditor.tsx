@@ -46,7 +46,7 @@ import {
 import {
     calculateSpreadMetrics,
     getStatusPillClass,
-    paginateMarkdownContent,
+    measurePages,
 } from '../../pageLayout'
 import { LexicalMarkdownEditor } from './LexicalMarkdownEditor'
 import { ChapterStyleMenu } from './ChapterStyleMenu'
@@ -59,8 +59,6 @@ import type {
 } from '../../types'
 import { formatRelativeTimestamp } from '../../utils/topicMetadata'
 import {
-    keyTakeawaysToMarkdown,
-    markdownToKeyTakeaways,
     normalizeMarkdownForStorage,
     normalizeStoredMarkdown,
 } from '../../utils/markdown'
@@ -72,9 +70,7 @@ type UnitEditorProps = {
 
 type ChapterDraft = {
     title: string
-    overviewMarkdown: string
     contentMarkdown: string
-    keyTakeawaysMarkdown: string
     presentationSettings: ChapterPresentationSettings
 }
 
@@ -88,11 +84,7 @@ function buildDraft(
 ): ChapterDraft {
     return {
         title: detail?.title ?? chapter.title,
-        overviewMarkdown: normalizeStoredMarkdown(detail?.overview ?? chapter.summary),
         contentMarkdown: normalizeStoredMarkdown(detail?.content ?? chapter.content),
-        keyTakeawaysMarkdown: keyTakeawaysToMarkdown(
-            detail?.keyTakeaways ?? chapter.keyPoints
-        ),
         presentationSettings: detail?.presentationSettings ?? chapter.presentationSettings,
     }
 }
@@ -349,14 +341,16 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
     )
     const paginatedContentPages = useMemo(
         () =>
-            draft
-                ? paginateMarkdownContent({
+            draft && activeChapter
+                ? measurePages({
+                      activeChapter,
+                      chapterIndex: activeChapter.chapterIndex,
                       content: draft.contentMarkdown,
                       pageHeight: spreadMetrics.pageHeight,
                       pageWidth: spreadMetrics.pageWidth,
-                  })
+                  }).slice(0, -1)
                 : [],
-        [draft, spreadMetrics.pageHeight, spreadMetrics.pageWidth]
+        [activeChapter, draft, spreadMetrics.pageHeight, spreadMetrics.pageWidth]
     )
     const visibleContentPages =
         isEditMode && contentPageDrafts.length > 0 ? contentPageDrafts : paginatedContentPages
@@ -558,9 +552,7 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
         }
 
         const nextTitle = draft.title.trim()
-        const nextOverview = normalizeMarkdownForStorage(draft.overviewMarkdown)
         const nextContent = normalizeMarkdownForStorage(draft.contentMarkdown)
-        const nextKeyTakeaways = markdownToKeyTakeaways(draft.keyTakeawaysMarkdown)
 
         await runAction(
             () =>
@@ -569,12 +561,7 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                     activeChapter.chapterIndex,
                     {
                         title: nextTitle,
-                        overview: nextOverview || activeChapter.summary,
                         content: nextContent || activeChapter.content || '',
-                        keyTakeaways:
-                            nextKeyTakeaways.length > 0
-                                ? nextKeyTakeaways
-                                : [...activeChapter.keyPoints],
                         presentationSettings: draft.presentationSettings,
                     }
                 ),
@@ -647,14 +634,10 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
 
         return (
             activeChapterDetail.title === revision.chapter.title &&
-            normalizeStoredMarkdown(activeChapterDetail.overview) ===
-                normalizeStoredMarkdown(revision.chapter.overview) &&
             normalizeStoredMarkdown(activeChapterDetail.content ?? '') ===
                 normalizeStoredMarkdown(revision.chapter.content) &&
             JSON.stringify(activeChapterDetail.presentationSettings) ===
-                JSON.stringify(revision.chapter.presentationSettings) &&
-            JSON.stringify(activeChapterDetail.keyTakeaways) ===
-                JSON.stringify(revision.chapter.keyTakeaways)
+                JSON.stringify(revision.chapter.presentationSettings)
         )
     }
 
@@ -670,9 +653,7 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                     activeChapter.chapterIndex,
                     {
                         title: revision.chapter.title,
-                        overview: revision.chapter.overview,
                         content: revision.chapter.content,
-                        keyTakeaways: [...revision.chapter.keyTakeaways],
                         presentationSettings: revision.chapter.presentationSettings,
                     }
                 ),
@@ -685,7 +666,7 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
         )
     }
 
-    const totalSpreads = Math.max(1, 1 + Math.ceil(Math.max(visibleContentPages.length - 1, 0) / 2))
+    const totalSpreads = Math.max(1, Math.ceil(Math.max(visibleContentPages.length, 1) / 2))
     const canGoPrev = currentSpread > 0
     const canGoNext = currentSpread < totalSpreads - 1
 
@@ -754,17 +735,15 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
         activeGeneratingChapterIndex !== null &&
         activeGeneratingChapterIndex === activeChapter.chapterIndex
     const hasConfiguredGenerationTier = unitGenerationTier !== null
-    const contentPageOffset = currentSpread === 0 ? 0 : 1 + (currentSpread - 1) * 2
-    const leftContentPage =
-        currentSpread === 0 ? undefined : visibleContentPages[contentPageOffset]
-    const rightContentPage =
-        currentSpread === 0
-            ? visibleContentPages[0]
-            : visibleContentPages[contentPageOffset + 1]
+    const contentPageOffset = currentSpread * 2
+    const leftContentPage = visibleContentPages[contentPageOffset]
+    const rightContentPage = visibleContentPages[contentPageOffset + 1]
+    const spreadStartPage = contentPageOffset + 1
+    const spreadEndPage = Math.min(contentPageOffset + 2, Math.max(visibleContentPages.length, 1))
     const spreadPageLabel =
-        currentSpread === 0
-            ? 'Pages 1-2'
-            : `Pages ${contentPageOffset + 2}-${contentPageOffset + 3}`
+        spreadStartPage === spreadEndPage
+            ? `Page ${spreadStartPage}`
+            : `Pages ${spreadStartPage}-${spreadEndPage}`
 
     const updatePaginatedContentPage = (pageIndex: number, markdown: string) => {
         setContentPageDrafts((previous) => {
@@ -802,43 +781,45 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
         markdown: string | undefined
         pageIndex: number
         pageNumber: number
-    }) => (
-        <div
-            className="relative overflow-hidden rounded-[16px] border border-[#E5E5E7] bg-white shadow-[0_8px_60px_rgba(0,0,0,0.08)] md:rounded-[24px]"
-            style={{
-                height: `${spreadMetrics.pageHeight}px`,
-                width: `${spreadMetrics.pageWidth}px`,
-            }}
-        >
-            <div className="flex h-full flex-col overflow-hidden p-6 pb-12 md:p-8 md:pb-14">
-                <div className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-[#86868B]">
-                    Chapter Content
-                </div>
-                <div className="relative min-h-0 flex-1 overflow-hidden">
-                    <LexicalMarkdownEditor
-                        key={`content-${didacticUnitId}-${activeChapter.chapterIndex}-${pageIndex}`}
-                        contentClassName="h-full min-h-full overflow-hidden leading-[1.9] text-[#1D1D1F] outline-none"
-                        baseTextStyle={draft.presentationSettings}
-                        editable={editable}
-                        editorId={`content-${didacticUnitId}-${activeChapter.chapterIndex}-${pageIndex}`}
-                        initialMarkdown={markdown ?? ''}
-                        onFocusEditor={setActiveLexicalEditor}
-                        onMarkdownChange={
-                            editable
-                                ? (nextMarkdown) =>
-                                      updatePaginatedContentPage(pageIndex, nextMarkdown)
-                                : undefined
-                        }
-                        placeholder="Write the chapter content here..."
-                    />
-                </div>
+    }) => {
+        return (
+            <div
+                className="relative overflow-hidden rounded-[16px] border border-[#E5E5E7] bg-white shadow-[0_8px_60px_rgba(0,0,0,0.08)] md:rounded-[24px]"
+                style={{
+                    height: `${spreadMetrics.pageHeight}px`,
+                    width: `${spreadMetrics.pageWidth}px`,
+                }}
+            >
+                <div className="flex h-full flex-col overflow-hidden p-6 pb-12 md:p-8 md:pb-14">
+                    <div className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-[#86868B]">
+                        Chapter Content
+                    </div>
+                    <div className="relative min-h-0 flex-1 overflow-hidden">
+                        <LexicalMarkdownEditor
+                            key={`content-${didacticUnitId}-${activeChapter.chapterIndex}-${pageIndex}-${editable ? 'edit' : 'read'}`}
+                            contentClassName="h-full min-h-full overflow-hidden leading-[1.9] text-[#1D1D1F] outline-none"
+                            baseTextStyle={draft.presentationSettings}
+                            editable={editable}
+                            editorId={`content-${didacticUnitId}-${activeChapter.chapterIndex}-${pageIndex}-${editable ? 'edit' : 'read'}`}
+                            initialMarkdown={markdown ?? ''}
+                            onFocusEditor={editable ? setActiveLexicalEditor : undefined}
+                            onMarkdownChange={
+                                editable
+                                    ? (nextMarkdown) =>
+                                          updatePaginatedContentPage(pageIndex, nextMarkdown)
+                                    : undefined
+                            }
+                            placeholder="Write the chapter content here..."
+                        />
+                    </div>
 
-                <div className="absolute bottom-4 right-6 text-[10px] font-medium text-[#86868B] md:bottom-6 md:right-10">
-                    {pageNumber}
+                    <div className="absolute bottom-4 right-6 text-[10px] font-medium text-[#86868B] md:bottom-6 md:right-10">
+                        {pageNumber}
+                    </div>
                 </div>
             </div>
-        </div>
-    )
+        )
+    }
 
     const renderLexicalSpread = (editable: boolean) => (
         <>
@@ -910,33 +891,9 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                                         >
                                             {draft.title}
                                         </h2>
-                                        <div className="relative min-h-[88px]">
-                                            <LexicalMarkdownEditor
-                                                key={`overview-${didacticUnitId}-${activeChapter.chapterIndex}`}
-                                                contentClassName="min-h-[88px] font-medium italic leading-relaxed text-[#86868B] outline-none"
-                                                baseTextStyle={draft.presentationSettings}
-                                                editable={editable}
-                                                editorId={`overview-${didacticUnitId}-${activeChapter.chapterIndex}`}
-                                                initialMarkdown={draft.overviewMarkdown}
-                                                onFocusEditor={setActiveLexicalEditor}
-                                                onMarkdownChange={
-                                                    editable
-                                                        ? (markdown) =>
-                                                              setDraft((previous) =>
-                                                                  previous
-                                                                      ? {
-                                                                            ...previous,
-                                                                            overviewMarkdown:
-                                                                                markdown,
-                                                                        }
-                                                                      : previous
-                                                              )
-                                                        : undefined
-                                                }
-                                                placeholder="Write a short overview for this chapter..."
-                                                placeholderClassName="pointer-events-none absolute inset-0 italic text-[#B0B0B5]"
-                                            />
-                                        </div>
+                                        <p className="min-h-[88px] font-medium italic leading-relaxed text-[#86868B]">
+                                            {activeChapter.summary}
+                                        </p>
                                         <div className="flex items-center gap-3 pt-1 text-[10px] text-[#86868B]">
                                             <div className="flex items-center gap-1">
                                                 <Clock size={12} strokeWidth={1.5} />
@@ -950,36 +907,23 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                                         <div className="my-3 h-[1px] w-full bg-[#E5E5E7]" />
                                     </div>
 
-                                    <div className="min-h-0 flex-1 overflow-hidden">
-                                        <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[#86868B]">
-                                            Key Takeaways
-                                        </div>
-                                        <div className="relative min-h-[180px]">
-                                            <LexicalMarkdownEditor
-                                                key={`takeaways-${didacticUnitId}-${activeChapter.chapterIndex}`}
-                                                contentClassName="min-h-[180px] leading-[1.9] text-[#1D1D1F] outline-none"
-                                                baseTextStyle={draft.presentationSettings}
-                                                editable={editable}
-                                                editorId={`takeaways-${didacticUnitId}-${activeChapter.chapterIndex}`}
-                                                initialMarkdown={draft.keyTakeawaysMarkdown}
-                                                onFocusEditor={setActiveLexicalEditor}
-                                                onMarkdownChange={
-                                                    editable
-                                                        ? (markdown) =>
-                                                              setDraft((previous) =>
-                                                                  previous
-                                                                      ? {
-                                                                            ...previous,
-                                                                            keyTakeawaysMarkdown:
-                                                                                markdown,
-                                                                        }
-                                                                      : previous
-                                                              )
-                                                        : undefined
-                                                }
-                                                placeholder="- Summarize the main outcomes here"
-                                            />
-                                        </div>
+                                    <div className="relative min-h-0 flex-1 overflow-hidden">
+                                        <LexicalMarkdownEditor
+                                            key={`content-${didacticUnitId}-${activeChapter.chapterIndex}-0-${editable ? 'edit' : 'read'}`}
+                                            contentClassName="h-full min-h-full overflow-hidden leading-[1.9] text-[#1D1D1F] outline-none"
+                                            baseTextStyle={draft.presentationSettings}
+                                            editable={editable}
+                                            editorId={`content-${didacticUnitId}-${activeChapter.chapterIndex}-0-${editable ? 'edit' : 'read'}`}
+                                            initialMarkdown={leftContentPage ?? ''}
+                                            onFocusEditor={editable ? setActiveLexicalEditor : undefined}
+                                            onMarkdownChange={
+                                                editable
+                                                    ? (nextMarkdown) =>
+                                                          updatePaginatedContentPage(0, nextMarkdown)
+                                                    : undefined
+                                            }
+                                            placeholder="Write the chapter content here..."
+                                        />
                                     </div>
 
                                     <div className="absolute bottom-4 right-6 text-[10px] font-medium text-[#86868B] md:bottom-6 md:right-10">
@@ -999,8 +943,8 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                         {renderContentPage({
                             editable,
                             markdown: rightContentPage,
-                            pageIndex: currentSpread === 0 ? 0 : contentPageOffset + 1,
-                            pageNumber: currentSpread === 0 ? 2 : contentPageOffset + 3,
+                            pageIndex: contentPageOffset + 1,
+                            pageNumber: contentPageOffset + 2,
                         })}
                     </Motion.div>
                 </AnimatePresence>

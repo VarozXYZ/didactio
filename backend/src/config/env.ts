@@ -12,6 +12,8 @@ export interface AppEnv {
     aiPremiumModel: string
     aiAuthoringLanguage: string
     aiAuthoringTone: string
+    aiAuthoringLearnerLevel: string
+    aiAuthoringPreferences: string | null
     mongoDbUri: string | null
     mongoDbName: string
 }
@@ -59,6 +61,9 @@ export function getAppEnv(): AppEnv {
             parseOptionalString(process.env.AI_PREMIUM_MODEL) ?? 'deepseek-reasoner',
         aiAuthoringLanguage: parseOptionalString(process.env.AI_AUTHORING_LANGUAGE) ?? 'English',
         aiAuthoringTone: parseOptionalString(process.env.AI_AUTHORING_TONE) ?? 'neutral',
+        aiAuthoringLearnerLevel:
+            parseOptionalString(process.env.AI_AUTHORING_LEARNER_LEVEL) ?? 'beginner',
+        aiAuthoringPreferences: parseOptionalString(process.env.AI_AUTHORING_PREFERENCES),
         mongoDbUri: parseOptionalString(process.env.MONGODB_URI),
         mongoDbName: parseOptionalString(process.env.MONGODB_DB_NAME) ?? 'didactio',
     }

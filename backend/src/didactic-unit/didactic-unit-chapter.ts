@@ -9,9 +9,7 @@ export interface DidacticUnitChapterPresentationSettings {
 export interface DidacticUnitGeneratedChapter {
     chapterIndex: number
     title: string
-    overview: string
-    content: string
-    keyTakeaways: string[]
+    markdown: string
     presentationSettings?: DidacticUnitChapterPresentationSettings
     generatedAt: string
     updatedAt?: string
@@ -38,9 +36,7 @@ export interface DidacticUnitChapterRevision {
 export interface UpdateDidacticUnitChapterInput {
     chapter: {
         title: string
-        overview: string
         content: string
-        keyTakeaways: string[]
         presentationSettings?: DidacticUnitChapterPresentationSettings
     }
 }
@@ -74,16 +70,6 @@ function parseNonEmptyString(value: unknown, fieldName: string): string {
     }
 
     return parsedValue
-}
-
-function parseStringArray(value: unknown, fieldName: string): string[] {
-    if (!Array.isArray(value) || value.length === 0) {
-        throw new Error(`${fieldName} must be a non-empty array.`)
-    }
-
-    return value.map((item, index) =>
-        parseNonEmptyString(item, `${fieldName}[${index}]`)
-    )
 }
 
 function parsePresentationSettings(
@@ -148,20 +134,13 @@ export function parseUpdateDidacticUnitChapterInput(
 
     const chapterPayload = payload.chapter as {
         title?: unknown
-        overview?: unknown
         content?: unknown
-        keyTakeaways?: unknown
     }
 
     return {
         chapter: {
             title: parseNonEmptyString(chapterPayload.title, 'chapter.title'),
-            overview: parseNonEmptyString(chapterPayload.overview, 'chapter.overview'),
             content: parseNonEmptyString(chapterPayload.content, 'chapter.content'),
-            keyTakeaways: parseStringArray(
-                chapterPayload.keyTakeaways,
-                'chapter.keyTakeaways'
-            ),
             presentationSettings: parsePresentationSettings(
                 (chapterPayload as { presentationSettings?: unknown }).presentationSettings,
                 'chapter.presentationSettings'
@@ -181,7 +160,6 @@ export function createDidacticUnitChapterRevision(input: {
         source: input.source,
         chapter: {
             ...input.chapter,
-            keyTakeaways: [...input.chapter.keyTakeaways],
             presentationSettings: resolveDidacticUnitChapterPresentationSettings(
                 input.chapter.presentationSettings
             ),

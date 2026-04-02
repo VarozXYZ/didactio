@@ -46,10 +46,6 @@ async function createApprovedDidacticUnit(app: ReturnType<typeof createTestApp>)
 
     await advanceToQuestionnaireAnswered(app, created.id)
 
-    await request(app)
-        .post(`/api/didactic-unit/${created.id}/syllabus-prompt/generate`)
-        .send({})
-
     const syllabusResponse = await request(app)
         .post(`/api/didactic-unit/${created.id}/syllabus/generate`)
         .send({ tier: 'cheap' })
@@ -118,17 +114,6 @@ describe('didactic-unit lifecycle', () => {
 
         await advanceToQuestionnaireAnswered(app, created.id)
 
-        const syllabusPromptResponse = await request(app)
-            .post(`/api/didactic-unit/${created.id}/syllabus-prompt/generate`)
-            .send({})
-
-        expect(syllabusPromptResponse.status).toBe(200)
-        expect(syllabusPromptResponse.body).toMatchObject({
-            status: 'syllabus_prompt_ready',
-            nextAction: 'review_syllabus_prompt',
-        })
-        expect(typeof syllabusPromptResponse.body.syllabusPrompt).toBe('string')
-
         const syllabusResponse = await request(app)
             .post(`/api/didactic-unit/${created.id}/syllabus/generate`)
             .send({ tier: 'cheap' })
@@ -183,17 +168,6 @@ describe('didactic-unit lifecycle', () => {
             nextAction: 'generate_syllabus_prompt',
             questionnaireEnabled: false,
         })
-
-        const syllabusPromptResponse = await request(app)
-            .post(`/api/didactic-unit/${createdResponse.body.id}/syllabus-prompt/generate`)
-            .send({})
-
-        expect(syllabusPromptResponse.status).toBe(200)
-        expect(syllabusPromptResponse.body).toMatchObject({
-            status: 'syllabus_prompt_ready',
-            nextAction: 'review_syllabus_prompt',
-            questionnaireEnabled: false,
-        })
     })
 
     it('generates, reads, completes, and tracks a chapter on the same didactic unit', async () => {
@@ -217,6 +191,7 @@ describe('didactic-unit lifecycle', () => {
         expect(chapterResponse.status).toBe(200)
         expect(chapterResponse.body).toMatchObject({
             chapterIndex: 0,
+            planningOverview: expect.any(String),
             state: 'ready',
             isCompleted: false,
             presentationSettings: {
@@ -232,9 +207,7 @@ describe('didactic-unit lifecycle', () => {
             .send({
                 chapter: {
                     title: chapterResponse.body.title,
-                    overview: chapterResponse.body.overview,
                     content: chapterResponse.body.content,
-                    keyTakeaways: chapterResponse.body.keyTakeaways,
                     presentationSettings: {
                         paragraphFontFamily: 'serif',
                         paragraphFontSize: '18px',

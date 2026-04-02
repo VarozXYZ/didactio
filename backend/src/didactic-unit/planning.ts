@@ -1,6 +1,7 @@
 export type DidacticUnitProvider = string
 export type DidacticUnitDepth = 'basic' | 'intermediate' | 'technical'
 export type DidacticUnitLength = 'intro' | 'short' | 'long' | 'textbook'
+export type DidacticUnitLevel = 'beginner' | 'intermediate' | 'advanced'
 
 export type DidacticUnitNextAction =
     | 'moderate_topic'
@@ -18,6 +19,7 @@ export interface CreateDidacticUnitInput {
     additionalContext?: string
     depth: DidacticUnitDepth
     length: DidacticUnitLength
+    level: DidacticUnitLevel
     questionnaireEnabled: boolean
 }
 
@@ -48,17 +50,16 @@ export interface DidacticUnitQuestionnaire {
     questions: DidacticUnitQuestion[]
 }
 
+export interface DidacticUnitSyllabusLesson {
+    title: string
+    contentOutline: string[]
+}
+
 export interface DidacticUnitSyllabusChapter {
     title: string
     overview: string
     keyPoints: string[]
-    estimatedDurationMinutes: number
     lessons: DidacticUnitSyllabusLesson[]
-}
-
-export interface DidacticUnitSyllabusLesson {
-    title: string
-    contentOutline: string[]
 }
 
 export interface DidacticUnitSyllabus {
@@ -66,8 +67,26 @@ export interface DidacticUnitSyllabus {
     overview: string
     learningGoals: string[]
     keywords: string[]
-    estimatedDurationMinutes: number
     chapters: DidacticUnitSyllabusChapter[]
+}
+
+export interface DidacticUnitModuleLesson {
+    title: string
+    contentOutline: string[]
+}
+
+export interface DidacticUnitModule {
+    title: string
+    overview: string
+    lessons: DidacticUnitModuleLesson[]
+}
+
+export interface DidacticUnitReferenceSyllabus {
+    topic: string
+    title: string
+    keywords: string
+    description: string
+    modules: DidacticUnitModule[]
 }
 
 export interface UpdateDidacticUnitSyllabusInput {
@@ -110,6 +129,87 @@ function parseEnumValue<T extends string>(
     return normalized as T
 }
 
+export function normalizeKeywordList(value: string): string[] {
+    return value
+        .split(/[,\n;]/)
+        .map((keyword) => keyword.trim())
+        .filter(Boolean)
+}
+
+function uniqueNonEmpty(values: string[]): string[] {
+    return [...new Set(values.map((value) => value.trim()).filter(Boolean))]
+}
+
+function deriveLearningGoals(syllabus: DidacticUnitReferenceSyllabus): string[] {
+    const outlineItems = uniqueNonEmpty(
+        syllabus.modules.flatMap((module) =>
+            module.lessons.flatMap((lesson) => lesson.contentOutline)
+        )
+    )
+
+    if (outlineItems.length >= 3) {
+        return outlineItems.slice(0, 3)
+    }
+
+    const moduleGoals = uniqueNonEmpty(
+        syllabus.modules.map((module) => `Understand ${module.title}`)
+    )
+
+    return moduleGoals.slice(0, 3)
+}
+
+function deriveModuleKeyPoints(module: DidacticUnitModule): string[] {
+    const keyPoints = uniqueNonEmpty(
+        module.lessons.flatMap((lesson) => lesson.contentOutline)
+    )
+
+    if (keyPoints.length >= 3) {
+        return keyPoints.slice(0, 3)
+    }
+
+    return uniqueNonEmpty(module.lessons.map((lesson) => lesson.title)).slice(0, 3)
+}
+
+export function adaptReferenceSyllabusToDidacticUnitSyllabus(
+    syllabus: DidacticUnitReferenceSyllabus
+): DidacticUnitSyllabus {
+    return {
+        title: syllabus.title,
+        overview: syllabus.description,
+        learningGoals: deriveLearningGoals(syllabus),
+        keywords: normalizeKeywordList(syllabus.keywords),
+        chapters: syllabus.modules.map((module) => ({
+            title: module.title,
+            overview: module.overview,
+            keyPoints: deriveModuleKeyPoints(module),
+            lessons: module.lessons.map((lesson) => ({
+                title: lesson.title,
+                contentOutline: [...lesson.contentOutline],
+            })),
+        })),
+    }
+}
+
+export function adaptDidacticUnitSyllabusToReferenceSyllabus(input: {
+    topic: string
+    syllabus: DidacticUnitSyllabus
+}): DidacticUnitReferenceSyllabus {
+    return {
+        topic: input.topic,
+        title: input.syllabus.title,
+        keywords: input.syllabus.keywords.join(', '),
+        description: input.syllabus.overview,
+        modules: input.syllabus.chapters.map((chapter) => ({
+            title: chapter.title,
+            overview: chapter.overview,
+            lessons: chapter.lessons.map((lesson) => ({
+                title: lesson.title,
+                contentOutline: [...lesson.contentOutline],
+            })),
+        })),
+    }
+}
+
 export function parseCreateDidacticUnitInput(body: unknown): CreateDidacticUnitInput {
     if (!body || typeof body !== 'object') {
         throw new Error('Request body must be a JSON object.')
@@ -121,6 +221,7 @@ export function parseCreateDidacticUnitInput(body: unknown): CreateDidacticUnitI
         additionalContext?: unknown
         depth?: unknown
         length?: unknown
+        level?: unknown
         questionnaireEnabled?: unknown
     }
     const topic = typeof payload.topic === 'string' ? payload.topic.trim() : ''
@@ -151,6 +252,12 @@ export function parseCreateDidacticUnitInput(body: unknown): CreateDidacticUnitI
             'length',
             ['intro', 'short', 'long', 'textbook'],
             'short'
+        ),
+        level: parseEnumValue(
+            payload.level,
+            'level',
+            ['beginner', 'intermediate', 'advanced'],
+            'beginner'
         ),
         questionnaireEnabled:
             payload.questionnaireEnabled === undefined
@@ -237,7 +344,6 @@ function parseChapter(value: unknown, index: number): DidacticUnitSyllabusChapte
         title?: unknown
         overview?: unknown
         keyPoints?: unknown
-        estimatedDurationMinutes?: unknown
         lessons?: unknown
     }
 
@@ -251,20 +357,8 @@ function parseChapter(value: unknown, index: number): DidacticUnitSyllabusChapte
             payload.keyPoints,
             `syllabus.chapters[${index}].keyPoints`
         ),
-        estimatedDurationMinutes: parsePositiveNumber(
-            payload.estimatedDurationMinutes,
-            `syllabus.chapters[${index}].estimatedDurationMinutes`
-        ),
         lessons: parseLessons(payload.lessons, `syllabus.chapters[${index}].lessons`),
     }
-}
-
-function parsePositiveNumber(value: unknown, fieldName: string): number {
-    if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
-        throw new Error(`${fieldName} must be a positive number.`)
-    }
-
-    return Math.round(value)
 }
 
 function parseLesson(value: unknown, fieldName: string): DidacticUnitSyllabusLesson {
@@ -312,7 +406,6 @@ export function parseUpdateDidacticUnitSyllabusInput(
         overview?: unknown
         learningGoals?: unknown
         keywords?: unknown
-        estimatedDurationMinutes?: unknown
         chapters?: unknown
     }
 
@@ -329,10 +422,6 @@ export function parseUpdateDidacticUnitSyllabusInput(
                 'syllabus.learningGoals'
             ),
             keywords: parseStringArray(syllabusPayload.keywords, 'syllabus.keywords'),
-            estimatedDurationMinutes: parsePositiveNumber(
-                syllabusPayload.estimatedDurationMinutes,
-                'syllabus.estimatedDurationMinutes'
-            ),
             chapters: syllabusPayload.chapters.map((chapter, index) =>
                 parseChapter(chapter, index)
             ),

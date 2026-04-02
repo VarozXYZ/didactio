@@ -2,6 +2,7 @@ import { getAppEnv } from '../config/env.js'
 
 export type AiModelTier = 'cheap' | 'premium'
 export type AuthoringTone = 'friendly' | 'neutral' | 'professional'
+export type AuthoringLearnerLevel = 'beginner' | 'intermediate' | 'advanced'
 
 export interface AiModelConfig {
     provider: string
@@ -11,6 +12,8 @@ export interface AiModelConfig {
 export interface AuthoringConfig {
     language: string
     tone: AuthoringTone
+    learnerLevel: AuthoringLearnerLevel
+    preferences?: string
 }
 
 export interface AiConfig {
@@ -28,6 +31,11 @@ export type PartialAiConfig = Partial<{
 export class AiConfigValidationError extends Error {}
 
 const AUTHORING_TONES: AuthoringTone[] = ['friendly', 'neutral', 'professional']
+const AUTHORING_LEARNER_LEVELS: AuthoringLearnerLevel[] = [
+    'beginner',
+    'intermediate',
+    'advanced',
+]
 const MODEL_TIERS: AiModelTier[] = ['cheap', 'premium']
 
 function normalizeNonEmptyString(value: unknown, fieldName: string): string {
@@ -78,6 +86,10 @@ export function normalizeAuthoringConfig(
     config: Partial<AuthoringConfig> | undefined,
     fallback?: AuthoringConfig
 ): AuthoringConfig {
+    const preferencesSource = config?.preferences ?? fallback?.preferences
+    const normalizedPreferences =
+        typeof preferencesSource === 'string' ? preferencesSource.trim() : ''
+
     return {
         language: normalizeNonEmptyString(
             config?.language ?? fallback?.language,
@@ -89,6 +101,13 @@ export function normalizeAuthoringConfig(
             AUTHORING_TONES,
             fallback?.tone
         ),
+        learnerLevel: normalizeEnumValue(
+            config?.learnerLevel,
+            'authoring.learnerLevel',
+            AUTHORING_LEARNER_LEVELS,
+            fallback?.learnerLevel
+        ),
+        preferences: normalizedPreferences || undefined,
     }
 }
 
@@ -112,6 +131,13 @@ export function getDefaultAiConfig(): AiConfig {
                 AUTHORING_TONES,
                 'neutral'
             ),
+            learnerLevel: normalizeEnumValue(
+                env.aiAuthoringLearnerLevel,
+                'authoring.learnerLevel',
+                AUTHORING_LEARNER_LEVELS,
+                'beginner'
+            ),
+            preferences: env.aiAuthoringPreferences ?? undefined,
         },
     }
 }
@@ -200,6 +226,24 @@ export function parseAiConfigPatch(body: unknown): PartialAiConfig {
                 rawConfig.tone === undefined
                     ? undefined
                     : normalizeEnumValue(rawConfig.tone, 'authoring.tone', AUTHORING_TONES),
+            learnerLevel:
+                rawConfig.learnerLevel === undefined
+                    ? undefined
+                    : normalizeEnumValue(
+                          rawConfig.learnerLevel,
+                          'authoring.learnerLevel',
+                          AUTHORING_LEARNER_LEVELS
+                      ),
+            preferences:
+                rawConfig.preferences === undefined
+                    ? undefined
+                    : typeof rawConfig.preferences === 'string'
+                      ? rawConfig.preferences.trim()
+                      : (() => {
+                            throw new AiConfigValidationError(
+                                'authoring.preferences must be a string.'
+                            )
+                        })(),
         }
     }
 

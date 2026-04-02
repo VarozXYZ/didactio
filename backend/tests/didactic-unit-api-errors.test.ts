@@ -41,13 +41,11 @@ describe('didactic-unit API errors', () => {
                     overview: 'This update should be rejected.',
                     learningGoals: ['One goal'],
                     keywords: ['one'],
-                    estimatedDurationMinutes: 60,
                     chapters: [
                         {
                             title: 'Chapter',
                             overview: 'Overview',
                             keyPoints: ['Point'],
-                            estimatedDurationMinutes: 60,
                             lessons: [
                                 {
                                     title: 'Lesson',

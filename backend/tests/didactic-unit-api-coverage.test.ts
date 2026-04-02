@@ -45,13 +45,11 @@ describe('didactic-unit API coverage', () => {
                 'Choose appropriate implementation tradeoffs',
             ],
             keywords: ['framework architecture', 'delivery', 'production'],
-            estimatedDurationMinutes: 180,
             chapters: [
                 {
                     title: 'Runtime Fundamentals',
                     overview: 'Review the core runtime model and framework primitives.',
                     keyPoints: ['Routing model', 'Rendering modes', 'Server and client boundaries'],
-                    estimatedDurationMinutes: 90,
                     lessons: [
                         {
                             title: 'Core Runtime',
@@ -67,7 +65,6 @@ describe('didactic-unit API coverage', () => {
                     title: 'Delivery Workflow',
                     overview: 'Move from local development to production delivery.',
                     keyPoints: ['Project structure', 'Deployment pipeline', 'Operational checks'],
-                    estimatedDurationMinutes: 90,
                     lessons: [
                         {
                             title: 'Project Structure',

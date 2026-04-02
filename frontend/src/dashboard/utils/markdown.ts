@@ -151,48 +151,247 @@ function repairAiMarkdown(markdown: string): string {
         .trim()
 }
 
+function collapseWhitespace(value: string): string {
+    return value.replace(/\s+/g, ' ').trim()
+}
+
+function escapeMarkdownText(value: string): string {
+    return value
+        .replace(/\\/g, '\\\\')
+        .replace(/\|/g, '\\|')
+}
+
+function escapeInlineCode(value: string): string {
+    return value.replace(/`/g, '\\`')
+}
+
+function serializeInlineNode(node: ChildNode): string {
+    if (node.nodeType === Node.TEXT_NODE) {
+        return node.textContent ?? ''
+    }
+
+    if (!(node instanceof HTMLElement)) {
+        return ''
+    }
+
+    const content = serializeInlineChildren(node)
+
+    switch (node.tagName) {
+        case 'STRONG':
+        case 'B':
+            return content ? `**${content}**` : ''
+        case 'EM':
+        case 'I':
+            return content ? `*${content}*` : ''
+        case 'CODE':
+            return node.closest('pre')
+                ? node.textContent ?? ''
+                : `\`${escapeInlineCode(content)}\``
+        case 'A': {
+            const href = node.getAttribute('href')
+            if (!href) {
+                return content
+            }
+
+            return `[${content || href}](${href})`
+        }
+        case 'BR':
+            return '\n'
+        default:
+            return content
+    }
+}
+
+function serializeInlineChildren(element: ParentNode): string {
+    return Array.from(element.childNodes)
+        .map((child) => serializeInlineNode(child))
+        .join('')
+        .replace(/[ \t]+\n/g, '\n')
+        .replace(/\n[ \t]+/g, '\n')
+}
+
+function serializeListElement(
+    element: HTMLElement,
+    depth = 0
+): string {
+    const isOrdered = element.tagName === 'OL'
+    const items = Array.from(element.children).filter(
+        (child): child is HTMLLIElement => child instanceof HTMLLIElement
+    )
+
+    return items
+        .map((item, index) => {
+            const prefix = isOrdered ? `${index + 1}. ` : '- '
+            const indent = '  '.repeat(depth)
+            const inlineParts: string[] = []
+            const nestedBlocks: string[] = []
+
+            Array.from(item.childNodes).forEach((child) => {
+                if (
+                    child instanceof HTMLElement &&
+                    (child.tagName === 'UL' || child.tagName === 'OL')
+                ) {
+                    nestedBlocks.push(serializeListElement(child, depth + 1))
+                    return
+                }
+
+                inlineParts.push(serializeInlineNode(child))
+            })
+
+            const line = `${indent}${prefix}${collapseWhitespace(inlineParts.join(''))}`
+            return [line, ...nestedBlocks.filter(Boolean)].filter(Boolean).join('\n')
+        })
+        .filter(Boolean)
+        .join('\n')
+}
+
+function serializeTableElement(table: HTMLTableElement): string {
+    const rows = Array.from(table.rows)
+    if (rows.length === 0) {
+        return ''
+    }
+
+    const serializeRow = (row: HTMLTableRowElement) =>
+        Array.from(row.cells).map((cell) =>
+            escapeMarkdownText(collapseWhitespace(serializeInlineChildren(cell)))
+        )
+
+    const headerCells = serializeRow(rows[0])
+    if (headerCells.length === 0) {
+        return ''
+    }
+
+    const separatorCells = headerCells.map((cell) => '-'.repeat(Math.max(3, cell.length || 3)))
+
+    return [
+        `| ${headerCells.join(' | ')} |`,
+        `| ${separatorCells.join(' | ')} |`,
+        ...rows.slice(1).map((row) => `| ${serializeRow(row).join(' | ')} |`),
+    ].join('\n')
+}
+
+function serializeBlockElement(element: HTMLElement): string {
+    switch (element.tagName) {
+        case 'H1':
+            return collapseWhitespace(`# ${serializeInlineChildren(element)}`)
+        case 'H2':
+            return collapseWhitespace(`## ${serializeInlineChildren(element)}`)
+        case 'H3':
+            return collapseWhitespace(`### ${serializeInlineChildren(element)}`)
+        case 'H4':
+            return collapseWhitespace(`#### ${serializeInlineChildren(element)}`)
+        case 'H5':
+            return collapseWhitespace(`##### ${serializeInlineChildren(element)}`)
+        case 'H6':
+            return collapseWhitespace(`###### ${serializeInlineChildren(element)}`)
+        case 'P':
+            return collapseWhitespace(serializeInlineChildren(element))
+        case 'UL':
+        case 'OL':
+            return serializeListElement(element)
+        case 'BLOCKQUOTE':
+            return serializeInlineChildren(element)
+                .split('\n')
+                .map((line) => `> ${collapseWhitespace(line)}`)
+                .join('\n')
+        case 'PRE':
+            return `\`\`\`\n${element.textContent?.trimEnd() ?? ''}\n\`\`\``
+        case 'TABLE':
+            return serializeTableElement(element as HTMLTableElement)
+        default: {
+            const nestedBlocks = Array.from(element.children)
+                .map((child) => serializeBlockElement(child as HTMLElement))
+                .filter(Boolean)
+
+            if (nestedBlocks.length > 0) {
+                return nestedBlocks.join('\n\n')
+            }
+
+            return collapseWhitespace(serializeInlineChildren(element))
+        }
+    }
+}
+
 function htmlToMarkdown(value: string): string {
     const parser = new DOMParser()
     const document = parser.parseFromString(value, 'text/html')
     const blocks = Array.from(document.body.children)
 
     if (blocks.length === 0) {
-        return document.body.textContent?.trim() ?? ''
+        return collapseWhitespace(document.body.textContent ?? '')
     }
 
     return blocks
-        .map((element) => {
-            const text = element.textContent?.trim() ?? ''
-
-            switch (element.tagName) {
-                case 'H1':
-                    return text ? `# ${text}` : ''
-                case 'H2':
-                    return text ? `## ${text}` : ''
-                case 'H3':
-                    return text ? `### ${text}` : ''
-                case 'LI':
-                    return text ? `- ${text}` : ''
-                case 'UL':
-                case 'OL':
-                    return Array.from(element.children)
-                        .map((child) => {
-                            const childText = child.textContent?.trim() ?? ''
-                            return childText ? `- ${childText}` : ''
-                        })
-                        .filter(Boolean)
-                        .join('\n')
-                default:
-                    return text
-            }
-        })
+        .map((element) => serializeBlockElement(element as HTMLElement))
         .filter(Boolean)
         .join('\n\n')
+        .replace(/\n{3,}/g, '\n\n')
         .trim()
 }
 
+type TableCellNode = {
+    children?: RootContent[]
+}
+
+type TableRowNode = {
+    children?: TableCellNode[]
+}
+
+type TableNode = RootContent & {
+    type: 'table'
+    children?: TableRowNode[]
+}
+
+function isTableNode(node: RootContent): node is TableNode {
+    return node.type === 'table'
+}
+
+function escapeTableCell(value: string): string {
+    return value.replace(/\|/g, '\\|')
+}
+
+function serializeTableNode(node: TableNode): string {
+    const rows = node.children ?? []
+
+    if (rows.length === 0) {
+        return ''
+    }
+
+    const serializeRow = (row: TableRowNode) =>
+        (row.children ?? []).map((cell) =>
+            escapeTableCell(
+                toString({
+                    type: 'root',
+                    children: cell.children ?? [],
+                }).replace(/\s+/g, ' ').trim()
+            )
+        )
+
+    const headerCells = serializeRow(rows[0])
+    if (headerCells.length === 0) {
+        return ''
+    }
+
+    const separatorCells = headerCells.map((cell) => '-'.repeat(Math.max(3, cell.length)))
+    const markdownRows = [
+        `| ${headerCells.join(' | ')} |`,
+        `| ${separatorCells.join(' | ')} |`,
+        ...rows.slice(1).map((row) => `| ${serializeRow(row).join(' | ')} |`),
+    ]
+
+    return markdownRows.join('\n').trim()
+}
+
 function normalizeTopLevelMarkdown(node: RootContent): string {
-    return toMarkdown(node).trim()
+    if (isTableNode(node)) {
+        return serializeTableNode(node)
+    }
+
+    try {
+        return toMarkdown(node).trim()
+    } catch {
+        return toString(node).replace(/\s+/g, ' ').trim()
+    }
 }
 
 export function normalizeStoredMarkdown(value: string | null | undefined): string {
@@ -277,40 +476,12 @@ export function normalizeMarkdownForStorage(markdown: string): string {
     return markdown.replace(/\u00a0/g, ' ').trim()
 }
 
-export function keyTakeawaysToMarkdown(items: string[]): string {
-    return items.map((item) => `- ${item}`).join('\n')
+export function markdownToDom(markdown: string): Document {
+    const parser = new DOMParser()
+    return parser.parseFromString(markdownToHtml(markdown), 'text/html')
 }
 
-export function markdownToKeyTakeaways(markdown: string): string[] {
-    const normalizedMarkdown = normalizeStoredMarkdown(markdown)
-
-    if (!normalizedMarkdown) {
-        return []
-    }
-
-    const tree = markdownParser.parse(normalizedMarkdown)
-    const takeaways: string[] = []
-
-    tree.children.forEach((node) => {
-        if (node.type === 'list') {
-            node.children.forEach((item) => {
-                const text = toString(item).replace(/\s+/g, ' ').trim()
-                if (text) {
-                    takeaways.push(text)
-                }
-            })
-            return
-        }
-
-        if (node.type === 'paragraph') {
-            const lines = normalizeTopLevelMarkdown(node)
-                .split('\n')
-                .map((line) => line.replace(/^[-*+]\s+/, '').trim())
-                .filter(Boolean)
-
-            takeaways.push(...lines)
-        }
-    })
-
-    return takeaways
+export function htmlToStoredMarkdown(html: string): string {
+    return repairAiMarkdown(htmlToMarkdown(html))
 }
+

@@ -33,26 +33,16 @@ export const syllabusLessonSchema = z.object({
     contentOutline: z.array(z.string().min(1)).min(1),
 })
 
-export const syllabusChapterSchema = z.object({
+export const syllabusModuleSchema = z.object({
     title: z.string().min(1),
     overview: z.string().min(1),
-    keyPoints: z.array(z.string().min(1)).min(1),
-    estimatedDurationMinutes: z.number().int().positive(),
     lessons: z.array(syllabusLessonSchema).min(1),
 })
 
 export const syllabusSchema = z.object({
+    topic: z.string().min(1),
     title: z.string().min(1),
-    overview: z.string().min(1),
-    learningGoals: z.array(z.string().min(1)).min(1),
-    keywords: z.array(z.string().min(1)).min(1),
-    estimatedDurationMinutes: z.number().int().positive(),
-    chapters: z.array(syllabusChapterSchema).min(1),
-})
-
-export const chapterSchema = z.object({
-    title: z.string().min(1),
-    overview: z.string().min(1),
-    content: z.string().min(1),
-    keyTakeaways: z.array(z.string().min(1)).min(1),
+    keywords: z.string().min(1),
+    description: z.string().min(1),
+    modules: z.array(syllabusModuleSchema).min(1),
 })

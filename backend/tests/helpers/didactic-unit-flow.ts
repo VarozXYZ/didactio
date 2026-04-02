@@ -56,12 +56,6 @@ export async function createSyllabusReadyDidacticUnit(app: TestApp) {
 
     await advanceToQuestionnaireAnswered(app, created.id)
 
-    const syllabusPromptResponse = await request(app)
-        .post(`/api/didactic-unit/${created.id}/syllabus-prompt/generate`)
-        .send({})
-
-    expect(syllabusPromptResponse.status).toBe(200)
-
     const syllabusResponse = await request(app)
         .post(`/api/didactic-unit/${created.id}/syllabus/generate`)
         .send({ tier: 'cheap' })
@@ -81,12 +75,6 @@ export async function createSyllabusReadyDidacticUnitWithProvider(
     const created = await createDidacticUnit(app, input)
 
     await advanceToQuestionnaireAnswered(app, created.id)
-
-    const syllabusPromptResponse = await request(app)
-        .post(`/api/didactic-unit/${created.id}/syllabus-prompt/generate`)
-        .send({})
-
-    expect(syllabusPromptResponse.status).toBe(200)
 
     const syllabusResponse = await request(app)
         .post(`/api/didactic-unit/${created.id}/syllabus/generate`)

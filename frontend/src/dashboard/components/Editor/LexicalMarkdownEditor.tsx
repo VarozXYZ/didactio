@@ -2,15 +2,18 @@ import { useEffect, useRef } from 'react'
 import {
     $createParagraphNode,
     $createTextNode,
+    $isDecoratorNode,
+    $isElementNode,
+    $isTextNode,
     $getRoot,
+    type LexicalNode,
     type LexicalEditor,
     SELECTION_CHANGE_COMMAND,
 } from 'lexical'
+import { $generateHtmlFromNodes, $generateNodesFromDOM } from '@lexical/html'
 import { CodeNode } from '@lexical/code'
 import { LinkNode } from '@lexical/link'
 import {
-    $convertFromMarkdownString,
-    $convertToMarkdownString,
     TRANSFORMERS,
 } from '@lexical/markdown'
 import { ListItemNode, ListNode } from '@lexical/list'
@@ -18,14 +21,20 @@ import { LexicalComposer } from '@lexical/react/LexicalComposer'
 import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary'
 import { ContentEditable } from '@lexical/react/LexicalContentEditable'
 import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin'
+import { HorizontalRuleNode } from '@lexical/react/LexicalHorizontalRuleNode'
 import { LinkPlugin } from '@lexical/react/LexicalLinkPlugin'
 import { ListPlugin } from '@lexical/react/LexicalListPlugin'
 import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { MarkdownShortcutPlugin } from '@lexical/react/LexicalMarkdownShortcutPlugin'
-import { OnChangePlugin } from '@lexical/react/LexicalOnChangePlugin'
+import { TablePlugin } from '@lexical/react/LexicalTablePlugin'
 import { HeadingNode, QuoteNode } from '@lexical/rich-text'
-import { normalizeMarkdownForStorage } from '../../utils/markdown'
+import { TableCellNode, TableNode, TableRowNode } from '@lexical/table'
+import {
+    htmlToStoredMarkdown,
+    markdownToDom,
+    normalizeMarkdownForStorage,
+} from '../../utils/markdown'
 import type { ChapterPresentationSettings } from '../../types'
 
 type LexicalMarkdownEditorProps = {
@@ -57,6 +66,12 @@ const lexicalTheme = {
     },
     paragraph: 'mb-4 leading-[1.9] text-[#1D1D1F]',
     quote: 'my-4 border-l-4 border-[#E5E5E7] pl-4 italic text-[#5A5A60]',
+    hr: 'lexical-horizontal-rule',
+    table: 'lexical-table',
+    tableScrollableWrapper: 'lexical-table-scrollable-wrapper',
+    tableCell: 'lexical-table-cell',
+    tableCellHeader: 'lexical-table-cell-header',
+    tableRow: 'lexical-table-row',
     text: {
         bold: 'font-semibold',
         italic: 'italic',
@@ -65,32 +80,118 @@ const lexicalTheme = {
     },
 }
 
-function MarkdownInitializer({ initialMarkdown }: { initialMarkdown: string }) {
-    const [editor] = useLexicalComposerContext()
-    const hasInitializedRef = useRef(false)
+function appendRootSafeNodes(root: ReturnType<typeof $getRoot>, nodes: LexicalNode[]): boolean {
+    const rootSafeNodes: LexicalNode[] = []
+    let inlineBuffer: LexicalNode[] = []
 
-    useEffect(() => {
-        if (hasInitializedRef.current) {
+    const flushInlineBuffer = () => {
+        if (inlineBuffer.length === 0) {
             return
         }
 
-        editor.update(() => {
-            const root = $getRoot()
-            root.clear()
+        const paragraph = $createParagraphNode()
+        paragraph.append(...inlineBuffer)
+        rootSafeNodes.push(paragraph)
+        inlineBuffer = []
+    }
 
-            const normalizedMarkdown = normalizeMarkdownForStorage(initialMarkdown)
+    nodes.forEach((node) => {
+        if ($isTextNode(node) && node.getTextContent().trim().length === 0) {
+            return
+        }
 
-            if (normalizedMarkdown) {
-                $convertFromMarkdownString(normalizedMarkdown, TRANSFORMERS)
-            } else {
-                const paragraph = $createParagraphNode()
-                paragraph.append($createTextNode(''))
-                root.append(paragraph)
+        if ($isElementNode(node) || $isDecoratorNode(node)) {
+            flushInlineBuffer()
+            rootSafeNodes.push(node)
+            return
+        }
+
+        inlineBuffer.push(node)
+    })
+
+    flushInlineBuffer()
+
+    if (rootSafeNodes.length === 0) {
+        return false
+    }
+
+    root.append(...rootSafeNodes)
+    return true
+}
+
+function applyMarkdownToEditor(editor: LexicalEditor, markdown: string) {
+    editor.update(() => {
+        const root = $getRoot()
+        root.clear()
+
+        const normalizedMarkdown = normalizeMarkdownForStorage(markdown)
+
+        if (normalizedMarkdown) {
+            const document = markdownToDom(normalizedMarkdown)
+            const nodes = $generateNodesFromDOM(editor, document)
+
+            if (nodes.length > 0 && appendRootSafeNodes(root, nodes)) {
+                return
             }
-        })
+
+            const paragraph = $createParagraphNode()
+            paragraph.append($createTextNode(normalizedMarkdown))
+            root.append(paragraph)
+            return
+        }
+
+        const paragraph = $createParagraphNode()
+        paragraph.append($createTextNode(''))
+        root.append(paragraph)
+    })
+}
+
+function MarkdownInitializer({
+    editable,
+    initialMarkdown,
+}: {
+    editable: boolean
+    initialMarkdown: string
+}) {
+    const [editor] = useLexicalComposerContext()
+    const hasInitializedRef = useRef(false)
+    const lastAppliedMarkdownRef = useRef<string | null>(null)
+
+    useEffect(() => {
+        const normalizedMarkdown = normalizeMarkdownForStorage(initialMarkdown)
+
+        if (editable && hasInitializedRef.current) {
+            return
+        }
+
+        if (!editable && lastAppliedMarkdownRef.current === normalizedMarkdown) {
+            return
+        }
+
+        applyMarkdownToEditor(editor, normalizedMarkdown)
 
         hasInitializedRef.current = true
-    }, [editor, initialMarkdown])
+        lastAppliedMarkdownRef.current = normalizedMarkdown
+    }, [editable, editor, initialMarkdown])
+
+    return null
+}
+
+function MarkdownSyncPlugin({ onMarkdownChange }: { onMarkdownChange: (markdown: string) => void }) {
+    const [editor] = useLexicalComposerContext()
+
+    useEffect(() => {
+        return editor.registerUpdateListener(({ editorState, dirtyElements, dirtyLeaves }) => {
+            if (dirtyElements.size === 0 && dirtyLeaves.size === 0) {
+                return
+            }
+
+            editorState.read(() => {
+                const html = $generateHtmlFromNodes(editor)
+                onMarkdownChange(normalizeMarkdownForStorage(htmlToStoredMarkdown(html)))
+            })
+        })
+    }, [editor, onMarkdownChange])
 
     return null
 }
@@ -166,6 +267,10 @@ export function LexicalMarkdownEditor({
                     ListItemNode,
                     LinkNode,
                     CodeNode,
+                    HorizontalRuleNode,
+                    TableNode,
+                    TableRowNode,
+                    TableCellNode,
                 ],
                 onError: (error) => {
                     throw error
@@ -173,7 +278,7 @@ export function LexicalMarkdownEditor({
                 theme: lexicalTheme,
             }}
         >
-            <MarkdownInitializer initialMarkdown={initialMarkdown} />
+            <MarkdownInitializer editable={editable} initialMarkdown={initialMarkdown} />
             <EditablePlugin editable={editable} />
             <FocusPlugin onFocusEditor={onFocusEditor} />
             <RichTextPlugin
@@ -201,18 +306,10 @@ export function LexicalMarkdownEditor({
             <HistoryPlugin />
             <ListPlugin />
             <LinkPlugin />
+            <TablePlugin hasHorizontalScroll />
             {editable && <MarkdownShortcutPlugin transformers={TRANSFORMERS} />}
             {onMarkdownChange && editable && (
-                <OnChangePlugin
-                    ignoreSelectionChange
-                    onChange={(editorState) => {
-                        editorState.read(() => {
-                            onMarkdownChange(
-                                normalizeMarkdownForStorage($convertToMarkdownString(TRANSFORMERS))
-                            )
-                        })
-                    }}
-                />
+                <MarkdownSyncPlugin onMarkdownChange={onMarkdownChange} />
             )}
         </LexicalComposer>
     )

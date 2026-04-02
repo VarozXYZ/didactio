@@ -42,6 +42,7 @@ import {
     updateDidacticUnitSyllabus,
 } from './didactic-unit/planning-lifecycle.js'
 import {
+    adaptDidacticUnitSyllabusToReferenceSyllabus,
     parseCreateDidacticUnitInput,
     parseQuestionnaireAnswersInput,
     parseUpdateDidacticUnitSyllabusInput,
@@ -178,7 +179,46 @@ function compareRunsByCreatedAtDesc(
 
 function buildDidacticUnitResponse(didacticUnit: DidacticUnit) {
     return {
-        ...didacticUnit,
+        id: didacticUnit.id,
+        ownerId: didacticUnit.ownerId,
+        topic: didacticUnit.topic,
+        title: didacticUnit.title,
+        provider: didacticUnit.provider,
+        status: didacticUnit.status,
+        nextAction: didacticUnit.nextAction,
+        createdAt: didacticUnit.createdAt,
+        updatedAt: didacticUnit.updatedAt,
+        moderatedAt: didacticUnit.moderatedAt,
+        questionnaireGeneratedAt: didacticUnit.questionnaireGeneratedAt,
+        questionnaireAnsweredAt: didacticUnit.questionnaireAnsweredAt,
+        improvedTopicBrief: didacticUnit.improvedTopicBrief,
+        reasoningNotes: didacticUnit.reasoningNotes,
+        additionalContext: didacticUnit.additionalContext,
+        depth: didacticUnit.depth,
+        length: didacticUnit.length,
+        level: didacticUnit.level,
+        generationTier: didacticUnit.generationTier,
+        questionnaireEnabled: didacticUnit.questionnaireEnabled,
+        questionnaire: didacticUnit.questionnaire,
+        questionnaireAnswers: didacticUnit.questionnaireAnswers,
+        syllabusPrompt: didacticUnit.syllabusPrompt,
+        syllabusPromptGeneratedAt: didacticUnit.syllabusPromptGeneratedAt,
+        syllabus: didacticUnit.syllabus,
+        syllabusGeneratedAt: didacticUnit.syllabusGeneratedAt,
+        syllabusUpdatedAt: didacticUnit.syllabusUpdatedAt,
+        syllabusApprovedAt: didacticUnit.syllabusApprovedAt,
+        overview: didacticUnit.overview,
+        learningGoals: didacticUnit.learningGoals,
+        keywords: didacticUnit.keywords,
+        chapters: didacticUnit.chapters.map((chapter) => ({
+            title: chapter.title,
+            overview: chapter.overview,
+            keyPoints: [...chapter.keyPoints],
+            lessons: chapter.lessons.map((lesson) => ({
+                title: lesson.title,
+                contentOutline: [...lesson.contentOutline],
+            })),
+        })),
         studyProgress: summarizeDidacticUnitStudyProgress(didacticUnit),
     }
 }
@@ -315,7 +355,7 @@ async function recordFailedChapterRun(
 ): Promise<void> {
     const promptSource = createChapterGenerationSourceFromDidacticUnit(didacticUnit)
 
-    if (!promptSource.syllabus?.chapters?.[chapterIndex]) {
+    if (!promptSource.syllabus?.modules?.[chapterIndex]) {
         return
     }
 
@@ -448,6 +488,7 @@ export function createApp(options: CreateAppOptions) {
             const config = await aiConfigStore.get(requestWithMockOwner.mockOwner.id)
             const moderation = await aiService.moderateTopic({
                 topic: didacticUnit.topic,
+                level: didacticUnit.level,
                 config,
                 tier: 'cheap',
                 abortSignal: createAbortSignal(request),
@@ -503,6 +544,7 @@ export function createApp(options: CreateAppOptions) {
             const moderation = await aiService.streamModeration(
                 {
                     topic: didacticUnit.topic,
+                    level: didacticUnit.level,
                     config,
                     tier: 'cheap',
                     abortSignal: createAbortSignal(request),
@@ -584,6 +626,7 @@ export function createApp(options: CreateAppOptions) {
             const config = await aiConfigStore.get(requestWithMockOwner.mockOwner.id)
             const result = await aiService.generateQuestionnaire({
                 topic: didacticUnit.topic,
+                level: didacticUnit.level,
                 improvedTopicBrief: didacticUnit.improvedTopicBrief,
                 config,
                 tier,
@@ -639,6 +682,7 @@ export function createApp(options: CreateAppOptions) {
             const result = await aiService.streamQuestionnaire(
                 {
                     topic: didacticUnit.topic,
+                    level: didacticUnit.level,
                     improvedTopicBrief: didacticUnit.improvedTopicBrief,
                     config,
                     tier,
@@ -804,6 +848,7 @@ export function createApp(options: CreateAppOptions) {
             )
             const result = await aiService.generateSyllabus({
                 topic: preparedDidacticUnit.topic,
+                level: preparedDidacticUnit.level,
                 improvedTopicBrief: preparedDidacticUnit.improvedTopicBrief,
                 syllabusPrompt: preparedDidacticUnit.syllabusPrompt ?? '',
                 questionnaireAnswers: preparedDidacticUnit.questionnaireAnswers,
@@ -897,6 +942,7 @@ export function createApp(options: CreateAppOptions) {
             const result = await aiService.streamSyllabus(
                 {
                     topic: preparedDidacticUnit.topic,
+                    level: preparedDidacticUnit.level,
                     improvedTopicBrief: preparedDidacticUnit.improvedTopicBrief,
                     syllabusPrompt: preparedDidacticUnit.syllabusPrompt ?? '',
                     questionnaireAnswers: preparedDidacticUnit.questionnaireAnswers,
@@ -915,11 +961,10 @@ export function createApp(options: CreateAppOptions) {
                             model: selection.model,
                         })
                     },
-                    onMarkdown: async (delta, markdown) => {
+                    onPartial: async (partial) => {
                         writeNdjsonEvent(response, {
-                            type: 'partial_markdown',
-                            delta,
-                            markdown,
+                            type: 'partial_structured',
+                            data: partial,
                         })
                     },
                 }
@@ -1037,7 +1082,7 @@ export function createApp(options: CreateAppOptions) {
         }
 
         const sourceMarkdown = (didacticUnit.generatedChapters ?? [])
-            .map((chapter) => `# ${chapter.title}\n\n${chapter.content}`)
+            .map((chapter) => `# ${chapter.title}\n\n${chapter.markdown}`)
             .join('\n\n')
 
         openNdjsonStream(response)
@@ -1177,9 +1222,8 @@ export function createApp(options: CreateAppOptions) {
         response.json({
             chapterIndex,
             title: generatedChapter?.title ?? plannedChapter.title,
-            overview: generatedChapter?.overview ?? plannedChapter.overview,
-            content: generatedChapter?.content ?? null,
-            keyTakeaways: generatedChapter?.keyTakeaways ?? [],
+            planningOverview: plannedChapter.overview,
+            content: generatedChapter?.markdown ?? null,
             presentationSettings: resolveDidacticUnitChapterPresentationSettings(
                 generatedChapter?.presentationSettings
             ),
@@ -1345,8 +1389,32 @@ export function createApp(options: CreateAppOptions) {
             const updatedChapter = updatedDidacticUnit.generatedChapters?.find(
                 (chapter) => chapter.chapterIndex === chapterIndex
             )
+            const plannedChapter = updatedDidacticUnit.chapters[chapterIndex]
 
-            response.json(updatedChapter)
+            response.json(
+                updatedChapter && plannedChapter
+                    ? {
+                          chapterIndex,
+                          title: updatedChapter.title,
+                          planningOverview: plannedChapter.overview,
+                          content: updatedChapter.markdown,
+                          presentationSettings:
+                              resolveDidacticUnitChapterPresentationSettings(
+                                  updatedChapter.presentationSettings
+                              ),
+                          generatedAt: updatedChapter.generatedAt,
+                          updatedAt: updatedChapter.updatedAt,
+                          state: 'ready',
+                          isCompleted:
+                              updatedDidacticUnit.completedChapters?.some(
+                                  (chapter) => chapter.chapterIndex === chapterIndex
+                              ) ?? false,
+                          completedAt: updatedDidacticUnit.completedChapters?.find(
+                              (chapter) => chapter.chapterIndex === chapterIndex
+                          )?.completedAt,
+                      }
+                    : null
+            )
         } catch (error) {
             const message =
                 error instanceof Error
@@ -1432,15 +1500,20 @@ export function createApp(options: CreateAppOptions) {
                 ? await aiService.streamChapter(
                       {
                           topic: didacticUnit.topic,
-                          syllabus: didacticUnit.syllabus ?? {
-                              title: didacticUnit.title,
-                              overview: didacticUnit.overview,
-                              learningGoals: didacticUnit.learningGoals,
-                              keywords: didacticUnit.keywords,
-                              estimatedDurationMinutes:
-                                  didacticUnit.estimatedDurationMinutes ?? 60,
-                              chapters: didacticUnit.chapters,
-                          },
+                          level: didacticUnit.level,
+                          syllabus:
+                              didacticUnit.referenceSyllabus ??
+                              adaptDidacticUnitSyllabusToReferenceSyllabus({
+                                  topic: didacticUnit.topic,
+                                  syllabus:
+                                      didacticUnit.syllabus ?? {
+                                          title: didacticUnit.title,
+                                          overview: didacticUnit.overview,
+                                          learningGoals: didacticUnit.learningGoals,
+                                          keywords: didacticUnit.keywords,
+                                          chapters: didacticUnit.chapters,
+                                      },
+                              }),
                           chapterIndex,
                           questionnaireAnswers: didacticUnit.questionnaireAnswers,
                           continuitySummaries: didacticUnit.continuitySummaries,
@@ -1472,14 +1545,20 @@ export function createApp(options: CreateAppOptions) {
                   )
                   : await aiService.generateChapter({
                       topic: didacticUnit.topic,
-                      syllabus: didacticUnit.syllabus ?? {
-                          title: didacticUnit.title,
-                          overview: didacticUnit.overview,
-                          learningGoals: didacticUnit.learningGoals,
-                          keywords: didacticUnit.keywords,
-                          estimatedDurationMinutes: didacticUnit.estimatedDurationMinutes ?? 60,
-                          chapters: didacticUnit.chapters,
-                      },
+                      level: didacticUnit.level,
+                      syllabus:
+                          didacticUnit.referenceSyllabus ??
+                          adaptDidacticUnitSyllabusToReferenceSyllabus({
+                              topic: didacticUnit.topic,
+                              syllabus:
+                                  didacticUnit.syllabus ?? {
+                                      title: didacticUnit.title,
+                                      overview: didacticUnit.overview,
+                                      learningGoals: didacticUnit.learningGoals,
+                                      keywords: didacticUnit.keywords,
+                                      chapters: didacticUnit.chapters,
+                                  },
+                          }),
                       chapterIndex,
                       questionnaireAnswers: didacticUnit.questionnaireAnswers,
                       continuitySummaries: didacticUnit.continuitySummaries,

@@ -107,7 +107,8 @@ describe('live AI didactic-unit generation', () => {
                 })
                 expect(typeof generatedChapterResponse.body.content).toBe('string')
                 expect(generatedChapterResponse.body.content.length).toBeGreaterThan(100)
-                expect(generatedChapterResponse.body.keyTakeaways.length).toBeGreaterThan(0)
+                expect(typeof generatedChapterResponse.body.content).toBe('string')
+                expect(generatedChapterResponse.body.planningOverview.length).toBeGreaterThan(0)
 
                 const runsResponse = await request(app).get(`/api/didactic-unit/${created.id}/runs`)
 

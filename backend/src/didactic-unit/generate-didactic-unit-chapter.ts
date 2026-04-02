@@ -15,15 +15,16 @@ export function createChapterGenerationSourceFromDidacticUnit(
     return {
         topic: didacticUnit.topic,
         provider: didacticUnit.provider,
+        level: didacticUnit.level,
         questionnaireAnswers: didacticUnit.questionnaireAnswers,
-        syllabus: {
-            title: didacticUnit.title,
-            overview: didacticUnit.overview,
-            learningGoals: didacticUnit.learningGoals,
-            keywords: didacticUnit.keywords,
-            estimatedDurationMinutes: didacticUnit.estimatedDurationMinutes ?? 0,
-            chapters: didacticUnit.chapters,
-        },
+        syllabus:
+            didacticUnit.referenceSyllabus ?? {
+                topic: didacticUnit.topic,
+                title: didacticUnit.title,
+                description: didacticUnit.overview,
+                keywords: didacticUnit.keywords.join(', '),
+                modules: didacticUnit.modules,
+            },
     }
 }
 

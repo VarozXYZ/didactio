@@ -29,6 +29,24 @@ const depthOptions = [
     },
 ]
 
+const levelOptions = [
+    {
+        value: 'beginner' as const,
+        label: 'Beginner',
+        description: 'Assume little or no prior experience.',
+    },
+    {
+        value: 'intermediate' as const,
+        label: 'Intermediate',
+        description: 'Assume basic familiarity and some prior exposure.',
+    },
+    {
+        value: 'advanced' as const,
+        label: 'Advanced',
+        description: 'Assume strong prior knowledge and faster progression.',
+    },
+]
+
 const lengthOptions = [
     {
         value: 'intro' as const,
@@ -70,6 +88,9 @@ export function DidacticUnitSetupModal({
     const [planning, setPlanning] = useState<PlanningDetailViewModel | null>(null)
     const [draftTopic, setDraftTopic] = useState('')
     const [draftAdditionalContext, setDraftAdditionalContext] = useState('')
+    const [draftLevel, setDraftLevel] = useState<'beginner' | 'intermediate' | 'advanced'>(
+        'beginner'
+    )
     const [draftDepth, setDraftDepth] = useState<'basic' | 'intermediate' | 'technical'>(
         'intermediate'
     )
@@ -115,6 +136,7 @@ export function DidacticUnitSetupModal({
             setPlanning(planningDetail)
             setQuestionnaireAnswers(planningDetail.questionnaire?.answers ?? {})
             setDraftAdditionalContext(planningDetail.additionalContext ?? '')
+            setDraftLevel(planningDetail.level)
             setDraftDepth(planningDetail.depth)
             setDraftLength(planningDetail.length)
             setDraftQuestionnaireEnabled(planningDetail.questionnaireEnabled)
@@ -157,6 +179,7 @@ export function DidacticUnitSetupModal({
             const created = await dashboardApi.createDidacticUnit({
                 topic: draftTopic.trim(),
                 additionalContext: draftAdditionalContext.trim() || undefined,
+                level: draftLevel,
                 depth: draftDepth,
                 length: draftLength,
                 questionnaireEnabled: draftQuestionnaireEnabled,
@@ -255,6 +278,29 @@ export function DidacticUnitSetupModal({
                     <div className="grid gap-4 md:grid-cols-2">
                         <div>
                             <label className="mb-2 block text-[13px] font-semibold text-[#1D1D1F]">
+                                Learner level
+                            </label>
+                            <select
+                                value={draftLevel}
+                                onChange={(event) =>
+                                    setDraftLevel(
+                                        event.target.value as
+                                            | 'beginner'
+                                            | 'intermediate'
+                                            | 'advanced'
+                                    )
+                                }
+                                className="w-full rounded-[14px] border border-[#E5E5E7] px-4 py-3 text-[14px] focus:border-[#4ADE80] focus:outline-none"
+                            >
+                                {levelOptions.map((option) => (
+                                    <option key={option.value} value={option.value}>
+                                        {option.label} - {option.description}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="mb-2 block text-[13px] font-semibold text-[#1D1D1F]">
                                 Unit depth
                             </label>
                             <select
@@ -326,7 +372,7 @@ export function DidacticUnitSetupModal({
                         <div className="font-semibold text-[#1D1D1F]">What happens next?</div>
                         <div className="mt-2 space-y-1">
                             <div>- AI profile settings choose provider, model, and tone</div>
-                            <div>- This unit keeps its own depth and length targets</div>
+                            <div>- This unit keeps its own learner level, depth, and length targets</div>
                             <div>- Topic moderation happens automatically with the cheap model</div>
                             <div>
                                 - {draftQuestionnaireEnabled
@@ -399,6 +445,9 @@ export function DidacticUnitSetupModal({
                             Generation brief
                         </h3>
                         <div className="mt-4 flex flex-wrap gap-2">
+                            <div className="rounded-full border border-[#DCEBDD] bg-white px-3 py-1 text-[12px] font-semibold text-[#34614A]">
+                                Level: {planning.level}
+                            </div>
                             <div className="rounded-full border border-[#DCEBDD] bg-white px-3 py-1 text-[12px] font-semibold text-[#34614A]">
                                 Depth: {planning.depth}
                             </div>

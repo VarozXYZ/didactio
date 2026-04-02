@@ -26,6 +26,8 @@ export type BackendAiModelConfig = {
 export type BackendAuthoringConfig = {
     language: string
     tone: 'friendly' | 'neutral' | 'professional'
+    learnerLevel: 'beginner' | 'intermediate' | 'advanced'
+    preferences?: string
 }
 
 export type BackendAiConfig = {
@@ -74,6 +76,7 @@ export interface BackendDidacticUnitDetail {
     improvedTopicBrief?: string
     reasoningNotes?: string
     additionalContext?: string
+    level: 'beginner' | 'intermediate' | 'advanced'
     depth: 'basic' | 'intermediate' | 'technical'
     length: 'intro' | 'short' | 'long' | 'textbook'
     generationTier?: BackendAiModelTier
@@ -111,9 +114,8 @@ export interface BackendDidacticUnitChapterSummary {
 export interface BackendDidacticUnitChapterDetail {
     chapterIndex: number
     title: string
-    overview: string
+    planningOverview: string
     content: string | null
-    keyTakeaways: string[]
     presentationSettings: BackendChapterPresentationSettings
     state: 'pending' | 'ready' | 'failed'
     isCompleted: boolean
@@ -129,9 +131,7 @@ export interface BackendDidacticUnitChapterRevision {
     createdAt: string
     chapter: {
         title: string
-        overview: string
         content: string
-        keyTakeaways: string[]
         presentationSettings?: BackendChapterPresentationSettings
     }
 }
@@ -289,6 +289,7 @@ export const dashboardApi = {
     createDidacticUnit(input: {
         topic: string
         additionalContext?: string
+        level?: 'beginner' | 'intermediate' | 'advanced'
         depth?: 'basic' | 'intermediate' | 'technical'
         length?: 'intro' | 'short' | 'long' | 'textbook'
         questionnaireEnabled?: boolean
@@ -391,9 +392,7 @@ export const dashboardApi = {
         chapterIndex: number,
         chapter: {
             title: string
-            overview: string
             content: string
-            keyTakeaways: string[]
             presentationSettings?: BackendChapterPresentationSettings
         }
     ) {

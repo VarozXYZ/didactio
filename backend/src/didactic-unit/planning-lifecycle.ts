@@ -1,11 +1,16 @@
 import type {
+    DidacticUnitReferenceSyllabus,
     DidacticUnitQuestionAnswer,
     DidacticUnitQuestionnaireAnswersInput,
     DidacticUnitQuestionnaire,
     DidacticUnitSyllabus,
     UpdateDidacticUnitSyllabusInput,
 } from './planning.js'
-import { buildQuestionnaireForDidacticUnit } from './planning.js'
+import {
+    adaptDidacticUnitSyllabusToReferenceSyllabus,
+    adaptReferenceSyllabusToDidacticUnitSyllabus,
+    buildQuestionnaireForDidacticUnit,
+} from './planning.js'
 import type { DidacticUnit } from './create-didactic-unit.js'
 import type { AuthoringConfig } from '../ai/config.js'
 
@@ -49,12 +54,13 @@ function buildSyllabusPrompt(
         `Learner current knowledge of the topic: ${topicKnowledge}.`,
         `Learner knowledge of related concepts: ${relatedKnowledge}.`,
         `Learning goal: ${learningGoal}.`,
+        `Explicit learner level: ${didacticUnit.level}.`,
         `Requested unit depth: ${didacticUnit.depth}.`,
         `Requested unit length: ${didacticUnit.length}.`,
         `Authoring language: ${authoring.language}.`,
         `Authoring tone: ${authoring.tone}.`,
         additionalContext ? `Additional learner/context notes: ${additionalContext}.` : '',
-        'Return a structured syllabus with a title, overview, learning goals, keywords, total estimated duration, and ordered chapter outline with lesson plans.',
+        'Return a structured syllabus with a title, description, keywords, and an ordered module outline with lesson plans.',
     ].join('\n')
 }
 
@@ -222,24 +228,32 @@ export function prepareDidacticUnitSyllabusGeneration(
 
 export function applyGeneratedDidacticUnitSyllabus(
     didacticUnit: DidacticUnit,
-    syllabus: DidacticUnitSyllabus
+    syllabus: DidacticUnitReferenceSyllabus
 ): DidacticUnit {
     if (didacticUnit.status !== 'syllabus_prompt_ready' || !didacticUnit.syllabusPrompt) {
         throw new Error('Syllabus cannot be generated from the current didactic unit state.')
     }
 
+    const compatibilitySyllabus = adaptReferenceSyllabusToDidacticUnitSyllabus(syllabus)
+
     return withUpdatedAt({
         ...didacticUnit,
-        title: syllabus.title,
-        overview: syllabus.overview,
-        learningGoals: [...syllabus.learningGoals],
-        keywords: [...syllabus.keywords],
-        estimatedDurationMinutes: syllabus.estimatedDurationMinutes,
-        chapters: syllabus.chapters.map((chapter) => ({
+        title: compatibilitySyllabus.title,
+        overview: compatibilitySyllabus.overview,
+        learningGoals: [...compatibilitySyllabus.learningGoals],
+        keywords: [...compatibilitySyllabus.keywords],
+        modules: syllabus.modules.map((module) => ({
+            title: module.title,
+            overview: module.overview,
+            lessons: module.lessons.map((lesson) => ({
+                title: lesson.title,
+                contentOutline: [...lesson.contentOutline],
+            })),
+        })),
+        chapters: compatibilitySyllabus.chapters.map((chapter) => ({
             title: chapter.title,
             overview: chapter.overview,
             keyPoints: [...chapter.keyPoints],
-            estimatedDurationMinutes: chapter.estimatedDurationMinutes,
             lessons: chapter.lessons.map((lesson) => ({
                 title: lesson.title,
                 contentOutline: [...lesson.contentOutline],
@@ -247,7 +261,8 @@ export function applyGeneratedDidacticUnitSyllabus(
         })),
         status: 'syllabus_ready',
         nextAction: 'review_syllabus',
-        syllabus,
+        referenceSyllabus: syllabus,
+        syllabus: compatibilitySyllabus,
         syllabusGeneratedAt: new Date().toISOString(),
     })
 }
@@ -260,24 +275,36 @@ export function updateDidacticUnitSyllabus(
         throw new Error('Syllabus cannot be updated from the current didactic unit state.')
     }
 
+    const referenceSyllabus = adaptDidacticUnitSyllabusToReferenceSyllabus({
+        topic: didacticUnit.topic,
+        syllabus: input.syllabus,
+    })
+
     return withUpdatedAt({
         ...didacticUnit,
         title: input.syllabus.title,
         overview: input.syllabus.overview,
         learningGoals: [...input.syllabus.learningGoals],
         keywords: [...input.syllabus.keywords],
-        estimatedDurationMinutes: input.syllabus.estimatedDurationMinutes,
+        modules: referenceSyllabus.modules.map((module) => ({
+            title: module.title,
+            overview: module.overview,
+            lessons: module.lessons.map((lesson) => ({
+                title: lesson.title,
+                contentOutline: [...lesson.contentOutline],
+            })),
+        })),
         chapters: input.syllabus.chapters.map((chapter) => ({
             title: chapter.title,
             overview: chapter.overview,
             keyPoints: [...chapter.keyPoints],
-            estimatedDurationMinutes: chapter.estimatedDurationMinutes,
             lessons: chapter.lessons.map((lesson) => ({
                 title: lesson.title,
                 contentOutline: [...lesson.contentOutline],
             })),
         })),
         nextAction: 'approve_syllabus',
+        referenceSyllabus,
         syllabus: input.syllabus,
         syllabusUpdatedAt: new Date().toISOString(),
     })

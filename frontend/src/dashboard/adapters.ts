@@ -183,6 +183,7 @@ export function adaptDidacticUnitPlanning(detail: BackendDidacticUnitDetail): Pl
         additionalContext: detail.additionalContext,
         improvedTopicBrief: detail.improvedTopicBrief,
         reasoningNotes: detail.reasoningNotes,
+        level: detail.level,
         depth: detail.depth,
         length: detail.length,
         questionnaireEnabled: detail.questionnaireEnabled,
@@ -210,14 +211,12 @@ function buildEditorChapter(
         chapterIndex: summary.chapterIndex,
         title: detail?.title ?? summary.title,
         status: summary.state,
-        summary: detail?.overview ?? summary.overview,
+        summary: detail?.planningOverview ?? summary.overview,
         readingTime,
         content,
         learningGoals: [...unit.learningGoals],
-        keyPoints: detail?.keyTakeaways?.length
-            ? [...detail.keyTakeaways]
-            : [...unit.chapters[summary.chapterIndex].keyPoints],
-        level: unit.provider === 'profile-config' ? 'Configured' : 'Adaptive',
+        keyPoints: [...unit.chapters[summary.chapterIndex].keyPoints],
+        level: unit.level,
         effort: deriveEffortFromReadingTime(readingTime),
         isCompleted: detail?.isCompleted ?? summary.isCompleted,
         completedAt: detail?.completedAt ?? summary.completedAt,
@@ -259,9 +258,7 @@ export function adaptDidacticUnitRevisions(
         title: revision.chapter.title,
         chapter: {
             title: revision.chapter.title,
-            overview: revision.chapter.overview,
             content: normalizeStoredMarkdown(revision.chapter.content),
-            keyTakeaways: [...revision.chapter.keyTakeaways],
             presentationSettings: resolvePresentationSettings(
                 revision.chapter.presentationSettings
             ),

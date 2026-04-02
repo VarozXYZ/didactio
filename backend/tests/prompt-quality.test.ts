@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import {
     buildChapterMarkdownPrompt,
+    buildGatewaySystemPrompt,
     buildModerationPrompt,
     resolveTargetChapterCount,
     buildSyllabusMarkdownPrompt,
 } from '../src/ai/prompt-builders.js'
-import { parseSyllabusMarkdown } from '../src/ai/markdown-parsers.js'
+import {
+    adaptReferenceSyllabusToDidacticUnitSyllabus,
+    type DidacticUnitReferenceSyllabus,
+} from '../src/didactic-unit/planning.js'
 
 const authoring = {
     language: 'English',
@@ -16,6 +20,7 @@ describe('prompt quality helpers', () => {
     it('builds a moderation prompt with the improved brief contract', () => {
         const prompt = buildModerationPrompt({
             topic: 'Python programming',
+            level: 'beginner',
             authoring,
         })
 
@@ -23,11 +28,13 @@ describe('prompt quality helpers', () => {
         expect(prompt).toContain('improved topic brief')
         expect(prompt).toContain('Python programming')
         expect(prompt).toContain('Tone: professional')
+        expect(prompt).toContain('Course level: beginner')
     })
 
-    it('builds a syllabus prompt with learner profile and strict markdown structure', () => {
+    it('builds a syllabus prompt with learner profile and strict structured output instructions', () => {
         const prompt = buildSyllabusMarkdownPrompt({
             topic: 'Python programming',
+            level: 'beginner',
             improvedTopicBrief:
                 'Create a practical unit that moves from syntax fundamentals to small real-world programs.',
             syllabusPrompt: 'Deterministic syllabus prompt body',
@@ -43,13 +50,14 @@ describe('prompt quality helpers', () => {
 
         expect(prompt).toContain('[Learner / Profile Context]')
         expect(prompt).toContain('Improved topic brief')
+        expect(prompt).toContain('Declared learner level: beginner')
         expect(prompt).toContain('Requested depth: intermediate')
         expect(prompt).toContain('Requested length: long')
-        expect(prompt).toContain('Target chapter count: 9')
-        expect(prompt).toContain('## Keywords')
-        expect(prompt).toContain('#### Lessons')
-        expect(prompt).toContain('##### 1. <Lesson Title>')
-        expect(prompt).toContain('Repeat the chapter structure for exactly 9 chapters.')
+        expect(prompt).toContain('Target module count: 9')
+        expect(prompt).toContain('Return a strict structured syllabus object.')
+        expect(prompt).toContain('Create exactly 9 modules.')
+        expect(prompt).toContain('Use a keywords string, not a keywords array.')
+        expect(prompt).toContain('Each module must include lessons with action-oriented content outlines.')
     })
 
     it('maps unit length to different syllabus chapter counts', () => {
@@ -59,9 +67,10 @@ describe('prompt quality helpers', () => {
         expect(resolveTargetChapterCount('textbook')).toBe(12)
     })
 
-    it('builds a chapter prompt with continuity, lesson plan, and regeneration guidance', () => {
+    it('builds a chapter prompt with continuity, module planning, and regeneration guidance', () => {
         const prompt = buildChapterMarkdownPrompt({
             topic: 'Python programming',
+            level: 'beginner',
             chapterIndex: 1,
             questionnaireAnswers: [
                 { questionId: 'topic_knowledge_level', value: 'basic' },
@@ -75,17 +84,14 @@ describe('prompt quality helpers', () => {
             depth: 'technical',
             length: 'textbook',
             syllabus: {
+                topic: 'Python programming',
                 title: 'Python programming learning path',
-                overview: 'From basics to practical scripting.',
-                learningGoals: ['Understand syntax', 'Write scripts', 'Practice debugging'],
-                keywords: ['python', 'scripting', 'automation'],
-                estimatedDurationMinutes: 180,
-                chapters: [
+                description: 'From basics to practical scripting.',
+                keywords: 'python, scripting, automation',
+                modules: [
                     {
                         title: 'Foundations',
                         overview: 'Core concepts and syntax.',
-                        keyPoints: ['Variables', 'Types', 'Expressions'],
-                        estimatedDurationMinutes: 60,
                         lessons: [
                             {
                                 title: 'Variables',
@@ -96,8 +102,6 @@ describe('prompt quality helpers', () => {
                     {
                         title: 'Control Flow',
                         overview: 'Make programs branch and repeat.',
-                        keyPoints: ['Conditionals', 'Loops', 'Branching'],
-                        estimatedDurationMinutes: 60,
                         lessons: [
                             {
                                 title: 'Conditionals',
@@ -112,8 +116,6 @@ describe('prompt quality helpers', () => {
                     {
                         title: 'Applied Scripts',
                         overview: 'Use the language in practical automations.',
-                        keyPoints: ['Files', 'Utilities', 'Examples'],
-                        estimatedDurationMinutes: 60,
                         lessons: [
                             {
                                 title: 'Mini scripts',
@@ -125,87 +127,81 @@ describe('prompt quality helpers', () => {
             },
         })
 
-        expect(prompt).toContain('1. Foundations (PREVIOUS)')
-        expect(prompt).toContain('2. Control Flow (CURRENT CHAPTER)')
+        expect(prompt).toContain('1. Foundations (COMPLETED)')
+        expect(prompt).toContain('2. Control Flow (CURRENT MODULE)')
         expect(prompt).toContain('3. Applied Scripts (UPCOMING)')
-        expect(prompt).toContain('Chapter 1 continuity summary')
+        expect(prompt).toContain('### Module 1 Concepts:')
         expect(prompt).toContain('Regeneration instruction from the user')
         expect(prompt).toContain('The learner prefers script-based examples.')
         expect(prompt).toContain('Requested depth: technical')
         expect(prompt).toContain('Requested length: textbook')
-        expect(prompt).toContain('Lesson plan:')
         expect(prompt).toContain('1. Conditionals')
+        expect(prompt).toContain('Do not use generic headings like "Concept Explanation"')
     })
 
-    it('parses richer syllabus markdown into the strict syllabus object', () => {
-        const syllabus = parseSyllabusMarkdown([
-            '# Python Programming Learning Path',
-            '## Overview',
-            'A practical path from fundamentals to useful scripts.',
-            '## Learning Goals',
-            '- Understand Python syntax',
-            '- Build working scripts',
-            '- Practice debugging',
-            '## Keywords',
-            '- python',
-            '- scripting',
-            '- automation',
-            '## Estimated Duration',
-            '180',
-            '## Chapters',
-            '### 1. Foundations',
-            '#### Overview',
-            'Learn the core syntax and vocabulary.',
-            '#### Estimated Duration',
-            '60',
-            '#### Key Points',
-            '- Variables',
-            '- Types',
-            '- Expressions',
-            '#### Lessons',
-            '##### 1. Variables',
-            '- Declare variables',
-            '- Use expressions',
-            '##### 2. Data Types',
-            '- Compare strings and numbers',
-            '- Convert between values',
-            '### 2. Control Flow',
-            '#### Overview',
-            'Guide execution with conditions and loops.',
-            '#### Estimated Duration',
-            '60',
-            '#### Key Points',
-            '- Conditionals',
-            '- Loops',
-            '- Branching',
-            '#### Lessons',
-            '##### 1. Conditionals',
-            '- Use if statements',
-            '- Compare outcomes',
-            '##### 2. Loops',
-            '- Iterate through data',
-            '- Repeat safely',
-            '### 3. Applied Scripts',
-            '#### Overview',
-            'Turn the concepts into small useful tools.',
-            '#### Estimated Duration',
-            '60',
-            '#### Key Points',
-            '- Files',
-            '- Utilities',
-            '- Examples',
-            '#### Lessons',
-            '##### 1. Mini scripts',
-            '- Automate a basic task',
-            '- Reflect on tradeoffs',
-        ].join('\n'))
+    it('adapts the reference syllabus schema into the compatibility syllabus object', () => {
+        const referenceSyllabus: DidacticUnitReferenceSyllabus = {
+            topic: 'Python programming',
+            title: 'Python Programming Learning Path',
+            description: 'A practical path from fundamentals to useful scripts.',
+            keywords: 'python, scripting, automation',
+            modules: [
+                {
+                    title: 'Foundations',
+                    overview: 'Learn the core syntax and vocabulary.',
+                    lessons: [
+                        {
+                            title: 'Variables',
+                            contentOutline: ['Declare variables', 'Use expressions'],
+                        },
+                        {
+                            title: 'Data Types',
+                            contentOutline: [
+                                'Compare strings and numbers',
+                                'Convert between values',
+                            ],
+                        },
+                    ],
+                },
+                {
+                    title: 'Control Flow',
+                    overview: 'Guide execution with conditions and loops.',
+                    lessons: [
+                        {
+                            title: 'Conditionals',
+                            contentOutline: ['Use if statements', 'Compare outcomes'],
+                        },
+                        {
+                            title: 'Loops',
+                            contentOutline: ['Iterate through data', 'Repeat safely'],
+                        },
+                    ],
+                },
+                {
+                    title: 'Applied Scripts',
+                    overview: 'Turn the concepts into small useful tools.',
+                    lessons: [
+                        {
+                            title: 'Mini scripts',
+                            contentOutline: [
+                                'Automate a basic task',
+                                'Reflect on tradeoffs',
+                            ],
+                        },
+                    ],
+                },
+            ],
+        }
 
+        const syllabus = adaptReferenceSyllabusToDidacticUnitSyllabus(referenceSyllabus)
+
+        expect(buildGatewaySystemPrompt('syllabus')).toContain('curriculum designer')
         expect(syllabus.keywords).toEqual(['python', 'scripting', 'automation'])
-        expect(syllabus.estimatedDurationMinutes).toBe(180)
-        expect(syllabus.chapters[0].estimatedDurationMinutes).toBe(60)
         expect(syllabus.chapters[0].lessons[0].contentOutline).toEqual([
             'Declare variables',
             'Use expressions',
         ])
+        expect(syllabus.chapters).toHaveLength(3)
+        expect(syllabus.learningGoals.length).toBeGreaterThan(0)
     })
 })
