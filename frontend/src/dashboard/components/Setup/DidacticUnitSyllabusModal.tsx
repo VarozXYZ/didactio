@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Sparkles, X } from 'lucide-react'
-import { Streamdown } from 'streamdown'
 import { type BackendAiModelTier, dashboardApi } from '../../api/dashboardApi'
 import { adaptDidacticUnitPlanning } from '../../adapters'
-import type { PlanningDetailViewModel } from '../../types'
+import type { PlanningDetailViewModel, PlanningSyllabus } from '../../types'
+import {
+    hasStructuredSyllabusPreview,
+    parsePartialSyllabusMarkdown,
+    type PartialPlanningSyllabus,
+} from '../../utils/syllabusPreview'
 
 type DidacticUnitSyllabusModalProps = {
     didacticUnitId: string
@@ -51,6 +55,14 @@ export function DidacticUnitSyllabusModal({
     const [regenerationContext, setRegenerationContext] = useState('')
 
     const hasSyllabus = Boolean(planning?.syllabus)
+    const streamedSyllabusPreview = useMemo(
+        () => parsePartialSyllabusMarkdown(streamedSyllabusMarkdown),
+        [streamedSyllabusMarkdown]
+    )
+    const hasStructuredStreamPreview = hasStructuredSyllabusPreview(streamedSyllabusPreview)
+    const syllabusToRender = isStreamingSyllabus && hasStructuredStreamPreview
+        ? streamedSyllabusPreview
+        : planning?.syllabus ?? (hasStructuredStreamPreview ? streamedSyllabusPreview : null)
 
     const applyPlanningState = useCallback(
         (detail: Awaited<ReturnType<typeof dashboardApi.getDidacticUnit>>) => {
@@ -168,25 +180,42 @@ export function DidacticUnitSyllabusModal({
         }
     }
 
-    const renderSyllabus = () => {
-        if (!planning?.syllabus) {
+    const renderSyllabus = (
+        syllabus: PlanningSyllabus | PartialPlanningSyllabus | null | undefined,
+        options?: {
+            heading?: string
+            badge?: string
+            caption?: string
+        }
+    ) => {
+        if (!syllabus || !hasStructuredSyllabusPreview(syllabus)) {
             return null
         }
-
-        const syllabus = planning.syllabus
 
         return (
             <section className="space-y-5 rounded-[18px] border border-[#E5E5E7] bg-[#FAFAFB] p-5">
                 <div>
-                    <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-[#4DA56A]">
-                        Syllabus Draft
+                    <div className="flex items-center justify-between gap-3">
+                        <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-[#4DA56A]">
+                            {options?.heading ?? 'Syllabus Draft'}
+                        </div>
+                        {options?.badge && (
+                            <div className="text-[12px] font-semibold text-[#4DA56A]">
+                                {options.badge}
+                            </div>
+                        )}
                     </div>
                     <h3 className="mt-2 text-[24px] font-bold tracking-tight text-[#1D1D1F]">
-                        {syllabus.title}
+                        {syllabus.title || 'Building syllabus draft...'}
                     </h3>
-                    <p className="mt-3 text-[14px] leading-7 text-[#4B5563]">
-                        {syllabus.overview}
-                    </p>
+                    {options?.caption && (
+                        <p className="mt-2 text-[12px] text-[#5F6B63]">{options.caption}</p>
+                    )}
+                    {syllabus.overview && (
+                        <p className="mt-3 text-[14px] leading-7 text-[#4B5563]">
+                            {syllabus.overview}
+                        </p>
+                    )}
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2">
@@ -194,19 +223,35 @@ export function DidacticUnitSyllabusModal({
                         <div className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#6B7280]">
                             Learning goals
                         </div>
-                        <div className="mt-3 space-y-2 text-[14px] text-[#1D1D1F]">
-                            {syllabus.learningGoals.map((goal) => (
-                                <div key={goal}>- {goal}</div>
-                            ))}
-                        </div>
+                        {syllabus.learningGoals.length > 0 ? (
+                            <div className="mt-3 space-y-2 text-[14px] text-[#1D1D1F]">
+                                {syllabus.learningGoals.map((goal) => (
+                                    <div key={goal}>- {goal}</div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="mt-3 text-[13px] text-[#86868B]">
+                                Learning goals are still streaming in.
+                            </div>
+                        )}
                     </div>
                     <div className="rounded-[14px] border border-[#E5E5E7] bg-white p-4">
                         <div className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#6B7280]">
                             Course metadata
                         </div>
                         <div className="mt-3 space-y-2 text-[14px] text-[#1D1D1F]">
-                            <div>Duration: {syllabus.estimatedDurationMinutes} minutes</div>
-                            <div>Keywords: {syllabus.keywords.join(', ')}</div>
+                            <div>
+                                Duration:{' '}
+                                {syllabus.estimatedDurationMinutes
+                                    ? `${syllabus.estimatedDurationMinutes} minutes`
+                                    : 'Calculating...'}
+                            </div>
+                            <div>
+                                Keywords:{' '}
+                                {syllabus.keywords.length > 0
+                                    ? syllabus.keywords.join(', ')
+                                    : 'Still streaming...'}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -223,45 +268,70 @@ export function DidacticUnitSyllabusModal({
                                         Chapter {index + 1}
                                     </div>
                                     <h4 className="mt-2 text-[18px] font-semibold text-[#1D1D1F]">
-                                        {chapter.title}
+                                        {chapter.title || `Chapter ${index + 1}`}
                                     </h4>
                                 </div>
                                 <div className="rounded-full border border-[#E5E5E7] bg-[#FAFAFB] px-3 py-1 text-[12px] font-semibold text-[#4B5563]">
-                                    {chapter.estimatedDurationMinutes} min
+                                    {chapter.estimatedDurationMinutes
+                                        ? `${chapter.estimatedDurationMinutes} min`
+                                        : 'Streaming...'}
                                 </div>
                             </div>
-                            <p className="mt-3 text-[14px] leading-7 text-[#4B5563]">
-                                {chapter.overview}
-                            </p>
+                            {chapter.overview && (
+                                <p className="mt-3 text-[14px] leading-7 text-[#4B5563]">
+                                    {chapter.overview}
+                                </p>
+                            )}
                             <div className="mt-4 grid gap-4 md:grid-cols-2">
                                 <div>
                                     <div className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#6B7280]">
                                         Key points
                                     </div>
-                                    <div className="mt-2 space-y-2 text-[14px] text-[#1D1D1F]">
-                                        {chapter.keyPoints.map((point) => (
-                                            <div key={point}>- {point}</div>
-                                        ))}
-                                    </div>
+                                    {chapter.keyPoints.length > 0 ? (
+                                        <div className="mt-2 space-y-2 text-[14px] text-[#1D1D1F]">
+                                            {chapter.keyPoints.map((point) => (
+                                                <div key={point}>- {point}</div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="mt-2 text-[13px] text-[#86868B]">
+                                            Key points are still streaming in.
+                                        </div>
+                                    )}
                                 </div>
                                 <div>
                                     <div className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#6B7280]">
                                         Lessons
                                     </div>
-                                    <div className="mt-2 space-y-3">
-                                        {chapter.lessons.map((lesson) => (
-                                            <div key={lesson.title} className="rounded-[12px] border border-[#EEF0F2] bg-[#FAFAFB] p-3">
-                                                <div className="text-[13px] font-semibold text-[#1D1D1F]">
-                                                    {lesson.title}
+                                    {chapter.lessons.length > 0 ? (
+                                        <div className="mt-2 space-y-3">
+                                            {chapter.lessons.map((lesson, lessonIndex) => (
+                                                <div
+                                                    key={`${lesson.title}-${lessonIndex}`}
+                                                    className="rounded-[12px] border border-[#EEF0F2] bg-[#FAFAFB] p-3"
+                                                >
+                                                    <div className="text-[13px] font-semibold text-[#1D1D1F]">
+                                                        {lesson.title || `Lesson ${lessonIndex + 1}`}
+                                                    </div>
+                                                    {lesson.contentOutline.length > 0 ? (
+                                                        <div className="mt-2 space-y-1 text-[13px] text-[#4B5563]">
+                                                            {lesson.contentOutline.map((outline) => (
+                                                                <div key={outline}>- {outline}</div>
+                                                            ))}
+                                                        </div>
+                                                    ) : (
+                                                        <div className="mt-2 text-[13px] text-[#86868B]">
+                                                            Lesson outline is still streaming in.
+                                                        </div>
+                                                    )}
                                                 </div>
-                                                <div className="mt-2 space-y-1 text-[13px] text-[#4B5563]">
-                                                    {lesson.contentOutline.map((outline) => (
-                                                        <div key={outline}>- {outline}</div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="mt-2 text-[13px] text-[#86868B]">
+                                            Lessons are still streaming in.
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </article>
@@ -377,32 +447,15 @@ export function DidacticUnitSyllabusModal({
                                 </section>
                             )}
 
-                            {(isStreamingSyllabus || streamedSyllabusMarkdown) && (
-                                <section className="rounded-[18px] border border-[#DCEEDD] bg-[#F7FFF8] p-5">
-                                    <div className="flex items-center justify-between gap-3">
-                                        <div>
-                                            <h3 className="text-[16px] font-semibold text-[#1D1D1F]">
-                                                Live syllabus generation
-                                            </h3>
-                                            <p className="text-[12px] text-[#5F6B63]">
-                                                Markdown is rendered as it streams in.
-                                            </p>
-                                        </div>
-                                        <div className="text-[12px] font-semibold text-[#4DA56A]">
-                                            {isStreamingSyllabus
-                                                ? `Streaming ${activeGenerationTier ?? 'selected'}...`
-                                                : 'Complete'}
-                                        </div>
-                                    </div>
-                                    <div className="mt-4 rounded-[14px] border border-[#E3EFE6] bg-white p-4">
-                                        <Streamdown className="text-[14px] leading-7 text-[#1D1D1F]">
-                                            {streamedSyllabusMarkdown || 'Waiting for markdown...'}
-                                        </Streamdown>
-                                    </div>
-                                </section>
-                            )}
-
-                            {renderSyllabus()}
+                            {renderSyllabus(syllabusToRender, {
+                                heading: 'Syllabus Draft',
+                                badge: isStreamingSyllabus
+                                    ? `Streaming ${activeGenerationTier ?? 'selected'}...`
+                                    : undefined,
+                                caption: isStreamingSyllabus
+                                    ? 'The syllabus is filling in progressively and will stay in this same layout as it completes.'
+                                    : undefined,
+                            })}
 
                             {hasSyllabus && (
                                 <section className="rounded-[18px] border border-[#E5E5E7] bg-[#FAFAFB] p-5">
