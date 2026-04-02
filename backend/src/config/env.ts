@@ -13,7 +13,7 @@ export interface AppEnv {
     aiAuthoringLanguage: string
     aiAuthoringTone: string
     aiAuthoringLearnerLevel: string
-    aiAuthoringPreferences: string | null
+    aiExtraInstructions: string | null
     mongoDbUri: string | null
     mongoDbName: string
 }
@@ -63,7 +63,7 @@ export function getAppEnv(): AppEnv {
         aiAuthoringTone: parseOptionalString(process.env.AI_AUTHORING_TONE) ?? 'neutral',
         aiAuthoringLearnerLevel:
             parseOptionalString(process.env.AI_AUTHORING_LEARNER_LEVEL) ?? 'beginner',
-        aiAuthoringPreferences: parseOptionalString(process.env.AI_AUTHORING_PREFERENCES),
+        aiExtraInstructions: parseOptionalString(process.env.AI_EXTRA_INSTRUCTIONS),
         mongoDbUri: parseOptionalString(process.env.MONGODB_URI),
         mongoDbName: parseOptionalString(process.env.MONGODB_DB_NAME) ?? 'didactio',
     }

@@ -82,9 +82,9 @@ function AuthoringConfigCard(props: {
     return (
         <div className="rounded-[14px] border border-[#E5E5E7] bg-white p-5">
             <div className="mb-4">
-                <h3 className="text-[16px] font-semibold text-[#1D1D1F]">Authoring Style</h3>
+                <h3 className="text-[16px] font-semibold text-[#1D1D1F]">Generation Context</h3>
                 <p className="mt-1 text-[12px] text-[#86868B]">
-                    These settings shape the global authoring voice and persistent user context used across every generation.
+                    These settings shape the persistent context appended to every generation prompt.
                 </p>
             </div>
 
@@ -149,17 +149,17 @@ function AuthoringConfigCard(props: {
 
                 <div className="md:col-span-2">
                     <label className="mb-2 block text-[12px] font-semibold uppercase tracking-wide text-[#6B7280]">
-                        Persistent Preferences
+                        Extra Instructions
                     </label>
                     <textarea
-                        value={props.value.preferences ?? ''}
+                        value={props.value.extraInstructions ?? ''}
                         onChange={(event) =>
                             props.onChange({
                                 ...props.value,
-                                preferences: event.target.value,
+                                extraInstructions: event.target.value,
                             })
                         }
-                        placeholder="Anything the system should preserve across all generations, like preferred explanation style, examples, or wording habits."
+                        placeholder="Anything the system should preserve across all generations, like dyslexia-friendly writing, stronger visual explanations, simpler wording, or accessibility needs."
                         rows={4}
                         className="w-full rounded-[12px] border border-[#E5E5E7] px-4 py-3 text-[14px] focus:border-[#4ADE80] focus:outline-none"
                     />
@@ -229,7 +229,7 @@ export function PreferencesView() {
                         Preferences
                     </h1>
                     <p className="mt-0.5 text-[13px] text-[#86868B]">
-                        Configure the cheap/premium AI profiles and the shared authoring tone
+                        Configure the cheap/premium AI profiles and the shared generation context
                     </p>
                 </div>
             </header>

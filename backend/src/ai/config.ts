@@ -13,7 +13,7 @@ export interface AuthoringConfig {
     language: string
     tone: AuthoringTone
     learnerLevel: AuthoringLearnerLevel
-    preferences?: string
+    extraInstructions?: string
 }
 
 export interface AiConfig {
@@ -86,9 +86,10 @@ export function normalizeAuthoringConfig(
     config: Partial<AuthoringConfig> | undefined,
     fallback?: AuthoringConfig
 ): AuthoringConfig {
-    const preferencesSource = config?.preferences ?? fallback?.preferences
-    const normalizedPreferences =
-        typeof preferencesSource === 'string' ? preferencesSource.trim() : ''
+    const extraInstructionsSource =
+        config?.extraInstructions ?? fallback?.extraInstructions
+    const normalizedExtraInstructions =
+        typeof extraInstructionsSource === 'string' ? extraInstructionsSource.trim() : ''
 
     return {
         language: normalizeNonEmptyString(
@@ -107,7 +108,7 @@ export function normalizeAuthoringConfig(
             AUTHORING_LEARNER_LEVELS,
             fallback?.learnerLevel
         ),
-        preferences: normalizedPreferences || undefined,
+        extraInstructions: normalizedExtraInstructions || undefined,
     }
 }
 
@@ -137,7 +138,7 @@ export function getDefaultAiConfig(): AiConfig {
                 AUTHORING_LEARNER_LEVELS,
                 'beginner'
             ),
-            preferences: env.aiAuthoringPreferences ?? undefined,
+            extraInstructions: env.aiExtraInstructions ?? undefined,
         },
     }
 }
@@ -234,14 +235,14 @@ export function parseAiConfigPatch(body: unknown): PartialAiConfig {
                           'authoring.learnerLevel',
                           AUTHORING_LEARNER_LEVELS
                       ),
-            preferences:
-                rawConfig.preferences === undefined
+            extraInstructions:
+                rawConfig.extraInstructions === undefined
                     ? undefined
-                    : typeof rawConfig.preferences === 'string'
-                      ? rawConfig.preferences.trim()
+                    : typeof rawConfig.extraInstructions === 'string'
+                      ? rawConfig.extraInstructions.trim()
                       : (() => {
                             throw new AiConfigValidationError(
-                                'authoring.preferences must be a string.'
+                                'authoring.extraInstructions must be a string.'
                             )
                         })(),
         }

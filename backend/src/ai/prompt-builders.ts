@@ -87,9 +87,6 @@ function buildAuthoringContext(authoring: AuthoringConfig): string[] {
         `Profile learner level: ${authoring.learnerLevel}`,
         toneInstruction(authoring.tone),
         learnerLevelInstruction(authoring.learnerLevel),
-        authoring.preferences
-            ? `Persistent user preferences: ${authoring.preferences}`
-            : '',
     ]
 }
 
@@ -243,7 +240,7 @@ export function buildModerationPrompt(input: {
         ]),
         buildSection('Output Contract', [
             'Return whether the prompt is approved, a normalized topic title, an improved topic brief targeting the requested level, and concise reasoning notes.',
-            'Preserve the persistent user preferences and authoring context in the improved brief so downstream generations inherit them.',
+            'Preserve the authoring context in the improved brief so downstream generations inherit it.',
         ]),
     ].join('\n\n')
 }
@@ -269,7 +266,7 @@ export function buildQuestionnairePrompt(input: {
             'Use these exact ids in this exact order: topic_knowledge_level, related_knowledge_level, learning_goal.',
             'Use single_select for fixed choices and long_text for open responses.',
             'Keep prompts concise, learner-facing, and useful for planning.',
-            'Keep the questionnaire aligned with the persistent user preferences and authoring profile.',
+            'Keep the questionnaire aligned with the authoring profile.',
         ]),
     ].join('\n\n')
 }
@@ -384,8 +381,8 @@ export function buildChapterMarkdownPrompt(input: {
             `Language: ${input.authoring.language}`,
             `Persistent profile learner level: ${input.authoring.learnerLevel}`,
             learnerLevelInstruction(input.authoring.learnerLevel),
-            input.authoring.preferences
-                ? `Persistent user preferences to preserve: ${input.authoring.preferences}`
+            input.authoring.extraInstructions
+                ? `Extra instructions for this educational content: ${input.authoring.extraInstructions}`
                 : '',
             'Use sentence case for headings and subheadings, not title case.',
             'Capitalize only the first word and proper nouns in headings.',

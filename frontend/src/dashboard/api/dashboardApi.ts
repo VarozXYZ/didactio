@@ -27,7 +27,7 @@ export type BackendAuthoringConfig = {
     language: string
     tone: 'friendly' | 'neutral' | 'professional'
     learnerLevel: 'beginner' | 'intermediate' | 'advanced'
-    preferences?: string
+    extraInstructions?: string
 }
 
 export type BackendAiConfig = {
