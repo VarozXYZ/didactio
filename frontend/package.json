@@ -20,6 +20,7 @@
     "@lexical/rich-text": "^0.42.0",
     "@lexical/table": "^0.42.0",
     "@tailwindcss/vite": "^4.1.18",
+    "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lexical": "^0.42.0",
     "lucide-react": "^0.577.0",
