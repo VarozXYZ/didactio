@@ -10,12 +10,6 @@ interface DefaultFolderDefinition {
 const DEFAULT_FOLDER_DEFINITIONS: DefaultFolderDefinition[] = [
     { name: 'General', slug: 'general', icon: 'book-open', color: '#4ADE80' },
     { name: 'Computer Science', slug: 'computer-science', icon: 'binary', color: '#818CF8' },
-    {
-        name: 'Physics & Computer Science',
-        slug: 'physics-computer-science',
-        icon: 'binary',
-        color: '#818CF8',
-    },
     { name: 'Mathematics', slug: 'mathematics', icon: 'calculator', color: '#F59E0B' },
     { name: 'Biology', slug: 'biology', icon: 'microscope', color: '#22C55E' },
     { name: 'History', slug: 'history', icon: 'scroll-text', color: '#EF4444' },

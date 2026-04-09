@@ -3,6 +3,7 @@ import {
     ChevronDown,
     ChevronRight,
     CreditCard,
+    FolderInput,
     Lock,
     MoreHorizontal,
     MoreVertical,
@@ -15,11 +16,15 @@ import {
 } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useState, type Dispatch, type SetStateAction } from 'react'
+import type { BackendFolder } from '../../../api/dashboardApi'
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuSeparator,
+    DropdownMenuSub,
+    DropdownMenuSubContent,
+    DropdownMenuSubTrigger,
     DropdownMenuTrigger,
 } from '../../../../components/ui/dropdown-menu'
 import type {
@@ -27,7 +32,7 @@ import type {
     DashboardListItem,
     DashboardSection,
 } from '../../../types'
-import { getFolderIcon } from '../../../utils/folderDisplay'
+import { getFolderEmoji } from '../../../utils/folderDisplay'
 
 type SidebarProps = {
     isSidebarOpen: boolean
@@ -36,11 +41,13 @@ type SidebarProps = {
     expandedFolders: string[]
     toggleFolder: (folderId: string) => void
     folders: DashboardFolder[]
+    allFolders: BackendFolder[]
     onCreateFolder: (name: string) => Promise<void>
     onOpenItem: (itemId: string) => void
     onOpenEditor: (itemId: string) => void
     onOpenSetup: (itemId: string) => void
     onDeleteItem: (itemId: string) => void
+    onMoveToFolder: (itemId: string, folderId: string) => void
     items: DashboardListItem[]
 }
 
@@ -51,11 +58,13 @@ export function Sidebar({
     expandedFolders,
     toggleFolder,
     folders,
+    allFolders,
     onCreateFolder,
     onOpenItem,
     onOpenEditor,
     onOpenSetup,
     onDeleteItem,
+    onMoveToFolder,
     items,
 }: SidebarProps) {
     const [isCreatingFolder, setIsCreatingFolder] = useState(false)
@@ -117,43 +126,28 @@ export function Sidebar({
                                     !isSidebarOpen ? 'justify-center' : ''
                                 }`}
                             >
-                                {(() => {
-                                    const FolderIcon = getFolderIcon(folder.icon)
-
-                                    return isSidebarOpen ? (
-                                        <>
-                                            {expandedFolders.includes(folder.id) ? (
-                                                <ChevronDown size={14} className="text-[#86868B]" />
-                                            ) : (
-                                                <ChevronRight
-                                                    size={14}
-                                                    className="text-[#86868B]"
-                                                />
-                                            )}
-                                            <div
-                                                className="flex h-7 w-7 items-center justify-center rounded-lg"
-                                                style={{
-                                                    backgroundColor: `${folder.color}1A`,
-                                                    color: folder.color,
-                                                }}
-                                            >
-                                                <FolderIcon size={15} strokeWidth={2} />
-                                            </div>
-                                            <span className="flex-1 truncate text-left text-[14px] font-medium">
-                                                {folder.name}
-                                            </span>
-                                            <span className="rounded-full bg-[#F5F5F7] px-2 py-0.5 text-[11px]">
-                                                {folder.unitCount}
-                                            </span>
-                                        </>
-                                    ) : (
-                                        <FolderIcon
-                                            size={18}
-                                            strokeWidth={2}
-                                            style={{ color: folder.color }}
-                                        />
-                                    )
-                                })()}
+                                {isSidebarOpen ? (
+                                    <>
+                                        {expandedFolders.includes(folder.id) ? (
+                                            <ChevronDown size={14} className="text-[#86868B]" />
+                                        ) : (
+                                            <ChevronRight size={14} className="text-[#86868B]" />
+                                        )}
+                                        <span className="text-lg leading-none">
+                                            {getFolderEmoji(folder.icon)}
+                                        </span>
+                                        <span className="flex-1 truncate text-left text-[14px] font-medium">
+                                            {folder.name}
+                                        </span>
+                                        <span className="rounded-full bg-[#F5F5F7] px-2 py-0.5 text-[11px]">
+                                            {folder.unitCount}
+                                        </span>
+                                    </>
+                                ) : (
+                                    <span className="text-lg leading-none">
+                                        {getFolderEmoji(folder.icon)}
+                                    </span>
+                                )}
                             </button>
 
                             {isSidebarOpen && expandedFolders.includes(folder.id) && (
@@ -203,6 +197,28 @@ export function Sidebar({
                                                                 <Settings2 />
                                                                 Open Setup
                                                             </DropdownMenuItem>
+                                                        )}
+                                                        {allFolders.filter(f => f.id !== unit.folder.id).length > 0 && (
+                                                            <DropdownMenuSub>
+                                                                <DropdownMenuSubTrigger>
+                                                                    <FolderInput />
+                                                                    Move to folder
+                                                                </DropdownMenuSubTrigger>
+                                                                <DropdownMenuSubContent>
+                                                                    {allFolders
+                                                                        .filter(f => f.id !== unit.folder.id)
+                                                                        .map(folder => (
+                                                                            <DropdownMenuItem
+                                                                                key={folder.id}
+                                                                                onSelect={() => onMoveToFolder(unitId, folder.id)}
+                                                                            >
+                                                                                <span>{getFolderEmoji(folder.icon)}</span>
+                                                                                {folder.name}
+                                                                            </DropdownMenuItem>
+                                                                        ))
+                                                                    }
+                                                                </DropdownMenuSubContent>
+                                                            </DropdownMenuSub>
                                                         )}
                                                         <DropdownMenuSeparator />
                                                         <DropdownMenuItem

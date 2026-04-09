@@ -65,3 +65,20 @@ export function getFolderVisuals(folder: { color: string; icon: string }) {
         icon: getFolderIcon(folder.icon),
     }
 }
+
+const folderEmojiMap: Record<string, string> = {
+    atom: '⚛️',
+    binary: '💻',
+    'book-open': '📚',
+    calculator: '📐',
+    'flask-conical': '🧪',
+    folder: '📁',
+    globe: '🌍',
+    microscope: '🔬',
+    'pen-line': '✍️',
+    'scroll-text': '📜',
+}
+
+export function getFolderEmoji(iconName: string): string {
+    return folderEmojiMap[iconName] ?? '📁'
+}

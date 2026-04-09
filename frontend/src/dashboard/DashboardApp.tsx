@@ -158,15 +158,6 @@ export default function DashboardApp() {
         )
     }, [items])
 
-    useEffect(() => {
-        if (sidebarFolders.length === 0) {
-            return
-        }
-
-        setExpandedFolders((previous) =>
-            previous.length > 0 ? previous : [sidebarFolders[0].id]
-        )
-    }, [sidebarFolders])
 
     const toggleFolder = (folderId: string) => {
         setExpandedFolders((previous) =>
@@ -218,6 +209,17 @@ export default function DashboardApp() {
         }
 
         await openSetup(itemId)
+    }
+
+    const moveItemToFolder = async (itemId: string, folderId: string) => {
+        try {
+            await dashboardApi.updateDidacticUnitFolder(itemId, { mode: 'manual', folderId })
+            refreshDashboard()
+        } catch (moveError) {
+            setIndexError(
+                moveError instanceof Error ? moveError.message : 'Failed to move unit.'
+            )
+        }
     }
 
     const deleteItem = async (itemId: string) => {
@@ -293,12 +295,14 @@ export default function DashboardApp() {
         <div className="flex min-h-screen bg-[#F5F5F7] font-sans text-[#1D1D1F]">
             <Sidebar
                 activeSection={activeSection}
+                allFolders={allFolders}
                 expandedFolders={expandedFolders}
                 folders={sidebarFolders}
                 isSidebarOpen={isSidebarOpen}
                 items={items}
                 onCreateFolder={createFolder}
                 onDeleteItem={deleteItem}
+                onMoveToFolder={moveItemToFolder}
                 onOpenEditor={openEditor}
                 onOpenItem={openItem}
                 onOpenSetup={openSetup}

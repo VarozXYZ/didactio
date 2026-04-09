@@ -34,7 +34,6 @@ describe('folder api', () => {
         expect(firstList.map((folder) => folder.name)).toEqual([
             'General',
             'Computer Science',
-            'Physics & Computer Science',
             'Mathematics',
             'Biology',
             'History',

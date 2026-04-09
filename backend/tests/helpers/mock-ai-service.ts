@@ -89,7 +89,7 @@ function classifyFolderName(topic: string, availableFolderNames: string[]): stri
     const normalizedTopic = topic.toLowerCase()
     const keywordMatchers: Array<{ folderName: string; keywords: string[] }> = [
         { folderName: 'Computer Science', keywords: ['javascript', 'typescript', 'react', 'next.js', 'python', 'programming', 'software'] },
-        { folderName: 'Physics & Computer Science', keywords: ['quantum', 'computing'] },
+        { folderName: 'Physics', keywords: ['quantum', 'computing'] },
         { folderName: 'Mathematics', keywords: ['math', 'algebra', 'calculus', 'statistics'] },
         { folderName: 'Biology', keywords: ['biology', 'cell', 'genetics'] },
         { folderName: 'History', keywords: ['history', 'war', 'ancient', 'civilization'] },
