@@ -2,10 +2,12 @@ import { Grid3x3, List, Search } from 'lucide-react'
 import { AllUnitsHeader } from './AllUnitsHeader'
 import { UnitsGrid } from './UnitsGrid'
 import { UnitsTable } from './UnitsTable'
+import type { BackendFolder } from '../../../api/dashboardApi'
 import type { DashboardListItem } from '../../../types'
 
 type AllUnitsViewProps = {
     filteredUnits: DashboardListItem[]
+    allFolders: BackendFolder[]
     searchQuery: string
     setSearchQuery: (value: string) => void
     viewMode: 'grid' | 'list'
@@ -14,11 +16,16 @@ type AllUnitsViewProps = {
     folderCount: number
     averageProgress: number
     onOpenItem: (itemId: string) => void
+    onOpenEditor: (itemId: string) => void
+    onOpenSetup: (itemId: string) => Promise<void>
+    onDeleteItem: (itemId: string) => Promise<void>
+    onMoveToFolder: (itemId: string, folderId: string) => Promise<void>
     onCreateUnit: () => void
 }
 
 export function AllUnitsView({
     filteredUnits,
+    allFolders,
     searchQuery,
     setSearchQuery,
     viewMode,
@@ -27,6 +34,10 @@ export function AllUnitsView({
     folderCount,
     averageProgress,
     onOpenItem,
+    onOpenEditor,
+    onOpenSetup,
+    onDeleteItem,
+    onMoveToFolder,
     onCreateUnit,
 }: AllUnitsViewProps) {
     void totalUnits
@@ -83,9 +94,25 @@ export function AllUnitsView({
                     </div>
 
                     {viewMode === 'grid' ? (
-                        <UnitsGrid onOpenItem={onOpenItem} units={filteredUnits} />
+                        <UnitsGrid
+                            allFolders={allFolders}
+                            onDeleteItem={onDeleteItem}
+                            onMoveToFolder={onMoveToFolder}
+                            onOpenEditor={onOpenEditor}
+                            onOpenItem={onOpenItem}
+                            onOpenSetup={onOpenSetup}
+                            units={filteredUnits}
+                        />
                     ) : (
-                        <UnitsTable onOpenItem={onOpenItem} units={filteredUnits} />
+                        <UnitsTable
+                            allFolders={allFolders}
+                            onDeleteItem={onDeleteItem}
+                            onMoveToFolder={onMoveToFolder}
+                            onOpenEditor={onOpenEditor}
+                            onOpenItem={onOpenItem}
+                            onOpenSetup={onOpenSetup}
+                            units={filteredUnits}
+                        />
                     )}
                 </div>
             </div>

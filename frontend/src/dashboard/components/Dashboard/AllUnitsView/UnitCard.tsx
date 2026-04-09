@@ -1,13 +1,37 @@
-import { Clock, MoreVertical, PencilLine } from 'lucide-react'
+import { Clock, FolderInput, MoreHorizontal, PenLine, Settings2, Trash2 } from 'lucide-react'
+import type { BackendFolder } from '../../../api/dashboardApi'
 import type { DashboardListItem } from '../../../types'
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuSub,
+    DropdownMenuSubContent,
+    DropdownMenuSubTrigger,
+    DropdownMenuTrigger,
+} from '../../../../components/ui/dropdown-menu'
 import { getFolderEmoji, getFolderVisuals } from '../../../utils/folderDisplay'
 
 type UnitCardProps = {
+    allFolders: BackendFolder[]
     onOpenItem: (itemId: string) => void
+    onOpenEditor: (itemId: string) => void
+    onOpenSetup: (itemId: string) => Promise<void>
+    onDeleteItem: (itemId: string) => Promise<void>
+    onMoveToFolder: (itemId: string, folderId: string) => Promise<void>
     unit: DashboardListItem
 }
 
-export function UnitCard({ onOpenItem, unit }: UnitCardProps) {
+export function UnitCard({
+    allFolders,
+    onDeleteItem,
+    onMoveToFolder,
+    onOpenEditor,
+    onOpenItem,
+    onOpenSetup,
+    unit,
+}: UnitCardProps) {
     const style = getFolderVisuals(unit.folder)
     const folderEmoji = getFolderEmoji(unit.folder.icon)
 
@@ -42,26 +66,16 @@ export function UnitCard({ onOpenItem, unit }: UnitCardProps) {
                     )}
 
                     {unit.canOpenEditor ? (
-                        <div className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[#1D1D1F] backdrop-blur-sm">
-                            <PencilLine size={12} />
-                            Open Editor
+                        <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-black/5">
+                            <div
+                                className="h-full transition-all"
+                                style={{
+                                    width: `${unit.primaryProgressPercent}%`,
+                                    backgroundColor: style.accentColor,
+                                }}
+                            />
                         </div>
-                    ) : (
-                        <div className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[#1D1D1F] backdrop-blur-sm">
-                            <PencilLine size={12} />
-                            Continue Setup
-                        </div>
-                    )}
-
-                    <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-black/5">
-                        <div
-                            className="h-full transition-all"
-                            style={{
-                                width: `${unit.primaryProgressPercent}%`,
-                                backgroundColor: style.accentColor,
-                            }}
-                        />
-                    </div>
+                    ) : null}
                 </div>
 
                 <div className="p-5">
@@ -69,27 +83,73 @@ export function UnitCard({ onOpenItem, unit }: UnitCardProps) {
                         <h3 className="line-clamp-2 text-[15px] font-semibold leading-snug text-[#1D1D1F] transition-colors group-hover:text-[#4ADE80]">
                             {unit.title}
                         </h3>
-                        <span className="rounded-lg p-1.5 opacity-0 transition-all group-hover:bg-[#F5F5F7] group-hover:opacity-100">
-                            <MoreVertical size={16} className="text-[#86868B]" />
-                        </span>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <button
+                                    type="button"
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="cursor-pointer rounded-lg p-1.5 opacity-0 transition-all group-hover:bg-[#F5F5F7] group-hover:opacity-100 data-[state=open]:bg-[#F5F5F7] data-[state=open]:opacity-100"
+                                >
+                                    <MoreHorizontal size={16} className="text-[#86868B]" />
+                                </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent side="left" align="end">
+                                {unit.canOpenEditor ? (
+                                    <DropdownMenuItem onSelect={() => onOpenEditor(unit.id)}>
+                                        <PenLine />
+                                        Open Editor
+                                    </DropdownMenuItem>
+                                ) : (
+                                    <DropdownMenuItem onSelect={() => onOpenSetup(unit.id)}>
+                                        <Settings2 />
+                                        Open Setup
+                                    </DropdownMenuItem>
+                                )}
+
+                                {allFolders.filter((f) => f.id !== unit.folder.id).length > 0 && (
+                                    <DropdownMenuSub>
+                                        <DropdownMenuSubTrigger>
+                                            <FolderInput />
+                                            Move to folder
+                                        </DropdownMenuSubTrigger>
+                                        <DropdownMenuSubContent>
+                                            {allFolders
+                                                .filter((f) => f.id !== unit.folder.id)
+                                                .map((folder) => (
+                                                    <DropdownMenuItem
+                                                        key={folder.id}
+                                                        onSelect={() => onMoveToFolder(unit.id, folder.id)}
+                                                    >
+                                                        <span>{getFolderEmoji(folder.icon)}</span>
+                                                        {folder.name}
+                                                    </DropdownMenuItem>
+                                                ))}
+                                        </DropdownMenuSubContent>
+                                    </DropdownMenuSub>
+                                )}
+
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem destructive onSelect={() => onDeleteItem(unit.id)}>
+                                    <Trash2 />
+                                    Remove Unit
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                     </div>
 
                     <div className="mb-4 flex items-center gap-2">
                         <span
-                            className="flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                            className="inline-flex min-w-0 max-w-[calc(100%-4.5rem)] shrink items-center gap-1.5 rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
                             style={{
                                 backgroundColor: style.bgColor,
                                 color: style.iconColor,
                             }}
                         >
                             <span className="text-[10px] leading-none">{folderEmoji}</span>
-                            {unit.folder.name}
+                            <span className="truncate">{unit.folder.name}</span>
                         </span>
-                        <span className="text-[11px] text-[#86868B]">
-                            {unit.chapterCount} {unit.chapterCount === 1 ? 'chapter' : 'chapters'}
-                        </span>
-                        <span className="text-[11px] text-[#B0B0B6]">
-                            {unit.canOpenEditor ? 'Learner workspace' : 'Setup workflow'}
+                        <span className="ml-auto shrink-0 text-[11px] text-[#86868B]">
+                            {unit.chapterCount} {unit.chapterCount === 1 ? 'module' : 'modules'}
                         </span>
                     </div>
 
@@ -98,9 +158,16 @@ export function UnitCard({ onOpenItem, unit }: UnitCardProps) {
                             <Clock size={12} />
                             <span>{unit.lastActivityAt}</span>
                         </div>
-                        <div className="font-semibold text-[#4ADE80]">
-                            {unit.primaryProgressPercent}%
-                        </div>
+                        {unit.canOpenEditor ? (
+                            <div className="font-semibold text-[#4ADE80]">
+                                {unit.primaryProgressPercent}%
+                            </div>
+                        ) : (
+                            <span className="inline-flex items-center gap-2 rounded-full border border-[#E5E5E7] bg-white/70 px-2 py-1 text-[11px] font-medium leading-tight text-[#6E6E73]">
+                                <span className="h-1.5 w-1.5 rounded-full bg-amber-500/80" />
+                                Setup needed
+                            </span>
+                        )}
                     </div>
                 </div>
             </div>

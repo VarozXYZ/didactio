@@ -279,10 +279,15 @@ export default function DashboardApp() {
                 ) : (
                     <AllUnitsView
                         averageProgress={averageProgress}
+                        allFolders={allFolders}
                         filteredUnits={filteredItems}
                         folderCount={allFolders.length}
                         onCreateUnit={openCreateView}
+                        onDeleteItem={deleteItem}
+                        onMoveToFolder={moveItemToFolder}
+                        onOpenEditor={openEditor}
                         onOpenItem={openItem}
+                        onOpenSetup={openSetup}
                         searchQuery={searchQuery}
                         setSearchQuery={setSearchQuery}
                         setViewMode={setViewMode}

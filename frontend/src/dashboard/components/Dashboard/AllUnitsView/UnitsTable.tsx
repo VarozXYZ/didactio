@@ -1,13 +1,37 @@
-import { MoreVertical, PencilLine } from 'lucide-react'
+import { FolderInput, MoreHorizontal, PenLine, Settings2, Trash2 } from 'lucide-react'
+import type { BackendFolder } from '../../../api/dashboardApi'
 import type { DashboardListItem } from '../../../types'
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuSub,
+    DropdownMenuSubContent,
+    DropdownMenuSubTrigger,
+    DropdownMenuTrigger,
+} from '../../../../components/ui/dropdown-menu'
 import { getFolderEmoji, getFolderVisuals } from '../../../utils/folderDisplay'
 
 type UnitsTableProps = {
+    allFolders: BackendFolder[]
     onOpenItem: (itemId: string) => void
+    onOpenEditor: (itemId: string) => void
+    onOpenSetup: (itemId: string) => Promise<void>
+    onDeleteItem: (itemId: string) => Promise<void>
+    onMoveToFolder: (itemId: string, folderId: string) => Promise<void>
     units: DashboardListItem[]
 }
 
-export function UnitsTable({ onOpenItem, units }: UnitsTableProps) {
+export function UnitsTable({
+    allFolders,
+    onDeleteItem,
+    onMoveToFolder,
+    onOpenEditor,
+    onOpenItem,
+    onOpenSetup,
+    units,
+}: UnitsTableProps) {
     return (
         <div className="overflow-hidden rounded-2xl border border-[#E5E5E7] bg-white">
             <table className="w-full">
@@ -20,7 +44,7 @@ export function UnitsTable({ onOpenItem, units }: UnitsTableProps) {
                             Folder
                         </th>
                         <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-[#86868B]">
-                            Chapters
+                            Modules
                         </th>
                         <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-[#86868B]">
                             Progress
@@ -61,17 +85,6 @@ export function UnitsTable({ onOpenItem, units }: UnitsTableProps) {
                                             <div className="text-[14px] font-semibold text-[#1D1D1F] transition-colors group-hover:text-[#4ADE80]">
                                                 {unit.title}
                                             </div>
-                                            <div className="flex items-center gap-2 text-[12px] text-[#86868B]">
-                                                <span>{unit.canOpenEditor ? 'Learner workspace' : 'Setup workflow'}</span>
-                                                {unit.canOpenEditor ? (
-                                                    <span className="inline-flex items-center gap-1 rounded-full bg-[#1D1D1F] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
-                                                        <PencilLine size={10} />
-                                                        Editor
-                                                    </span>
-                                                ) : (
-                                                    <span>Continue setup</span>
-                                                )}
-                                            </div>
                                         </div>
                                     </button>
                                 </td>
@@ -91,32 +104,84 @@ export function UnitsTable({ onOpenItem, units }: UnitsTableProps) {
                                     {unit.chapterCount}
                                 </td>
                                 <td className="px-6 py-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className="h-2 max-w-[120px] flex-1 overflow-hidden rounded-full bg-[#F5F5F7]">
-                                            <div
-                                                className="h-full"
-                                                style={{
-                                                    width: `${unit.primaryProgressPercent}%`,
-                                                    backgroundColor: style.accentColor,
-                                                }}
-                                            />
+                                    {unit.canOpenEditor ? (
+                                        <div className="flex items-center gap-3">
+                                            <div className="h-2 max-w-[120px] flex-1 overflow-hidden rounded-full bg-[#F5F5F7]">
+                                                <div
+                                                    className="h-full"
+                                                    style={{
+                                                        width: `${unit.primaryProgressPercent}%`,
+                                                        backgroundColor: style.accentColor,
+                                                    }}
+                                                />
+                                            </div>
+                                            <span className="min-w-[35px] text-[13px] font-semibold text-[#1D1D1F]">
+                                                {unit.primaryProgressPercent}%
+                                            </span>
                                         </div>
-                                        <span className="min-w-[35px] text-[13px] font-semibold text-[#1D1D1F]">
-                                            {unit.primaryProgressPercent}%
+                                    ) : (
+                                        <span className="inline-flex items-center gap-2 rounded-full border border-[#E5E5E7] bg-white/70 px-2 py-0.5 text-[11px] font-medium leading-none text-[#6E6E73]">
+                                            <span className="h-1.5 w-1.5 rounded-full bg-amber-500/80" />
+                                            Setup needed
                                         </span>
-                                    </div>
+                                    )}
                                 </td>
                                 <td className="px-6 py-4 text-[13px] text-[#86868B]">
                                     {unit.lastActivityAt}
                                 </td>
                                 <td className="px-6 py-4">
-                                    <button
-                                        type="button"
-                                        onClick={() => onOpenItem(unit.id)}
-                                        className="rounded-lg p-2 transition-all hover:bg-[#F5F5F7]"
-                                    >
-                                        <MoreVertical size={16} className="text-[#86868B]" />
-                                    </button>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <button
+                                                type="button"
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="rounded-lg p-2 transition-all hover:bg-[#F5F5F7]"
+                                            >
+                                                <MoreHorizontal size={16} className="text-[#86868B]" />
+                                            </button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent side="left" align="end">
+                                            {unit.canOpenEditor ? (
+                                                <DropdownMenuItem onSelect={() => onOpenEditor(unit.id)}>
+                                                    <PenLine />
+                                                    Open Editor
+                                                </DropdownMenuItem>
+                                            ) : (
+                                                <DropdownMenuItem onSelect={() => onOpenSetup(unit.id)}>
+                                                    <Settings2 />
+                                                    Open Setup
+                                                </DropdownMenuItem>
+                                            )}
+
+                                            {allFolders.filter((f) => f.id !== unit.folder.id).length > 0 && (
+                                                <DropdownMenuSub>
+                                                    <DropdownMenuSubTrigger>
+                                                        <FolderInput />
+                                                        Move to folder
+                                                    </DropdownMenuSubTrigger>
+                                                    <DropdownMenuSubContent>
+                                                        {allFolders
+                                                            .filter((f) => f.id !== unit.folder.id)
+                                                            .map((folder) => (
+                                                                <DropdownMenuItem
+                                                                    key={folder.id}
+                                                                    onSelect={() => onMoveToFolder(unit.id, folder.id)}
+                                                                >
+                                                                    <span>{getFolderEmoji(folder.icon)}</span>
+                                                                    {folder.name}
+                                                                </DropdownMenuItem>
+                                                            ))}
+                                                    </DropdownMenuSubContent>
+                                                </DropdownMenuSub>
+                                            )}
+
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem destructive onSelect={() => onDeleteItem(unit.id)}>
+                                                <Trash2 />
+                                                Remove Unit
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
                                 </td>
                             </tr>
                         )

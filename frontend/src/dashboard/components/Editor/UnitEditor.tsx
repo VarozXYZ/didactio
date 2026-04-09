@@ -7,7 +7,6 @@ import {
 } from 'react'
 import {
     AlertCircle,
-    ArrowLeft,
     CheckCheck,
     CheckCircle2,
     ChevronLeft,
@@ -16,9 +15,9 @@ import {
     Edit3,
     FileText,
     History,
-    LayoutDashboard,
     Loader2,
     MoreHorizontal,
+    Undo2,
     RotateCcw,
     Settings,
     Share2,
@@ -35,7 +34,6 @@ import { useNavigate } from 'react-router-dom'
 import {
     type BackendAiModelTier,
     type BackendDidacticUnitChapterDetail,
-    type BackendFolder,
     type BackendGenerationRun,
     DashboardApiError,
     dashboardApi,
@@ -113,12 +111,10 @@ function formatRunLabel(run: BackendGenerationRun): string {
 export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
     const navigate = useNavigate()
     const [workspace, setWorkspace] = useState<DidacticUnitEditorViewModel | null>(null)
-    const [availableFolders, setAvailableFolders] = useState<BackendFolder[]>([])
     const [chapterDetails, setChapterDetails] = useState<Record<number, BackendDidacticUnitChapterDetail>>({})
     const [revisions, setRevisions] = useState<DidacticUnitRevisionViewModel[]>([])
     const [activeChapterIndex, setActiveChapterIndex] = useState(0)
     const [draft, setDraft] = useState<ChapterDraft | null>(null)
-    const [isSidebarOpen, setIsSidebarOpen] = useState(true)
     const [isSaving, setIsSaving] = useState(false)
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [isEditMode, setIsEditMode] = useState(false)
@@ -190,10 +186,9 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
             setError(null)
 
             try {
-                const [unit, chaptersResponse, foldersResponse] = await Promise.all([
+                const [unit, chaptersResponse] = await Promise.all([
                     dashboardApi.getDidacticUnit(didacticUnitId),
                     dashboardApi.listDidacticUnitChapters(didacticUnitId),
-                    dashboardApi.listFolders(),
                 ])
 
                 const detailResponses = await Promise.all(
@@ -223,7 +218,6 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                     null
 
                 setWorkspace(nextWorkspace)
-                setAvailableFolders(foldersResponse.folders)
                 setUnitGenerationTier((previousTier) => unit.generationTier ?? previousTier ?? null)
                 setChapterDetails(detailsRecord)
                 setActiveChapterIndex(nextActiveChapter?.chapterIndex ?? 0)
@@ -339,11 +333,10 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
     const spreadMetrics = useMemo(
         () =>
             calculateSpreadMetrics({
-                isSidebarOpen,
                 viewportHeight: viewport.height,
                 viewportWidth: viewport.width,
             }),
-        [isSidebarOpen, viewport.height, viewport.width]
+        [viewport.height, viewport.width]
     )
     const paginatedContentPages = useMemo(
         () =>
@@ -423,21 +416,6 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
             window.clearTimeout(saveTimeoutRef.current)
         }
         saveTimeoutRef.current = window.setTimeout(() => setIsSaving(false), 1200)
-    }
-
-    const handleFolderUpdate = async (
-        folderSelection:
-            | { mode: 'manual'; folderId: string }
-            | { mode: 'auto' }
-    ) => {
-        await runAction(
-            () => dashboardApi.updateDidacticUnitFolder(didacticUnitId, folderSelection),
-            {
-                chapterIndex: activeChapterIndex,
-                silentRefresh: true,
-                preserveSpread: true,
-            }
-        )
     }
 
     const refreshWorkspaceAfterGeneration = useCallback(async () => {
@@ -1042,64 +1020,40 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
     return (
         <div className="flex h-screen overflow-hidden bg-[#F5F5F7] font-sans text-[#1D1D1F]">
             <Motion.aside
-                animate={{ width: isSidebarOpen ? 260 : 80 }}
                 className="z-20 flex h-full flex-col overflow-hidden border-r border-[#E5E5E7] bg-white"
                 initial={false}
-                transition={{ type: 'spring', stiffness: 300, damping: 30 }}
             >
-                <div
-                    className={cn(
-                        'flex shrink-0 items-center p-6',
-                        isSidebarOpen ? 'justify-between gap-3' : 'justify-center'
-                    )}
-                >
-                    {isSidebarOpen ? (
-                        <>
-                            <div className="flex items-center gap-3">
-                                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1D1D1F]">
-                                    <Sparkles size={18} className="text-[#4ADE80]" />
-                                </div>
-                                <span className="text-lg font-semibold tracking-tight">Didactio</span>
-                            </div>
-                            <button
-                                className="rounded-lg p-1.5 text-[#86868B] transition-all hover:bg-[#F5F5F7]"
-                                onClick={() => setIsSidebarOpen(false)}
-                                type="button"
-                            >
-                                <ChevronLeft size={18} />
-                            </button>
-                        </>
-                    ) : (
-                        <button
-                            className="rounded-lg p-1.5 text-[#86868B] transition-all hover:bg-[#F5F5F7]"
-                            onClick={() => setIsSidebarOpen(true)}
-                            type="button"
-                        >
-                            <ChevronRight size={18} />
-                        </button>
-                    )}
+                <div className="flex shrink-0 items-center justify-between gap-3 p-6">
+                    <div className="flex items-center gap-3">
+                        <img
+                            src="/assets/logos/logo-horizontal.png"
+                            alt="Didactio"
+                            className="h-8 w-auto object-contain"
+                        />
+                    </div>
+                    <button
+                        aria-label="Back to library"
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#86868B] transition-colors hover:bg-[#F5F5F7] hover:text-[#1D1D1F] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4ADE80]/40"
+                        onClick={() => navigate('/dashboard')}
+                        title="Library"
+                        type="button"
+                    >
+                        <ChevronLeft size={20} strokeWidth={2} />
+                    </button>
                 </div>
 
-                <div className={cn('mb-6 shrink-0', isSidebarOpen ? 'px-6' : 'px-3')}>
-                    {isSidebarOpen ? (
-                        <>
-                            <div className="mb-2 flex items-center justify-between text-xs font-medium uppercase tracking-wider text-[#86868B]">
-                                <span>Overall Progress</span>
-                                <span>{workspace.progress}%</span>
-                            </div>
-                            <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#F5F5F7]">
-                                <Motion.div
-                                    animate={{ width: `${workspace.progress}%` }}
-                                    className="h-full bg-[#4ADE80]"
-                                    initial={{ width: 0 }}
-                                />
-                            </div>
-                        </>
-                    ) : (
-                        <div className="text-center">
-                            <div className="text-sm font-bold text-[#4ADE80]">{workspace.progress}%</div>
-                        </div>
-                    )}
+                <div className="mb-6 shrink-0 px-6">
+                    <div className="mb-2 flex items-center justify-between text-xs font-medium uppercase tracking-wider text-[#86868B]">
+                        <span>Overall Progress</span>
+                        <span>{workspace.progress}%</span>
+                    </div>
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#F5F5F7]">
+                        <Motion.div
+                            animate={{ width: `${workspace.progress}%` }}
+                            className="h-full bg-[#4ADE80]"
+                            initial={{ width: 0 }}
+                        />
+                    </div>
                 </div>
 
                 <nav className="flex-1 space-y-1 overflow-y-auto px-3">
@@ -1108,7 +1062,7 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                             key={chapter.chapterIndex}
                             className={cn(
                                 'group flex w-full items-center rounded-[10px] text-left transition-all duration-200',
-                                isSidebarOpen ? 'gap-3 px-3 py-2.5' : 'justify-center px-2 py-2.5',
+                                'gap-3 px-3 py-2.5',
                                 activeChapterIndex === chapter.chapterIndex
                                     ? 'bg-[#F5F5F7] text-[#1D1D1F]'
                                     : 'text-[#86868B] hover:bg-[#F5F5F7]/50 hover:text-[#1D1D1F]'
@@ -1116,67 +1070,41 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                             onClick={() => setActiveChapterIndex(chapter.chapterIndex)}
                             type="button"
                         >
-                            {isSidebarOpen ? (
-                                <>
-                                    <span className="w-4 text-center text-xs font-medium opacity-50">
-                                        {index + 1}
-                                    </span>
-                                    <span className="flex-1 truncate text-[14px] font-medium">
-                                        {chapter.title}
-                                    </span>
-                                    <div className="flex-shrink-0">{getStatusIcon(chapter.status)}</div>
-                                </>
-                            ) : (
-                                <div className="flex items-center justify-center">
-                                    <span
-                                        className={cn(
-                                            'text-sm font-semibold',
-                                            chapter.status === 'ready'
-                                                ? 'text-[#4ADE80]'
-                                                : chapter.status === 'pending'
-                                                  ? 'text-[#4ADE80]'
-                                                  : 'text-red-400'
-                                        )}
-                                    >
-                                        {index + 1}
-                                    </span>
-                                </div>
-                            )}
+                            <>
+                                <span className="w-4 text-center text-xs font-medium opacity-50">
+                                    {index + 1}
+                                </span>
+                                <span className="flex-1 truncate text-[14px] font-medium">
+                                    {chapter.title}
+                                </span>
+                                <div className="flex-shrink-0">{getStatusIcon(chapter.status)}</div>
+                            </>
                         </button>
                     ))}
                 </nav>
 
                 <div className="shrink-0 space-y-1 border-t border-[#E5E5E7] p-4">
                     <button
-                        className={cn(
-                            'flex w-full items-center rounded-[10px] text-[14px] text-[#86868B] transition-all hover:bg-[#F5F5F7] hover:text-[#1D1D1F]',
-                            isSidebarOpen ? 'gap-3 px-3 py-2' : 'justify-center py-2.5'
-                        )}
+                        className="flex w-full items-center gap-3 rounded-[10px] px-3 py-2 text-[14px] text-[#86868B] transition-all hover:bg-[#F5F5F7] hover:text-[#1D1D1F]"
                         onClick={() => navigate('/dashboard')}
                         type="button"
                     >
-                        <LayoutDashboard size={18} />
-                        {isSidebarOpen && <span>Dashboard</span>}
+                        <Undo2 size={18} />
+                        <span>Back to Dashboard</span>
                     </button>
                     <button
-                        className={cn(
-                            'flex w-full items-center rounded-[10px] text-[14px] text-[#86868B] transition-all hover:bg-[#F5F5F7] hover:text-[#1D1D1F]',
-                            isSidebarOpen ? 'gap-3 px-3 py-2' : 'justify-center py-2.5'
-                        )}
+                        className="flex w-full items-center gap-3 rounded-[10px] px-3 py-2 text-[14px] text-[#86868B] transition-all hover:bg-[#F5F5F7] hover:text-[#1D1D1F]"
                         type="button"
                     >
                         <Share2 size={18} />
-                        {isSidebarOpen && <span>Export Unit</span>}
+                        <span>Export Unit</span>
                     </button>
                     <button
-                        className={cn(
-                            'flex w-full items-center rounded-[10px] text-[14px] text-[#86868B] transition-all hover:bg-[#F5F5F7] hover:text-[#1D1D1F]',
-                            isSidebarOpen ? 'gap-3 px-3 py-2' : 'justify-center py-2.5'
-                        )}
+                        className="flex w-full items-center gap-3 rounded-[10px] px-3 py-2 text-[14px] text-[#86868B] transition-all hover:bg-[#F5F5F7] hover:text-[#1D1D1F]"
                         type="button"
                     >
                         <Settings size={18} />
-                        {isSidebarOpen && <span>Settings</span>}
+                        <span>Settings</span>
                     </button>
                 </div>
             </Motion.aside>
@@ -1184,14 +1112,6 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
             <main className="relative flex h-full flex-1 flex-col overflow-hidden">
                 <header className="z-10 flex h-[64px] shrink-0 items-center justify-between border-b border-[#E5E5E7] bg-white/80 px-6 backdrop-blur-md">
                     <div className="flex items-center gap-4">
-                        <button
-                            className="rounded-lg p-2 text-[#86868B] transition-all hover:bg-[#F5F5F7]"
-                            onClick={() => navigate('/dashboard')}
-                            type="button"
-                        >
-                            <ArrowLeft size={20} />
-                        </button>
-                        <div className="h-4 w-[1px] bg-[#E5E5E7]" />
                         <div className="flex flex-col">
                             <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-[#86868B]">
                                 <span>Units</span>
@@ -1218,32 +1138,6 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                     </div>
 
                     <div className="flex items-center gap-6">
-                        <div className="flex items-center gap-2">
-                            <select
-                                value={workspace.folder.id}
-                                onChange={(event) =>
-                                    void handleFolderUpdate({
-                                        mode: 'manual',
-                                        folderId: event.target.value,
-                                    })
-                                }
-                                className="rounded-full border border-[#D4D7DD] bg-white px-3 py-1.5 text-[12px] font-medium text-[#1D1D1F] outline-none"
-                            >
-                                {availableFolders.map((folder) => (
-                                    <option key={folder.id} value={folder.id}>
-                                        {folder.name}
-                                    </option>
-                                ))}
-                            </select>
-                            <button
-                                className="rounded-full border border-[#D4D7DD] bg-white px-3 py-1.5 text-[12px] font-medium text-[#1D1D1F] transition-all hover:bg-[#F5F5F7]"
-                                onClick={() => void handleFolderUpdate({ mode: 'auto' })}
-                                type="button"
-                            >
-                                Auto-assign
-                            </button>
-                        </div>
-
                         <div className="flex items-center gap-2 text-[13px] text-[#86868B]">
                             <span
                                 className={cn(
@@ -1251,7 +1145,7 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                                     isSaving || isSubmitting ? 'bg-amber-400' : 'bg-[#4ADE80]'
                                 )}
                             />
-                            {isSaving || isSubmitting ? 'Saving...' : 'Autosaved'}
+                            {isSaving || isSubmitting ? 'Saving...' : 'Saved'}
                         </div>
 
                         <div className="h-4 w-[1px] bg-[#E5E5E7]" />

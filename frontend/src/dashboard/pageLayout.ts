@@ -4,7 +4,6 @@ import { extractMarkdownBlocks, markdownToHtml, type MarkdownPageBlock } from '.
 const MOBILE_BREAKPOINT = 768
 const HEADER_HEIGHT = 64
 const OPEN_SIDEBAR_WIDTH = 260
-const CLOSED_SIDEBAR_WIDTH = 80
 export const ACTIVITIES_PAGE = '__ACTIVITIES_PAGE__'
 const PAGE_WIDTH_RATIO = 0.72
 
@@ -396,14 +395,11 @@ export function paginateMarkdownContent({
 export function calculateSpreadMetrics({
     viewportWidth,
     viewportHeight,
-    isSidebarOpen,
 }: {
     viewportWidth: number
     viewportHeight: number
-    isSidebarOpen: boolean
 }) {
     const isMobile = viewportWidth < MOBILE_BREAKPOINT
-    const sidebarWidth = isSidebarOpen ? OPEN_SIDEBAR_WIDTH : CLOSED_SIDEBAR_WIDTH
     const stagePaddingX = isMobile ? 16 : 32
     const stagePaddingTop = isMobile ? 16 : 24
     const stagePaddingBottom = isMobile ? 20 : 32
@@ -413,7 +409,7 @@ export function calculateSpreadMetrics({
     const spreadGap = isMobile ? 16 : Math.max(28, Math.min(44, viewportWidth * 0.014))
     const availableWidth = Math.max(
         360,
-        viewportWidth - sidebarWidth - stagePaddingX * 2 - arrowAllowance
+        viewportWidth - OPEN_SIDEBAR_WIDTH - stagePaddingX * 2 - arrowAllowance
     )
     const availableHeight = Math.max(
         420,
