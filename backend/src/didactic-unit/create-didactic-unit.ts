@@ -4,6 +4,7 @@ import type {
     DidacticUnitDepth,
     DidacticUnitLength,
     DidacticUnitLevel,
+    DidacticUnitFolderAssignmentMode,
     DidacticUnitModule,
     DidacticUnitNextAction,
     DidacticUnitProvider,
@@ -49,6 +50,8 @@ export interface DidacticUnit {
     depth: DidacticUnitDepth
     length: DidacticUnitLength
     questionnaireEnabled: boolean
+    folderId: string
+    folderAssignmentMode: DidacticUnitFolderAssignmentMode
     improvedTopicBrief?: string
     reasoningNotes?: string
     questionnaire?: DidacticUnitQuestionnaire
@@ -97,6 +100,8 @@ export function createDidacticUnit(
         depth: input.depth,
         length: input.length,
         questionnaireEnabled: input.questionnaireEnabled,
+        folderId: input.folderSelection.folderId ?? '',
+        folderAssignmentMode: input.folderSelection.mode,
         createdAt,
         updatedAt: createdAt,
     }

@@ -271,6 +271,41 @@ export function buildQuestionnairePrompt(input: {
     ].join('\n\n')
 }
 
+export function buildFolderClassificationPrompt(input: {
+    topic: string
+    additionalContext?: string
+    folders: Array<{
+        name: string
+        description: string
+    }>
+    authoring: AuthoringConfig
+}): string {
+    return [
+        buildSection('Role / Contract', [
+            'Classify the requested didactic unit into exactly one existing folder.',
+            'Choose the closest folder from the provided list only.',
+            'Prefer General when the topic is broad, ambiguous, or does not clearly fit a more specific folder.',
+        ]),
+        buildSection('Authoring Profile', buildAuthoringContext(input.authoring)),
+        buildSection('Unit Context', [
+            `Topic: ${input.topic}`,
+            input.additionalContext ? `Additional context: ${input.additionalContext}` : '',
+        ]),
+        buildSection('Available folders', [
+            input.folders
+                .map(
+                    (folder, index) =>
+                        `${index + 1}. ${folder.name}: ${folder.description}`
+                )
+                .join('\n'),
+        ]),
+        buildSection('Output Contract', [
+            'Return the chosen folderName exactly as written in the available folder list.',
+            'Include a concise reasoning string explaining the match.',
+        ]),
+    ].join('\n\n')
+}
+
 export function buildSyllabusMarkdownPrompt(input: {
     topic: string
     level: DidacticUnitLevel

@@ -28,6 +28,11 @@ export const questionnaireSchema = z.object({
         .min(1),
 })
 
+export const folderClassificationSchema = z.object({
+    folderName: z.string().min(1),
+    reasoning: z.string().min(1),
+})
+
 export const syllabusLessonSchema = z.object({
     title: z.string().min(1),
     contentOutline: z.array(z.string().min(1)).min(1),

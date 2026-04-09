@@ -8,11 +8,20 @@ export type DashboardSection =
 
 export type DashboardItemKind = 'didacticUnit'
 
+export interface DashboardFolderSummary {
+    id: string
+    name: string
+    icon: string
+    color: string
+    kind: 'default' | 'custom'
+}
+
 export interface DashboardFolder {
     id: string
     name: string
     icon: string
     color: string
+    kind: 'default' | 'custom'
     units: string[]
     unitCount: number
 }
@@ -22,7 +31,7 @@ export interface DashboardListItem {
     id: string
     title: string
     subtitle: string
-    subject: string
+    folder: DashboardFolderSummary
     status: string
     primaryProgressPercent: number
     studyProgressPercent?: number
@@ -71,7 +80,7 @@ export interface PlanningSyllabus {
 export interface PlanningDetailViewModel {
     id: string
     topic: string
-    subject: string
+    folder: DashboardFolderSummary
     provider: string
     status: string
     nextAction: string
@@ -124,7 +133,7 @@ export interface DidacticUnitEditorChapter {
 export interface DidacticUnitEditorViewModel {
     id: string
     title: string
-    subject: string
+    folder: DashboardFolderSummary
     progress: number
     lastEdited: string
     coverColor: string

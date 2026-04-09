@@ -1,6 +1,6 @@
 import { MoreVertical, PencilLine } from 'lucide-react'
-import { getSubjectStyle } from '../../../utils/subjectStyles'
 import type { DashboardListItem } from '../../../types'
+import { getFolderVisuals } from '../../../utils/folderDisplay'
 
 type UnitsTableProps = {
     onOpenItem: (itemId: string) => void
@@ -17,7 +17,7 @@ export function UnitsTable({ onOpenItem, units }: UnitsTableProps) {
                             Title
                         </th>
                         <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-[#86868B]">
-                            Subject
+                            Folder
                         </th>
                         <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-[#86868B]">
                             Chapters
@@ -35,8 +35,8 @@ export function UnitsTable({ onOpenItem, units }: UnitsTableProps) {
                 </thead>
                 <tbody>
                     {units.map((unit, index) => {
-                        const style = getSubjectStyle(unit.subject)
-                        const SubjectIcon = style.icon
+                        const style = getFolderVisuals(unit.folder)
+                        const FolderIcon = style.icon
 
                         return (
                             <tr
@@ -55,7 +55,7 @@ export function UnitsTable({ onOpenItem, units }: UnitsTableProps) {
                                             className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg"
                                             style={{ backgroundColor: style.bgColor }}
                                         >
-                                            <SubjectIcon
+                                            <FolderIcon
                                                 size={22}
                                                 strokeWidth={2}
                                                 style={{ color: style.iconColor }}
@@ -87,8 +87,8 @@ export function UnitsTable({ onOpenItem, units }: UnitsTableProps) {
                                             color: style.iconColor,
                                         }}
                                     >
-                                        <SubjectIcon size={11} strokeWidth={2.5} />
-                                        {unit.subject}
+                                        <FolderIcon size={11} strokeWidth={2.5} />
+                                        {unit.folder.name}
                                     </span>
                                 </td>
                                 <td className="px-6 py-4 text-[14px] text-[#1D1D1F]">

@@ -15,6 +15,7 @@ import type {
 import type { AiConfig, AiModelConfig, AiModelTier } from './config.js'
 import { resolveGatewayModelId } from './config.js'
 import {
+    buildFolderClassificationPrompt,
     buildChapterMarkdownPrompt,
     buildContinuitySummaryPrompt,
     buildGatewaySystemPrompt,
@@ -25,6 +26,7 @@ import {
     buildSyllabusMarkdownPrompt,
 } from './prompt-builders.js'
 import {
+    folderClassificationSchema,
     moderationSchema,
     questionnaireSchema,
     syllabusSchema,
@@ -51,6 +53,11 @@ export interface ModerationResult extends BaseStageResult {
     normalizedTopic: string
     improvedTopicBrief: string
     reasoningNotes: string
+}
+
+export interface FolderClassificationResult extends BaseStageResult {
+    folderName: string
+    reasoning: string
 }
 
 export interface QuestionnaireResult extends BaseStageResult {
@@ -84,6 +91,17 @@ export interface StructuredStreamCallbacks<T> {
 }
 
 export interface AiService {
+    classifyFolder(input: {
+        topic: string
+        additionalContext?: string
+        folders: Array<{
+            name: string
+            description: string
+        }>
+        config: AiConfig
+        tier: AiModelTier
+        abortSignal?: AbortSignal
+    }): Promise<FolderClassificationResult>
     moderateTopic(input: {
         topic: string
         level: DidacticUnitLevel
@@ -362,6 +380,43 @@ export class GatewayAiService implements AiService {
         return {
             provider: config.provider.trim(),
             model: config.model.trim(),
+        }
+    }
+
+    async classifyFolder(input: {
+        topic: string
+        additionalContext?: string
+        folders: Array<{
+            name: string
+            description: string
+        }>
+        config: AiConfig
+        tier: AiModelTier
+        abortSignal?: AbortSignal
+    }): Promise<FolderClassificationResult> {
+        const selection = this.selectModel(input.tier, input.config)
+        const prompt = buildFolderClassificationPrompt({
+            topic: input.topic,
+            additionalContext: input.additionalContext,
+            folders: input.folders,
+            authoring: input.config.authoring,
+        })
+
+        const result = await generateObject({
+            model: this.gateway(selection.modelId),
+            system: buildGatewaySystemPrompt('moderation'),
+            prompt,
+            schema: folderClassificationSchema,
+            maxOutputTokens: resolveStageMaxOutputTokens('moderation'),
+            abortSignal: input.abortSignal,
+        })
+
+        return {
+            provider: selection.provider,
+            model: selection.model,
+            prompt,
+            folderName: result.object.folderName,
+            reasoning: result.object.reasoning,
         }
     }
 

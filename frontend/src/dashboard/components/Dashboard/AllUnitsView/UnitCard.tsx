@@ -1,6 +1,6 @@
 import { Clock, MoreVertical, PencilLine } from 'lucide-react'
-import { getSubjectStyle } from '../../../utils/subjectStyles'
 import type { DashboardListItem } from '../../../types'
+import { getFolderVisuals } from '../../../utils/folderDisplay'
 
 type UnitCardProps = {
     onOpenItem: (itemId: string) => void
@@ -8,8 +8,8 @@ type UnitCardProps = {
 }
 
 export function UnitCard({ onOpenItem, unit }: UnitCardProps) {
-    const style = getSubjectStyle(unit.subject)
-    const SubjectIcon = style.icon
+    const style = getFolderVisuals(unit.folder)
+    const FolderIcon = style.icon
 
     return (
         <button
@@ -22,7 +22,7 @@ export function UnitCard({ onOpenItem, unit }: UnitCardProps) {
                     className="relative flex h-[180px] items-center justify-center"
                     style={{ backgroundColor: style.bgColor }}
                 >
-                    <SubjectIcon
+                    <FolderIcon
                         size={72}
                         strokeWidth={1.5}
                         style={{ color: style.iconColor, opacity: 0.4 }}
@@ -81,8 +81,8 @@ export function UnitCard({ onOpenItem, unit }: UnitCardProps) {
                                 color: style.iconColor,
                             }}
                         >
-                            <SubjectIcon size={10} strokeWidth={2.5} />
-                            {unit.subject}
+                            <FolderIcon size={10} strokeWidth={2.5} />
+                            {unit.folder.name}
                         </span>
                         <span className="text-[11px] text-[#86868B]">
                             {unit.chapterCount} {unit.chapterCount === 1 ? 'chapter' : 'chapters'}

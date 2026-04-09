@@ -4,6 +4,7 @@ export interface DidacticUnitStore {
     save(didacticUnit: DidacticUnit): Promise<void>
     getById(ownerId: string, didacticUnitId: string): Promise<DidacticUnit | null>
     listByOwner(ownerId: string): Promise<DidacticUnit[]>
+    deleteById(ownerId: string, didacticUnitId: string): Promise<boolean>
 }
 
 export class InMemoryDidacticUnitStore implements DidacticUnitStore {
@@ -27,5 +28,15 @@ export class InMemoryDidacticUnitStore implements DidacticUnitStore {
         return [...this.didacticUnits.values()]
             .filter((didacticUnit) => didacticUnit.ownerId === ownerId)
             .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+    }
+
+    async deleteById(ownerId: string, didacticUnitId: string): Promise<boolean> {
+        const didacticUnit = this.didacticUnits.get(didacticUnitId)
+
+        if (!didacticUnit || didacticUnit.ownerId !== ownerId) {
+            return false
+        }
+
+        return this.didacticUnits.delete(didacticUnitId)
     }
 }

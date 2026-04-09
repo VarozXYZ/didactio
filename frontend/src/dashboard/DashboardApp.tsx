@@ -20,6 +20,7 @@ import { UnitEditor } from './components/Editor/UnitEditor'
 import { DidacticUnitSetupModal } from './components/Setup/DidacticUnitSetupModal'
 import { DidacticUnitSyllabusModal } from './components/Setup/DidacticUnitSyllabusModal'
 import type { DashboardListItem, DashboardSection } from './types'
+import type { BackendFolder } from './api/dashboardApi'
 
 function renderSettingsView(section: DashboardSection) {
     switch (section) {
@@ -64,9 +65,10 @@ export default function DashboardApp() {
     const [isSidebarOpen] = useState(true)
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
     const [searchQuery, setSearchQuery] = useState('')
-    const [expandedFolders, setExpandedFolders] = useState<string[]>(['general'])
+    const [expandedFolders, setExpandedFolders] = useState<string[]>([])
     const [activeSection, setActiveSection] = useState<DashboardSection>('all-units')
     const [items, setItems] = useState<DashboardListItem[]>([])
+    const [allFolders, setAllFolders] = useState<BackendFolder[]>([])
     const [isLoadingIndex, setIsLoadingIndex] = useState(true)
     const [indexError, setIndexError] = useState<string | null>(null)
     const [refreshKey, setRefreshKey] = useState(0)
@@ -105,12 +107,16 @@ export default function DashboardApp() {
             setIndexError(null)
 
             try {
-                const didacticUnitResponse = await dashboardApi.listDidacticUnits()
+                const [didacticUnitResponse, folderResponse] = await Promise.all([
+                    dashboardApi.listDidacticUnits(),
+                    dashboardApi.listFolders(),
+                ])
                 setItems(
                     mergeDashboardItems({
                         didacticUnits: didacticUnitResponse.didacticUnits,
                     })
                 )
+                setAllFolders(folderResponse.folders)
             } catch (loadError) {
                 setIndexError(
                     loadError instanceof Error
@@ -125,7 +131,10 @@ export default function DashboardApp() {
         void loadDashboardIndex()
     }, [refreshKey])
 
-    const folders = useMemo(() => buildDashboardFolders(items), [items])
+    const sidebarFolders = useMemo(
+        () => buildDashboardFolders(allFolders, items),
+        [allFolders, items]
+    )
     const filteredItems = useMemo(() => {
         const normalizedQuery = searchQuery.trim().toLowerCase()
         if (!normalizedQuery) {
@@ -136,7 +145,7 @@ export default function DashboardApp() {
             (item) =>
                 item.title.toLowerCase().includes(normalizedQuery) ||
                 item.subtitle.toLowerCase().includes(normalizedQuery) ||
-                item.subject.toLowerCase().includes(normalizedQuery)
+                item.folder.name.toLowerCase().includes(normalizedQuery)
         )
     }, [items, searchQuery])
     const averageProgress = useMemo(() => {
@@ -148,6 +157,16 @@ export default function DashboardApp() {
             items.reduce((total, item) => total + item.primaryProgressPercent, 0) / items.length
         )
     }, [items])
+
+    useEffect(() => {
+        if (sidebarFolders.length === 0) {
+            return
+        }
+
+        setExpandedFolders((previous) =>
+            previous.length > 0 ? previous : [sidebarFolders[0].id]
+        )
+    }, [sidebarFolders])
 
     const toggleFolder = (folderId: string) => {
         setExpandedFolders((previous) =>
@@ -161,28 +180,53 @@ export default function DashboardApp() {
         setRefreshKey((previous) => previous + 1)
     }
 
+    const createFolder = async (name: string) => {
+        await dashboardApi.createFolder({ name })
+        refreshDashboard()
+    }
+
+    const openEditor = (itemId: string) => {
+        setActiveSection('all-units')
+        navigate(`/dashboard/unit/${itemId}`)
+    }
+
+    const openSetup = async (itemId: string) => {
+        setActiveSection('all-units')
+        try {
+            const detail = await dashboardApi.getDidacticUnit(itemId)
+            setModalState({
+                isOpen: true,
+                didacticUnitId: itemId,
+                kind: isSyllabusStage(detail.nextAction) ? 'syllabus' : 'setup',
+            })
+        } catch (loadError) {
+            setIndexError(
+                loadError instanceof Error ? loadError.message : 'Failed to open didactic unit.'
+            )
+        }
+    }
+
     const openItem = async (itemId: string) => {
         const item = items.find((entry) => entry.id === itemId)
         if (!item) {
             return
         }
 
-        setActiveSection('all-units')
         if (item.canOpenEditor) {
-            navigate(`/dashboard/unit/${item.id}`)
+            openEditor(itemId)
             return
         }
 
+        await openSetup(itemId)
+    }
+
+    const deleteItem = async (itemId: string) => {
         try {
-            const detail = await dashboardApi.getDidacticUnit(item.id)
-            setModalState({
-                isOpen: true,
-                didacticUnitId: item.id,
-                kind: isSyllabusStage(detail.nextAction) ? 'syllabus' : 'setup',
-            })
-        } catch (loadError) {
+            await dashboardApi.deleteDidacticUnit(itemId)
+            refreshDashboard()
+        } catch (deleteError) {
             setIndexError(
-                loadError instanceof Error ? loadError.message : 'Failed to open didactic unit.'
+                deleteError instanceof Error ? deleteError.message : 'Failed to remove unit.'
             )
         }
     }
@@ -218,7 +262,7 @@ export default function DashboardApp() {
                     <AllUnitsView
                         averageProgress={averageProgress}
                         filteredUnits={filteredItems}
-                        folderCount={folders.length}
+                        folderCount={allFolders.length}
                         onCreateUnit={openCreateView}
                         onOpenItem={openItem}
                         searchQuery={searchQuery}
@@ -250,10 +294,14 @@ export default function DashboardApp() {
             <Sidebar
                 activeSection={activeSection}
                 expandedFolders={expandedFolders}
-                folders={folders}
+                folders={sidebarFolders}
                 isSidebarOpen={isSidebarOpen}
                 items={items}
+                onCreateFolder={createFolder}
+                onDeleteItem={deleteItem}
+                onOpenEditor={openEditor}
                 onOpenItem={openItem}
+                onOpenSetup={openSetup}
                 setActiveSection={handleSetActiveSection}
                 toggleFolder={toggleFolder}
             />

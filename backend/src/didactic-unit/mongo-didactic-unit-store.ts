@@ -49,4 +49,9 @@ export class MongoDidacticUnitStore implements DidacticUnitStore {
             .map((document) => stripMongoId(document))
             .filter((document): document is DidacticUnit => document !== null)
     }
+
+    async deleteById(ownerId: string, didacticUnitId: string): Promise<boolean> {
+        const result = await this.collection.deleteOne({ id: didacticUnitId, ownerId })
+        return result.deletedCount === 1
+    }
 }

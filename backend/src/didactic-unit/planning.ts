@@ -2,6 +2,7 @@ export type DidacticUnitProvider = string
 export type DidacticUnitDepth = 'basic' | 'intermediate' | 'technical'
 export type DidacticUnitLength = 'intro' | 'short' | 'long' | 'textbook'
 export type DidacticUnitLevel = 'beginner' | 'intermediate' | 'advanced'
+export type DidacticUnitFolderAssignmentMode = 'manual' | 'auto'
 
 export type DidacticUnitNextAction =
     | 'moderate_topic'
@@ -21,6 +22,16 @@ export interface CreateDidacticUnitInput {
     length: DidacticUnitLength
     level: DidacticUnitLevel
     questionnaireEnabled: boolean
+    folderSelection: DidacticUnitFolderSelectionInput
+}
+
+export interface DidacticUnitFolderSelectionInput {
+    mode: DidacticUnitFolderAssignmentMode
+    folderId?: string
+}
+
+export interface UpdateDidacticUnitFolderInput {
+    folderSelection: DidacticUnitFolderSelectionInput
 }
 
 export interface DidacticUnitQuestionAnswer {
@@ -223,6 +234,7 @@ export function parseCreateDidacticUnitInput(body: unknown): CreateDidacticUnitI
         length?: unknown
         level?: unknown
         questionnaireEnabled?: unknown
+        folderSelection?: unknown
     }
     const topic = typeof payload.topic === 'string' ? payload.topic.trim() : ''
 
@@ -263,6 +275,54 @@ export function parseCreateDidacticUnitInput(body: unknown): CreateDidacticUnitI
             payload.questionnaireEnabled === undefined
                 ? true
                 : Boolean(payload.questionnaireEnabled),
+        folderSelection: parseFolderSelectionInput(payload.folderSelection),
+    }
+}
+
+export function parseFolderSelectionInput(
+    value: unknown
+): DidacticUnitFolderSelectionInput {
+    if (!value || typeof value !== 'object') {
+        return { mode: 'auto' }
+    }
+
+    const payload = value as {
+        mode?: unknown
+        folderId?: unknown
+    }
+
+    if (payload.mode !== 'manual' && payload.mode !== 'auto') {
+        throw new Error('folderSelection.mode must be either "manual" or "auto".')
+    }
+
+    if (payload.mode === 'manual') {
+        const folderId =
+            typeof payload.folderId === 'string' ? payload.folderId.trim() : ''
+
+        if (!folderId) {
+            throw new Error('folderSelection.folderId is required for manual mode.')
+        }
+
+        return {
+            mode: 'manual',
+            folderId,
+        }
+    }
+
+    return { mode: 'auto' }
+}
+
+export function parseUpdateDidacticUnitFolderInput(
+    body: unknown
+): UpdateDidacticUnitFolderInput {
+    if (!body || typeof body !== 'object') {
+        throw new Error('Request body must be a JSON object.')
+    }
+
+    const payload = body as { folderSelection?: unknown }
+
+    return {
+        folderSelection: parseFolderSelectionInput(payload.folderSelection),
     }
 }
 

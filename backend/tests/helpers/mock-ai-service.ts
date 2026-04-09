@@ -1,6 +1,7 @@
 import type {
     AiService,
     ChapterResult,
+    FolderClassificationResult,
     MarkdownStreamCallbacks,
     ModerationResult,
     QuestionnaireResult,
@@ -84,11 +85,47 @@ function chapterMarkdown(input: {
     ].join('\n')
 }
 
+function classifyFolderName(topic: string, availableFolderNames: string[]): string {
+    const normalizedTopic = topic.toLowerCase()
+    const keywordMatchers: Array<{ folderName: string; keywords: string[] }> = [
+        { folderName: 'Computer Science', keywords: ['javascript', 'typescript', 'react', 'next.js', 'python', 'programming', 'software'] },
+        { folderName: 'Physics & Computer Science', keywords: ['quantum', 'computing'] },
+        { folderName: 'Mathematics', keywords: ['math', 'algebra', 'calculus', 'statistics'] },
+        { folderName: 'Biology', keywords: ['biology', 'cell', 'genetics'] },
+        { folderName: 'History', keywords: ['history', 'war', 'ancient', 'civilization'] },
+        { folderName: 'Literature', keywords: ['literature', 'english', 'writing', 'shakespeare'] },
+        { folderName: 'Physics', keywords: ['physics', 'thermodynamics', 'mechanics'] },
+        { folderName: 'Chemistry', keywords: ['chemistry', 'chemical'] },
+        { folderName: 'Geography', keywords: ['geography', 'earth', 'climate'] },
+    ]
+
+    const matchedFolderName =
+        keywordMatchers.find(({ keywords }) =>
+            keywords.some((keyword) => normalizedTopic.includes(keyword))
+        )?.folderName ?? 'General'
+
+    return availableFolderNames.includes(matchedFolderName) ? matchedFolderName : 'General'
+}
+
 export function createMockAiService(): AiService {
     const provider = 'mock-provider'
     const model = 'mock-model'
 
     return {
+        async classifyFolder(input): Promise<FolderClassificationResult> {
+            const folderName = classifyFolderName(
+                input.topic,
+                input.folders.map((folder) => folder.name)
+            )
+
+            return {
+                provider,
+                model,
+                prompt: `Classify folder for ${input.topic}`,
+                folderName,
+                reasoning: `Matched ${folderName} from the provided folder list.`,
+            }
+        },
         async moderateTopic(input): Promise<ModerationResult> {
             return {
                 provider,

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Sparkles, X } from 'lucide-react'
-import { dashboardApi } from '../../api/dashboardApi'
+import { type BackendFolder, dashboardApi } from '../../api/dashboardApi'
 import { adaptDidacticUnitPlanning } from '../../adapters'
 import type { PlanningDetailViewModel } from '../../types'
+import { getFolderIcon } from '../../utils/folderDisplay'
 
 type DidacticUnitSetupModalProps = {
     didacticUnitId?: string | null
@@ -98,6 +99,10 @@ export function DidacticUnitSetupModal({
         'short'
     )
     const [draftQuestionnaireEnabled, setDraftQuestionnaireEnabled] = useState(true)
+    const [draftFolderMode, setDraftFolderMode] = useState<'manual' | 'auto'>('auto')
+    const [draftFolderId, setDraftFolderId] = useState('')
+    const [availableFolders, setAvailableFolders] = useState<BackendFolder[]>([])
+    const [draftNewFolderName, setDraftNewFolderName] = useState('')
     const [questionnaireAnswers, setQuestionnaireAnswers] = useState<Record<string, string>>({})
     const [isLoading, setIsLoading] = useState(Boolean(didacticUnitId))
     const [isSubmitting, setIsSubmitting] = useState(false)
@@ -140,10 +145,23 @@ export function DidacticUnitSetupModal({
             setDraftDepth(planningDetail.depth)
             setDraftLength(planningDetail.length)
             setDraftQuestionnaireEnabled(planningDetail.questionnaireEnabled)
+             setDraftFolderId(planningDetail.folder.id)
             setActiveDidacticUnitId(planningDetail.id)
         },
         [onOpenSyllabusReview]
     )
+
+    useEffect(() => {
+        void (async () => {
+            try {
+                const response = await dashboardApi.listFolders()
+                setAvailableFolders(response.folders)
+                setDraftFolderId((previous) => previous || response.folders[0]?.id || '')
+            } catch (loadError) {
+                setError(loadError instanceof Error ? loadError.message : 'Failed to load folders.')
+            }
+        })()
+    }, [])
 
     useEffect(() => {
         if (!didacticUnitId) {
@@ -183,6 +201,10 @@ export function DidacticUnitSetupModal({
                 depth: draftDepth,
                 length: draftLength,
                 questionnaireEnabled: draftQuestionnaireEnabled,
+                folderSelection:
+                    draftFolderMode === 'manual'
+                        ? { mode: 'manual', folderId: draftFolderId }
+                        : { mode: 'auto' },
             })
 
             let detail = await dashboardApi.moderateDidacticUnit(created.id)
@@ -191,6 +213,49 @@ export function DidacticUnitSetupModal({
                 detail = await dashboardApi.generateDidacticUnitQuestionnaire(created.id, 'cheap')
             }
 
+            onDataChanged()
+            applyPlanningState(detail)
+        } catch (actionError) {
+            setError(actionError instanceof Error ? actionError.message : 'Action failed.')
+        } finally {
+            setIsSubmitting(false)
+        }
+    }
+
+    const handleCreateFolder = async () => {
+        if (!draftNewFolderName.trim()) {
+            return
+        }
+
+        setIsSubmitting(true)
+        setError(null)
+
+        try {
+            const folder = await dashboardApi.createFolder({ name: draftNewFolderName.trim() })
+            const response = await dashboardApi.listFolders()
+            setAvailableFolders(response.folders)
+            setDraftFolderMode('manual')
+            setDraftFolderId(folder.id)
+            setDraftNewFolderName('')
+        } catch (actionError) {
+            setError(actionError instanceof Error ? actionError.message : 'Action failed.')
+        } finally {
+            setIsSubmitting(false)
+        }
+    }
+
+    const handleUpdateFolder = async (
+        folderSelection: { mode: 'manual'; folderId: string } | { mode: 'auto' }
+    ) => {
+        if (!planning) {
+            return
+        }
+
+        setIsSubmitting(true)
+        setError(null)
+
+        try {
+            const detail = await dashboardApi.updateDidacticUnitFolder(planning.id, folderSelection)
             onDataChanged()
             applyPlanningState(detail)
         } catch (actionError) {
@@ -273,6 +338,78 @@ export function DidacticUnitSetupModal({
                             placeholder="Optional: learner goals, domain constraints, course angle, or audience notes."
                             className="w-full rounded-[14px] border border-[#E5E5E7] px-4 py-3 text-[14px] focus:border-[#4ADE80] focus:outline-none"
                         />
+                    </div>
+
+                    <div className="space-y-4 rounded-[16px] border border-[#E5E5E7] bg-[#FAFAFB] p-4">
+                        <div>
+                            <div className="text-[14px] font-semibold text-[#1D1D1F]">
+                                Folder assignment
+                            </div>
+                            <div className="mt-1 text-[13px] text-[#6B7280]">
+                                Pick a folder now or let the cheap model classify the unit after topic moderation.
+                            </div>
+                        </div>
+
+                        <div className="grid gap-3 md:grid-cols-2">
+                            <button
+                                type="button"
+                                onClick={() => setDraftFolderMode('manual')}
+                                className={`rounded-[14px] border px-4 py-3 text-left transition-all ${
+                                    draftFolderMode === 'manual'
+                                        ? 'border-[#1D1D1F] bg-white text-[#1D1D1F]'
+                                        : 'border-[#E5E5E7] bg-white text-[#86868B]'
+                                }`}
+                            >
+                                <div className="text-[13px] font-semibold">Manual</div>
+                                <div className="mt-1 text-[12px]">Choose an existing folder before creation.</div>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setDraftFolderMode('auto')}
+                                className={`rounded-[14px] border px-4 py-3 text-left transition-all ${
+                                    draftFolderMode === 'auto'
+                                        ? 'border-[#1D1D1F] bg-white text-[#1D1D1F]'
+                                        : 'border-[#E5E5E7] bg-white text-[#86868B]'
+                                }`}
+                            >
+                                <div className="text-[13px] font-semibold">Auto</div>
+                                <div className="mt-1 text-[12px]">Classify with the cheap model and fall back to General if needed.</div>
+                            </button>
+                        </div>
+
+                        {draftFolderMode === 'manual' && (
+                            <div className="space-y-3">
+                                <select
+                                    value={draftFolderId}
+                                    onChange={(event) => setDraftFolderId(event.target.value)}
+                                    className="w-full rounded-[14px] border border-[#E5E5E7] px-4 py-3 text-[14px] focus:border-[#4ADE80] focus:outline-none"
+                                >
+                                    {availableFolders.map((folder) => (
+                                        <option key={folder.id} value={folder.id}>
+                                            {folder.name}
+                                        </option>
+                                    ))}
+                                </select>
+
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={draftNewFolderName}
+                                        onChange={(event) => setDraftNewFolderName(event.target.value)}
+                                        placeholder="Create a new folder"
+                                        className="flex-1 rounded-[14px] border border-[#E5E5E7] px-4 py-3 text-[14px] focus:border-[#4ADE80] focus:outline-none"
+                                    />
+                                    <button
+                                        type="button"
+                                        disabled={!draftNewFolderName.trim() || isSubmitting}
+                                        onClick={() => void handleCreateFolder()}
+                                        className="rounded-[14px] border border-[#1D1D1F] px-4 py-3 text-[13px] font-semibold text-[#1D1D1F] disabled:opacity-50"
+                                    >
+                                        Add Folder
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     <div className="grid gap-4 md:grid-cols-2">
@@ -373,6 +510,11 @@ export function DidacticUnitSetupModal({
                         <div className="mt-2 space-y-1">
                             <div>- AI profile settings choose provider, model, and tone</div>
                             <div>- This unit keeps its own learner level, depth, and length targets</div>
+                            <div>
+                                - {draftFolderMode === 'manual'
+                                    ? 'The unit is created in the selected folder immediately'
+                                    : 'The cheap model auto-assigns a folder after moderation, with General as fallback'}
+                            </div>
                             <div>- Topic moderation happens automatically with the cheap model</div>
                             <div>
                                 - {draftQuestionnaireEnabled
@@ -394,7 +536,11 @@ export function DidacticUnitSetupModal({
                         </button>
                         <button
                             type="submit"
-                            disabled={!draftTopic.trim() || isSubmitting}
+                            disabled={
+                                !draftTopic.trim() ||
+                                isSubmitting ||
+                                (draftFolderMode === 'manual' && !draftFolderId)
+                            }
                             className="rounded-[12px] bg-[#1D1D1F] px-5 py-3 text-[14px] font-semibold text-white disabled:opacity-50"
                         >
                             {isSubmitting ? 'Preparing...' : 'Next Step'}
@@ -438,6 +584,61 @@ export function DidacticUnitSetupModal({
                         </div>
                     </div>
                 </div>
+
+                <section className="rounded-[18px] border border-[#E5E5E7] bg-[#FAFAFB] p-5">
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                        <div>
+                            <h3 className="text-[16px] font-semibold text-[#1D1D1F]">
+                                Folder
+                            </h3>
+                            <div className="mt-2 flex items-center gap-2 text-[13px] text-[#4B5563]">
+                                {(() => {
+                                    const FolderIcon = getFolderIcon(planning.folder.icon)
+
+                                    return (
+                                        <span
+                                            className="flex h-8 w-8 items-center justify-center rounded-lg"
+                                            style={{
+                                                backgroundColor: `${planning.folder.color}1A`,
+                                                color: planning.folder.color,
+                                            }}
+                                        >
+                                            <FolderIcon size={16} strokeWidth={2} />
+                                        </span>
+                                    )
+                                })()}
+                                <span className="font-medium">{planning.folder.name}</span>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2">
+                            <select
+                                value={planning.folder.id}
+                                onChange={(event) =>
+                                    void handleUpdateFolder({
+                                        mode: 'manual',
+                                        folderId: event.target.value,
+                                    })
+                                }
+                                className="rounded-[12px] border border-[#E5E5E7] bg-white px-4 py-3 text-[13px] focus:border-[#4ADE80] focus:outline-none"
+                            >
+                                {availableFolders.map((folder) => (
+                                    <option key={folder.id} value={folder.id}>
+                                        {folder.name}
+                                    </option>
+                                ))}
+                            </select>
+                            <button
+                                type="button"
+                                disabled={isSubmitting}
+                                onClick={() => void handleUpdateFolder({ mode: 'auto' })}
+                                className="rounded-[12px] border border-[#1D1D1F] bg-white px-4 py-3 text-[13px] font-semibold text-[#1D1D1F] disabled:opacity-50"
+                            >
+                                Auto-assign
+                            </button>
+                        </div>
+                    </div>
+                </section>
 
                 {(planning.improvedTopicBrief || planning.reasoningNotes || planning.additionalContext) && (
                     <section className="rounded-[18px] border border-[#E5E5E7] bg-[#FAFAFB] p-5">

@@ -4,18 +4,30 @@ import {
     ChevronRight,
     CreditCard,
     Lock,
+    MoreHorizontal,
     MoreVertical,
     Palette,
+    PenLine,
     Plus,
+    Settings2,
+    Trash2,
     User,
 } from 'lucide-react'
 import { motion } from 'motion/react'
-import type { Dispatch, SetStateAction } from 'react'
+import { useState, type Dispatch, type SetStateAction } from 'react'
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '../../../../components/ui/dropdown-menu'
 import type {
     DashboardFolder,
     DashboardListItem,
     DashboardSection,
 } from '../../../types'
+import { getFolderIcon } from '../../../utils/folderDisplay'
 
 type SidebarProps = {
     isSidebarOpen: boolean
@@ -24,7 +36,11 @@ type SidebarProps = {
     expandedFolders: string[]
     toggleFolder: (folderId: string) => void
     folders: DashboardFolder[]
+    onCreateFolder: (name: string) => Promise<void>
     onOpenItem: (itemId: string) => void
+    onOpenEditor: (itemId: string) => void
+    onOpenSetup: (itemId: string) => void
+    onDeleteItem: (itemId: string) => void
     items: DashboardListItem[]
 }
 
@@ -35,9 +51,16 @@ export function Sidebar({
     expandedFolders,
     toggleFolder,
     folders,
+    onCreateFolder,
     onOpenItem,
+    onOpenEditor,
+    onOpenSetup,
+    onDeleteItem,
     items,
 }: SidebarProps) {
+    const [isCreatingFolder, setIsCreatingFolder] = useState(false)
+    const [draftFolderName, setDraftFolderName] = useState('')
+    const [isSubmittingFolder, setIsSubmittingFolder] = useState(false)
     const settingsItems: Array<{
         id: DashboardSection
         label: string
@@ -94,24 +117,43 @@ export function Sidebar({
                                     !isSidebarOpen ? 'justify-center' : ''
                                 }`}
                             >
-                                {isSidebarOpen ? (
-                                    <>
-                                        {expandedFolders.includes(folder.id) ? (
-                                            <ChevronDown size={14} className="text-[#86868B]" />
-                                        ) : (
-                                            <ChevronRight size={14} className="text-[#86868B]" />
-                                        )}
-                                        <span className="text-lg">{folder.icon}</span>
-                                        <span className="flex-1 truncate text-left text-[14px] font-medium">
-                                            {folder.name}
-                                        </span>
-                                        <span className="rounded-full bg-[#F5F5F7] px-2 py-0.5 text-[11px]">
-                                            {folder.unitCount}
-                                        </span>
-                                    </>
-                                ) : (
-                                    <span className="text-lg">{folder.icon}</span>
-                                )}
+                                {(() => {
+                                    const FolderIcon = getFolderIcon(folder.icon)
+
+                                    return isSidebarOpen ? (
+                                        <>
+                                            {expandedFolders.includes(folder.id) ? (
+                                                <ChevronDown size={14} className="text-[#86868B]" />
+                                            ) : (
+                                                <ChevronRight
+                                                    size={14}
+                                                    className="text-[#86868B]"
+                                                />
+                                            )}
+                                            <div
+                                                className="flex h-7 w-7 items-center justify-center rounded-lg"
+                                                style={{
+                                                    backgroundColor: `${folder.color}1A`,
+                                                    color: folder.color,
+                                                }}
+                                            >
+                                                <FolderIcon size={15} strokeWidth={2} />
+                                            </div>
+                                            <span className="flex-1 truncate text-left text-[14px] font-medium">
+                                                {folder.name}
+                                            </span>
+                                            <span className="rounded-full bg-[#F5F5F7] px-2 py-0.5 text-[11px]">
+                                                {folder.unitCount}
+                                            </span>
+                                        </>
+                                    ) : (
+                                        <FolderIcon
+                                            size={18}
+                                            strokeWidth={2}
+                                            style={{ color: folder.color }}
+                                        />
+                                    )
+                                })()}
                             </button>
 
                             {isSidebarOpen && expandedFolders.includes(folder.id) && (
@@ -124,25 +166,55 @@ export function Sidebar({
                                         }
 
                                         return (
-                                            <button
+                                            <div
                                                 key={unitId}
-                                                type="button"
-                                                onClick={() => onOpenItem(unitId)}
-                                                className="block w-full rounded-[6px] px-3 py-1.5 text-left text-[13px] text-[#86868B] transition-all hover:bg-[#F5F5F7]/50 hover:text-[#1D1D1F]"
+                                                className="group flex items-center gap-1 rounded-[6px] px-3 py-1.5 text-[13px] text-[#86868B] transition-all hover:bg-[#F5F5F7]/50 hover:text-[#1D1D1F]"
                                             >
-                                                <span className="flex items-center justify-between gap-3">
-                                                    <span className="truncate">{unit.title}</span>
-                                                    {unit.canOpenEditor ? (
-                                                        <span className="rounded-full bg-[#1D1D1F] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
-                                                            Editor
-                                                        </span>
-                                                    ) : (
-                                                        <span className="rounded-full bg-[#F5F5F7] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#86868B]">
-                                                            Setup
-                                                        </span>
-                                                    )}
-                                                </span>
-                                            </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => onOpenItem(unitId)}
+                                                    className="min-w-0 flex-1 truncate text-left"
+                                                >
+                                                    {unit.title}
+                                                </button>
+
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded opacity-0 transition-opacity hover:bg-[#E5E5E7] group-hover:opacity-100 data-[state=open]:opacity-100"
+                                                        >
+                                                            <MoreHorizontal size={13} />
+                                                        </button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent side="right" align="start">
+                                                        {unit.canOpenEditor ? (
+                                                            <DropdownMenuItem
+                                                                onSelect={() => onOpenEditor(unitId)}
+                                                            >
+                                                                <PenLine />
+                                                                Open Editor
+                                                            </DropdownMenuItem>
+                                                        ) : (
+                                                            <DropdownMenuItem
+                                                                onSelect={() => onOpenSetup(unitId)}
+                                                            >
+                                                                <Settings2 />
+                                                                Open Setup
+                                                            </DropdownMenuItem>
+                                                        )}
+                                                        <DropdownMenuSeparator />
+                                                        <DropdownMenuItem
+                                                            destructive
+                                                            onSelect={() => onDeleteItem(unitId)}
+                                                        >
+                                                            <Trash2 />
+                                                            Remove Unit
+                                                        </DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            </div>
                                         )
                                     })}
                                     {folder.units.length === 0 && (
@@ -157,13 +229,68 @@ export function Sidebar({
                 </div>
 
                 {isSidebarOpen && (
-                    <button
-                        type="button"
-                        className="mb-6 flex w-full items-center gap-3 rounded-[10px] px-3 py-2 text-[13px] text-[#86868B] transition-all hover:bg-[#F5F5F7]/50 hover:text-[#1D1D1F]"
-                    >
-                        <Plus size={16} />
-                        <span>Create Folder</span>
-                    </button>
+                    <div className="mb-6">
+                        {isCreatingFolder ? (
+                            <form
+                                className="space-y-2 rounded-[14px] border border-[#E5E5E7] bg-[#FAFAFB] p-3"
+                                onSubmit={(event) => {
+                                    event.preventDefault()
+
+                                    if (!draftFolderName.trim() || isSubmittingFolder) {
+                                        return
+                                    }
+
+                                    void (async () => {
+                                        setIsSubmittingFolder(true)
+
+                                        try {
+                                            await onCreateFolder(draftFolderName.trim())
+                                            setDraftFolderName('')
+                                            setIsCreatingFolder(false)
+                                        } finally {
+                                            setIsSubmittingFolder(false)
+                                        }
+                                    })()
+                                }}
+                            >
+                                <input
+                                    type="text"
+                                    value={draftFolderName}
+                                    onChange={(event) => setDraftFolderName(event.target.value)}
+                                    placeholder="New folder name"
+                                    className="w-full rounded-[10px] border border-[#E5E5E7] bg-white px-3 py-2 text-[13px] text-[#1D1D1F] outline-none focus:border-[#4ADE80]"
+                                />
+                                <div className="flex items-center justify-end gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setDraftFolderName('')
+                                            setIsCreatingFolder(false)
+                                        }}
+                                        className="rounded-[10px] px-3 py-2 text-[12px] font-medium text-[#86868B]"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={!draftFolderName.trim() || isSubmittingFolder}
+                                        className="rounded-[10px] bg-[#1D1D1F] px-3 py-2 text-[12px] font-medium text-white disabled:opacity-50"
+                                    >
+                                        {isSubmittingFolder ? 'Creating...' : 'Create'}
+                                    </button>
+                                </div>
+                            </form>
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={() => setIsCreatingFolder(true)}
+                                className="flex w-full items-center gap-3 rounded-[10px] px-3 py-2 text-[13px] text-[#86868B] transition-all hover:bg-[#F5F5F7]/50 hover:text-[#1D1D1F]"
+                            >
+                                <Plus size={16} />
+                                <span>Create Folder</span>
+                            </button>
+                        )}
+                    </div>
                 )}
 
                 {isSidebarOpen && (

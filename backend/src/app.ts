@@ -14,6 +14,7 @@ import {
     GatewayAiService,
     type AiService,
     type ChapterResult,
+    type FolderClassificationResult,
     type SyllabusResult,
 } from './ai/service.js'
 import { completeDidacticUnitChapter } from './didactic-unit/complete-didactic-unit-chapter.js'
@@ -44,7 +45,9 @@ import {
 import {
     adaptDidacticUnitSyllabusToReferenceSyllabus,
     parseCreateDidacticUnitInput,
+    parseFolderSelectionInput,
     parseQuestionnaireAnswersInput,
+    parseUpdateDidacticUnitFolderInput,
     parseUpdateDidacticUnitSyllabusInput,
 } from './didactic-unit/planning.js'
 import {
@@ -52,7 +55,17 @@ import {
     summarizeDidacticUnitStudyProgress,
 } from './didactic-unit/summarize-didactic-unit.js'
 import { updateDidacticUnitChapter } from './didactic-unit/update-didactic-unit-chapter.js'
+import { updateDidacticUnitFolder } from './didactic-unit/update-didactic-unit-folder.js'
 import type { DidacticUnitStore } from './didactic-unit/didactic-unit-store.js'
+import {
+    CUSTOM_FOLDER_COLOR,
+    CUSTOM_FOLDER_ICON,
+    ensureDefaultFolders,
+    getGeneralFolder,
+    normalizeFolderName,
+    slugifyFolderName,
+} from './folders/folder-defaults.js'
+import type { Folder, FolderStore } from './folders/folder-store.js'
 import {
     createCompletedChapterGenerationRunRecord,
     createCompletedSyllabusGenerationRunRecord,
@@ -72,6 +85,7 @@ import { buildChapterGenerationPrompt } from './providers/chapter-generator.js'
 export interface CreateAppOptions {
     didacticUnitStore: DidacticUnitStore
     generationRunStore: GenerationRunStore
+    folderStore: FolderStore
     aiConfigStore?: AiConfigStore
     aiService?: AiService
     mongoHealth?: MongoHealthStatus
@@ -177,12 +191,55 @@ function compareRunsByCreatedAtDesc(
     return right.createdAt.localeCompare(left.createdAt)
 }
 
-function buildDidacticUnitResponse(didacticUnit: DidacticUnit) {
+function buildFolderResponse(folder: Folder) {
+    return {
+        id: folder.id,
+        name: folder.name,
+        icon: folder.icon,
+        color: folder.color,
+        kind: folder.kind,
+    }
+}
+
+function buildFolderDescription(folder: Folder): string {
+    if (folder.slug === 'general') {
+        return 'Use for broad topics, mixed subjects, or units that do not clearly fit a specialized folder.'
+    }
+
+    return `Use for units primarily focused on ${folder.name.toLowerCase()}.`
+}
+
+function resolveFolderOrFallback(
+    didacticUnit: Pick<DidacticUnit, 'folderId'>,
+    foldersById: Map<string, Folder>
+): Folder {
+    const assignedFolder = foldersById.get(didacticUnit.folderId)
+    if (assignedFolder) {
+        return assignedFolder
+    }
+
+    const generalFolder = [...foldersById.values()].find((folder) => folder.slug === 'general')
+    if (generalFolder) {
+        return generalFolder
+    }
+
+    throw new Error('No folder metadata was available for the didactic unit response.')
+}
+
+function buildDidacticUnitResponseFromFolders(
+    didacticUnit: DidacticUnit,
+    foldersById: Map<string, Folder>
+) {
+    const folder = resolveFolderOrFallback(didacticUnit, foldersById)
+
     return {
         id: didacticUnit.id,
         ownerId: didacticUnit.ownerId,
         topic: didacticUnit.topic,
         title: didacticUnit.title,
+        folderId: folder.id,
+        folderAssignmentMode: didacticUnit.folderAssignmentMode,
+        folder: buildFolderResponse(folder),
         provider: didacticUnit.provider,
         status: didacticUnit.status,
         nextAction: didacticUnit.nextAction,
@@ -220,6 +277,131 @@ function buildDidacticUnitResponse(didacticUnit: DidacticUnit) {
             })),
         })),
         studyProgress: summarizeDidacticUnitStudyProgress(didacticUnit),
+    }
+}
+
+async function loadFoldersById(folderStore: FolderStore, ownerId: string): Promise<Map<string, Folder>> {
+    const folders = await ensureDefaultFolders(folderStore, ownerId)
+    return new Map(folders.map((folder) => [folder.id, folder] as const))
+}
+
+async function buildDidacticUnitResponse(
+    didacticUnit: DidacticUnit,
+    folderStore: FolderStore
+) {
+    return buildDidacticUnitResponseFromFolders(
+        didacticUnit,
+        await loadFoldersById(folderStore, didacticUnit.ownerId)
+    )
+}
+
+async function buildDidacticUnitSummaryResponses(
+    didacticUnits: DidacticUnit[],
+    folderStore: FolderStore,
+    ownerId: string
+) {
+    const foldersById = await loadFoldersById(folderStore, ownerId)
+
+    return didacticUnits.map((didacticUnit) => {
+        const summary = summarizeDidacticUnit(didacticUnit)
+        const folder = resolveFolderOrFallback(didacticUnit, foldersById)
+
+        return {
+            ...summary,
+            folder: buildFolderResponse(folder),
+        }
+    })
+}
+
+async function listFoldersWithUnitCounts(
+    folderStore: FolderStore,
+    didacticUnitStore: DidacticUnitStore,
+    ownerId: string
+) {
+    const folders = await ensureDefaultFolders(folderStore, ownerId)
+    const didacticUnits = await didacticUnitStore.listByOwner(ownerId)
+    const unitCounts = didacticUnits.reduce<Map<string, number>>((counts, didacticUnit) => {
+        counts.set(
+            didacticUnit.folderId,
+            (counts.get(didacticUnit.folderId) ?? 0) + 1
+        )
+        return counts
+    }, new Map())
+
+    return folders.map((folder) => ({
+        ...buildFolderResponse(folder),
+        unitCount: unitCounts.get(folder.id) ?? 0,
+    }))
+}
+
+function resolveFolderSelectionForManualMode(
+    folderSelection: {
+        mode: 'manual' | 'auto'
+        folderId?: string
+    },
+    foldersById: Map<string, Folder>
+) {
+    if (folderSelection.mode !== 'manual') {
+        return folderSelection
+    }
+
+    const selectedFolder = folderSelection.folderId
+        ? foldersById.get(folderSelection.folderId)
+        : null
+
+    if (!selectedFolder) {
+        throw new Error('Selected folder was not found.')
+    }
+
+    return {
+        mode: 'manual' as const,
+        folderId: selectedFolder.id,
+    }
+}
+
+async function resolveAutoAssignedFolderSelection(input: {
+    didacticUnit: DidacticUnit
+    folderStore: FolderStore
+    aiConfigStore: AiConfigStore
+    aiService: AiService
+    abortSignal?: AbortSignal
+}): Promise<{
+    folderId: string
+    result?: FolderClassificationResult
+}> {
+    const folders = await ensureDefaultFolders(input.folderStore, input.didacticUnit.ownerId)
+    const generalFolder = folders.find((folder) => folder.slug === 'general')
+
+    if (!generalFolder) {
+        throw new Error('General folder could not be resolved.')
+    }
+
+    try {
+        const config = await input.aiConfigStore.get(input.didacticUnit.ownerId)
+        const result = await input.aiService.classifyFolder({
+            topic: input.didacticUnit.topic,
+            additionalContext: input.didacticUnit.additionalContext,
+            folders: folders.map((folder) => ({
+                name: folder.name,
+                description: buildFolderDescription(folder),
+            })),
+            config,
+            tier: 'cheap',
+            abortSignal: input.abortSignal,
+        })
+
+        const matchedFolder =
+            folders.find(
+                (folder) =>
+                    folder.name.toLowerCase() === result.folderName.trim().toLowerCase()
+            ) ?? generalFolder
+
+        return {
+            folderId: matchedFolder.id,
+            result,
+        }
+    } catch {
+        return { folderId: generalFolder.id }
     }
 }
 
@@ -380,6 +562,7 @@ export function createApp(options: CreateAppOptions) {
     const app = express()
     const didacticUnitStore = options.didacticUnitStore
     const generationRunStore = options.generationRunStore
+    const folderStore = options.folderStore
     const aiConfigStore = options.aiConfigStore ?? new InMemoryAiConfigStore()
     const aiService = options.aiService ?? new GatewayAiService()
     const mongoHealth = options.mongoHealth ?? disconnectedMongoHealthStatus
@@ -419,22 +602,103 @@ export function createApp(options: CreateAppOptions) {
         }
     })
 
+    app.get('/api/folders', async (request, response) => {
+        const requestWithMockOwner = asRequestWithMockOwner(request)
+
+        response.json({
+            folders: await listFoldersWithUnitCounts(
+                folderStore,
+                didacticUnitStore,
+                requestWithMockOwner.mockOwner.id
+            ),
+        })
+    })
+
+    app.post('/api/folders', async (request, response) => {
+        const requestWithMockOwner = asRequestWithMockOwner(request)
+
+        try {
+            if (!request.body || typeof request.body !== 'object') {
+                throw new Error('Request body must be a JSON object.')
+            }
+
+            const payload = request.body as { name?: unknown }
+            const name = normalizeFolderName(
+                typeof payload.name === 'string' ? payload.name : ''
+            )
+
+            if (!name) {
+                throw new Error('Folder name is required.')
+            }
+
+            const slug = slugifyFolderName(name)
+
+            if (!slug) {
+                throw new Error('Folder name must include letters or numbers.')
+            }
+
+            await ensureDefaultFolders(folderStore, requestWithMockOwner.mockOwner.id)
+            const existingFolder = await folderStore.getBySlug(
+                requestWithMockOwner.mockOwner.id,
+                slug
+            )
+
+            if (existingFolder) {
+                throw new Error('A folder with that name already exists.')
+            }
+
+            const folder = await folderStore.create({
+                ownerId: requestWithMockOwner.mockOwner.id,
+                name,
+                slug,
+                kind: 'custom',
+                icon: CUSTOM_FOLDER_ICON,
+                color: CUSTOM_FOLDER_COLOR,
+            })
+
+            response.status(201).json({
+                ...buildFolderResponse(folder),
+                unitCount: 0,
+            })
+        } catch (error) {
+            response.status(400).json({
+                error: error instanceof Error ? error.message : 'Invalid folder request.',
+            })
+        }
+    })
+
     app.post('/api/didactic-unit', async (request, response) => {
         const requestWithMockOwner = asRequestWithMockOwner(request)
 
         try {
             const input = parseCreateDidacticUnitInput(request.body)
             const config = await aiConfigStore.get(requestWithMockOwner.mockOwner.id)
+            const foldersById = await loadFoldersById(
+                folderStore,
+                requestWithMockOwner.mockOwner.id
+            )
+            const generalFolder = await getGeneralFolder(
+                folderStore,
+                requestWithMockOwner.mockOwner.id
+            )
+            const resolvedFolderSelection =
+                input.folderSelection.mode === 'manual'
+                    ? resolveFolderSelectionForManualMode(input.folderSelection, foldersById)
+                    : {
+                          mode: 'auto' as const,
+                          folderId: generalFolder.id,
+                      }
             const didacticUnit = createDidacticUnit(
                 {
                     ...input,
                     provider: resolveCompatibilityProvider(config, input.provider),
+                    folderSelection: resolvedFolderSelection,
                 },
                 requestWithMockOwner.mockOwner.id
             )
 
             await didacticUnitStore.save(didacticUnit)
-            response.status(201).json(buildDidacticUnitResponse(didacticUnit))
+            response.status(201).json(await buildDidacticUnitResponse(didacticUnit, folderStore))
         } catch (error) {
             response.status(400).json({
                 error: error instanceof Error ? error.message : 'Invalid didactic unit request.',
@@ -444,11 +708,14 @@ export function createApp(options: CreateAppOptions) {
 
     app.get('/api/didactic-unit', async (request, response) => {
         const requestWithMockOwner = asRequestWithMockOwner(request)
+        const didacticUnits = await didacticUnitStore.listByOwner(requestWithMockOwner.mockOwner.id)
 
         response.json({
-            didacticUnits: (
-                await didacticUnitStore.listByOwner(requestWithMockOwner.mockOwner.id)
-            ).map(summarizeDidacticUnit),
+            didacticUnits: await buildDidacticUnitSummaryResponses(
+                didacticUnits,
+                folderStore,
+                requestWithMockOwner.mockOwner.id
+            ),
         })
     })
 
@@ -464,7 +731,75 @@ export function createApp(options: CreateAppOptions) {
             return
         }
 
-        response.json(buildDidacticUnitResponse(didacticUnit))
+        response.json(await buildDidacticUnitResponse(didacticUnit, folderStore))
+    })
+
+    app.delete('/api/didactic-unit/:id', async (request, response) => {
+        const requestWithMockOwner = asRequestWithMockOwner(request)
+        const deleted = await didacticUnitStore.deleteById(
+            requestWithMockOwner.mockOwner.id,
+            request.params.id
+        )
+
+        if (!deleted) {
+            response.status(404).json({ error: 'Didactic unit not found.' })
+            return
+        }
+
+        response.status(204).end()
+    })
+
+    app.patch('/api/didactic-unit/:id/folder', async (request, response) => {
+        const requestWithMockOwner = asRequestWithMockOwner(request)
+        const didacticUnit = await didacticUnitStore.getById(
+            requestWithMockOwner.mockOwner.id,
+            request.params.id
+        )
+
+        if (!didacticUnit) {
+            response.status(404).json({ error: 'Didactic unit not found.' })
+            return
+        }
+
+        try {
+            const parsedInput = parseUpdateDidacticUnitFolderInput(request.body)
+            const foldersById = await loadFoldersById(
+                folderStore,
+                requestWithMockOwner.mockOwner.id
+            )
+
+            const updatedDidacticUnit =
+                parsedInput.folderSelection.mode === 'manual'
+                    ? updateDidacticUnitFolder(
+                          didacticUnit,
+                          resolveFolderSelectionForManualMode(
+                              parsedInput.folderSelection,
+                              foldersById
+                          )
+                      )
+                    : updateDidacticUnitFolder(didacticUnit, {
+                          mode: 'auto',
+                          folderId:
+                              (
+                                  await resolveAutoAssignedFolderSelection({
+                                      didacticUnit,
+                                      folderStore,
+                                      aiConfigStore,
+                                      aiService,
+                                  })
+                              ).folderId,
+                      })
+
+            await didacticUnitStore.save(updatedDidacticUnit)
+            response.json(await buildDidacticUnitResponse(updatedDidacticUnit, folderStore))
+        } catch (error) {
+            response.status(400).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : 'Invalid didactic unit folder update request.',
+            })
+        }
     })
 
     app.post('/api/didactic-unit/:id/moderate', async (request, response) => {
@@ -480,7 +815,7 @@ export function createApp(options: CreateAppOptions) {
         }
 
         if (didacticUnit.status !== 'submitted') {
-            response.json(buildDidacticUnitResponse(didacticUnit))
+            response.json(await buildDidacticUnitResponse(didacticUnit, folderStore))
             return
         }
 
@@ -504,8 +839,24 @@ export function createApp(options: CreateAppOptions) {
                 improvedTopicBrief: moderation.improvedTopicBrief,
                 reasoningNotes: moderation.reasoningNotes,
             })
-            await didacticUnitStore.save(moderatedDidacticUnit)
-            response.json(buildDidacticUnitResponse(moderatedDidacticUnit))
+            const folderResolvedDidacticUnit =
+                moderatedDidacticUnit.folderAssignmentMode === 'auto'
+                    ? updateDidacticUnitFolder(moderatedDidacticUnit, {
+                          mode: 'auto',
+                          folderId:
+                              (
+                                  await resolveAutoAssignedFolderSelection({
+                                      didacticUnit: moderatedDidacticUnit,
+                                      folderStore,
+                                      aiConfigStore,
+                                      aiService,
+                                      abortSignal: createAbortSignal(request),
+                                  })
+                              ).folderId,
+                      })
+                    : moderatedDidacticUnit
+            await didacticUnitStore.save(folderResolvedDidacticUnit)
+            response.json(await buildDidacticUnitResponse(folderResolvedDidacticUnit, folderStore))
         } catch (error) {
             const resolved = resolveStageConfigError(
                 error,
@@ -531,7 +882,7 @@ export function createApp(options: CreateAppOptions) {
             openNdjsonStream(response)
             writeNdjsonEvent(response, {
                 type: 'complete',
-                data: buildDidacticUnitResponse(didacticUnit),
+                data: await buildDidacticUnitResponse(didacticUnit, folderStore),
             })
             response.end()
             return
@@ -581,10 +932,26 @@ export function createApp(options: CreateAppOptions) {
                 improvedTopicBrief: moderation.improvedTopicBrief,
                 reasoningNotes: moderation.reasoningNotes,
             })
-            await didacticUnitStore.save(moderatedDidacticUnit)
+            const folderResolvedDidacticUnit =
+                moderatedDidacticUnit.folderAssignmentMode === 'auto'
+                    ? updateDidacticUnitFolder(moderatedDidacticUnit, {
+                          mode: 'auto',
+                          folderId:
+                              (
+                                  await resolveAutoAssignedFolderSelection({
+                                      didacticUnit: moderatedDidacticUnit,
+                                      folderStore,
+                                      aiConfigStore,
+                                      aiService,
+                                      abortSignal: createAbortSignal(request),
+                                  })
+                              ).folderId,
+                      })
+                    : moderatedDidacticUnit
+            await didacticUnitStore.save(folderResolvedDidacticUnit)
             writeNdjsonEvent(response, {
                 type: 'complete',
-                data: buildDidacticUnitResponse(moderatedDidacticUnit),
+                data: await buildDidacticUnitResponse(folderResolvedDidacticUnit, folderStore),
             })
         } catch (error) {
             const resolved = resolveStageConfigError(
@@ -638,7 +1005,7 @@ export function createApp(options: CreateAppOptions) {
             )
             updatedDidacticUnit.provider = result.provider
             await didacticUnitStore.save(updatedDidacticUnit)
-            response.json(buildDidacticUnitResponse(updatedDidacticUnit))
+            response.json(await buildDidacticUnitResponse(updatedDidacticUnit, folderStore))
         } catch (error) {
             const resolved = resolveStageConfigError(
                 error,
@@ -714,7 +1081,7 @@ export function createApp(options: CreateAppOptions) {
             await didacticUnitStore.save(updatedDidacticUnit)
             writeNdjsonEvent(response, {
                 type: 'complete',
-                data: buildDidacticUnitResponse(updatedDidacticUnit),
+                data: await buildDidacticUnitResponse(updatedDidacticUnit, folderStore),
             })
         } catch (error) {
             const resolved = resolveStageConfigError(
@@ -758,7 +1125,7 @@ export function createApp(options: CreateAppOptions) {
                 parsedInput
             )
             await didacticUnitStore.save(updatedDidacticUnit)
-            response.json(buildDidacticUnitResponse(updatedDidacticUnit))
+            response.json(await buildDidacticUnitResponse(updatedDidacticUnit, folderStore))
         } catch (error) {
             response.status(409).json({
                 error:
@@ -788,7 +1155,7 @@ export function createApp(options: CreateAppOptions) {
                 config.authoring
             )
             await didacticUnitStore.save(updatedDidacticUnit)
-            response.json(buildDidacticUnitResponse(updatedDidacticUnit))
+            response.json(await buildDidacticUnitResponse(updatedDidacticUnit, folderStore))
         } catch (error) {
             response.status(409).json({
                 error:
@@ -869,7 +1236,7 @@ export function createApp(options: CreateAppOptions) {
                 updatedDidacticUnit,
                 result
             )
-            response.json(buildDidacticUnitResponse(updatedDidacticUnit))
+            response.json(await buildDidacticUnitResponse(updatedDidacticUnit, folderStore))
         } catch (error) {
             await recordFailedSyllabusRun(
                 generationRunStore,
@@ -983,7 +1350,7 @@ export function createApp(options: CreateAppOptions) {
             )
             writeNdjsonEvent(response, {
                 type: 'complete',
-                data: buildDidacticUnitResponse(updatedDidacticUnit),
+                data: await buildDidacticUnitResponse(updatedDidacticUnit, folderStore),
             })
         } catch (error) {
             await recordFailedSyllabusRun(
@@ -1028,7 +1395,7 @@ export function createApp(options: CreateAppOptions) {
         try {
             const updatedDidacticUnit = updateDidacticUnitSyllabus(didacticUnit, parsedInput)
             await didacticUnitStore.save(updatedDidacticUnit)
-            response.json(buildDidacticUnitResponse(updatedDidacticUnit))
+            response.json(await buildDidacticUnitResponse(updatedDidacticUnit, folderStore))
         } catch (error) {
             response.status(409).json({
                 error:
@@ -1058,7 +1425,7 @@ export function createApp(options: CreateAppOptions) {
                 generationTier
             )
             await didacticUnitStore.save(approvedDidacticUnit)
-            response.json(buildDidacticUnitResponse(approvedDidacticUnit))
+            response.json(await buildDidacticUnitResponse(approvedDidacticUnit, folderStore))
         } catch (error) {
             response.status(409).json({
                 error:
@@ -1329,7 +1696,7 @@ export function createApp(options: CreateAppOptions) {
                 chapterIndex
             )
             await didacticUnitStore.save(updatedDidacticUnit)
-            response.json(buildDidacticUnitResponse(updatedDidacticUnit))
+            response.json(await buildDidacticUnitResponse(updatedDidacticUnit, folderStore))
         } catch (error) {
             const message =
                 error instanceof Error
@@ -1590,13 +1957,13 @@ export function createApp(options: CreateAppOptions) {
             if (isStreaming) {
                 writeNdjsonEvent(response, {
                     type: 'complete',
-                    data: buildDidacticUnitResponse(updatedDidacticUnit),
+                    data: await buildDidacticUnitResponse(updatedDidacticUnit, folderStore),
                 })
                 response.end()
                 return
             }
 
-            response.json(buildDidacticUnitResponse(updatedDidacticUnit))
+            response.json(await buildDidacticUnitResponse(updatedDidacticUnit, folderStore))
         } catch (error) {
             await recordFailedChapterRun(
                 generationRunStore,

@@ -4,6 +4,7 @@ export interface DidacticUnitSummary {
     id: string
     title: string
     topic: string
+    folderId: string
     provider: DidacticUnit['provider']
     status: DidacticUnit['status']
     nextAction: DidacticUnit['nextAction']
@@ -65,6 +66,7 @@ export function summarizeDidacticUnit(didacticUnit: DidacticUnit): DidacticUnitS
         id: didacticUnit.id,
         title: didacticUnit.title,
         topic: didacticUnit.topic,
+        folderId: didacticUnit.folderId,
         provider: didacticUnit.provider,
         status: didacticUnit.status,
         nextAction: didacticUnit.nextAction,

@@ -5,6 +5,7 @@ import type {
     BackendDidacticUnitChapterSummary,
     BackendDidacticUnitDetail,
     BackendDidacticUnitSummary,
+    BackendFolder,
 } from './api/dashboardApi'
 import type {
     ChapterPresentationSettings,
@@ -17,12 +18,10 @@ import type {
 } from './types'
 import {
     deriveEffortFromReadingTime,
-    deriveSubjectFromTopic,
     estimateReadingTimeFromText,
     formatRelativeTimestamp,
 } from './utils/topicMetadata'
 import { markdownToPlainText, normalizeStoredMarkdown } from './utils/markdown'
-import { getSubjectStyle } from './utils/subjectStyles'
 
 function resolveDisplayStatus(status: string): string {
     switch (status) {
@@ -71,10 +70,6 @@ function resolveActivityDate(value: string | undefined, fallback: string): strin
     return value?.trim() ? value : fallback
 }
 
-function buildCoverColor(subject: string): string {
-    return getSubjectStyle(subject).accentColor
-}
-
 function resolvePresentationSettings(
     settings?: BackendChapterPresentationSettings
 ): ChapterPresentationSettings {
@@ -85,10 +80,19 @@ function resolvePresentationSettings(
     }
 }
 
+export function adaptFolderSummary(folder: Omit<BackendFolder, 'unitCount'>) {
+    return {
+        id: folder.id,
+        name: folder.name,
+        icon: folder.icon,
+        color: folder.color,
+        kind: folder.kind,
+    } as const
+}
+
 export function adaptDidacticUnitSummaryToDashboardItem(
     summary: BackendDidacticUnitSummary
 ): DashboardListItem {
-    const subject = deriveSubjectFromTopic(summary.topic)
     const activityDate = resolveActivityDate(summary.lastActivityAt, summary.createdAt)
     const canOpenEditor =
         summary.status === 'syllabus_approved' ||
@@ -101,7 +105,7 @@ export function adaptDidacticUnitSummaryToDashboardItem(
         id: summary.id,
         title: summary.title,
         subtitle: summary.topic,
-        subject,
+        folder: adaptFolderSummary(summary.folder),
         status: resolveDisplayStatus(summary.status),
         primaryProgressPercent: canOpenEditor
             ? summary.studyProgressPercent
@@ -109,7 +113,7 @@ export function adaptDidacticUnitSummaryToDashboardItem(
         studyProgressPercent: summary.studyProgressPercent,
         chapterCount: summary.chapterCount,
         lastActivityAt: formatRelativeTimestamp(activityDate),
-        coverColor: buildCoverColor(subject),
+        coverColor: summary.folder.color,
         canOpenEditor,
         didacticUnitId: summary.id,
         route: canOpenEditor ? `/dashboard/unit/${summary.id}` : '/dashboard',
@@ -128,45 +132,30 @@ export function mergeDashboardItems(input: {
         .map(({ item }) => item)
 }
 
-export function buildDashboardFolders(items: DashboardListItem[]): DashboardFolder[] {
-    return [
-        {
-            id: 'general',
-            name: 'General',
-            icon: '📚',
-            color: '#4ADE80',
-            units: items.map((item) => item.id),
-            unitCount: items.length,
-        },
-        {
-            id: 'math-units',
-            name: 'Math Units',
-            icon: '📐',
-            color: '#4ADE80',
-            units: [],
-            unitCount: 0,
-        },
-        {
-            id: 'science-curriculum',
-            name: 'Science Curriculum',
-            icon: '🔬',
-            color: '#3B82F6',
-            units: [],
-            unitCount: 0,
-        },
-        {
-            id: 'history-lessons',
-            name: 'History Lessons',
-            icon: '📜',
-            color: '#F59E0B',
-            units: [],
-            unitCount: 0,
-        },
-    ]
+export function buildDashboardFolders(
+    folders: BackendFolder[],
+    items: DashboardListItem[]
+): DashboardFolder[] {
+    return folders
+        .map((folder) => {
+            const units = items
+                .filter((item) => item.folder.id === folder.id)
+                .map((item) => item.id)
+
+            return {
+                id: folder.id,
+                name: folder.name,
+                icon: folder.icon,
+                color: folder.color,
+                kind: folder.kind,
+                units,
+                unitCount: units.length,
+            }
+        })
+        .filter((folder) => folder.unitCount > 0)
 }
 
 export function adaptDidacticUnitPlanning(detail: BackendDidacticUnitDetail): PlanningDetailViewModel {
-    const subject = deriveSubjectFromTopic(detail.topic)
     const answers = Object.fromEntries(
         (detail.questionnaireAnswers ?? []).map((answer) => [answer.questionId, answer.value])
     )
@@ -174,7 +163,7 @@ export function adaptDidacticUnitPlanning(detail: BackendDidacticUnitDetail): Pl
     return {
         id: detail.id,
         topic: detail.topic,
-        subject,
+        folder: adaptFolderSummary(detail.folder),
         provider: detail.provider,
         status: detail.status,
         nextAction: detail.nextAction,
@@ -229,15 +218,13 @@ export function adaptDidacticUnitEditor(input: {
     chapterSummaries: BackendDidacticUnitChapterSummary[]
     chapterDetails: Map<number, BackendDidacticUnitChapterDetail>
 }): DidacticUnitEditorViewModel {
-    const subject = deriveSubjectFromTopic(input.unit.topic)
-
     return {
         id: input.unit.id,
         title: input.unit.title,
-        subject,
+        folder: adaptFolderSummary(input.unit.folder),
         progress: input.unit.studyProgress.studyProgressPercent,
         lastEdited: formatRelativeTimestamp(input.unit.updatedAt),
-        coverColor: buildCoverColor(subject),
+        coverColor: input.unit.folder.color,
         status: resolveDisplayStatus(input.unit.status),
         overview: input.unit.overview,
         provider: input.unit.provider,

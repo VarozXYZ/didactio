@@ -35,6 +35,7 @@ import { useNavigate } from 'react-router-dom'
 import {
     type BackendAiModelTier,
     type BackendDidacticUnitChapterDetail,
+    type BackendFolder,
     type BackendGenerationRun,
     DashboardApiError,
     dashboardApi,
@@ -62,6 +63,7 @@ import {
     normalizeMarkdownForStorage,
     normalizeStoredMarkdown,
 } from '../../utils/markdown'
+import { getFolderIcon } from '../../utils/folderDisplay'
 
 type UnitEditorProps = {
     didacticUnitId: string
@@ -111,6 +113,7 @@ function formatRunLabel(run: BackendGenerationRun): string {
 export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
     const navigate = useNavigate()
     const [workspace, setWorkspace] = useState<DidacticUnitEditorViewModel | null>(null)
+    const [availableFolders, setAvailableFolders] = useState<BackendFolder[]>([])
     const [chapterDetails, setChapterDetails] = useState<Record<number, BackendDidacticUnitChapterDetail>>({})
     const [revisions, setRevisions] = useState<DidacticUnitRevisionViewModel[]>([])
     const [activeChapterIndex, setActiveChapterIndex] = useState(0)
@@ -154,6 +157,7 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
         ? chapterDetails[activeChapter.chapterIndex]
         : undefined
     const activeRuns = [] as BackendGenerationRun[]
+    const FolderIcon = workspace ? getFolderIcon(workspace.folder.icon) : null
 
     const loadRevisions = useCallback(
         async (chapterIndex: number) => {
@@ -186,9 +190,10 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
             setError(null)
 
             try {
-                const [unit, chaptersResponse] = await Promise.all([
+                const [unit, chaptersResponse, foldersResponse] = await Promise.all([
                     dashboardApi.getDidacticUnit(didacticUnitId),
                     dashboardApi.listDidacticUnitChapters(didacticUnitId),
+                    dashboardApi.listFolders(),
                 ])
 
                 const detailResponses = await Promise.all(
@@ -218,6 +223,7 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                     null
 
                 setWorkspace(nextWorkspace)
+                setAvailableFolders(foldersResponse.folders)
                 setUnitGenerationTier((previousTier) => unit.generationTier ?? previousTier ?? null)
                 setChapterDetails(detailsRecord)
                 setActiveChapterIndex(nextActiveChapter?.chapterIndex ?? 0)
@@ -417,6 +423,21 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
             window.clearTimeout(saveTimeoutRef.current)
         }
         saveTimeoutRef.current = window.setTimeout(() => setIsSaving(false), 1200)
+    }
+
+    const handleFolderUpdate = async (
+        folderSelection:
+            | { mode: 'manual'; folderId: string }
+            | { mode: 'auto' }
+    ) => {
+        await runAction(
+            () => dashboardApi.updateDidacticUnitFolder(didacticUnitId, folderSelection),
+            {
+                chapterIndex: activeChapterIndex,
+                silentRefresh: true,
+                preserveSpread: true,
+            }
+        )
     }
 
     const refreshWorkspaceAfterGeneration = useCallback(async () => {
@@ -1175,15 +1196,54 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                             <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-[#86868B]">
                                 <span>Units</span>
                                 <ChevronRight size={10} />
-                                <span>{workspace.subject}</span>
+                                <span>{workspace.folder.name}</span>
                             </div>
-                            <h1 className="max-w-[300px] truncate text-[14px] font-semibold text-[#1D1D1F]">
-                                {workspace.title}
-                            </h1>
+                            <div className="flex items-center gap-2">
+                                {FolderIcon && (
+                                    <span
+                                        className="flex h-6 w-6 items-center justify-center rounded-md"
+                                        style={{
+                                            backgroundColor: `${workspace.folder.color}1A`,
+                                            color: workspace.folder.color,
+                                        }}
+                                    >
+                                        <FolderIcon size={14} strokeWidth={2} />
+                                    </span>
+                                )}
+                                <h1 className="max-w-[300px] truncate text-[14px] font-semibold text-[#1D1D1F]">
+                                    {workspace.title}
+                                </h1>
+                            </div>
                         </div>
                     </div>
 
                     <div className="flex items-center gap-6">
+                        <div className="flex items-center gap-2">
+                            <select
+                                value={workspace.folder.id}
+                                onChange={(event) =>
+                                    void handleFolderUpdate({
+                                        mode: 'manual',
+                                        folderId: event.target.value,
+                                    })
+                                }
+                                className="rounded-full border border-[#D4D7DD] bg-white px-3 py-1.5 text-[12px] font-medium text-[#1D1D1F] outline-none"
+                            >
+                                {availableFolders.map((folder) => (
+                                    <option key={folder.id} value={folder.id}>
+                                        {folder.name}
+                                    </option>
+                                ))}
+                            </select>
+                            <button
+                                className="rounded-full border border-[#D4D7DD] bg-white px-3 py-1.5 text-[12px] font-medium text-[#1D1D1F] transition-all hover:bg-[#F5F5F7]"
+                                onClick={() => void handleFolderUpdate({ mode: 'auto' })}
+                                type="button"
+                            >
+                                Auto-assign
+                            </button>
+                        </div>
+
                         <div className="flex items-center gap-2 text-[13px] text-[#86868B]">
                             <span
                                 className={cn(

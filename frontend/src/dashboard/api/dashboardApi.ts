@@ -12,6 +12,15 @@ export class DashboardApiError extends Error {
 type BackendProvider = string
 export type BackendAiModelTier = 'cheap' | 'premium'
 
+export interface BackendFolder {
+    id: string
+    name: string
+    icon: string
+    color: string
+    kind: 'default' | 'custom'
+    unitCount: number
+}
+
 export type BackendChapterPresentationSettings = {
     paragraphFontFamily: 'sans' | 'serif' | 'mono'
     paragraphFontSize: '14px' | '16px' | '18px' | '20px'
@@ -40,6 +49,8 @@ export interface BackendDidacticUnitSummary {
     id: string
     title: string
     topic: string
+    folderId: string
+    folder: Omit<BackendFolder, 'unitCount'>
     provider: BackendProvider
     status: string
     nextAction: string
@@ -67,6 +78,9 @@ export interface BackendDidacticUnitDetail {
     ownerId: string
     topic: string
     title: string
+    folderId: string
+    folderAssignmentMode: 'manual' | 'auto'
+    folder: Omit<BackendFolder, 'unitCount'>
     provider: BackendProvider
     status: string
     nextAction: string
@@ -283,6 +297,15 @@ async function streamNdjson<T>(
 }
 
 export const dashboardApi = {
+    listFolders() {
+        return requestJson<{ folders: BackendFolder[] }>('/api/folders')
+    },
+    createFolder(input: { name: string }) {
+        return requestJson<BackendFolder>('/api/folders', {
+            method: 'POST',
+            body: JSON.stringify(input),
+        })
+    },
     listDidacticUnits() {
         return requestJson<{ didacticUnits: BackendDidacticUnitSummary[] }>('/api/didactic-unit')
     },
@@ -293,6 +316,10 @@ export const dashboardApi = {
         depth?: 'basic' | 'intermediate' | 'technical'
         length?: 'intro' | 'short' | 'long' | 'textbook'
         questionnaireEnabled?: boolean
+        folderSelection?: {
+            mode: 'manual' | 'auto'
+            folderId?: string
+        }
     }) {
         return requestJson<BackendDidacticUnitDetail>('/api/didactic-unit', {
             method: 'POST',
@@ -310,6 +337,18 @@ export const dashboardApi = {
     },
     getDidacticUnit(id: string) {
         return requestJson<BackendDidacticUnitDetail>(`/api/didactic-unit/${id}`)
+    },
+    updateDidacticUnitFolder(
+        id: string,
+        folderSelection: {
+            mode: 'manual' | 'auto'
+            folderId?: string
+        }
+    ) {
+        return requestJson<BackendDidacticUnitDetail>(`/api/didactic-unit/${id}/folder`, {
+            method: 'PATCH',
+            body: JSON.stringify({ folderSelection }),
+        })
     },
     moderateDidacticUnit(id: string) {
         return requestJson<BackendDidacticUnitDetail>(`/api/didactic-unit/${id}/moderate`, {
@@ -482,5 +521,10 @@ export const dashboardApi = {
     },
     listDidacticUnitRuns(id: string) {
         return requestJson<{ runs: BackendGenerationRun[] }>(`/api/didactic-unit/${id}/runs`)
+    },
+    deleteDidacticUnit(id: string) {
+        return requestJson<void>(`/api/didactic-unit/${id}`, {
+            method: 'DELETE',
+        })
     },
 }
