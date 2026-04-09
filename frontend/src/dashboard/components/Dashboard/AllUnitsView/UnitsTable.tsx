@@ -1,6 +1,6 @@
 import { MoreVertical, PencilLine } from 'lucide-react'
 import type { DashboardListItem } from '../../../types'
-import { getFolderVisuals } from '../../../utils/folderDisplay'
+import { getFolderEmoji, getFolderVisuals } from '../../../utils/folderDisplay'
 
 type UnitsTableProps = {
     onOpenItem: (itemId: string) => void
@@ -36,7 +36,7 @@ export function UnitsTable({ onOpenItem, units }: UnitsTableProps) {
                 <tbody>
                     {units.map((unit, index) => {
                         const style = getFolderVisuals(unit.folder)
-                        const FolderIcon = style.icon
+                        const folderEmoji = getFolderEmoji(unit.folder.icon)
 
                         return (
                             <tr
@@ -55,11 +55,7 @@ export function UnitsTable({ onOpenItem, units }: UnitsTableProps) {
                                             className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg"
                                             style={{ backgroundColor: style.bgColor }}
                                         >
-                                            <FolderIcon
-                                                size={22}
-                                                strokeWidth={2}
-                                                style={{ color: style.iconColor }}
-                                            />
+                                            <span className="text-[22px] leading-none">{folderEmoji}</span>
                                         </div>
                                         <div>
                                             <div className="text-[14px] font-semibold text-[#1D1D1F] transition-colors group-hover:text-[#4ADE80]">
@@ -87,7 +83,7 @@ export function UnitsTable({ onOpenItem, units }: UnitsTableProps) {
                                             color: style.iconColor,
                                         }}
                                     >
-                                        <FolderIcon size={11} strokeWidth={2.5} />
+                                        <span className="text-[11px] leading-none">{folderEmoji}</span>
                                         {unit.folder.name}
                                     </span>
                                 </td>

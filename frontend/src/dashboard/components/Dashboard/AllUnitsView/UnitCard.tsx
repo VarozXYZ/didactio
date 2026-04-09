@@ -1,6 +1,6 @@
 import { Clock, MoreVertical, PencilLine } from 'lucide-react'
 import type { DashboardListItem } from '../../../types'
-import { getFolderVisuals } from '../../../utils/folderDisplay'
+import { getFolderEmoji, getFolderVisuals } from '../../../utils/folderDisplay'
 
 type UnitCardProps = {
     onOpenItem: (itemId: string) => void
@@ -9,7 +9,7 @@ type UnitCardProps = {
 
 export function UnitCard({ onOpenItem, unit }: UnitCardProps) {
     const style = getFolderVisuals(unit.folder)
-    const FolderIcon = style.icon
+    const folderEmoji = getFolderEmoji(unit.folder.icon)
 
     return (
         <button
@@ -22,11 +22,12 @@ export function UnitCard({ onOpenItem, unit }: UnitCardProps) {
                     className="relative flex h-[180px] items-center justify-center"
                     style={{ backgroundColor: style.bgColor }}
                 >
-                    <FolderIcon
-                        size={72}
-                        strokeWidth={1.5}
-                        style={{ color: style.iconColor, opacity: 0.4 }}
-                    />
+                    <span
+                        className="select-none text-[72px] leading-none"
+                        style={{ opacity: 0.4 }}
+                    >
+                        {folderEmoji}
+                    </span>
 
                     <div
                         className="absolute right-0 top-0 h-32 w-32 rounded-bl-full opacity-10"
@@ -81,7 +82,7 @@ export function UnitCard({ onOpenItem, unit }: UnitCardProps) {
                                 color: style.iconColor,
                             }}
                         >
-                            <FolderIcon size={10} strokeWidth={2.5} />
+                            <span className="text-[10px] leading-none">{folderEmoji}</span>
                             {unit.folder.name}
                         </span>
                         <span className="text-[11px] text-[#86868B]">
