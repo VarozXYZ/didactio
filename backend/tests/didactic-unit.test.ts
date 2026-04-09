@@ -170,6 +170,44 @@ describe('didactic-unit lifecycle', () => {
         })
     })
 
+    it('can skip a generated questionnaire and continue with fallback learner context', async () => {
+        const app = createTestApp()
+        const created = await createDidacticUnit(app)
+
+        const moderatedResponse = await request(app)
+            .post(`/api/didactic-unit/${created.id}/moderate`)
+            .send({ tier: 'cheap' })
+
+        expect(moderatedResponse.status).toBe(200)
+
+        const questionnaireResponse = await request(app)
+            .post(`/api/didactic-unit/${created.id}/questionnaire/generate`)
+            .send({ tier: 'cheap' })
+
+        expect(questionnaireResponse.status).toBe(200)
+
+        const skippedResponse = await request(app)
+            .patch(`/api/didactic-unit/${created.id}/questionnaire/answers`)
+            .send({ answers: [] })
+
+        expect(skippedResponse.status).toBe(200)
+        expect(skippedResponse.body).toMatchObject({
+            status: 'questionnaire_answered',
+            nextAction: 'generate_syllabus_prompt',
+            questionnaireAnswers: [],
+        })
+
+        const syllabusResponse = await request(app)
+            .post(`/api/didactic-unit/${created.id}/syllabus/generate`)
+            .send({ tier: 'cheap' })
+
+        expect(syllabusResponse.status).toBe(200)
+        expect(syllabusResponse.body).toMatchObject({
+            status: 'syllabus_ready',
+            nextAction: 'review_syllabus',
+        })
+    })
+
     it('generates, reads, completes, and tracks a chapter on the same didactic unit', async () => {
         const app = createTestApp()
         const approved = await createApprovedDidacticUnit(app)

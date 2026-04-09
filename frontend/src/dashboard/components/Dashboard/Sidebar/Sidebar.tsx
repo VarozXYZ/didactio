@@ -390,7 +390,7 @@ export function Sidebar({
 
         <AlertDialog
             open={folderPendingDelete !== null}
-            onOpenChange={(open) => { if (!open) setFolderPendingDelete(null) }}
+            onOpenChange={(open: boolean) => { if (!open) setFolderPendingDelete(null) }}
         >
             <AlertDialogContent>
                 <AlertDialogHeader>

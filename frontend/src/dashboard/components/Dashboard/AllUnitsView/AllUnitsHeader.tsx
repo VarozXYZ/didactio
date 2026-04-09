@@ -81,7 +81,7 @@ function CreateUnitButton({ onClick }: { onClick: () => void }) {
                     className="flex select-none items-center gap-2.5 px-5 py-[11px] text-[14px] font-semibold text-white"
                 >
                     <Plus size={17} strokeWidth={2.5} />
-                    Create Unit
+                    New unit
                 </div>
             </button>
         </>

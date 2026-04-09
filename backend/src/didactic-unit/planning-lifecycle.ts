@@ -156,6 +156,16 @@ export function answerDidacticUnitQuestionnaire(
         throw new Error('Questionnaire cannot be answered from the current didactic unit state.')
     }
 
+    if (input.answers.length === 0) {
+        return withUpdatedAt({
+            ...didacticUnit,
+            status: 'questionnaire_answered',
+            nextAction: 'generate_syllabus_prompt',
+            questionnaireAnswers: [],
+            questionnaireAnsweredAt: new Date().toISOString(),
+        })
+    }
+
     const questionIds = didacticUnit.questionnaire.questions.map((question) => question.id)
     const uniqueAnswerIds = new Set(input.answers.map((answer) => answer.questionId))
 

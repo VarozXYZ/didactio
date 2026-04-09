@@ -334,8 +334,12 @@ export function parseQuestionnaireAnswersInput(
     }
 
     const payload = body as { answers?: unknown }
-    if (!Array.isArray(payload.answers) || payload.answers.length === 0) {
-        throw new Error('Answers must be a non-empty array.')
+    if (!Array.isArray(payload.answers)) {
+        throw new Error('Answers must be an array.')
+    }
+
+    if (payload.answers.length === 0) {
+        return { answers: [] }
     }
 
     const answers = payload.answers.map((entry) => {

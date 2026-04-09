@@ -1,5 +1,6 @@
 import request from 'supertest'
 import { describe, expect, it } from 'vitest'
+import { createMockAiService } from './helpers/mock-ai-service.js'
 import { createTestApp } from './helpers/create-test-app.js'
 
 async function listFolders(app: ReturnType<typeof createTestApp>) {
@@ -142,6 +143,47 @@ describe('folder api', () => {
             folderAssignmentMode: 'auto',
             folder: {
                 name: 'Chemistry',
+            },
+        })
+    })
+
+    it('falls back to General when moderation returns an unknown folder name', async () => {
+        const aiService = createMockAiService()
+        aiService.moderateTopic = async (input) => ({
+            provider: 'mock-provider',
+            model: 'mock-model',
+            prompt: `Moderate ${input.topic}`,
+            approved: true,
+            notes: 'Approved.',
+            normalizedTopic: input.topic.trim(),
+            improvedTopicBrief: `Create a practical didactic unit about ${input.topic.trim()}.`,
+            reasoningNotes: 'Topic is safe.',
+            folderName: 'Definitely Not A Real Folder',
+            folderReasoning: 'Hallucinated folder name for test coverage.',
+        })
+
+        const app = createTestApp({ aiService })
+
+        const createResponse = await request(app)
+            .post('/api/didactic-unit')
+            .send({
+                topic: 'interdisciplinary capstone',
+                folderSelection: {
+                    mode: 'auto',
+                },
+            })
+
+        expect(createResponse.status).toBe(201)
+
+        const moderateResponse = await request(app)
+            .post(`/api/didactic-unit/${createResponse.body.id}/moderate`)
+            .send({})
+
+        expect(moderateResponse.status).toBe(200)
+        expect(moderateResponse.body).toMatchObject({
+            folderAssignmentMode: 'auto',
+            folder: {
+                name: 'General',
             },
         })
     })

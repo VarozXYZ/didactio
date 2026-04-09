@@ -148,9 +148,11 @@ export function UnitCard({
                             <span className="text-[10px] leading-none">{folderEmoji}</span>
                             <span className="truncate">{unit.folder.name}</span>
                         </span>
-                        <span className="ml-auto shrink-0 text-[11px] text-[#86868B]">
-                            {unit.chapterCount} {unit.chapterCount === 1 ? 'module' : 'modules'}
-                        </span>
+                        {unit.canOpenEditor && (
+                            <span className="ml-auto shrink-0 text-[11px] text-[#86868B]">
+                                {unit.chapterCount} {unit.chapterCount === 1 ? 'module' : 'modules'}
+                            </span>
+                        )}
                     </div>
 
                     <div className="flex items-center justify-between text-[11px] text-[#86868B]">

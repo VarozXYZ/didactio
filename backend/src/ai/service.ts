@@ -53,6 +53,8 @@ export interface ModerationResult extends BaseStageResult {
     normalizedTopic: string
     improvedTopicBrief: string
     reasoningNotes: string
+    folderName?: string
+    folderReasoning?: string
 }
 
 export interface FolderClassificationResult extends BaseStageResult {
@@ -105,6 +107,11 @@ export interface AiService {
     moderateTopic(input: {
         topic: string
         level: DidacticUnitLevel
+        additionalContext?: string
+        folders?: Array<{
+            name: string
+            description: string
+        }>
         config: AiConfig
         tier: AiModelTier
         abortSignal?: AbortSignal
@@ -113,6 +120,11 @@ export interface AiService {
         input: {
             topic: string
             level: DidacticUnitLevel
+            additionalContext?: string
+            folders?: Array<{
+                name: string
+                description: string
+            }>
             config: AiConfig
             tier: AiModelTier
             abortSignal?: AbortSignal
@@ -423,6 +435,11 @@ export class GatewayAiService implements AiService {
     async moderateTopic(input: {
         topic: string
         level: DidacticUnitLevel
+        additionalContext?: string
+        folders?: Array<{
+            name: string
+            description: string
+        }>
         config: AiConfig
         tier: AiModelTier
         abortSignal?: AbortSignal
@@ -431,6 +448,8 @@ export class GatewayAiService implements AiService {
         const prompt = buildModerationPrompt({
             topic: input.topic,
             level: input.level,
+            additionalContext: input.additionalContext,
+            folders: input.folders,
             authoring: input.config.authoring,
         })
 
@@ -452,6 +471,8 @@ export class GatewayAiService implements AiService {
             normalizedTopic: result.object.normalizedTopic,
             improvedTopicBrief: result.object.improvedTopicBrief,
             reasoningNotes: result.object.reasoningNotes,
+            folderName: result.object.folderName,
+            folderReasoning: result.object.folderReasoning,
         }
     }
 
@@ -459,6 +480,11 @@ export class GatewayAiService implements AiService {
         input: {
             topic: string
             level: DidacticUnitLevel
+            additionalContext?: string
+            folders?: Array<{
+                name: string
+                description: string
+            }>
             config: AiConfig
             tier: AiModelTier
             abortSignal?: AbortSignal
@@ -469,6 +495,8 @@ export class GatewayAiService implements AiService {
         const prompt = buildModerationPrompt({
             topic: input.topic,
             level: input.level,
+            additionalContext: input.additionalContext,
+            folders: input.folders,
             authoring: input.config.authoring,
         })
 
@@ -493,6 +521,8 @@ export class GatewayAiService implements AiService {
                 normalizedTopic: partial.normalizedTopic,
                 improvedTopicBrief: partial.improvedTopicBrief,
                 reasoningNotes: partial.reasoningNotes,
+                folderName: partial.folderName,
+                folderReasoning: partial.folderReasoning,
             })
         }
 
@@ -506,6 +536,8 @@ export class GatewayAiService implements AiService {
             normalizedTopic: object.normalizedTopic,
             improvedTopicBrief: object.improvedTopicBrief,
             reasoningNotes: object.reasoningNotes,
+            folderName: object.folderName,
+            folderReasoning: object.folderReasoning,
         }
 
         await callbacks.onComplete?.(finalResult)

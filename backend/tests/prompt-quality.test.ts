@@ -21,6 +21,18 @@ describe('prompt quality helpers', () => {
         const prompt = buildModerationPrompt({
             topic: 'Python programming',
             level: 'beginner',
+            additionalContext: 'Focus on beginners building small useful scripts.',
+            folders: [
+                {
+                    name: 'Computer Science',
+                    description: 'Use for units primarily focused on computer science.',
+                },
+                {
+                    name: 'General',
+                    description:
+                        'Use for broad topics, mixed subjects, or units that do not clearly fit a specialized folder.',
+                },
+            ],
             authoring,
         })
 
@@ -29,6 +41,8 @@ describe('prompt quality helpers', () => {
         expect(prompt).toContain('Python programming')
         expect(prompt).toContain('Tone: professional')
         expect(prompt).toContain('Course level: beginner')
+        expect(prompt).toContain('Available folders')
+        expect(prompt).toContain('folderName exactly as written')
     })
 
     it('builds a syllabus prompt with learner profile and strict structured output instructions', () => {
@@ -137,6 +151,56 @@ describe('prompt quality helpers', () => {
         expect(prompt).toContain('Requested length: textbook')
         expect(prompt).toContain('1. Conditionals')
         expect(prompt).toContain('Do not use generic headings like "Concept Explanation"')
+    })
+
+    it('falls back to not provided when questionnaire answers are skipped', () => {
+        const syllabusPrompt = buildSyllabusMarkdownPrompt({
+            topic: 'The history of the Silk Road',
+            level: 'beginner',
+            improvedTopicBrief:
+                'Create an introductory unit that explains the Silk Road as a network of trade, ideas, and cultural exchange.',
+            syllabusPrompt: 'Deterministic syllabus prompt body',
+            questionnaireAnswers: [],
+            authoring,
+            depth: 'basic',
+            length: 'short',
+        })
+
+        const chapterPrompt = buildChapterMarkdownPrompt({
+            topic: 'The history of the Silk Road',
+            level: 'beginner',
+            chapterIndex: 0,
+            questionnaireAnswers: [],
+            continuitySummaries: [],
+            authoring,
+            depth: 'basic',
+            length: 'short',
+            syllabus: {
+                topic: 'The history of the Silk Road',
+                title: 'The Silk Road learning path',
+                description: 'An introduction to trade routes and cultural exchange.',
+                keywords: 'Silk Road, trade, history',
+                modules: [
+                    {
+                        title: 'Origins of the routes',
+                        overview: 'How the network emerged and expanded.',
+                        lessons: [
+                            {
+                                title: 'Early exchanges',
+                                contentOutline: ['Trade routes', 'Goods and ideas'],
+                            },
+                        ],
+                    },
+                ],
+            },
+        })
+
+        expect(syllabusPrompt).toContain('Topic knowledge: not provided')
+        expect(syllabusPrompt).toContain('Related knowledge: not provided')
+        expect(syllabusPrompt).toContain('Learning goal: not provided')
+        expect(chapterPrompt).toContain('Topic knowledge: not provided')
+        expect(chapterPrompt).toContain('Related knowledge: not provided')
+        expect(chapterPrompt).toContain('Learning goal: not provided')
     })
 
     it('adapts the reference syllabus schema into the compatibility syllabus object', () => {

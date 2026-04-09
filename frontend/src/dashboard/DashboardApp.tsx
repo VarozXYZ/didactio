@@ -7,6 +7,7 @@ import {
     useNavigate,
     useParams,
 } from 'react-router-dom'
+import { toastError } from '@/hooks/use-toast'
 import { dashboardApi } from './api/dashboardApi'
 import { buildDashboardFolders, mergeDashboardItems } from './adapters'
 import { AllUnitsView } from './components/Dashboard/AllUnitsView/AllUnitsView'
@@ -17,8 +18,7 @@ import { SecurityView } from './components/Dashboard/SettingsViews/SecurityView'
 import { SubscriptionView } from './components/Dashboard/SettingsViews/SubscriptionView'
 import { Sidebar } from './components/Dashboard/Sidebar/Sidebar'
 import { UnitEditor } from './components/Editor/UnitEditor'
-import { DidacticUnitSetupModal } from './components/Setup/DidacticUnitSetupModal'
-import { DidacticUnitSyllabusModal } from './components/Setup/DidacticUnitSyllabusModal'
+import { CreateUnitWizard } from './components/Setup/CreateUnitWizard'
 import type { DashboardListItem, DashboardSection } from './types'
 import type { BackendFolder } from './api/dashboardApi'
 
@@ -70,30 +70,14 @@ export default function DashboardApp() {
     const [items, setItems] = useState<DashboardListItem[]>([])
     const [allFolders, setAllFolders] = useState<BackendFolder[]>([])
     const [isLoadingIndex, setIsLoadingIndex] = useState(true)
-    const [indexError, setIndexError] = useState<string | null>(null)
     const [refreshKey, setRefreshKey] = useState(0)
-    const [modalState, setModalState] = useState<
-        | {
-              isOpen: false
-              didacticUnitId: null
-              kind: null
-          }
-        | {
-              isOpen: true
-              didacticUnitId: string | null
-              kind: 'setup' | 'syllabus'
-          }
-    >({
+    const [modalState, setModalState] = useState<{
+        isOpen: boolean
+        didacticUnitId: string | null
+    }>({
         isOpen: false,
         didacticUnitId: null,
-        kind: null,
     })
-
-    const isSyllabusStage = (nextAction: string) =>
-        nextAction === 'generate_syllabus_prompt' ||
-        nextAction === 'review_syllabus_prompt' ||
-        nextAction === 'review_syllabus' ||
-        nextAction === 'approve_syllabus'
 
     useEffect(() => {
         if (location.pathname !== '/dashboard' && activeSection !== 'all-units') {
@@ -104,7 +88,6 @@ export default function DashboardApp() {
     useEffect(() => {
         const loadDashboardIndex = async () => {
             setIsLoadingIndex(true)
-            setIndexError(null)
 
             try {
                 const [didacticUnitResponse, folderResponse] = await Promise.all([
@@ -118,7 +101,7 @@ export default function DashboardApp() {
                 )
                 setAllFolders(folderResponse.folders)
             } catch (loadError) {
-                setIndexError(
+                toastError(
                     loadError instanceof Error
                         ? loadError.message
                         : 'Failed to load dashboard library.'
@@ -186,7 +169,7 @@ export default function DashboardApp() {
             await dashboardApi.deleteFolder(folderId)
             refreshDashboard()
         } catch (deleteError) {
-            setIndexError(
+            toastError(
                 deleteError instanceof Error ? deleteError.message : 'Failed to remove folder.'
             )
         }
@@ -199,21 +182,10 @@ export default function DashboardApp() {
 
     const openSetup = async (itemId: string) => {
         setActiveSection('all-units')
-        try {
-            const detail = await dashboardApi.getDidacticUnit(itemId)
-            setModalState({
-                isOpen: true,
-                didacticUnitId: itemId,
-                kind: isSyllabusStage(detail.nextAction) ? 'syllabus' : 'setup',
-            })
-        } catch (loadError) {
-            setIndexError(
-                loadError instanceof Error ? loadError.message : 'Failed to open didactic unit.'
-            )
-        }
+        setModalState({ isOpen: true, didacticUnitId: itemId })
     }
 
-    const openItem = async (itemId: string) => {
+    const openItem = (itemId: string) => {
         const item = items.find((entry) => entry.id === itemId)
         if (!item) {
             return
@@ -224,7 +196,7 @@ export default function DashboardApp() {
             return
         }
 
-        await openSetup(itemId)
+        openSetup(itemId)
     }
 
     const moveItemToFolder = async (itemId: string, folderId: string) => {
@@ -232,7 +204,7 @@ export default function DashboardApp() {
             await dashboardApi.updateDidacticUnitFolder(itemId, { mode: 'manual', folderId })
             refreshDashboard()
         } catch (moveError) {
-            setIndexError(
+            toastError(
                 moveError instanceof Error ? moveError.message : 'Failed to move unit.'
             )
         }
@@ -243,7 +215,7 @@ export default function DashboardApp() {
             await dashboardApi.deleteDidacticUnit(itemId)
             refreshDashboard()
         } catch (deleteError) {
-            setIndexError(
+            toastError(
                 deleteError instanceof Error ? deleteError.message : 'Failed to remove unit.'
             )
         }
@@ -251,11 +223,7 @@ export default function DashboardApp() {
 
     const openCreateView = () => {
         setActiveSection('all-units')
-        setModalState({
-            isOpen: true,
-            didacticUnitId: null,
-            kind: 'setup',
-        })
+        setModalState({ isOpen: true, didacticUnitId: null })
     }
 
     const handleSetActiveSection: Dispatch<SetStateAction<DashboardSection>> = (value) => {
@@ -267,11 +235,6 @@ export default function DashboardApp() {
     const indexView =
         activeSection === 'all-units' ? (
             <div className="flex min-w-0 flex-1 flex-col">
-                {indexError && (
-                    <div className="border-b border-red-200 bg-red-50 px-8 py-3 text-[13px] text-red-600">
-                        {indexError}
-                    </div>
-                )}
                 {isLoadingIndex && items.length === 0 ? (
                     <div className="flex min-w-0 flex-1 items-center justify-center bg-[#F5F5F7] text-[#86868B]">
                         Loading library...
@@ -338,52 +301,13 @@ export default function DashboardApp() {
                 <Route path="*" element={<Navigate replace to="/dashboard" />} />
             </Routes>
 
-            {modalState.isOpen && modalState.kind === 'setup' && (
-                <DidacticUnitSetupModal
+            {modalState.isOpen && (
+                <CreateUnitWizard
                     didacticUnitId={modalState.didacticUnitId}
-                    onClose={() =>
-                        setModalState({
-                            isOpen: false,
-                            didacticUnitId: null,
-                            kind: null,
-                        })
-                    }
+                    onClose={() => setModalState({ isOpen: false, didacticUnitId: null })}
                     onDataChanged={refreshDashboard}
-                    onOpenSyllabusReview={(didacticUnitId) => {
-                        setModalState({
-                            isOpen: true,
-                            didacticUnitId,
-                            kind: 'syllabus',
-                        })
-                        refreshDashboard()
-                    }}
-                />
-            )}
-
-            {modalState.isOpen && modalState.kind === 'syllabus' && modalState.didacticUnitId && (
-                <DidacticUnitSyllabusModal
-                    didacticUnitId={modalState.didacticUnitId}
-                    onClose={() =>
-                        setModalState({
-                            isOpen: false,
-                            didacticUnitId: null,
-                            kind: null,
-                        })
-                    }
-                    onDataChanged={refreshDashboard}
-                    onOpenSetup={(didacticUnitId) => {
-                        setModalState({
-                            isOpen: true,
-                            didacticUnitId,
-                            kind: 'setup',
-                        })
-                    }}
                     onOpenEditor={(didacticUnitId) => {
-                        setModalState({
-                            isOpen: false,
-                            didacticUnitId: null,
-                            kind: null,
-                        })
+                        setModalState({ isOpen: false, didacticUnitId: null })
                         refreshDashboard()
                         navigate(`/dashboard/unit/${didacticUnitId}`)
                     }}

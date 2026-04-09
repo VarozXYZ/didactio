@@ -6,6 +6,8 @@ export const moderationSchema = z.object({
     normalizedTopic: z.string().min(1),
     improvedTopicBrief: z.string().min(1),
     reasoningNotes: z.string().min(1),
+    folderName: z.string().min(1).optional(),
+    folderReasoning: z.string().min(1).optional(),
 })
 
 export const questionnaireSchema = z.object({

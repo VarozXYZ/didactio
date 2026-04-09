@@ -360,6 +360,25 @@ function resolveFolderSelectionForManualMode(
     }
 }
 
+function resolveFolderIdFromModelName(input: {
+    folderName: string | undefined
+    folders: Folder[]
+    fallbackFolderId: string
+}): string {
+    const normalizedFolderName = input.folderName?.trim().toLowerCase()
+
+    if (!normalizedFolderName) {
+        return input.fallbackFolderId
+    }
+
+    return (
+        input.folders.find(
+            (folder) =>
+                folder.name.trim().toLowerCase() === normalizedFolderName
+        )?.id ?? input.fallbackFolderId
+    )
+}
+
 async function resolveAutoAssignedFolderSelection(input: {
     didacticUnit: DidacticUnit
     folderStore: FolderStore
@@ -906,9 +925,26 @@ export function createApp(options: CreateAppOptions) {
 
         try {
             const config = await aiConfigStore.get(requestWithMockOwner.mockOwner.id)
+            const folders = await ensureDefaultFolders(
+                folderStore,
+                requestWithMockOwner.mockOwner.id
+            )
+            const generalFolder = folders.find((folder) => folder.slug === 'general')
+
+            if (!generalFolder) {
+                throw new Error('General folder could not be resolved.')
+            }
             const moderation = await aiService.moderateTopic({
                 topic: didacticUnit.topic,
                 level: didacticUnit.level,
+                additionalContext: didacticUnit.additionalContext,
+                folders:
+                    didacticUnit.folderAssignmentMode === 'auto'
+                        ? folders.map((folder) => ({
+                              name: folder.name,
+                              description: buildFolderDescription(folder),
+                          }))
+                        : undefined,
                 config,
                 tier: 'cheap',
                 abortSignal: createAbortSignal(request),
@@ -928,16 +964,11 @@ export function createApp(options: CreateAppOptions) {
                 moderatedDidacticUnit.folderAssignmentMode === 'auto'
                     ? updateDidacticUnitFolder(moderatedDidacticUnit, {
                           mode: 'auto',
-                          folderId:
-                              (
-                                  await resolveAutoAssignedFolderSelection({
-                                      didacticUnit: moderatedDidacticUnit,
-                                      folderStore,
-                                      aiConfigStore,
-                                      aiService,
-                                      abortSignal: createAbortSignal(request),
-                                  })
-                              ).folderId,
+                          folderId: resolveFolderIdFromModelName({
+                              folderName: moderation.folderName,
+                              folders,
+                              fallbackFolderId: generalFolder.id,
+                          }),
                       })
                     : moderatedDidacticUnit
             await didacticUnitStore.save(folderResolvedDidacticUnit)
@@ -977,10 +1008,27 @@ export function createApp(options: CreateAppOptions) {
 
         try {
             const config = await aiConfigStore.get(requestWithMockOwner.mockOwner.id)
+            const folders = await ensureDefaultFolders(
+                folderStore,
+                requestWithMockOwner.mockOwner.id
+            )
+            const generalFolder = folders.find((folder) => folder.slug === 'general')
+
+            if (!generalFolder) {
+                throw new Error('General folder could not be resolved.')
+            }
             const moderation = await aiService.streamModeration(
                 {
                     topic: didacticUnit.topic,
                     level: didacticUnit.level,
+                    additionalContext: didacticUnit.additionalContext,
+                    folders:
+                        didacticUnit.folderAssignmentMode === 'auto'
+                            ? folders.map((folder) => ({
+                                  name: folder.name,
+                                  description: buildFolderDescription(folder),
+                              }))
+                            : undefined,
                     config,
                     tier: 'cheap',
                     abortSignal: createAbortSignal(request),
@@ -1021,16 +1069,11 @@ export function createApp(options: CreateAppOptions) {
                 moderatedDidacticUnit.folderAssignmentMode === 'auto'
                     ? updateDidacticUnitFolder(moderatedDidacticUnit, {
                           mode: 'auto',
-                          folderId:
-                              (
-                                  await resolveAutoAssignedFolderSelection({
-                                      didacticUnit: moderatedDidacticUnit,
-                                      folderStore,
-                                      aiConfigStore,
-                                      aiService,
-                                      abortSignal: createAbortSignal(request),
-                                  })
-                              ).folderId,
+                          folderId: resolveFolderIdFromModelName({
+                              folderName: moderation.folderName,
+                              folders,
+                              fallbackFolderId: generalFolder.id,
+                          }),
                       })
                     : moderatedDidacticUnit
             await didacticUnitStore.save(folderResolvedDidacticUnit)

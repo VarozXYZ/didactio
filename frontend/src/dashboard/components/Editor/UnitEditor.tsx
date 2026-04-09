@@ -30,6 +30,7 @@ import type { LexicalEditor } from 'lexical'
 import { AnimatePresence, motion as Motion } from 'motion/react'
 import { clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
+import { toastError } from '@/hooks/use-toast'
 import { useNavigate } from 'react-router-dom'
 import {
     type BackendAiModelTier,
@@ -122,7 +123,6 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
     const [currentSpread, setCurrentSpread] = useState(0)
     const [contentPageDrafts, setContentPageDrafts] = useState<string[]>([])
     const [activeLexicalEditor, setActiveLexicalEditor] = useState<LexicalEditor | null>(null)
-    const [error, setError] = useState<string | null>(null)
     const [isLoading, setIsLoading] = useState(true)
     const [streamingMarkdown, setStreamingMarkdown] = useState('')
     const [isStreamingGeneration, setIsStreamingGeneration] = useState(false)
@@ -183,7 +183,6 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
             if (!options.silent) {
                 setIsLoading(true)
             }
-            setError(null)
 
             try {
                 const [unit, chaptersResponse] = await Promise.all([
@@ -240,7 +239,7 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                     setRevisions([])
                 }
             } catch (loadError) {
-                setError(
+                toastError(
                     loadError instanceof Error
                         ? loadError.message
                         : 'Failed to load didactic unit.'
@@ -379,7 +378,6 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
         } = {}
     ) => {
         setIsSubmitting(true)
-        setError(null)
 
         try {
             await action()
@@ -399,7 +397,7 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
             }
             saveTimeoutRef.current = window.setTimeout(() => setIsSaving(false), 1200)
         } catch (actionError) {
-            setError(
+            toastError(
                 actionError instanceof Error
                     ? actionError.message
                     : 'Didactic unit action failed.'
@@ -443,7 +441,6 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
         setIsStreamingGeneration(true)
         setActiveGeneratingChapterIndex(activeChapter.chapterIndex)
         setStreamingMarkdown('')
-        setError(null)
 
         try {
             if (activeChapter.status === 'ready') {
@@ -473,7 +470,7 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
             setUnitGenerationTier((previousTier) => previousTier ?? tier)
             await refreshWorkspaceAfterGeneration()
         } catch (actionError) {
-            setError(
+            toastError(
                 actionError instanceof Error
                     ? actionError.message
                     : 'Didactic unit action failed.'
@@ -508,7 +505,6 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
         isGenerationQueueRunningRef.current = true
         setIsSubmitting(true)
         setIsStreamingGeneration(true)
-        setError(null)
 
         try {
             for (const chapter of pendingChapters) {
@@ -530,7 +526,7 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
             }
         } catch (actionError) {
             generationQueueBlockedRef.current = true
-            setError(
+            toastError(
                 actionError instanceof Error
                     ? actionError.message
                     : 'Didactic unit generation failed.'
@@ -1221,12 +1217,6 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                         </div>
                     </div>
                 </header>
-
-                {error && (
-                    <div className="border-b border-red-200 bg-red-50 px-6 py-3 text-[13px] text-red-600">
-                        {error}
-                    </div>
-                )}
 
                 <div className="relative flex flex-1 flex-col items-center justify-center bg-[#F5F5F7] px-4 py-4 md:px-8 md:py-6">
                     {activeChapter.status === 'ready' || isActiveChapterStreaming ? (

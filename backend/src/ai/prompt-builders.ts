@@ -225,22 +225,52 @@ export function buildGatewaySystemPrompt(
 export function buildModerationPrompt(input: {
     topic: string
     level: DidacticUnitLevel
+    additionalContext?: string
+    folders?: Array<{
+        name: string
+        description: string
+    }>
     authoring: AuthoringConfig
 }): string {
+    const shouldClassifyFolder = (input.folders?.length ?? 0) > 0
+
     return [
         buildSection('Role / Contract', [
             'Validate that the topic is appropriate for educational content.',
             'Reject only harmful, illegal, clearly non-educational, or unusable requests.',
             'Improve vague prompts into clear, structured learning objectives.',
+            shouldClassifyFolder
+                ? 'Also classify the unit into exactly one of the provided folders.'
+                : '',
         ]),
         buildSection('Authoring Profile', buildAuthoringContext(input.authoring)),
         buildSection('Learner Context', [`Course level: ${input.level}`]),
         buildSection('Requested Topic', [
             `Evaluate and improve this course topic request for a ${input.level} level course: "${input.topic}"`,
+            input.additionalContext ? `Additional context: ${input.additionalContext}` : '',
         ]),
+        shouldClassifyFolder
+            ? buildSection(
+                  'Available folders',
+                  [
+                      input.folders!
+                          .map(
+                              (folder, index) =>
+                                  `${index + 1}. ${folder.name}: ${folder.description}`
+                          )
+                          .join('\n'),
+                  ]
+              )
+            : '',
         buildSection('Output Contract', [
             'Return whether the prompt is approved, a normalized topic title, an improved topic brief targeting the requested level, and concise reasoning notes.',
             'Preserve the authoring context in the improved brief so downstream generations inherit it.',
+            shouldClassifyFolder
+                ? 'Return folderName exactly as written in the available folder list. If uncertain, use General.'
+                : '',
+            shouldClassifyFolder
+                ? 'Return folderReasoning with a short explanation for the folder choice.'
+                : '',
         ]),
     ].join('\n\n')
 }

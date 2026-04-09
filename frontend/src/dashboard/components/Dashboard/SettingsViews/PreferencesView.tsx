@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { toastError } from '@/hooks/use-toast'
 import { Loader2, Save } from 'lucide-react'
 import {
     type BackendAiConfig,
@@ -173,18 +174,16 @@ export function PreferencesView() {
     const [config, setConfig] = useState<BackendAiConfig | null>(null)
     const [isLoading, setIsLoading] = useState(true)
     const [isSaving, setIsSaving] = useState(false)
-    const [error, setError] = useState<string | null>(null)
     const [savedNotice, setSavedNotice] = useState<string | null>(null)
 
     useEffect(() => {
         const loadConfig = async () => {
             setIsLoading(true)
-            setError(null)
 
             try {
                 setConfig(await dashboardApi.getAiConfig())
             } catch (loadError) {
-                setError(
+                toastError(
                     loadError instanceof Error
                         ? loadError.message
                         : 'Failed to load AI configuration.'
@@ -203,7 +202,6 @@ export function PreferencesView() {
         }
 
         setIsSaving(true)
-        setError(null)
         setSavedNotice(null)
 
         try {
@@ -211,7 +209,7 @@ export function PreferencesView() {
             setConfig(nextConfig)
             setSavedNotice('AI profile saved in memory for this session.')
         } catch (saveError) {
-            setError(
+            toastError(
                 saveError instanceof Error
                     ? saveError.message
                     : 'Failed to save AI configuration.'
@@ -236,11 +234,6 @@ export function PreferencesView() {
 
             <div className="p-8">
                 <div className="max-w-[920px] space-y-6">
-                    {error && (
-                        <div className="rounded-[12px] border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-600">
-                            {error}
-                        </div>
-                    )}
                     {savedNotice && (
                         <div className="rounded-[12px] border border-[#D6F3DB] bg-[#F4FFF6] px-4 py-3 text-[13px] text-[#2F7A45]">
                             {savedNotice}

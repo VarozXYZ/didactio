@@ -107,7 +107,7 @@ export function FolderFormModal({
     ]
 
     return (
-        <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
+        <Dialog open={open} onOpenChange={(o: boolean) => { if (!o) onClose() }}>
             <DialogContent className="max-w-[400px]">
                 <form onSubmit={handleSubmit}>
                     <DialogHeader>

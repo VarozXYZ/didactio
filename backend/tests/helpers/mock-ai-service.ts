@@ -127,6 +127,13 @@ export function createMockAiService(): AiService {
             }
         },
         async moderateTopic(input): Promise<ModerationResult> {
+            const folderName = input.folders
+                ? classifyFolderName(
+                      input.topic,
+                      input.folders.map((folder) => folder.name)
+                  )
+                : undefined
+
             return {
                 provider,
                 model,
@@ -136,9 +143,20 @@ export function createMockAiService(): AiService {
                 normalizedTopic: input.topic.trim(),
                 improvedTopicBrief: `Create a practical didactic unit about ${input.topic.trim()} with clear progression from fundamentals to real application.`,
                 reasoningNotes: 'Topic is safe, coherent, and appropriate for educational generation.',
+                folderName,
+                folderReasoning: folderName
+                    ? `Matched ${folderName} from the provided folder list.`
+                    : undefined,
             }
         },
         async streamModeration(input, callbacks): Promise<ModerationResult> {
+            const folderName = input.folders
+                ? classifyFolderName(
+                      input.topic,
+                      input.folders.map((folder) => folder.name)
+                  )
+                : undefined
+
             await callbacks.onStart?.({ provider, model, modelId: `${provider}/${model}` })
             await callbacks.onPartial?.({
                 approved: true,
@@ -146,6 +164,10 @@ export function createMockAiService(): AiService {
                 normalizedTopic: input.topic.trim(),
                 improvedTopicBrief: `Create a practical didactic unit about ${input.topic.trim()} with clear progression from fundamentals to real application.`,
                 reasoningNotes: 'Topic is safe, coherent, and appropriate for educational generation.',
+                folderName,
+                folderReasoning: folderName
+                    ? `Matched ${folderName} from the provided folder list.`
+                    : undefined,
             })
             const result = await this.moderateTopic(input)
             await callbacks.onComplete?.(result)
