@@ -171,9 +171,25 @@ export default function DashboardApp() {
         setRefreshKey((previous) => previous + 1)
     }
 
-    const createFolder = async (name: string) => {
-        await dashboardApi.createFolder({ name })
+    const createFolder = async (name: string, icon: string, color: string) => {
+        await dashboardApi.createFolder({ name, icon, color })
         refreshDashboard()
+    }
+
+    const editFolder = async (folderId: string, name: string, icon: string, color: string) => {
+        await dashboardApi.updateFolder(folderId, { name, icon, color })
+        refreshDashboard()
+    }
+
+    const deleteFolder = async (folderId: string) => {
+        try {
+            await dashboardApi.deleteFolder(folderId)
+            refreshDashboard()
+        } catch (deleteError) {
+            setIndexError(
+                deleteError instanceof Error ? deleteError.message : 'Failed to remove folder.'
+            )
+        }
     }
 
     const openEditor = (itemId: string) => {
@@ -301,6 +317,8 @@ export default function DashboardApp() {
                 isSidebarOpen={isSidebarOpen}
                 items={items}
                 onCreateFolder={createFolder}
+                onEditFolder={editFolder}
+                onDeleteFolder={deleteFolder}
                 onDeleteItem={deleteItem}
                 onMoveToFolder={moveItemToFolder}
                 onOpenEditor={openEditor}

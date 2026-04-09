@@ -195,6 +195,7 @@ function buildFolderResponse(folder: Folder) {
     return {
         id: folder.id,
         name: folder.name,
+        slug: folder.slug,
         icon: folder.icon,
         color: folder.color,
         kind: folder.kind,
@@ -622,10 +623,18 @@ export function createApp(options: CreateAppOptions) {
                 throw new Error('Request body must be a JSON object.')
             }
 
-            const payload = request.body as { name?: unknown }
+            const payload = request.body as { name?: unknown; icon?: unknown; color?: unknown }
             const name = normalizeFolderName(
                 typeof payload.name === 'string' ? payload.name : ''
             )
+            const icon =
+                typeof payload.icon === 'string' && payload.icon.trim().length > 0 && payload.icon.trim().length <= 16
+                    ? payload.icon.trim()
+                    : CUSTOM_FOLDER_ICON
+            const color =
+                typeof payload.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(payload.color.trim())
+                    ? payload.color.trim()
+                    : CUSTOM_FOLDER_COLOR
 
             if (!name) {
                 throw new Error('Folder name is required.')
@@ -652,8 +661,8 @@ export function createApp(options: CreateAppOptions) {
                 name,
                 slug,
                 kind: 'custom',
-                icon: CUSTOM_FOLDER_ICON,
-                color: CUSTOM_FOLDER_COLOR,
+                icon,
+                color,
             })
 
             response.status(201).json({
@@ -665,6 +674,82 @@ export function createApp(options: CreateAppOptions) {
                 error: error instanceof Error ? error.message : 'Invalid folder request.',
             })
         }
+    })
+
+    app.patch('/api/folders/:id', async (request, response) => {
+        const requestWithMockOwner = asRequestWithMockOwner(request)
+        const ownerId = requestWithMockOwner.mockOwner.id
+        const folder = await folderStore.getById(ownerId, request.params.id)
+
+        if (!folder) {
+            response.status(404).json({ error: 'Folder not found.' })
+            return
+        }
+
+        try {
+            const payload = request.body as { name?: unknown; icon?: unknown; color?: unknown }
+            const patch: { name?: string; icon?: string; color?: string } = {}
+
+            if (typeof payload.name === 'string' && payload.name.trim()) {
+                patch.name = normalizeFolderName(payload.name)
+            }
+            if (typeof payload.icon === 'string' && payload.icon.trim().length > 0 && payload.icon.trim().length <= 16) {
+                patch.icon = payload.icon.trim()
+            }
+            if (typeof payload.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(payload.color.trim())) {
+                patch.color = payload.color.trim()
+            }
+
+            const updated = await folderStore.updateById(ownerId, request.params.id, patch)
+
+            if (!updated) {
+                response.status(404).json({ error: 'Folder not found.' })
+                return
+            }
+
+            const unitCount = (await didacticUnitStore.listByOwner(ownerId))
+                .filter((unit) => unit.folderId === updated.id).length
+
+            response.json({ ...buildFolderResponse(updated), unitCount })
+        } catch (error) {
+            response.status(400).json({
+                error: error instanceof Error ? error.message : 'Invalid folder update.',
+            })
+        }
+    })
+
+    app.delete('/api/folders/:id', async (request, response) => {
+        const requestWithMockOwner = asRequestWithMockOwner(request)
+        const ownerId = requestWithMockOwner.mockOwner.id
+        const folder = await folderStore.getById(ownerId, request.params.id)
+
+        if (!folder) {
+            response.status(404).json({ error: 'Folder not found.' })
+            return
+        }
+
+        if (folder.slug === 'general') {
+            response.status(403).json({ error: 'The General folder cannot be removed.' })
+            return
+        }
+
+        const generalFolder = await getGeneralFolder(folderStore, ownerId)
+        const allUnits = await didacticUnitStore.listByOwner(ownerId)
+        const unitsInFolder = allUnits.filter((unit) => unit.folderId === folder.id)
+
+        await Promise.all(
+            unitsInFolder.map((unit) =>
+                didacticUnitStore.save(
+                    updateDidacticUnitFolder(unit, {
+                        mode: 'manual',
+                        folderId: generalFolder.id,
+                    })
+                )
+            )
+        )
+
+        await folderStore.deleteById(ownerId, request.params.id)
+        response.status(204).end()
     })
 
     app.post('/api/didactic-unit', async (request, response) => {

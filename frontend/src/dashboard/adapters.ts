@@ -145,6 +145,7 @@ export function buildDashboardFolders(
             return {
                 id: folder.id,
                 name: folder.name,
+                slug: folder.slug,
                 icon: folder.icon,
                 color: folder.color,
                 kind: folder.kind,

@@ -15,6 +15,7 @@ export type BackendAiModelTier = 'cheap' | 'premium'
 export interface BackendFolder {
     id: string
     name: string
+    slug: string
     icon: string
     color: string
     kind: 'default' | 'custom'
@@ -300,10 +301,21 @@ export const dashboardApi = {
     listFolders() {
         return requestJson<{ folders: BackendFolder[] }>('/api/folders')
     },
-    createFolder(input: { name: string }) {
+    createFolder(input: { name: string; icon?: string; color?: string }) {
         return requestJson<BackendFolder>('/api/folders', {
             method: 'POST',
             body: JSON.stringify(input),
+        })
+    },
+    updateFolder(id: string, patch: { name?: string; icon?: string; color?: string }) {
+        return requestJson<BackendFolder>(`/api/folders/${id}`, {
+            method: 'PATCH',
+            body: JSON.stringify(patch),
+        })
+    },
+    deleteFolder(id: string) {
+        return requestJson<void>(`/api/folders/${id}`, {
+            method: 'DELETE',
         })
     },
     listDidacticUnits() {

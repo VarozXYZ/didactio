@@ -66,4 +66,24 @@ export class MongoFolderStore implements FolderStore {
         await this.collection.insertOne(folder)
         return folder
     }
+
+    async updateById(ownerId: string, folderId: string, patch: { name?: string; icon?: string; color?: string }): Promise<Folder | null> {
+        const update: Record<string, string> = { updatedAt: new Date().toISOString() }
+        if (patch.name !== undefined) update.name = patch.name
+        if (patch.icon !== undefined) update.icon = patch.icon
+        if (patch.color !== undefined) update.color = patch.color
+
+        const result = await this.collection.findOneAndUpdate(
+            { id: folderId, ownerId },
+            { $set: update },
+            { returnDocument: 'after' }
+        )
+
+        return stripMongoId(result)
+    }
+
+    async deleteById(ownerId: string, folderId: string): Promise<boolean> {
+        const result = await this.collection.deleteOne({ id: folderId, ownerId })
+        return result.deletedCount === 1
+    }
 }

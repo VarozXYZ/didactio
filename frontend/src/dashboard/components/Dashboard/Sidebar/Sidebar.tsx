@@ -4,6 +4,7 @@ import {
     ChevronRight,
     CreditCard,
     FolderInput,
+    FolderPen,
     Lock,
     MoreHorizontal,
     MoreVertical,
@@ -17,6 +18,17 @@ import {
 import { motion } from 'motion/react'
 import { useState, type Dispatch, type SetStateAction } from 'react'
 import type { BackendFolder } from '../../../api/dashboardApi'
+import { FolderFormModal } from './FolderFormModal'
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '../../../../components/ui/alert-dialog'
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -42,7 +54,9 @@ type SidebarProps = {
     toggleFolder: (folderId: string) => void
     folders: DashboardFolder[]
     allFolders: BackendFolder[]
-    onCreateFolder: (name: string) => Promise<void>
+    onCreateFolder: (name: string, icon: string, color: string) => Promise<void>
+    onEditFolder: (folderId: string, name: string, icon: string, color: string) => Promise<void>
+    onDeleteFolder: (folderId: string) => void
     onOpenItem: (itemId: string) => void
     onOpenEditor: (itemId: string) => void
     onOpenSetup: (itemId: string) => void
@@ -60,6 +74,8 @@ export function Sidebar({
     folders,
     allFolders,
     onCreateFolder,
+    onEditFolder,
+    onDeleteFolder,
     onOpenItem,
     onOpenEditor,
     onOpenSetup,
@@ -67,9 +83,12 @@ export function Sidebar({
     onMoveToFolder,
     items,
 }: SidebarProps) {
-    const [isCreatingFolder, setIsCreatingFolder] = useState(false)
-    const [draftFolderName, setDraftFolderName] = useState('')
-    const [isSubmittingFolder, setIsSubmittingFolder] = useState(false)
+    const [folderModal, setFolderModal] = useState<
+        | { open: false }
+        | { open: true; mode: 'create'; initialName?: undefined; initialIcon?: undefined; initialColor?: undefined }
+        | { open: true; mode: 'edit'; folderId: string; initialName: string; initialIcon: string; initialColor: string }
+    >({ open: false })
+    const [folderPendingDelete, setFolderPendingDelete] = useState<DashboardFolder | null>(null)
     const settingsItems: Array<{
         id: DashboardSection
         label: string
@@ -83,6 +102,7 @@ export function Sidebar({
     ]
 
     return (
+        <>
         <motion.aside
             initial={false}
             animate={{ width: isSidebarOpen ? 280 : 80 }}
@@ -119,36 +139,77 @@ export function Sidebar({
                 <div className="mb-6 space-y-0.5">
                     {folders.map((folder) => (
                         <div key={folder.id}>
-                            <button
-                                type="button"
-                                onClick={() => toggleFolder(folder.id)}
-                                className={`flex w-full items-center gap-3 rounded-[10px] px-3 py-2.5 text-[#86868B] transition-all hover:bg-[#F5F5F7]/50 hover:text-[#1D1D1F] ${
-                                    !isSidebarOpen ? 'justify-center' : ''
-                                }`}
-                            >
-                                {isSidebarOpen ? (
-                                    <>
-                                        {expandedFolders.includes(folder.id) ? (
-                                            <ChevronDown size={14} className="text-[#86868B]" />
-                                        ) : (
-                                            <ChevronRight size={14} className="text-[#86868B]" />
-                                        )}
+                            <div className={`group flex items-center rounded-[10px] text-[#86868B] transition-all hover:bg-[#F5F5F7]/50 hover:text-[#1D1D1F] ${!isSidebarOpen ? 'justify-center' : ''}`}>
+                                <button
+                                    type="button"
+                                    onClick={() => toggleFolder(folder.id)}
+                                    className={`flex flex-1 min-w-0 items-center gap-3 px-3 py-2.5 ${!isSidebarOpen ? 'justify-center' : ''}`}
+                                >
+                                    {isSidebarOpen ? (
+                                        <>
+                                            {expandedFolders.includes(folder.id) ? (
+                                                <ChevronDown size={14} className="shrink-0 text-[#86868B]" />
+                                            ) : (
+                                                <ChevronRight size={14} className="shrink-0 text-[#86868B]" />
+                                            )}
+                                            <span className="text-lg leading-none shrink-0">
+                                                {getFolderEmoji(folder.icon)}
+                                            </span>
+                                            <span className="flex-1 truncate text-left text-[14px] font-medium">
+                                                {folder.name}
+                                            </span>
+                                            <span className="text-[12px] text-[#86868B] tabular-nums">
+                                                {folder.unitCount}
+                                            </span>
+                                        </>
+                                    ) : (
                                         <span className="text-lg leading-none">
                                             {getFolderEmoji(folder.icon)}
                                         </span>
-                                        <span className="flex-1 truncate text-left text-[14px] font-medium">
-                                            {folder.name}
-                                        </span>
-                                        <span className="rounded-full bg-[#F5F5F7] px-2 py-0.5 text-[11px]">
-                                            {folder.unitCount}
-                                        </span>
-                                    </>
-                                ) : (
-                                    <span className="text-lg leading-none">
-                                        {getFolderEmoji(folder.icon)}
-                                    </span>
+                                    )}
+                                </button>
+
+                                {isSidebarOpen && (
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <button
+                                                type="button"
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="mr-2 flex h-5 w-5 shrink-0 items-center justify-center rounded opacity-0 transition-opacity hover:bg-[#E5E5E7] group-hover:opacity-100 data-[state=open]:opacity-100"
+                                            >
+                                                <MoreHorizontal size={13} />
+                                            </button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent side="right" align="start">
+                                            <DropdownMenuItem
+                                                onSelect={() => setFolderModal({
+                                                    open: true,
+                                                    mode: 'edit',
+                                                    folderId: folder.id,
+                                                    initialName: folder.name,
+                                                    initialIcon: folder.icon,
+                                                    initialColor: folder.color ?? '#6B7280',
+                                                })}
+                                            >
+                                                <FolderPen />
+                                                Edit Folder
+                                            </DropdownMenuItem>
+                                            {folder.slug !== 'general' && (
+                                                <>
+                                                    <DropdownMenuSeparator />
+                                                    <DropdownMenuItem
+                                                        destructive
+                                                        onSelect={() => setFolderPendingDelete(folder)}
+                                                    >
+                                                        <Trash2 />
+                                                        Remove Folder
+                                                    </DropdownMenuItem>
+                                                </>
+                                            )}
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
                                 )}
-                            </button>
+                            </div>
 
                             {isSidebarOpen && expandedFolders.includes(folder.id) && (
                                 <div className="ml-8 mt-1 space-y-0.5">
@@ -167,7 +228,7 @@ export function Sidebar({
                                                 <button
                                                     type="button"
                                                     onClick={() => onOpenItem(unitId)}
-                                                    className="min-w-0 flex-1 truncate text-left"
+                                                    className="min-w-0 flex-1 text-left"
                                                 >
                                                     {unit.title}
                                                 </button>
@@ -246,66 +307,14 @@ export function Sidebar({
 
                 {isSidebarOpen && (
                     <div className="mb-6">
-                        {isCreatingFolder ? (
-                            <form
-                                className="space-y-2 rounded-[14px] border border-[#E5E5E7] bg-[#FAFAFB] p-3"
-                                onSubmit={(event) => {
-                                    event.preventDefault()
-
-                                    if (!draftFolderName.trim() || isSubmittingFolder) {
-                                        return
-                                    }
-
-                                    void (async () => {
-                                        setIsSubmittingFolder(true)
-
-                                        try {
-                                            await onCreateFolder(draftFolderName.trim())
-                                            setDraftFolderName('')
-                                            setIsCreatingFolder(false)
-                                        } finally {
-                                            setIsSubmittingFolder(false)
-                                        }
-                                    })()
-                                }}
-                            >
-                                <input
-                                    type="text"
-                                    value={draftFolderName}
-                                    onChange={(event) => setDraftFolderName(event.target.value)}
-                                    placeholder="New folder name"
-                                    className="w-full rounded-[10px] border border-[#E5E5E7] bg-white px-3 py-2 text-[13px] text-[#1D1D1F] outline-none focus:border-[#4ADE80]"
-                                />
-                                <div className="flex items-center justify-end gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setDraftFolderName('')
-                                            setIsCreatingFolder(false)
-                                        }}
-                                        className="rounded-[10px] px-3 py-2 text-[12px] font-medium text-[#86868B]"
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        disabled={!draftFolderName.trim() || isSubmittingFolder}
-                                        className="rounded-[10px] bg-[#1D1D1F] px-3 py-2 text-[12px] font-medium text-white disabled:opacity-50"
-                                    >
-                                        {isSubmittingFolder ? 'Creating...' : 'Create'}
-                                    </button>
-                                </div>
-                            </form>
-                        ) : (
-                            <button
-                                type="button"
-                                onClick={() => setIsCreatingFolder(true)}
-                                className="flex w-full items-center gap-3 rounded-[10px] px-3 py-2 text-[13px] text-[#86868B] transition-all hover:bg-[#F5F5F7]/50 hover:text-[#1D1D1F]"
-                            >
-                                <Plus size={16} />
-                                <span>Create Folder</span>
-                            </button>
-                        )}
+                        <button
+                            type="button"
+                            onClick={() => setFolderModal({ open: true, mode: 'create' })}
+                            className="flex w-full items-center gap-3 rounded-[10px] px-3 py-2 text-[13px] text-[#86868B] transition-all hover:bg-[#F5F5F7]/50 hover:text-[#1D1D1F]"
+                        >
+                            <Plus size={16} />
+                            <span>Create Folder</span>
+                        </button>
                     </div>
                 )}
 
@@ -362,5 +371,55 @@ export function Sidebar({
                 )}
             </div>
         </motion.aside>
+
+        <FolderFormModal
+            open={folderModal.open}
+            mode={folderModal.open ? folderModal.mode : 'create'}
+            initialName={folderModal.open ? folderModal.initialName : undefined}
+            initialIcon={folderModal.open ? (folderModal.initialIcon ? getFolderEmoji(folderModal.initialIcon) : '📁') : undefined}
+            initialColor={folderModal.open && folderModal.mode === 'edit' ? folderModal.initialColor : undefined}
+            onClose={() => setFolderModal({ open: false })}
+            onSubmit={async (name, icon, color) => {
+                if (folderModal.open && folderModal.mode === 'edit') {
+                    await onEditFolder(folderModal.folderId, name, icon, color)
+                } else {
+                    await onCreateFolder(name, icon, color)
+                }
+            }}
+        />
+
+        <AlertDialog
+            open={folderPendingDelete !== null}
+            onOpenChange={(open) => { if (!open) setFolderPendingDelete(null) }}
+        >
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Remove folder?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        <strong className="font-medium text-[#1D1D1F]">
+                            {folderPendingDelete?.name}
+                        </strong>{' '}
+                        will be removed. All units inside will be moved to{' '}
+                        <strong className="font-medium text-[#1D1D1F]">General</strong>{' '}
+                        automatically. This action cannot be undone.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                        className="bg-red-500 hover:bg-red-600 focus-visible:ring-red-500"
+                        onClick={() => {
+                            if (folderPendingDelete) {
+                                onDeleteFolder(folderPendingDelete.id)
+                                setFolderPendingDelete(null)
+                            }
+                        }}
+            >
+                Remove
+            </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+        </>
     )
 }

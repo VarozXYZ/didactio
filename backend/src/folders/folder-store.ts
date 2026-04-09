@@ -28,6 +28,8 @@ export interface FolderStore {
     getById(ownerId: string, folderId: string): Promise<Folder | null>
     getBySlug(ownerId: string, slug: string): Promise<Folder | null>
     create(input: CreateFolderInput): Promise<Folder>
+    updateById(ownerId: string, folderId: string, patch: { name?: string; icon?: string; color?: string }): Promise<Folder | null>
+    deleteById(ownerId: string, folderId: string): Promise<boolean>
 }
 
 function createFolderRecord(input: CreateFolderInput): Folder {
@@ -77,5 +79,34 @@ export class InMemoryFolderStore implements FolderStore {
         const folder = createFolderRecord(input)
         this.folders.set(folder.id, folder)
         return folder
+    }
+
+    async updateById(ownerId: string, folderId: string, patch: { name?: string; icon?: string; color?: string }): Promise<Folder | null> {
+        const folder = this.folders.get(folderId)
+
+        if (!folder || folder.ownerId !== ownerId) {
+            return null
+        }
+
+        const updated: Folder = {
+            ...folder,
+            ...(patch.name !== undefined ? { name: patch.name } : {}),
+            ...(patch.icon !== undefined ? { icon: patch.icon } : {}),
+            ...(patch.color !== undefined ? { color: patch.color } : {}),
+            updatedAt: new Date().toISOString(),
+        }
+
+        this.folders.set(folderId, updated)
+        return updated
+    }
+
+    async deleteById(ownerId: string, folderId: string): Promise<boolean> {
+        const folder = this.folders.get(folderId)
+
+        if (!folder || folder.ownerId !== ownerId) {
+            return false
+        }
+
+        return this.folders.delete(folderId)
     }
 }

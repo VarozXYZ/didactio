@@ -80,5 +80,5 @@ const folderEmojiMap: Record<string, string> = {
 }
 
 export function getFolderEmoji(iconName: string): string {
-    return folderEmojiMap[iconName] ?? '📁'
+    return folderEmojiMap[iconName] ?? iconName ?? '📁'
 }

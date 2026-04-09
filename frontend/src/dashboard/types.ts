@@ -19,6 +19,7 @@ export interface DashboardFolderSummary {
 export interface DashboardFolder {
     id: string
     name: string
+    slug: string
     icon: string
     color: string
     kind: 'default' | 'custom'
