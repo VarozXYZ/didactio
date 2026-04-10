@@ -82,8 +82,9 @@ describe('didactic-unit lifecycle', () => {
         })
         expect(typeof response.body.id).toBe('string')
         expect(response.body.studyProgress).toEqual({
-            chapterCount: 0,
-            completedChapterCount: 0,
+            moduleCount: 0,
+            readCharacterCount: 0,
+            totalCharacterCount: 0,
             studyProgressPercent: 0,
         })
     })
@@ -102,7 +103,7 @@ describe('didactic-unit lifecycle', () => {
             topic: 'next.js framework',
             status: 'submitted',
             nextAction: 'moderate_topic',
-            chapterCount: 0,
+            moduleCount: 0,
             progressPercent: 0,
         })
         expect(response.body.didacticUnits[0]).not.toHaveProperty('legacyPlanningId')
@@ -267,9 +268,13 @@ describe('didactic-unit lifecycle', () => {
 
         expect(completionResponse.status).toBe(200)
         expect(completionResponse.body.studyProgress).toMatchObject({
-            chapterCount: expect.any(Number),
-            completedChapterCount: 1,
+            moduleCount: expect.any(Number),
+            readCharacterCount: expect.any(Number),
+            totalCharacterCount: expect.any(Number),
+            studyProgressPercent: expect.any(Number),
         })
+        expect(completionResponse.body.studyProgress.readCharacterCount).toBeGreaterThan(0)
+        expect(completionResponse.body.studyProgress.totalCharacterCount).toBeGreaterThan(0)
 
         const revisionsResponse = await request(app).get(
             `/api/didactic-unit/${approved.id}/chapters/0/revisions`

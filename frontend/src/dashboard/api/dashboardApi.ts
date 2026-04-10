@@ -56,9 +56,10 @@ export interface BackendDidacticUnitSummary {
     status: string
     nextAction: string
     overview: string
-    chapterCount: number
+    moduleCount: number
     generatedChapterCount: number
-    completedChapterCount: number
+    readCharacterCount: number
+    totalCharacterCount: number
     progressPercent: number
     studyProgressPercent: number
     createdAt: string
@@ -108,8 +109,9 @@ export interface BackendDidacticUnitDetail {
         keyPoints: string[]
     }>
     studyProgress: {
-        chapterCount: number
-        completedChapterCount: number
+        moduleCount: number
+        readCharacterCount: number
+        totalCharacterCount: number
         studyProgressPercent: number
     }
 }
@@ -119,6 +121,8 @@ export interface BackendDidacticUnitChapterSummary {
     title: string
     overview: string
     hasGeneratedContent: boolean
+    readCharacterCount: number
+    totalCharacterCount: number
     isCompleted: boolean
     state: 'pending' | 'ready' | 'failed'
     generatedAt?: string
@@ -133,10 +137,22 @@ export interface BackendDidacticUnitChapterDetail {
     content: string | null
     presentationSettings: BackendChapterPresentationSettings
     state: 'pending' | 'ready' | 'failed'
+    readCharacterCount: number
+    totalCharacterCount: number
     isCompleted: boolean
     generatedAt?: string
     updatedAt?: string
     completedAt?: string
+}
+
+export interface BackendDidacticUnitReadingProgressResponse {
+    module: BackendDidacticUnitChapterDetail | null
+    studyProgress: {
+        moduleCount: number
+        readCharacterCount: number
+        totalCharacterCount: number
+        studyProgressPercent: number
+    }
 }
 
 export interface BackendDidacticUnitChapterRevision {
@@ -588,6 +604,19 @@ export const dashboardApi = {
             {
                 method: 'POST',
                 body: JSON.stringify({}),
+            }
+        )
+    },
+    updateDidacticUnitReadingProgress(
+        id: string,
+        chapterIndex: number,
+        readCharacterCount: number
+    ) {
+        return requestJson<BackendDidacticUnitReadingProgressResponse>(
+            `/api/didactic-unit/${id}/modules/${chapterIndex}/reading-progress`,
+            {
+                method: 'PUT',
+                body: JSON.stringify({ readCharacterCount }),
             }
         )
     },

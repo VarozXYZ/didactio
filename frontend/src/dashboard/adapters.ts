@@ -112,7 +112,7 @@ export function adaptDidacticUnitSummaryToDashboardItem(
             ? summary.studyProgressPercent
             : summary.progressPercent,
         studyProgressPercent: summary.studyProgressPercent,
-        chapterCount: summary.chapterCount,
+        chapterCount: summary.moduleCount,
         lastActivityAt: formatRelativeTimestamp(activityDate),
         coverColor: summary.folder.color,
         canOpenEditor,
@@ -211,6 +211,8 @@ function buildEditorChapter(
         effort: deriveEffortFromReadingTime(readingTime),
         isCompleted: detail?.isCompleted ?? summary.isCompleted,
         completedAt: detail?.completedAt ?? summary.completedAt,
+        readCharacterCount: detail?.readCharacterCount ?? summary.readCharacterCount,
+        totalCharacterCount: detail?.totalCharacterCount ?? summary.totalCharacterCount,
         presentationSettings: resolvePresentationSettings(detail?.presentationSettings),
     }
 }

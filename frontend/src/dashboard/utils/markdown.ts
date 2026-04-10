@@ -24,6 +24,7 @@ export type MarkdownPageBlock =
     | {
           type: 'markdown'
           markdown: string
+          text: string
       }
 
 const TITLE_STOP_WORDS = new Set([
@@ -612,6 +613,7 @@ export function extractMarkdownBlocks(markdown: string): MarkdownPageBlock[] {
         blocks.push({
             type: 'markdown',
             markdown: nodeMarkdown,
+            text: toString(node).replace(/\s+/g, ' ').trim(),
         })
     })
 

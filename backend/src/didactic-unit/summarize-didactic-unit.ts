@@ -1,4 +1,8 @@
 import type { DidacticUnit } from './create-didactic-unit.js'
+import {
+    getModuleReadCharacterCount,
+    getModuleTotalCharacterCount,
+} from './module-reading-progress.js'
 
 export interface DidacticUnitSummary {
     id: string
@@ -9,24 +13,43 @@ export interface DidacticUnitSummary {
     status: DidacticUnit['status']
     nextAction: DidacticUnit['nextAction']
     overview: string
-    chapterCount: number
+    moduleCount: number
     generatedChapterCount: number
-    completedChapterCount: number
+    readCharacterCount: number
+    totalCharacterCount: number
     progressPercent: number
     studyProgressPercent: number
     createdAt: string
     lastActivityAt: string
 }
 
+export interface DidacticUnitStudyProgress {
+    moduleCount: number
+    readCharacterCount: number
+    totalCharacterCount: number
+    studyProgressPercent: number
+}
+
 function calculateProgressPercent(
-    chapterCount: number,
+    moduleCount: number,
     generatedChapterCount: number
 ): number {
-    if (chapterCount === 0) {
+    if (moduleCount === 0) {
         return 0
     }
 
-    return Math.round((generatedChapterCount / chapterCount) * 100)
+    return Math.round((generatedChapterCount / moduleCount) * 100)
+}
+
+function calculateStudyProgressPercent(
+    readCharacterCount: number,
+    totalCharacterCount: number
+): number {
+    if (totalCharacterCount === 0) {
+        return 0
+    }
+
+    return Math.round((readCharacterCount / totalCharacterCount) * 100)
 }
 
 const planningProgressPercentByStatus: Partial<Record<DidacticUnit['status'], number>> = {
@@ -53,14 +76,35 @@ function resolveLastActivityAt(didacticUnit: DidacticUnit): string {
     )
 }
 
+function summarizeReadableProgress(didacticUnit: DidacticUnit): {
+    readCharacterCount: number
+    totalCharacterCount: number
+} {
+    return didacticUnit.chapters.reduce(
+        (totals, _chapter, moduleIndex) => ({
+            readCharacterCount:
+                totals.readCharacterCount +
+                getModuleReadCharacterCount(didacticUnit, moduleIndex),
+            totalCharacterCount:
+                totals.totalCharacterCount +
+                getModuleTotalCharacterCount(didacticUnit, moduleIndex),
+        }),
+        {
+            readCharacterCount: 0,
+            totalCharacterCount: 0,
+        }
+    )
+}
+
 export function summarizeDidacticUnit(didacticUnit: DidacticUnit): DidacticUnitSummary {
-    const chapterCount = didacticUnit.chapters.length
+    const moduleCount = didacticUnit.chapters.length
     const generatedChapterCount = didacticUnit.generatedChapters?.length ?? 0
-    const completedChapterCount = didacticUnit.completedChapters?.length ?? 0
     const lastActivityAt = resolveLastActivityAt(didacticUnit)
+    const { readCharacterCount, totalCharacterCount } =
+        summarizeReadableProgress(didacticUnit)
     const progressPercent =
         planningProgressPercentByStatus[didacticUnit.status] ??
-        calculateProgressPercent(chapterCount, generatedChapterCount)
+        calculateProgressPercent(moduleCount, generatedChapterCount)
 
     return {
         id: didacticUnit.id,
@@ -71,37 +115,34 @@ export function summarizeDidacticUnit(didacticUnit: DidacticUnit): DidacticUnitS
         status: didacticUnit.status,
         nextAction: didacticUnit.nextAction,
         overview: didacticUnit.overview,
-        chapterCount,
+        moduleCount,
         generatedChapterCount,
-        completedChapterCount,
+        readCharacterCount,
+        totalCharacterCount,
         progressPercent,
-        studyProgressPercent: calculateProgressPercent(
-            chapterCount,
-            completedChapterCount
+        studyProgressPercent: calculateStudyProgressPercent(
+            readCharacterCount,
+            totalCharacterCount
         ),
         createdAt: didacticUnit.createdAt,
         lastActivityAt,
     }
 }
 
-export interface DidacticUnitStudyProgress {
-    chapterCount: number
-    completedChapterCount: number
-    studyProgressPercent: number
-}
-
 export function summarizeDidacticUnitStudyProgress(
     didacticUnit: DidacticUnit
 ): DidacticUnitStudyProgress {
-    const chapterCount = didacticUnit.chapters.length
-    const completedChapterCount = didacticUnit.completedChapters?.length ?? 0
+    const moduleCount = didacticUnit.chapters.length
+    const { readCharacterCount, totalCharacterCount } =
+        summarizeReadableProgress(didacticUnit)
 
     return {
-        chapterCount,
-        completedChapterCount,
-        studyProgressPercent: calculateProgressPercent(
-            chapterCount,
-            completedChapterCount
+        moduleCount,
+        readCharacterCount,
+        totalCharacterCount,
+        studyProgressPercent: calculateStudyProgressPercent(
+            readCharacterCount,
+            totalCharacterCount
         ),
     }
 }

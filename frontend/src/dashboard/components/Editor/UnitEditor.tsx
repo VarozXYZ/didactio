@@ -7,12 +7,14 @@ import {
 } from 'react'
 import {
     AlertCircle,
+    CheckCircle2,
     ChevronLeft,
     ChevronRight,
     Clock,
     Edit3,
     History,
     Loader2,
+    MoreHorizontal,
     Undo2,
     RotateCcw,
     Settings,
@@ -27,8 +29,16 @@ import { AnimatePresence, motion as Motion } from 'motion/react'
 import { clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 import { toastError } from '@/hooks/use-toast'
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { useNavigate } from 'react-router-dom'
 import {
+    type BackendDidacticUnitReadingProgressResponse,
     type BackendAiModelTier,
     type BackendDidacticUnitChapterDetail,
     type BackendGenerationRun,
@@ -41,6 +51,8 @@ import {
 } from '../../adapters'
 import {
     calculateSpreadMetrics,
+    findResumeSpreadIndex,
+    getReadCharacterCountForSpread,
     getStatusPillClass,
     measurePages,
 } from '../../pageLayout'
@@ -146,6 +158,43 @@ type ChapterDraft = {
 
 function cn(...inputs: Array<string | false | null | undefined>) {
     return twMerge(clsx(inputs))
+}
+
+function calculateUnitStudyProgressPercent(
+    chapters: DidacticUnitEditorChapter[],
+    input: {
+        chapterIndex: number
+        readCharacterCount: number
+        totalCharacterCount: number
+    }
+): number {
+    const totals = chapters.reduce(
+        (result, chapter) => {
+            const readCharacterCount =
+                chapter.chapterIndex === input.chapterIndex
+                    ? Math.max(chapter.readCharacterCount, input.readCharacterCount)
+                    : chapter.readCharacterCount
+            const totalCharacterCount =
+                chapter.chapterIndex === input.chapterIndex
+                    ? input.totalCharacterCount
+                    : chapter.totalCharacterCount
+
+            return {
+                readCharacterCount: result.readCharacterCount + readCharacterCount,
+                totalCharacterCount: result.totalCharacterCount + totalCharacterCount,
+            }
+        },
+        {
+            readCharacterCount: 0,
+            totalCharacterCount: 0,
+        }
+    )
+
+    if (totals.totalCharacterCount === 0) {
+        return 0
+    }
+
+    return Math.round((totals.readCharacterCount / totals.totalCharacterCount) * 100)
 }
 
 function buildDraft(
@@ -406,7 +455,7 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
             }),
         [viewport.height, viewport.width]
     )
-    const paginatedContentPages = useMemo(
+    const measuredContentPages = useMemo(
         () =>
             draft && activeChapter
                 ? measurePages({
@@ -415,9 +464,13 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                       content: draft.contentMarkdown,
                       pageHeight: spreadMetrics.pageHeight,
                       pageWidth: spreadMetrics.pageWidth,
-                  }).slice(0, -1)
+                  }).filter((page) => page.kind === 'content')
                 : [],
         [activeChapter, draft, spreadMetrics.pageHeight, spreadMetrics.pageWidth]
+    )
+    const paginatedContentPages = useMemo(
+        () => measuredContentPages.map((page) => page.markdown),
+        [measuredContentPages]
     )
     const visibleContentPages =
         isEditMode && contentPageDrafts.length > 0 ? contentPageDrafts : paginatedContentPages
@@ -435,6 +488,24 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
         paginatedContentPages,
         spreadMetrics.pageHeight,
         spreadMetrics.pageWidth,
+    ])
+
+    useEffect(() => {
+        if (isEditMode) {
+            return
+        }
+
+        if (!activeChapter || measuredContentPages.length === 0) {
+            setCurrentSpread(0)
+            return
+        }
+
+        setCurrentSpread(findResumeSpreadIndex(measuredContentPages, activeChapter.readCharacterCount))
+    }, [
+        activeChapter?.chapterIndex,
+        activeChapter?.readCharacterCount,
+        isEditMode,
+        measuredContentPages,
     ])
 
     const runAction = async (
@@ -477,6 +548,97 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
         }
     }
 
+    const applyReadingProgressLocally = useCallback(
+        (input: {
+            chapterIndex: number
+            readCharacterCount: number
+            totalCharacterCount: number
+            studyProgressPercent?: number
+            completedAt?: string
+        }) => {
+            const isCompleted =
+                input.totalCharacterCount > 0 &&
+                input.readCharacterCount >= input.totalCharacterCount
+
+            setChapterDetails((currentDetails) => {
+                const currentDetail = currentDetails[input.chapterIndex]
+
+                if (!currentDetail) {
+                    return currentDetails
+                }
+
+                return {
+                    ...currentDetails,
+                    [input.chapterIndex]: {
+                        ...currentDetail,
+                        readCharacterCount: Math.max(
+                            currentDetail.readCharacterCount,
+                            input.readCharacterCount
+                        ),
+                        totalCharacterCount: input.totalCharacterCount,
+                        isCompleted,
+                        completedAt: isCompleted
+                            ? input.completedAt ?? currentDetail.completedAt
+                            : undefined,
+                    },
+                }
+            })
+
+            setWorkspace((currentWorkspace) => {
+                if (!currentWorkspace) {
+                    return currentWorkspace
+                }
+
+                const chapters = currentWorkspace.chapters.map((chapter) =>
+                    chapter.chapterIndex === input.chapterIndex
+                        ? {
+                              ...chapter,
+                              readCharacterCount: Math.max(
+                                  chapter.readCharacterCount,
+                                  input.readCharacterCount
+                              ),
+                              totalCharacterCount: input.totalCharacterCount,
+                              isCompleted,
+                              completedAt: isCompleted
+                                  ? input.completedAt ?? chapter.completedAt
+                                  : undefined,
+                          }
+                        : chapter
+                )
+
+                return {
+                    ...currentWorkspace,
+                    progress:
+                        input.studyProgressPercent ??
+                        calculateUnitStudyProgressPercent(chapters, {
+                            chapterIndex: input.chapterIndex,
+                            readCharacterCount: input.readCharacterCount,
+                            totalCharacterCount: input.totalCharacterCount,
+                        }),
+                    chapters,
+                }
+            })
+        },
+        []
+    )
+
+    const reconcileReadingProgress = useCallback(
+        (response: BackendDidacticUnitReadingProgressResponse) => {
+            if (!response.module) {
+                return
+            }
+
+            applyReadingProgressLocally({
+                chapterIndex: response.module.chapterIndex,
+                readCharacterCount: response.module.readCharacterCount,
+                totalCharacterCount: response.module.totalCharacterCount,
+                studyProgressPercent: response.studyProgress.studyProgressPercent,
+                completedAt: response.module.completedAt,
+            })
+        },
+        [applyReadingProgressLocally]
+    )
+
     const pulseSavedState = () => {
         setIsSaving(true)
         if (saveTimeoutRef.current) {
@@ -498,6 +660,58 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
         pulseSavedState()
     }, [loadWorkspace, onDataChanged])
 
+    const streamChapterContent = useCallback(
+        async (chapter: DidacticUnitEditorChapter, tier: BackendAiModelTier) => {
+            generationQueueBlockedRef.current = false
+            setIsSubmitting(true)
+            setIsStreamingGeneration(true)
+            setActiveGeneratingChapterIndex(chapter.chapterIndex)
+            setStreamingMarkdown('')
+
+            try {
+                if (chapter.status === 'ready') {
+                    await dashboardApi.streamRegenerateDidacticUnitChapter(
+                        didacticUnitId,
+                        chapter.chapterIndex,
+                        tier,
+                        {
+                            onPartialMarkdown: (event) => {
+                                setStreamingMarkdown(event.markdown)
+                            },
+                        }
+                    )
+                } else {
+                    await dashboardApi.streamGenerateDidacticUnitChapter(
+                        didacticUnitId,
+                        chapter.chapterIndex,
+                        tier,
+                        {
+                            onPartialMarkdown: (event) => {
+                                setStreamingMarkdown(event.markdown)
+                            },
+                        }
+                    )
+                }
+
+                setUnitGenerationTier((previousTier) => previousTier ?? tier)
+                await refreshWorkspaceAfterGeneration()
+            } catch (actionError) {
+                toastError(
+                    actionError instanceof Error
+                        ? actionError.message
+                        : 'Didactic unit action failed.'
+                )
+                setIsSaving(false)
+            } finally {
+                setIsSubmitting(false)
+                setIsStreamingGeneration(false)
+                setActiveGeneratingChapterIndex(null)
+                setStreamingMarkdown('')
+            }
+        },
+        [didacticUnitId, refreshWorkspaceAfterGeneration]
+    )
+
     const handlePrimaryGeneration = async (tierOverride?: BackendAiModelTier) => {
         const tier = tierOverride ?? unitGenerationTier
 
@@ -505,52 +719,7 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
             return
         }
 
-        generationQueueBlockedRef.current = false
-        setIsSubmitting(true)
-        setIsStreamingGeneration(true)
-        setActiveGeneratingChapterIndex(activeChapter.chapterIndex)
-        setStreamingMarkdown('')
-
-        try {
-            if (activeChapter.status === 'ready') {
-                await dashboardApi.streamRegenerateDidacticUnitChapter(
-                    didacticUnitId,
-                    activeChapter.chapterIndex,
-                    tier,
-                    {
-                        onPartialMarkdown: (event) => {
-                            setStreamingMarkdown(event.markdown)
-                        },
-                    }
-                )
-            } else {
-                await dashboardApi.streamGenerateDidacticUnitChapter(
-                    didacticUnitId,
-                    activeChapter.chapterIndex,
-                    tier,
-                    {
-                        onPartialMarkdown: (event) => {
-                            setStreamingMarkdown(event.markdown)
-                        },
-                    }
-                )
-            }
-
-            setUnitGenerationTier((previousTier) => previousTier ?? tier)
-            await refreshWorkspaceAfterGeneration()
-        } catch (actionError) {
-            toastError(
-                actionError instanceof Error
-                    ? actionError.message
-                    : 'Didactic unit action failed.'
-            )
-            setIsSaving(false)
-        } finally {
-            setIsSubmitting(false)
-            setIsStreamingGeneration(false)
-            setActiveGeneratingChapterIndex(null)
-            setStreamingMarkdown('')
-        }
+        await streamChapterContent(activeChapter, tier)
     }
 
     const startUnitGenerationQueue = useCallback(async () => {
@@ -715,15 +884,84 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
         )
     }
 
+    const persistReadProgress = useCallback(
+        async (chapter: DidacticUnitEditorChapter, readCharacterCount: number) => {
+            if (chapter.status !== 'ready' || chapter.totalCharacterCount === 0) {
+                return
+            }
+
+            if (readCharacterCount <= chapter.readCharacterCount) {
+                return
+            }
+
+            applyReadingProgressLocally({
+                chapterIndex: chapter.chapterIndex,
+                readCharacterCount,
+                totalCharacterCount: chapter.totalCharacterCount,
+            })
+
+            try {
+                const response = await dashboardApi.updateDidacticUnitReadingProgress(
+                    didacticUnitId,
+                    chapter.chapterIndex,
+                    readCharacterCount
+                )
+
+                reconcileReadingProgress(response)
+                onDataChanged()
+            } catch (actionError) {
+                toastError(
+                    actionError instanceof Error
+                        ? actionError.message
+                        : 'Didactic unit reading progress update failed.'
+                )
+                await loadWorkspace(chapter.chapterIndex, {
+                    silent: true,
+                    preserveSpread: true,
+                })
+            }
+        },
+        [
+            applyReadingProgressLocally,
+            didacticUnitId,
+            loadWorkspace,
+            onDataChanged,
+            reconcileReadingProgress,
+        ]
+    )
+
     const totalSpreads = Math.max(1, Math.ceil(Math.max(visibleContentPages.length, 1) / 2))
     const canGoPrev = currentSpread > 0
     const canGoNext = currentSpread < totalSpreads - 1
 
     const goToNextSpread = useCallback(() => {
+        if (!canGoNext) {
+            return
+        }
+
+        if (!isEditMode && activeChapter) {
+            const readCharacterCount = getReadCharacterCountForSpread(
+                measuredContentPages,
+                currentSpread
+            )
+
+            if (readCharacterCount > 0) {
+                void persistReadProgress(activeChapter, readCharacterCount)
+            }
+        }
+
         setCurrentSpread((previousSpread) =>
             previousSpread < totalSpreads - 1 ? previousSpread + 1 : previousSpread
         )
-    }, [totalSpreads])
+    }, [
+        activeChapter,
+        canGoNext,
+        currentSpread,
+        isEditMode,
+        measuredContentPages,
+        persistReadProgress,
+        totalSpreads,
+    ])
 
     const goToPrevSpread = useCallback(() => {
         setCurrentSpread((previousSpread) => (previousSpread > 0 ? previousSpread - 1 : 0))
@@ -1072,15 +1310,15 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
     return (
         <div className="flex h-screen overflow-hidden bg-[#F5F5F7] font-sans text-[#1D1D1F]">
             <Motion.aside
-                className="z-20 flex h-full flex-col overflow-hidden border-r border-[#E5E5E7] bg-white"
+                className="z-20 flex h-full w-[280px] shrink-0 flex-col overflow-hidden border-r border-[#E5E5E7] bg-white"
                 initial={false}
             >
-                <div className="flex shrink-0 items-center justify-between gap-3 p-6">
-                    <div className="flex items-center gap-3">
+                <div className="flex shrink-0 items-center justify-between gap-2 px-4 py-5">
+                    <div className="min-w-0 flex-1">
                         <img
                             src="/assets/logos/logo-horizontal.png"
                             alt="Didactio"
-                            className="h-8 w-auto object-contain"
+                            className="h-7 w-auto max-w-[180px] object-contain"
                         />
                     </div>
                     <button
@@ -1094,7 +1332,7 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                     </button>
                 </div>
 
-                <div className="mb-6 shrink-0 px-6">
+                <div className="mb-5 shrink-0 px-4">
                     <div className="mb-2 flex items-center justify-between text-xs font-medium uppercase tracking-wider text-[#86868B]">
                         <span>Overall Progress</span>
                         <span>{workspace.progress}%</span>
@@ -1108,54 +1346,139 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                     </div>
                 </div>
 
-                <nav className="flex-1 space-y-1 overflow-y-auto px-3">
-                    {workspace.chapters.map((chapter, index) => (
-                        <button
-                            key={chapter.chapterIndex}
-                            className={cn(
-                                'group flex w-full items-center rounded-[10px] text-left transition-all duration-200',
-                                'gap-3 px-3 py-2.5',
-                                activeChapterIndex === chapter.chapterIndex
-                                    ? 'bg-[#F5F5F7] text-[#1D1D1F]'
-                                    : 'text-[#86868B] hover:bg-[#F5F5F7]/50 hover:text-[#1D1D1F]'
-                            )}
-                            onClick={() => setActiveChapterIndex(chapter.chapterIndex)}
-                            type="button"
-                        >
-                            <>
-                                <span className="w-4 text-center text-xs font-medium opacity-50">
-                                    {index + 1}
-                                </span>
-                                <span className="flex-1 truncate text-[14px] font-medium">
-                                    {chapter.title}
-                                </span>
-                                <div className="flex-shrink-0">{getStatusIcon(chapter)}</div>
-                            </>
-                        </button>
-                    ))}
+                <nav className="flex-1 space-y-2 overflow-y-auto px-2 pb-2">
+                    {workspace.chapters.map((chapter, index) => {
+                        const isActive = activeChapterIndex === chapter.chapterIndex
+                        const canAiModule =
+                            hasConfiguredGenerationTier &&
+                            (chapter.status === 'ready' ||
+                                chapter.status === 'pending' ||
+                                chapter.status === 'failed')
+                        const aiBusy = isSubmitting || isStreamingGeneration
+                        const aiLabel =
+                            chapter.status === 'ready'
+                                ? 'Regenerate module'
+                                : chapter.status === 'failed'
+                                  ? 'Retry generation'
+                                  : 'Generate module'
+                        const canMarkRead =
+                            chapter.status === 'ready' && !chapter.isCompleted
+
+                        return (
+                            <div
+                                key={chapter.chapterIndex}
+                                className={cn(
+                                    'group relative flex w-full items-start gap-1.5 rounded-[14px] transition-all duration-200',
+                                    'px-2 py-2.5',
+                                    isActive
+                                        ? 'bg-[#F5F5F7] text-[#1D1D1F] shadow-[inset_0_0_0_1px_rgba(0,0,0,0.06)]'
+                                        : 'text-[#6E6E73] hover:bg-[#FAFAFA] hover:text-[#1D1D1F] hover:shadow-[inset_0_0_0_1px_rgba(0,0,0,0.04)]'
+                                )}
+                            >
+                                {isActive && (
+                                    <span
+                                        aria-hidden
+                                        className="absolute left-0 top-3 bottom-3 w-[3px] rounded-r-full bg-[#34C759]"
+                                    />
+                                )}
+                                <button
+                                    className="flex min-w-0 flex-1 items-start gap-2.5 text-left"
+                                    onClick={() => setActiveChapterIndex(chapter.chapterIndex)}
+                                    type="button"
+                                >
+                                    <span
+                                        className={cn(
+                                            'mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-[8px] text-[11px] font-bold tabular-nums transition-colors',
+                                            isActive
+                                                ? 'bg-white text-[#1D1D1F] shadow-[0_1px_2px_rgba(0,0,0,0.06)] ring-1 ring-black/[0.05]'
+                                                : 'bg-black/[0.05] text-[#86868B] group-hover:bg-black/[0.07] group-hover:text-[#1D1D1F]'
+                                        )}
+                                    >
+                                        {index + 1}
+                                    </span>
+                                    <span className="min-w-0 flex-1 text-[12.5px] font-medium leading-[1.4] text-balance">
+                                        {chapter.title}
+                                    </span>
+                                </button>
+                                <div className="flex shrink-0 items-center gap-0.5 self-center">
+                                    <div className="flex shrink-0">{getStatusIcon(chapter)}</div>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <button
+                                                aria-label={`Module ${index + 1} actions`}
+                                                className="flex h-7 w-7 items-center justify-center rounded-md text-[#86868B] opacity-0 transition-opacity hover:bg-black/[0.06] hover:text-[#1D1D1F] group-hover:opacity-100 data-[state=open]:opacity-100"
+                                                type="button"
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                <MoreHorizontal size={15} />
+                                            </button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent side="right" align="start" className="w-52">
+                                            {canAiModule && unitGenerationTier ? (
+                                                <DropdownMenuItem
+                                                    disabled={aiBusy}
+                                                    onSelect={() => {
+                                                        void streamChapterContent(chapter, unitGenerationTier)
+                                                    }}
+                                                >
+                                                    <RotateCcw size={14} className="text-[#86868B]" />
+                                                    {aiLabel}
+                                                </DropdownMenuItem>
+                                            ) : null}
+                                            {canAiModule && unitGenerationTier && canMarkRead ? (
+                                                <DropdownMenuSeparator />
+                                            ) : null}
+                                            {canMarkRead ? (
+                                                <DropdownMenuItem
+                                                    disabled={isSubmitting}
+                                                    onSelect={() => {
+                                                        void runAction(
+                                                            () =>
+                                                                dashboardApi.completeDidacticUnitChapter(
+                                                                    didacticUnitId,
+                                                                    chapter.chapterIndex
+                                                                ),
+                                                            {
+                                                                chapterIndex: activeChapterIndexRef.current,
+                                                                preserveSpread: true,
+                                                                silentRefresh: true,
+                                                            }
+                                                        )
+                                                    }}
+                                                >
+                                                    <CheckCircle2 size={14} className="text-[#86868B]" />
+                                                    Mark as read
+                                                </DropdownMenuItem>
+                                            ) : null}
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </div>
+                            </div>
+                        )
+                    })}
                 </nav>
 
-                <div className="shrink-0 space-y-1 border-t border-[#E5E5E7] p-4">
+                <div className="shrink-0 space-y-0.5 border-t border-[#E5E5E7] p-3">
                     <button
-                        className="flex w-full items-center gap-3 rounded-[10px] px-3 py-2 text-[14px] text-[#86868B] transition-all hover:bg-[#F5F5F7] hover:text-[#1D1D1F]"
+                        className="flex w-full items-center gap-2 rounded-[10px] px-2 py-1.5 text-[13px] text-[#86868B] transition-all hover:bg-[#F5F5F7] hover:text-[#1D1D1F]"
                         onClick={() => navigate('/dashboard')}
                         type="button"
                     >
-                        <Undo2 size={18} />
+                        <Undo2 size={16} />
                         <span>Back to Dashboard</span>
                     </button>
                     <button
-                        className="flex w-full items-center gap-3 rounded-[10px] px-3 py-2 text-[14px] text-[#86868B] transition-all hover:bg-[#F5F5F7] hover:text-[#1D1D1F]"
+                        className="flex w-full items-center gap-2 rounded-[10px] px-2 py-1.5 text-[13px] text-[#86868B] transition-all hover:bg-[#F5F5F7] hover:text-[#1D1D1F]"
                         type="button"
                     >
-                        <Share2 size={18} />
+                        <Share2 size={16} />
                         <span>Export Unit</span>
                     </button>
                     <button
-                        className="flex w-full items-center gap-3 rounded-[10px] px-3 py-2 text-[14px] text-[#86868B] transition-all hover:bg-[#F5F5F7] hover:text-[#1D1D1F]"
+                        className="flex w-full items-center gap-2 rounded-[10px] px-2 py-1.5 text-[13px] text-[#86868B] transition-all hover:bg-[#F5F5F7] hover:text-[#1D1D1F]"
                         type="button"
                     >
-                        <Settings size={18} />
+                        <Settings size={16} />
                         <span>Settings</span>
                     </button>
                 </div>

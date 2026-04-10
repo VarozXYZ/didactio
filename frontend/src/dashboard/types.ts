@@ -129,6 +129,8 @@ export interface DidacticUnitEditorChapter {
     effort: string
     isCompleted: boolean
     completedAt?: string
+    readCharacterCount: number
+    totalCharacterCount: number
     presentationSettings: ChapterPresentationSettings
 }
 

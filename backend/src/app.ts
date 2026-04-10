@@ -34,6 +34,12 @@ import {
 } from './didactic-unit/generate-didactic-unit-chapter.js'
 import { listDidacticUnitChapters } from './didactic-unit/list-didactic-unit-chapters.js'
 import {
+    getModuleReadCharacterCount,
+    getModuleReadProgressRecord,
+    getModuleTotalCharacterCount,
+    updateDidacticUnitModuleReadProgress,
+} from './didactic-unit/module-reading-progress.js'
+import {
     answerDidacticUnitQuestionnaire,
     applyGeneratedDidacticUnitQuestionnaire,
     applyGeneratedDidacticUnitSyllabus,
@@ -106,6 +112,26 @@ function parseChapterIndex(value: string): number {
     }
 
     return chapterIndex
+}
+
+function parseModuleReadProgressInput(body: unknown): { readCharacterCount: number } {
+    if (!body || typeof body !== 'object') {
+        throw new Error('Request body must be a JSON object.')
+    }
+
+    const payload = body as { readCharacterCount?: unknown }
+
+    if (typeof payload.readCharacterCount !== 'number' || !Number.isFinite(payload.readCharacterCount)) {
+        throw new Error('readCharacterCount must be a finite number.')
+    }
+
+    if (payload.readCharacterCount < 0) {
+        throw new Error('readCharacterCount must be greater than or equal to 0.')
+    }
+
+    return {
+        readCharacterCount: payload.readCharacterCount,
+    }
 }
 
 function parseChapterGenerationInstruction(body: unknown): string | undefined {
@@ -495,6 +521,54 @@ async function recordCompletedSyllabusRun(
             telemetry: result.telemetry,
         })
     )
+}
+
+function buildDidacticUnitModuleDetailResponse(input: {
+    didacticUnit: DidacticUnit
+    moduleIndex: number
+    chapterRuns: ChapterGenerationRunRecord[]
+}) {
+    const plannedChapter = input.didacticUnit.chapters[input.moduleIndex]
+    if (!plannedChapter) {
+        return null
+    }
+
+    const generatedChapter = input.didacticUnit.generatedChapters?.find(
+        (chapter) => chapter.chapterIndex === input.moduleIndex
+    )
+    const totalCharacterCount = getModuleTotalCharacterCount(
+        input.didacticUnit,
+        input.moduleIndex
+    )
+    const readCharacterCount = getModuleReadCharacterCount(
+        input.didacticUnit,
+        input.moduleIndex
+    )
+    const isCompleted = totalCharacterCount > 0 && readCharacterCount >= totalCharacterCount
+    const completedAt = isCompleted
+        ? getModuleReadProgressRecord(input.didacticUnit, input.moduleIndex)?.lastReadAt
+        : undefined
+
+    return {
+        chapterIndex: input.moduleIndex,
+        title: generatedChapter?.title ?? plannedChapter.title,
+        planningOverview: plannedChapter.overview,
+        content: generatedChapter?.markdown ?? null,
+        presentationSettings: resolveDidacticUnitChapterPresentationSettings(
+            generatedChapter?.presentationSettings
+        ),
+        generatedAt: generatedChapter?.generatedAt,
+        updatedAt: generatedChapter?.updatedAt,
+        state: resolveDidacticUnitChapterState({
+            didacticUnit: input.didacticUnit,
+            chapterIndex: input.moduleIndex,
+            chapterRuns: input.chapterRuns,
+        }),
+        readCharacterCount,
+        totalCharacterCount,
+        isCompleted,
+        completedAt,
+    }
 }
 
 async function recordFailedSyllabusRun(
@@ -1739,37 +1813,19 @@ export function createApp(options: CreateAppOptions) {
             return
         }
 
-        const generatedChapter = didacticUnit.generatedChapters?.find(
-            (chapter) => chapter.chapterIndex === chapterIndex
-        )
         const chapterRuns = (
             await generationRunStore.listByDidacticUnit(
                 requestWithMockOwner.mockOwner.id,
                 didacticUnit.id
             )
         ).filter((run): run is ChapterGenerationRunRecord => run.stage === 'chapter')
-        const completedChapter = didacticUnit.completedChapters?.find(
-            (chapter) => chapter.chapterIndex === chapterIndex
-        )
-
-        response.json({
-            chapterIndex,
-            title: generatedChapter?.title ?? plannedChapter.title,
-            planningOverview: plannedChapter.overview,
-            content: generatedChapter?.markdown ?? null,
-            presentationSettings: resolveDidacticUnitChapterPresentationSettings(
-                generatedChapter?.presentationSettings
-            ),
-            generatedAt: generatedChapter?.generatedAt,
-            updatedAt: generatedChapter?.updatedAt,
-            state: resolveDidacticUnitChapterState({
+        response.json(
+            buildDidacticUnitModuleDetailResponse({
                 didacticUnit,
-                chapterIndex,
+                moduleIndex: chapterIndex,
                 chapterRuns,
-            }),
-            isCompleted: completedChapter !== undefined,
-            completedAt: completedChapter?.completedAt,
-        })
+            })
+        )
     })
 
     app.get(['/api/didactic-unit/:id/chapters/:chapterIndex/revisions', '/api/didactic-unit/:id/modules/:chapterIndex/revisions'], async (request, response) => {
@@ -1874,6 +1930,59 @@ export function createApp(options: CreateAppOptions) {
         }
     })
 
+    app.put(['/api/didactic-unit/:id/chapters/:chapterIndex/reading-progress', '/api/didactic-unit/:id/modules/:chapterIndex/reading-progress'], async (request, response) => {
+        const requestWithMockOwner = asRequestWithMockOwner(request)
+        const didacticUnit = await didacticUnitStore.getById(
+            requestWithMockOwner.mockOwner.id,
+            String(request.params.id)
+        )
+
+        if (!didacticUnit) {
+            response.status(404).json({ error: 'Didactic unit not found.' })
+            return
+        }
+
+        let chapterIndex
+        try {
+            chapterIndex = parseChapterIndex(String(request.params.chapterIndex))
+        } catch (error) {
+            response.status(400).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : 'Invalid didactic unit module reading progress request.',
+            })
+            return
+        }
+
+        try {
+            const parsedInput = parseModuleReadProgressInput(request.body)
+            const updatedDidacticUnit = updateDidacticUnitModuleReadProgress(
+                didacticUnit,
+                chapterIndex,
+                parsedInput.readCharacterCount
+            )
+            await didacticUnitStore.save(updatedDidacticUnit)
+
+            response.json({
+                module: buildDidacticUnitModuleDetailResponse({
+                    didacticUnit: updatedDidacticUnit,
+                    moduleIndex: chapterIndex,
+                    chapterRuns: [],
+                }),
+                studyProgress: summarizeDidacticUnitStudyProgress(updatedDidacticUnit),
+            })
+        } catch (error) {
+            const message =
+                error instanceof Error
+                    ? error.message
+                    : 'Didactic unit module reading progress update failed.'
+            response.status(
+                message === 'Generated didactic unit module not found.' ? 404 : 409
+            ).json({ error: message })
+        }
+    })
+
     app.patch(['/api/didactic-unit/:id/chapters/:chapterIndex', '/api/didactic-unit/:id/modules/:chapterIndex'], async (request, response) => {
         const requestWithMockOwner = asRequestWithMockOwner(request)
         const didacticUnit = await didacticUnitStore.getById(
@@ -1919,34 +2028,12 @@ export function createApp(options: CreateAppOptions) {
                 parsedInput
             )
             await didacticUnitStore.save(updatedDidacticUnit)
-            const updatedChapter = updatedDidacticUnit.generatedChapters?.find(
-                (chapter) => chapter.chapterIndex === chapterIndex
-            )
-            const plannedChapter = updatedDidacticUnit.chapters[chapterIndex]
-
             response.json(
-                updatedChapter && plannedChapter
-                    ? {
-                          chapterIndex,
-                          title: updatedChapter.title,
-                          planningOverview: plannedChapter.overview,
-                          content: updatedChapter.markdown,
-                          presentationSettings:
-                              resolveDidacticUnitChapterPresentationSettings(
-                                  updatedChapter.presentationSettings
-                              ),
-                          generatedAt: updatedChapter.generatedAt,
-                          updatedAt: updatedChapter.updatedAt,
-                          state: 'ready',
-                          isCompleted:
-                              updatedDidacticUnit.completedChapters?.some(
-                                  (chapter) => chapter.chapterIndex === chapterIndex
-                              ) ?? false,
-                          completedAt: updatedDidacticUnit.completedChapters?.find(
-                              (chapter) => chapter.chapterIndex === chapterIndex
-                          )?.completedAt,
-                      }
-                    : null
+                buildDidacticUnitModuleDetailResponse({
+                    didacticUnit: updatedDidacticUnit,
+                    moduleIndex: chapterIndex,
+                    chapterRuns: [],
+                })
             )
         } catch (error) {
             const message =

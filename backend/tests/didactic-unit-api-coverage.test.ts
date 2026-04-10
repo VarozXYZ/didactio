@@ -24,8 +24,9 @@ describe('didactic-unit API coverage', () => {
             title: expect.any(String),
             chapters: expect.any(Array),
             studyProgress: {
-                chapterCount: expect.any(Number),
-                completedChapterCount: 0,
+                moduleCount: expect.any(Number),
+                readCharacterCount: 0,
+                totalCharacterCount: 0,
                 studyProgressPercent: 0,
             },
         })
@@ -118,7 +119,83 @@ describe('didactic-unit API coverage', () => {
         expect(response.body.chapters[0]).toMatchObject({
             chapterIndex: 0,
             hasGeneratedContent: true,
+            readCharacterCount: 0,
             state: 'ready',
+        })
+    })
+
+    it('updates module reading progress monotonically and returns weighted study progress', async () => {
+        const app = createTestApp()
+        const approved = await createApprovedDidacticUnit(app)
+
+        await generateDidacticUnitChapter(app, approved.id, 0)
+
+        const chapterResponse = await request(app).get(
+            `/api/didactic-unit/${approved.id}/chapters/0`
+        )
+
+        expect(chapterResponse.status).toBe(200)
+        expect(chapterResponse.body.totalCharacterCount).toBeGreaterThan(0)
+
+        const firstProgressResponse = await request(app)
+            .put(`/api/didactic-unit/${approved.id}/chapters/0/reading-progress`)
+            .send({ readCharacterCount: 40 })
+
+        expect(firstProgressResponse.status).toBe(200)
+        expect(firstProgressResponse.body.module).toMatchObject({
+            chapterIndex: 0,
+            readCharacterCount: 40,
+            totalCharacterCount: chapterResponse.body.totalCharacterCount,
+            isCompleted: false,
+        })
+        expect(firstProgressResponse.body.studyProgress).toMatchObject({
+            moduleCount: expect.any(Number),
+            readCharacterCount: 40,
+            totalCharacterCount: chapterResponse.body.totalCharacterCount,
+        })
+
+        const secondProgressResponse = await request(app)
+            .put(`/api/didactic-unit/${approved.id}/chapters/0/reading-progress`)
+            .send({ readCharacterCount: 10 })
+
+        expect(secondProgressResponse.status).toBe(200)
+        expect(secondProgressResponse.body.module.readCharacterCount).toBe(40)
+    })
+
+    it('resets module reading progress when generated content is edited', async () => {
+        const app = createTestApp()
+        const approved = await createApprovedDidacticUnit(app)
+
+        await generateDidacticUnitChapter(app, approved.id, 0)
+
+        const chapterResponse = await request(app).get(
+            `/api/didactic-unit/${approved.id}/chapters/0`
+        )
+
+        expect(chapterResponse.status).toBe(200)
+
+        const progressResponse = await request(app)
+            .put(`/api/didactic-unit/${approved.id}/chapters/0/reading-progress`)
+            .send({ readCharacterCount: chapterResponse.body.totalCharacterCount })
+
+        expect(progressResponse.status).toBe(200)
+        expect(progressResponse.body.module.isCompleted).toBe(true)
+
+        const updateResponse = await request(app)
+            .patch(`/api/didactic-unit/${approved.id}/chapters/0`)
+            .send({
+                chapter: {
+                    title: `${chapterResponse.body.title} updated`,
+                    content: `${chapterResponse.body.content}\n\nAdditional closing note.`,
+                    presentationSettings: chapterResponse.body.presentationSettings,
+                },
+            })
+
+        expect(updateResponse.status).toBe(200)
+        expect(updateResponse.body).toMatchObject({
+            chapterIndex: 0,
+            readCharacterCount: 0,
+            isCompleted: false,
         })
     })
 

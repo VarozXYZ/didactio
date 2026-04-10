@@ -19,6 +19,7 @@ import type {
     DidacticUnitChapterRevision,
     DidacticUnitGeneratedChapter,
 } from './didactic-unit-chapter.js'
+import type { DidacticUnitModuleReadProgress } from './module-reading-progress.js'
 
 export type DidacticUnitStatus =
     | 'submitted'
@@ -68,6 +69,7 @@ export interface DidacticUnit {
     syllabusApprovedAt?: string
     generatedChapters?: DidacticUnitGeneratedChapter[]
     completedChapters?: DidacticUnitChapterCompletion[]
+    moduleReadProgress?: DidacticUnitModuleReadProgress[]
     chapterRevisions?: DidacticUnitChapterRevision[]
     continuitySummaries?: string[]
     generationTier?: 'cheap' | 'premium'

@@ -8,6 +8,7 @@ import {
     resolveDidacticUnitChapterPresentationSettings,
     type DidacticUnitChapterRevisionSource,
 } from './didactic-unit-chapter.js'
+import { resetDidacticUnitModuleReadProgress } from './module-reading-progress.js'
 
 export function createChapterGenerationSourceFromDidacticUnit(
     didacticUnit: DidacticUnit
@@ -86,7 +87,7 @@ export function applyGeneratedDidacticUnitChapter(
         const updatedChapters = [...generatedChapters]
         updatedChapters[existingChapterIndex] = generatedChapter
 
-        return {
+        return resetDidacticUnitModuleReadProgress({
             ...didacticUnit,
             chapterRevisions: [
                 ...(didacticUnit.chapterRevisions ?? []),
@@ -103,10 +104,10 @@ export function applyGeneratedDidacticUnitChapter(
             }),
             continuitySummaries: nextContinuitySummaries,
             generatedChapters: updatedChapters,
-        }
+        }, chapterIndex)
     }
 
-    return {
+    return resetDidacticUnitModuleReadProgress({
         ...didacticUnit,
         chapterRevisions: [
             ...(didacticUnit.chapterRevisions ?? []),
@@ -127,5 +128,5 @@ export function applyGeneratedDidacticUnitChapter(
                 (left, right) => left.chapterIndex - right.chapterIndex
             ),
         }),
-    }
+    }, chapterIndex)
 }

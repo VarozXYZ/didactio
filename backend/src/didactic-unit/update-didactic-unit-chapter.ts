@@ -7,6 +7,7 @@ import {
     createDidacticUnitChapterRevision,
     resolveDidacticUnitChapterPresentationSettings,
 } from './didactic-unit-chapter.js'
+import { resetDidacticUnitModuleReadProgress } from './module-reading-progress.js'
 
 export function updateDidacticUnitChapter(
     didacticUnit: DidacticUnit,
@@ -36,7 +37,7 @@ export function updateDidacticUnitChapter(
     const updatedChapters = [...generatedChapters]
     updatedChapters[existingChapterIndex] = updatedChapter
 
-    return {
+    return resetDidacticUnitModuleReadProgress({
         ...didacticUnit,
         chapterRevisions: [
             ...(didacticUnit.chapterRevisions ?? []),
@@ -48,5 +49,5 @@ export function updateDidacticUnitChapter(
         ],
         generatedChapters: updatedChapters,
         updatedAt: updatedChapter.updatedAt as string,
-    }
+    }, chapterIndex)
 }
