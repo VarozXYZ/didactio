@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { DidacticUnitGeneratedChapter } from '../didactic-unit/didactic-unit-chapter.js'
 import type { DidacticUnitSyllabus } from '../didactic-unit/planning.js'
+import type { AiCallTelemetry } from '../ai/telemetry.js'
 
 export type GenerationRunStage = 'syllabus' | 'chapter'
 export type GenerationRunStatus = 'completed' | 'failed'
@@ -16,6 +17,7 @@ interface GenerationRunBase {
     createdAt: string
     rawOutput?: string
     error?: string
+    telemetry?: AiCallTelemetry
 }
 
 export interface SyllabusGenerationRunRecord extends GenerationRunBase {
@@ -61,6 +63,7 @@ interface CreateCompletedSyllabusGenerationRunInput {
     prompt: string
     syllabus: DidacticUnitSyllabus
     createdAt: string
+    telemetry?: AiCallTelemetry
 }
 
 interface CreateFailedSyllabusGenerationRunInput {
@@ -72,6 +75,7 @@ interface CreateFailedSyllabusGenerationRunInput {
     rawOutput?: string
     error: string
     createdAt: string
+    telemetry?: AiCallTelemetry
 }
 
 interface CreateCompletedChapterGenerationRunInput {
@@ -83,6 +87,8 @@ interface CreateCompletedChapterGenerationRunInput {
     prompt: string
     chapter: DidacticUnitGeneratedChapter
     createdAt: string
+    rawOutput?: string
+    telemetry?: AiCallTelemetry
 }
 
 interface CreateFailedChapterGenerationRunInput {
@@ -95,6 +101,7 @@ interface CreateFailedChapterGenerationRunInput {
     rawOutput?: string
     error: string
     createdAt: string
+    telemetry?: AiCallTelemetry
 }
 
 export function createCompletedSyllabusGenerationRunRecord(
@@ -111,6 +118,7 @@ export function createCompletedSyllabusGenerationRunRecord(
         syllabus: input.syllabus,
         status: 'completed',
         createdAt: input.createdAt,
+        telemetry: input.telemetry,
     }
 }
 
@@ -129,6 +137,7 @@ export function createFailedSyllabusGenerationRunRecord(
         error: input.error,
         status: 'failed',
         createdAt: input.createdAt,
+        telemetry: input.telemetry,
     }
 }
 
@@ -145,8 +154,10 @@ export function createCompletedChapterGenerationRunRecord(
         model: input.model,
         prompt: input.prompt,
         chapter: input.chapter,
+        rawOutput: input.rawOutput,
         status: 'completed',
         createdAt: input.createdAt,
+        telemetry: input.telemetry,
     }
 }
 
@@ -166,5 +177,6 @@ export function createFailedChapterGenerationRunRecord(
         error: input.error,
         status: 'failed',
         createdAt: input.createdAt,
+        telemetry: input.telemetry,
     }
 }

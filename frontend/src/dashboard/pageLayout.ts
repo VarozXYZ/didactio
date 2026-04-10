@@ -1,5 +1,10 @@
 import type { DidacticUnitEditorChapter as UnitChapter } from './types'
-import { extractMarkdownBlocks, markdownToHtml, type MarkdownPageBlock } from './utils/markdown'
+import {
+    extractMarkdownBlocks,
+    formatModuleMarkdownForRender,
+    markdownToHtml,
+    type MarkdownPageBlock,
+} from './utils/markdown'
 
 const MOBILE_BREAKPOINT = 768
 const HEADER_HEIGHT = 64
@@ -136,7 +141,7 @@ function createHeaderMarkup(activeChapter: UnitChapter, chapterIndex: number): s
     <div class="mb-4 flex-shrink-0 space-y-2">
       <div class="flex items-center gap-2">
         <span class="rounded-full bg-[#F5F5F7] px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-[#86868B]">
-          Chapter ${chapterIndex + 1}
+          Module ${chapterIndex + 1}
         </span>
         <span class="rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest ${getStatusPillClass(activeChapter.status)}">
           ${escapeHtml(activeChapter.status)}
@@ -175,6 +180,8 @@ export function measurePages({
     chapterIndex: number
 }): string[] {
     if (!content || !pageWidth || !pageHeight) return []
+    const renderedContent = formatModuleMarkdownForRender(content)
+    if (!renderedContent) return []
 
     const isMobile = pageWidth < 420
     const horizontalPadding = isMobile ? 24 : 32
@@ -211,7 +218,7 @@ export function measurePages({
         contentLimit - headerMeasure.scrollHeight - measurementBuffer
     )
     const regularPageLimit = Math.max(140, contentLimit - measurementBuffer)
-    const blocks = extractMarkdownBlocks(content)
+    const blocks = extractMarkdownBlocks(renderedContent)
     const pages: string[] = []
     let currentBlocks: string[] = []
     let blockIndex = 0

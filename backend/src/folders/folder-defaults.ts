@@ -22,6 +22,7 @@ const DEFAULT_FOLDER_DEFINITIONS: DefaultFolderDefinition[] = [
 export const CUSTOM_FOLDER_ICON = 'folder'
 export const CUSTOM_FOLDER_COLOR = '#6B7280'
 export const GENERAL_FOLDER_SLUG = 'general'
+const defaultFolderSeedsInFlight = new Map<string, Promise<Folder[]>>()
 
 export function normalizeFolderName(name: string): string {
     return name.replace(/\s+/g, ' ').trim()
@@ -35,7 +36,7 @@ export function slugifyFolderName(name: string): string {
         .replace(/^-+|-+$/g, '')
 }
 
-export async function ensureDefaultFolders(
+async function ensureDefaultFoldersOnce(
     folderStore: FolderStore,
     ownerId: string
 ): Promise<Folder[]> {
@@ -48,8 +49,8 @@ export async function ensureDefaultFolders(
             continue
         }
 
-        createdFolders.push(
-            await folderStore.create({
+        const createdOrExistingFolder = await folderStore
+            .create({
                 ownerId,
                 name: definition.name,
                 slug: definition.slug,
@@ -57,12 +58,44 @@ export async function ensureDefaultFolders(
                 icon: definition.icon,
                 color: definition.color,
             })
-        )
+            .catch(async (error) => {
+                const existingFolder = await folderStore.getBySlug(ownerId, definition.slug)
+
+                if (existingFolder) {
+                    return existingFolder
+                }
+
+                throw error
+            })
+
+        existingBySlug.add(createdOrExistingFolder.slug)
+        createdFolders.push(createdOrExistingFolder)
     }
 
     return [...existingFolders, ...createdFolders].sort((left, right) =>
         left.createdAt.localeCompare(right.createdAt)
     )
+}
+
+export async function ensureDefaultFolders(
+    folderStore: FolderStore,
+    ownerId: string
+): Promise<Folder[]> {
+    const inFlightSeed = defaultFolderSeedsInFlight.get(ownerId)
+
+    if (inFlightSeed) {
+        return inFlightSeed
+    }
+
+    let seedPromise: Promise<Folder[]>
+    seedPromise = ensureDefaultFoldersOnce(folderStore, ownerId).finally(() => {
+        if (defaultFolderSeedsInFlight.get(ownerId) === seedPromise) {
+            defaultFolderSeedsInFlight.delete(ownerId)
+        }
+    })
+
+    defaultFolderSeedsInFlight.set(ownerId, seedPromise)
+    return seedPromise
 }
 
 export async function getGeneralFolder(

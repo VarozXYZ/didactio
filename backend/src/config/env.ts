@@ -4,6 +4,8 @@ let envLoaded = false
 
 export interface AppEnv {
     port: number
+    logLevel: 'debug' | 'info' | 'warn' | 'error'
+    logFilePath: string | null
     aiGatewayApiKey: string | null
     aiGatewayBaseUrl: string
     aiCheapProvider: string
@@ -37,6 +39,21 @@ function parseOptionalString(value: string | undefined): string | null {
     return parsedValue ? parsedValue : null
 }
 
+function parseLogLevel(value: string | undefined): 'debug' | 'info' | 'warn' | 'error' {
+    const parsedValue = value?.trim().toLowerCase()
+
+    if (
+        parsedValue === 'debug' ||
+        parsedValue === 'info' ||
+        parsedValue === 'warn' ||
+        parsedValue === 'error'
+    ) {
+        return parsedValue
+    }
+
+    return process.env.NODE_ENV === 'test' ? 'error' : 'info'
+}
+
 export function loadEnv(): void {
     if (envLoaded) {
         return
@@ -49,6 +66,8 @@ export function loadEnv(): void {
 export function getAppEnv(): AppEnv {
     return {
         port: parsePort(process.env.PORT),
+        logLevel: parseLogLevel(process.env.LOG_LEVEL),
+        logFilePath: parseOptionalString(process.env.LOG_FILE_PATH),
         aiGatewayApiKey: parseOptionalString(process.env.AI_GATEWAY_API_KEY),
         aiGatewayBaseUrl:
             parseOptionalString(process.env.AI_GATEWAY_BASE_URL) ??

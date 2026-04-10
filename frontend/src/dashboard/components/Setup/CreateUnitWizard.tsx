@@ -42,7 +42,13 @@ type PartialReferenceSyllabus = {
 
 function normalizeKeywords(value: string | string[] | undefined): string[] | undefined {
     if (Array.isArray(value)) return value.filter((k) => typeof k === 'string' && k.trim())
-    if (typeof value === 'string') return value.split(/[,\n;]/).map((k) => k.trim()).filter(Boolean)
+    if (typeof value === 'string') {
+        const byDelimiter = value.split(/[,\n;]/).map((k) => k.trim()).filter(Boolean)
+        if (byDelimiter.length <= 1 && value.includes(' ')) {
+            return value.split(/\s+/).map((k) => k.trim()).filter(Boolean)
+        }
+        return byDelimiter
+    }
     return undefined
 }
 
@@ -382,88 +388,63 @@ export function CreateUnitWizard({
             <div className="flex min-h-0 max-h-[calc(100dvh-0.75rem)] w-full max-w-[920px] overflow-hidden rounded-[22px] sm:max-h-[calc(100dvh-1.5rem)]"
                  style={{ background: 'rgba(255,255,255,0.72)', backdropFilter: 'blur(40px) saturate(1.6)', boxShadow: '0 2px 0 rgba(255,255,255,0.8) inset, 0 32px_80px rgba(0,0,0,0.22), 0 0 0 1px rgba(255,255,255,0.5)', border: '1px solid rgba(255,255,255,0.55)' }}>
                 {/* Stepper sidebar */}
-                <div className="flex w-[196px] shrink-0 flex-col px-5 py-7"
+                <div className="flex w-[196px] shrink-0 flex-col justify-between px-5 py-5"
                      style={{ background: 'rgba(255,255,255,0.45)', borderRight: '1px solid rgba(0,0,0,0.06)' }}>
-                    <div className="mb-7">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#86868B]">New Unit</p>
-                    </div>
+                    <div>
+                        <div className="mb-6">
+                            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#86868B]">New Unit</p>
+                        </div>
 
-                    <nav className="flex flex-1 flex-col gap-0.5">
-                        {STEPS.map((step, index) => {
-                            const isCompleted = index < currentStep
-                            const isCurrent = index === currentStep
+                        <nav className="flex flex-col gap-1">
+                            {STEPS.map((step, index) => {
+                                const isCompleted = index < currentStep
+                                const isCurrent = index === currentStep
+                                const isFuture = index > currentStep
 
-                            return (
-                                <div
-                                    key={step.label}
-                                    className={`flex items-center gap-3 rounded-[12px] px-3 py-2.5 transition-all ${
-                                        isCurrent
-                                            ? 'shadow-[0_1px_4px_rgba(0,0,0,0.10)]'
-                                            : !isCompleted
-                                              ? 'opacity-30'
-                                              : 'opacity-60'
-                                    }`}
-                                    style={isCurrent ? { background: 'rgba(255,255,255,0.80)' } : undefined}
-                                >
-                                    <span
-                                        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold transition-all ${
+                                return (
+                                    <div key={step.label} className="flex items-start gap-3">
+                                        {/* Vertical track */}
+                                        <div className="flex flex-col items-center">
+                                            <span
+                                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-[10px] text-[11px] font-bold transition-all ${
                                             isCompleted
                                                 ? 'bg-[#11A07D] text-white'
                                                 : isCurrent
-                                                  ? 'bg-[#1D1D1F] text-white'
-                                                  : 'bg-black/10 text-[#86868B]'
+                                                  ? 'bg-[#1D1D1F] text-white shadow-[0_2px_8px_rgba(0,0,0,0.15)]'
+                                                  : 'bg-black/[0.06] text-[#C7C7CC]'
                                         }`}
-                                    >
-                                        {isCompleted ? (
-                                            <Check size={11} strokeWidth={3} />
-                                        ) : (
-                                            index + 1
-                                        )}
-                                    </span>
-                                    <div className="min-w-0">
-                                        <div className={`text-[13px] font-semibold ${isCurrent ? 'text-[#1D1D1F]' : 'text-[#6E6E73]'}`}>
-                                            {step.label}
+                                            >
+                                                {isCompleted ? <Check size={12} strokeWidth={3} /> : index + 1}
+                                            </span>
+                                            {index < STEPS.length - 1 && (
+                                                <div className={`my-1 h-5 w-px ${isCompleted ? 'bg-[#11A07D]/40' : 'bg-black/[0.06]'}`} />
+                                            )}
                                         </div>
-                                        <div className="text-[11px] text-[#86868B]">{step.subtitle}</div>
+                                        <div className={`min-w-0 pt-[3px] ${isFuture ? 'opacity-40' : ''}`}>
+                                            <div className={`text-[13px] font-semibold leading-tight ${isCurrent ? 'text-[#1D1D1F]' : isCompleted ? 'text-[#6E6E73]' : 'text-[#AEAEB2]'}`}>
+                                                {step.label}
+                                            </div>
+                                            <div className={`text-[11px] leading-snug ${isCurrent ? 'text-[#86868B]' : 'text-[#AEAEB2]'}`}>{step.subtitle}</div>
+                                        </div>
                                     </div>
-                                </div>
-                            )
-                        })}
-                    </nav>
+                                )
+                            })}
+                        </nav>
+                    </div>
                 </div>
 
                 {/* Content area */}
                 <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-                    <div className="flex items-center justify-between px-6 py-4"
-                         style={{ borderBottom: '1px solid rgba(0,0,0,0.07)' }}>
-                        <div>
-                            <div className="flex items-center gap-2">
-                                <h1 className="text-[16px] font-semibold text-[#1D1D1F]">
-                                    {STEPS[currentStep].label}
-                                </h1>
-                                {currentStep === 1 && (
-                                    <span
-                                        className="rounded-full px-2 py-0.5 text-[11px] font-medium"
-                                        style={{ background: 'rgba(17,160,125,0.10)', color: '#0A8A6A' }}
-                                    >
-                                        Optional
-                                    </span>
-                                )}
-                            </div>
-                            <p className="text-[12px] text-[#86868B]">
-                                Step {currentStep + 1} of {STEPS.length}
-                            </p>
-                        </div>
+                    <div className="flex shrink-0 justify-end px-4 pt-4">
                         <button
                             type="button"
                             onClick={onClose}
-                            className="rounded-full p-1.5 text-[#86868B] transition-colors hover:bg-black/[0.06] hover:text-[#1D1D1F]"
+                            className="flex h-7 w-7 items-center justify-center rounded-full text-[#AEAEB2] transition-colors hover:bg-black/[0.06] hover:text-[#1D1D1F]"
                         >
-                            <X size={16} />
+                            <X size={15} />
                         </button>
                     </div>
-
-                    <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+                    <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-5 pt-2">
                         {currentStep === 0 && (
                             <TopicStep
                                 draftTopic={draftTopic}

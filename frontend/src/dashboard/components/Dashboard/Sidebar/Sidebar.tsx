@@ -45,6 +45,7 @@ import type {
     DashboardSection,
 } from '../../../types'
 import { getFolderEmoji } from '../../../utils/folderDisplay'
+import { getMoveTargetFolders } from '../../../utils/folderTargets'
 
 type SidebarProps = {
     isSidebarOpen: boolean
@@ -89,6 +90,7 @@ export function Sidebar({
         | { open: true; mode: 'edit'; folderId: string; initialName: string; initialIcon: string; initialColor: string }
     >({ open: false })
     const [folderPendingDelete, setFolderPendingDelete] = useState<DashboardFolder | null>(null)
+    const [unitPendingDelete, setUnitPendingDelete] = useState<{ id: string; title: string } | null>(null)
     const settingsItems: Array<{
         id: DashboardSection
         label: string
@@ -220,6 +222,8 @@ export function Sidebar({
                                             return null
                                         }
 
+                                        const moveTargetFolders = getMoveTargetFolders(allFolders, unit.folder)
+
                                         return (
                                             <div
                                                 key={unitId}
@@ -249,7 +253,7 @@ export function Sidebar({
                                                                 onSelect={() => onOpenEditor(unitId)}
                                                             >
                                                                 <PenLine />
-                                                                Open Editor
+                                                                Open editor
                                                             </DropdownMenuItem>
                                                         ) : (
                                                             <DropdownMenuItem
@@ -259,16 +263,14 @@ export function Sidebar({
                                                                 Open Setup
                                                             </DropdownMenuItem>
                                                         )}
-                                                        {allFolders.filter(f => f.id !== unit.folder.id).length > 0 && (
+                                                        {moveTargetFolders.length > 0 && (
                                                             <DropdownMenuSub>
                                                                 <DropdownMenuSubTrigger>
                                                                     <FolderInput />
                                                                     Move to folder
                                                                 </DropdownMenuSubTrigger>
                                                                 <DropdownMenuSubContent>
-                                                                    {allFolders
-                                                                        .filter(f => f.id !== unit.folder.id)
-                                                                        .map(folder => (
+                                                                    {moveTargetFolders.map(folder => (
                                                                             <DropdownMenuItem
                                                                                 key={folder.id}
                                                                                 onSelect={() => onMoveToFolder(unitId, folder.id)}
@@ -284,10 +286,13 @@ export function Sidebar({
                                                         <DropdownMenuSeparator />
                                                         <DropdownMenuItem
                                                             destructive
-                                                            onSelect={() => onDeleteItem(unitId)}
+                                                            onSelect={() => {
+                                                                const unit = items.find((e) => e.id === unitId)
+                                                                setUnitPendingDelete({ id: unitId, title: unit?.title ?? '' })
+                                                            }}
                                                         >
                                                             <Trash2 />
-                                                            Remove Unit
+                                                            Remove unit
                                                         </DropdownMenuItem>
                                                     </DropdownMenuContent>
                                                 </DropdownMenu>
@@ -417,6 +422,37 @@ export function Sidebar({
             >
                 Remove
             </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog
+            open={unitPendingDelete !== null}
+            onOpenChange={(open: boolean) => { if (!open) setUnitPendingDelete(null) }}
+        >
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Remove unit?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        <strong className="font-medium text-[#1D1D1F]">
+                            {unitPendingDelete?.title}
+                        </strong>{' '}
+                        will be permanently removed. This action cannot be undone.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                        className="bg-red-500 hover:bg-red-600 focus-visible:ring-red-500"
+                        onClick={() => {
+                            if (unitPendingDelete) {
+                                onDeleteItem(unitPendingDelete.id)
+                                setUnitPendingDelete(null)
+                            }
+                        }}
+                    >
+                        Remove
+                    </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>

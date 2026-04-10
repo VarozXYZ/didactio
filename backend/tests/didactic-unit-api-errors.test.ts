@@ -63,7 +63,7 @@ describe('didactic-unit API errors', () => {
         })
     })
 
-    it('returns 404 when a chapter regeneration is requested before any generation exists', async () => {
+    it('returns 404 when a module regeneration is requested before any generation exists', async () => {
         const app = createTestApp()
         const approved = await createApprovedDidacticUnit(app)
 
@@ -73,11 +73,11 @@ describe('didactic-unit API errors', () => {
 
         expect(response.status).toBe(404)
         expect(response.body).toEqual({
-            error: 'Generated didactic unit chapter not found.',
+            error: 'Generated didactic unit module not found.',
         })
     })
 
-    it('returns 400 when the requested chapter index is outside the approved syllabus', async () => {
+    it('returns 400 when the requested module index is outside the approved syllabus', async () => {
         const app = createTestApp()
         const approved = await createApprovedDidacticUnit(app)
 
@@ -87,7 +87,7 @@ describe('didactic-unit API errors', () => {
 
         expect(response.status).toBe(400)
         expect(response.body).toEqual({
-            error: 'Chapter index is out of range for the approved syllabus.',
+            error: 'Module index is out of range for the approved syllabus.',
         })
     })
 })

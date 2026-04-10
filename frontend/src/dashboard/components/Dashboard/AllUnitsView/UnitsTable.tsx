@@ -1,6 +1,17 @@
 import { FolderInput, MoreHorizontal, PenLine, Settings2, Trash2 } from 'lucide-react'
+import { useState } from 'react'
 import type { BackendFolder } from '../../../api/dashboardApi'
 import type { DashboardListItem } from '../../../types'
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '../../../../components/ui/alert-dialog'
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -12,6 +23,7 @@ import {
     DropdownMenuTrigger,
 } from '../../../../components/ui/dropdown-menu'
 import { getFolderEmoji, getFolderVisuals } from '../../../utils/folderDisplay'
+import { getMoveTargetFolders } from '../../../utils/folderTargets'
 
 type UnitsTableProps = {
     allFolders: BackendFolder[]
@@ -32,7 +44,10 @@ export function UnitsTable({
     onOpenSetup,
     units,
 }: UnitsTableProps) {
+    const [unitPendingDelete, setUnitPendingDelete] = useState<DashboardListItem | null>(null)
+
     return (
+        <>
         <div className="overflow-hidden rounded-2xl border border-[#E5E5E7] bg-white">
             <table className="w-full">
                 <thead className="border-b border-[#E5E5E7] bg-[#F5F5F7]">
@@ -61,6 +76,7 @@ export function UnitsTable({
                     {units.map((unit, index) => {
                         const style = getFolderVisuals(unit.folder)
                         const folderEmoji = getFolderEmoji(unit.folder.icon)
+                        const moveTargetFolders = getMoveTargetFolders(allFolders, unit.folder)
 
                         return (
                             <tr
@@ -144,7 +160,7 @@ export function UnitsTable({
                                             {unit.canOpenEditor ? (
                                                 <DropdownMenuItem onSelect={() => onOpenEditor(unit.id)}>
                                                     <PenLine />
-                                                    Open Editor
+                                                    Open editor
                                                 </DropdownMenuItem>
                                             ) : (
                                                 <DropdownMenuItem onSelect={() => onOpenSetup(unit.id)}>
@@ -153,16 +169,14 @@ export function UnitsTable({
                                                 </DropdownMenuItem>
                                             )}
 
-                                            {allFolders.filter((f) => f.id !== unit.folder.id).length > 0 && (
+                                            {moveTargetFolders.length > 0 && (
                                                 <DropdownMenuSub>
                                                     <DropdownMenuSubTrigger>
                                                         <FolderInput />
                                                         Move to folder
                                                     </DropdownMenuSubTrigger>
                                                     <DropdownMenuSubContent>
-                                                        {allFolders
-                                                            .filter((f) => f.id !== unit.folder.id)
-                                                            .map((folder) => (
+                                                        {moveTargetFolders.map((folder) => (
                                                                 <DropdownMenuItem
                                                                     key={folder.id}
                                                                     onSelect={() => onMoveToFolder(unit.id, folder.id)}
@@ -176,9 +190,9 @@ export function UnitsTable({
                                             )}
 
                                             <DropdownMenuSeparator />
-                                            <DropdownMenuItem destructive onSelect={() => onDeleteItem(unit.id)}>
+                                            <DropdownMenuItem destructive onSelect={() => setUnitPendingDelete(unit)}>
                                                 <Trash2 />
-                                                Remove Unit
+                                                Remove unit
                                             </DropdownMenuItem>
                                         </DropdownMenuContent>
                                     </DropdownMenu>
@@ -189,5 +203,34 @@ export function UnitsTable({
                 </tbody>
             </table>
         </div>
+
+        <AlertDialog
+            open={unitPendingDelete !== null}
+            onOpenChange={(open: boolean) => { if (!open) setUnitPendingDelete(null) }}
+        >
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Remove unit?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        <strong className="font-medium text-[#1D1D1F]">{unitPendingDelete?.title}</strong> will be permanently removed. This action cannot be undone.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                        className="bg-red-500 hover:bg-red-600 focus-visible:ring-red-500"
+                        onClick={() => {
+                            if (unitPendingDelete) {
+                                onDeleteItem(unitPendingDelete.id)
+                                setUnitPendingDelete(null)
+                            }
+                        }}
+                    >
+                        Remove
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+        </>
     )
 }

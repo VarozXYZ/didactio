@@ -220,7 +220,7 @@ export function TopicStep({
                     onChange={(e) => setDraftTopic(e.target.value)}
                     placeholder={topicPlaceholder}
                     disabled={isResumed}
-                    className="w-full rounded-[14px] px-4 py-2.5 text-[14px] text-[#1D1D1F] placeholder:text-[#AEAEB2] focus:outline-none disabled:opacity-60"
+                    className="w-full rounded-[14px] px-4 py-2.5 text-[14px] text-[#1D1D1F] placeholder:text-[#AEAEB2]/60 placeholder:italic focus:outline-none disabled:opacity-60"
                     style={{ background: 'rgba(255,255,255,0.65)', border: '1px solid rgba(0,0,0,0.10)', backdropFilter: 'blur(8px)' }}
                 />
             </div>
@@ -241,7 +241,7 @@ export function TopicStep({
                         value={draftAdditionalContext}
                         onChange={(e) => setDraftAdditionalContext(e.target.value)}
                         placeholder="Learner goals, domain constraints, audience notes..."
-                        className="mt-2 w-full rounded-[14px] px-4 py-2.5 text-[14px] text-[#1D1D1F] placeholder:text-[#AEAEB2] focus:outline-none"
+                        className="mt-2 w-full rounded-[14px] px-4 py-2.5 text-[14px] text-[#1D1D1F] placeholder:text-[#AEAEB2]/60 placeholder:italic focus:outline-none"
                         style={{ background: 'rgba(255,255,255,0.65)', border: '1px solid rgba(0,0,0,0.10)', backdropFilter: 'blur(8px)' }}
                     />
                 )}

@@ -9,6 +9,7 @@ import type {
     SummaryResult,
     SyllabusResult,
 } from '../../src/ai/service.js'
+import type { AiCallTelemetry } from '../../src/ai/telemetry.js'
 import {
     buildQuestionnaireForDidacticUnit,
     type DidacticUnitQuestionAnswer,
@@ -110,6 +111,31 @@ function classifyFolderName(topic: string, availableFolderNames: string[]): stri
 export function createMockAiService(): AiService {
     const provider = 'mock-provider'
     const model = 'mock-model'
+    const telemetry: AiCallTelemetry = {
+        finishReason: 'stop',
+        rawFinishReason: 'stop',
+        usage: {
+            inputTokens: 10,
+            outputTokens: 20,
+            totalTokens: 30,
+        },
+        totalUsage: {
+            inputTokens: 10,
+            outputTokens: 20,
+            totalTokens: 30,
+        },
+        response: {
+            id: 'mock-response-id',
+            modelId: `${provider}/${model}`,
+            timestamp: '2026-01-01T00:00:00.000Z',
+        },
+        providerMetadata: {
+            gateway: {
+                generationId: 'mock-generation-id',
+            },
+        },
+        gatewayGenerationId: 'mock-generation-id',
+    }
 
     return {
         async classifyFolder(input): Promise<FolderClassificationResult> {
@@ -122,6 +148,7 @@ export function createMockAiService(): AiService {
                 provider,
                 model,
                 prompt: `Classify folder for ${input.topic}`,
+                telemetry,
                 folderName,
                 reasoning: `Matched ${folderName} from the provided folder list.`,
             }
@@ -138,6 +165,7 @@ export function createMockAiService(): AiService {
                 provider,
                 model,
                 prompt: `Moderate ${input.topic}`,
+                telemetry,
                 approved: true,
                 notes: 'Approved.',
                 normalizedTopic: input.topic.trim(),
@@ -178,6 +206,7 @@ export function createMockAiService(): AiService {
                 provider,
                 model,
                 prompt: `Questionnaire ${input.topic}`,
+                telemetry,
                 questionnaire: buildQuestionnaireForDidacticUnit(input.topic),
             }
         },
@@ -193,6 +222,7 @@ export function createMockAiService(): AiService {
                 provider,
                 model,
                 prompt: input.syllabusPrompt,
+                telemetry,
                 syllabus: referenceSyllabusForLength(input.topic, input.length),
             }
         },
@@ -208,6 +238,7 @@ export function createMockAiService(): AiService {
                 provider,
                 model,
                 prompt: `Summary ${input.chapterTitle}`,
+                telemetry,
                 markdown:
                     input.kind === 'continuity'
                         ? '- Concepts introduced\n- Workflow explained\n- Safe to assume the learner knows the basics'
@@ -234,6 +265,7 @@ export function createMockAiService(): AiService {
                 provider,
                 model,
                 prompt: `Chapter ${chapter.title}`,
+                telemetry,
                 markdown,
                 continuitySummary:
                     '- Concepts introduced\n- Workflow explained\n- Safe to assume the learner knows the basics',

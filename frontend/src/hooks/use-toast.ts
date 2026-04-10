@@ -189,7 +189,7 @@ function toastError(message: string) {
     variant: "destructive",
     title: "Something went wrong",
     description: message,
-    duration: 8000,
+    duration: 5000,
   })
 }
 

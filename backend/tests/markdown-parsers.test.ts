@@ -32,4 +32,31 @@ describe('markdown parsers', () => {
         expect(parsed.title).toBe('Module 1')
         expect(parsed.markdown).toBe('## Core concepts\nExplain the fundamentals clearly.')
     })
+
+    it('ignores heading-like lines inside fenced code blocks', () => {
+        const parsed = normalizeGeneratedChapterMarkdown(
+            [
+                '## Variables in practice',
+                'We can annotate examples with inline Python comments.',
+                '',
+                '```python',
+                'headline = "DataCraft Studio"',
+                '# This prints: DataCraft Studio - Transforming ideas into digital content',
+                'print(headline)',
+                '```',
+                '',
+                '## Why this matters',
+                'The rest of the module should still be preserved.',
+            ].join('\n'),
+            0,
+            { fallbackTitle: 'Module 1' }
+        )
+
+        expect(parsed.title).toBe('Module 1')
+        expect(parsed.markdown).toContain('## Variables in practice')
+        expect(parsed.markdown).toContain(
+            '# This prints: DataCraft Studio - Transforming ideas into digital content'
+        )
+        expect(parsed.markdown).toContain('## Why this matters')
+    })
 })

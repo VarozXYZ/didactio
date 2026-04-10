@@ -29,7 +29,7 @@ const toastVariants = cva(
         default:
           "border-black/[0.06] bg-white text-[#1D1D1F]",
         destructive:
-          "border-red-200 bg-red-50 text-red-800 [&_[data-slot=toast-description]]:text-red-700",
+          "border-red-300/40 bg-white/80 backdrop-blur-xl text-red-900 shadow-[0_8px_32px_rgba(239,68,68,0.18),0_2px_8px_rgba(0,0,0,0.06)] [&_[data-slot=toast-description]]:text-red-700/80",
       },
     },
     defaultVariants: {
@@ -42,13 +42,21 @@ const Toast = React.forwardRef<
   React.ElementRef<typeof ToastPrimitives.Root>,
   React.ComponentPropsWithoutRef<typeof ToastPrimitives.Root> &
     VariantProps<typeof toastVariants>
->(({ className, variant, ...props }, ref) => {
+>(({ className, variant, children, duration = 5000, ...props }, ref) => {
   return (
     <ToastPrimitives.Root
       ref={ref}
+      duration={duration}
       className={cn(toastVariants({ variant }), className)}
       {...props}
-    />
+    >
+      {children}
+      {variant === "destructive" && (
+        <div className="absolute bottom-0 left-0 h-[3px] w-full origin-left bg-red-400/50 group-hover:[animation-play-state:paused]"
+          style={{ animation: `toast-shrink ${duration + 150}ms linear forwards` }}
+        />
+      )}
+    </ToastPrimitives.Root>
   )
 })
 Toast.displayName = ToastPrimitives.Root.displayName

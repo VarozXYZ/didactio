@@ -161,6 +161,71 @@ export interface BackendGenerationRun {
     createdAt: string
     error?: string
     chapterIndex?: number
+    rawOutput?: string
+    telemetry?: {
+        durationMs?: number
+        finishReason?: string
+        rawFinishReason?: string
+        usage?: {
+            inputTokens?: number
+            outputTokens?: number
+            totalTokens?: number
+            inputTokenDetails?: {
+                noCacheTokens?: number
+                cacheReadTokens?: number
+                cacheWriteTokens?: number
+            }
+            outputTokenDetails?: {
+                textTokens?: number
+                reasoningTokens?: number
+            }
+            raw?: unknown
+        }
+        totalUsage?: {
+            inputTokens?: number
+            outputTokens?: number
+            totalTokens?: number
+            inputTokenDetails?: {
+                noCacheTokens?: number
+                cacheReadTokens?: number
+                cacheWriteTokens?: number
+            }
+            outputTokenDetails?: {
+                textTokens?: number
+                reasoningTokens?: number
+            }
+            raw?: unknown
+        }
+        warnings?: unknown[]
+        request?: {
+            body?: unknown
+        }
+        response?: {
+            id?: string
+            timestamp?: string
+            modelId?: string
+            headers?: Record<string, string>
+            body?: unknown
+        }
+        providerMetadata?: unknown
+        gatewayGenerationId?: string
+        gateway?: {
+            id?: string
+            totalCost?: number
+            upstreamInferenceCost?: number
+            usageCost?: number
+            createdAt?: string
+            model?: string
+            providerName?: string
+            streamed?: boolean
+            isByok?: boolean
+            inputTokens?: number
+            outputTokens?: number
+            cachedInputTokens?: number
+            cacheCreationInputTokens?: number
+            reasoningTokens?: number
+        }
+    }
 }
 
 type NdjsonEvent =
@@ -430,12 +495,12 @@ export const dashboardApi = {
     },
     listDidacticUnitChapters(id: string) {
         return requestJson<{ chapters: BackendDidacticUnitChapterSummary[] }>(
-            `/api/didactic-unit/${id}/chapters`
+            `/api/didactic-unit/${id}/modules`
         )
     },
     getDidacticUnitChapter(id: string, chapterIndex: number) {
         return requestJson<BackendDidacticUnitChapterDetail>(
-            `/api/didactic-unit/${id}/chapters/${chapterIndex}`
+            `/api/didactic-unit/${id}/modules/${chapterIndex}`
         )
     },
     updateDidacticUnitChapter(
@@ -448,7 +513,7 @@ export const dashboardApi = {
         }
     ) {
         return requestJson<BackendDidacticUnitChapterDetail>(
-            `/api/didactic-unit/${id}/chapters/${chapterIndex}`,
+            `/api/didactic-unit/${id}/modules/${chapterIndex}`,
             {
                 method: 'PATCH',
                 body: JSON.stringify({ chapter }),
@@ -461,7 +526,7 @@ export const dashboardApi = {
         tier: BackendAiModelTier
     ) {
         return requestJson<BackendDidacticUnitDetail>(
-            `/api/didactic-unit/${id}/chapters/${chapterIndex}/generate`,
+            `/api/didactic-unit/${id}/modules/${chapterIndex}/generate`,
             {
                 method: 'POST',
                 body: JSON.stringify({ tier }),
@@ -475,7 +540,7 @@ export const dashboardApi = {
         handlers: StreamHandlers
     ) {
         return streamNdjson<BackendDidacticUnitDetail>(
-            `/api/didactic-unit/${id}/chapters/${chapterIndex}/generate/stream`,
+            `/api/didactic-unit/${id}/modules/${chapterIndex}/generate/stream`,
             handlers,
             {
                 body: JSON.stringify({ tier }),
@@ -489,7 +554,7 @@ export const dashboardApi = {
         input?: { instruction?: string }
     ) {
         return requestJson<BackendDidacticUnitDetail>(
-            `/api/didactic-unit/${id}/chapters/${chapterIndex}/regenerate`,
+            `/api/didactic-unit/${id}/modules/${chapterIndex}/regenerate`,
             {
                 method: 'POST',
                 body: JSON.stringify({
@@ -507,7 +572,7 @@ export const dashboardApi = {
         input?: { instruction?: string }
     ) {
         return streamNdjson<BackendDidacticUnitDetail>(
-            `/api/didactic-unit/${id}/chapters/${chapterIndex}/regenerate/stream`,
+            `/api/didactic-unit/${id}/modules/${chapterIndex}/regenerate/stream`,
             handlers,
             {
                 body: JSON.stringify({
@@ -519,7 +584,7 @@ export const dashboardApi = {
     },
     completeDidacticUnitChapter(id: string, chapterIndex: number) {
         return requestJson<BackendDidacticUnitDetail>(
-            `/api/didactic-unit/${id}/chapters/${chapterIndex}/complete`,
+            `/api/didactic-unit/${id}/modules/${chapterIndex}/complete`,
             {
                 method: 'POST',
                 body: JSON.stringify({}),
@@ -528,7 +593,7 @@ export const dashboardApi = {
     },
     listDidacticUnitChapterRevisions(id: string, chapterIndex: number) {
         return requestJson<{ revisions: BackendDidacticUnitChapterRevision[] }>(
-            `/api/didactic-unit/${id}/chapters/${chapterIndex}/revisions`
+            `/api/didactic-unit/${id}/modules/${chapterIndex}/revisions`
         )
     },
     listDidacticUnitRuns(id: string) {

@@ -97,7 +97,7 @@ export function ChapterStyleMenu({ value, onChange }: ChapterStyleMenuProps) {
                 }`}
             >
                 <Settings2 size={15} />
-                <span>Chapter Style</span>
+                <span>Module Style</span>
                 <ChevronDown size={14} className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} />
             </button>
 

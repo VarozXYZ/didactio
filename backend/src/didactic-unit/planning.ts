@@ -141,10 +141,16 @@ function parseEnumValue<T extends string>(
 }
 
 export function normalizeKeywordList(value: string): string[] {
-    return value
+    const byDelimiter = value
         .split(/[,\n;]/)
         .map((keyword) => keyword.trim())
         .filter(Boolean)
+
+    if (byDelimiter.length <= 1 && value.includes(' ')) {
+        return value.split(/\s+/).map((k) => k.trim()).filter(Boolean)
+    }
+
+    return byDelimiter
 }
 
 function uniqueNonEmpty(values: string[]): string[] {
@@ -354,10 +360,6 @@ export function parseQuestionnaireAnswersInput(
 
         if (!questionId) {
             throw new Error('Each answer must include a questionId.')
-        }
-
-        if (!value) {
-            throw new Error('Each answer must include a non-empty value.')
         }
 
         return { questionId, value }

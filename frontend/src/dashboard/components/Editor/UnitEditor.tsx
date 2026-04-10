@@ -7,16 +7,12 @@ import {
 } from 'react'
 import {
     AlertCircle,
-    CheckCheck,
-    CheckCircle2,
     ChevronLeft,
     ChevronRight,
     Clock,
     Edit3,
-    FileText,
     History,
     Loader2,
-    MoreHorizontal,
     Undo2,
     RotateCcw,
     Settings,
@@ -62,7 +58,80 @@ import {
     normalizeMarkdownForStorage,
     normalizeStoredMarkdown,
 } from '../../utils/markdown'
-import { getFolderIcon } from '../../utils/folderDisplay'
+import { getFolderEmoji } from '../../utils/folderDisplay'
+
+function ChapterStatusIcon({
+    status,
+    isCompleted,
+    isGenerating,
+}: {
+    status: 'pending' | 'ready' | 'failed'
+    isCompleted: boolean
+    isGenerating: boolean
+}) {
+    const S = 14
+    const SW = 1.5
+    const r = S / 2 - SW / 2  // 6.25
+    const circ = 2 * Math.PI * r  // ≈ 39.27
+    const cx = S / 2
+    const cy = S / 2
+
+    if (isGenerating) {
+        return (
+            <svg width={S} height={S} viewBox={`0 0 ${S} ${S}`} className="animate-spin" aria-hidden>
+                <circle cx={cx} cy={cy} r={r} fill="none" stroke="#E5E5E7" strokeWidth={SW} />
+                <circle
+                    cx={cx} cy={cy} r={r} fill="none"
+                    stroke="#4ADE80" strokeWidth={SW}
+                    strokeDasharray={`${circ * 0.28} ${circ * 0.72}`}
+                    strokeLinecap="round"
+                    transform={`rotate(-90 ${cx} ${cy})`}
+                />
+            </svg>
+        )
+    }
+
+    if (status === 'failed') {
+        return (
+            <svg width={S} height={S} viewBox={`0 0 ${S} ${S}`} aria-hidden>
+                <circle cx={cx} cy={cy} r={r} fill="none" stroke="#F87171" strokeWidth={SW} />
+                <line x1="4.8" y1="4.8" x2="9.2" y2="9.2" stroke="#F87171" strokeWidth={SW} strokeLinecap="round" />
+                <line x1="9.2" y1="4.8" x2="4.8" y2="9.2" stroke="#F87171" strokeWidth={SW} strokeLinecap="round" />
+            </svg>
+        )
+    }
+
+    if (status === 'pending') {
+        return (
+            <svg width={S} height={S} viewBox={`0 0 ${S} ${S}`} aria-hidden>
+                <circle
+                    cx={cx} cy={cy} r={r} fill="none"
+                    stroke="#C7C7CC" strokeWidth={SW}
+                    strokeDasharray="2.5 2.2"
+                />
+            </svg>
+        )
+    }
+
+    if (isCompleted) {
+        return (
+            <svg width={S} height={S} viewBox={`0 0 ${S} ${S}`} aria-hidden>
+                <circle cx={cx} cy={cy} r={r} fill="none" stroke="#4ADE80" strokeWidth={SW} />
+                <path
+                    d="M4 7.3L6.1 9.4L10 5.2"
+                    fill="none" stroke="#4ADE80" strokeWidth={SW}
+                    strokeLinecap="round" strokeLinejoin="round"
+                />
+            </svg>
+        )
+    }
+
+    return (
+        <svg width={S} height={S} viewBox={`0 0 ${S} ${S}`} aria-hidden>
+            <circle cx={cx} cy={cy} r={r} fill="none" stroke="#C7C7CC" strokeWidth={SW} />
+        </svg>
+    )
+}
 
 type UnitEditorProps = {
     didacticUnitId: string
@@ -106,7 +175,7 @@ function formatRunLabel(run: BackendGenerationRun): string {
         return 'Syllabus generation'
     }
 
-    return `Chapter ${run.chapterIndex !== undefined ? run.chapterIndex + 1 : '-'}`
+    return `Module ${run.chapterIndex !== undefined ? run.chapterIndex + 1 : '-'}`
 }
 
 export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
@@ -153,7 +222,7 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
         ? chapterDetails[activeChapter.chapterIndex]
         : undefined
     const activeRuns = [] as BackendGenerationRun[]
-    const FolderIcon = workspace ? getFolderIcon(workspace.folder.icon) : null
+
 
     const loadRevisions = useCallback(
         async (chapterIndex: number) => {
@@ -607,21 +676,6 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
         setIsEditMode(false)
     }
 
-    const handleComplete = async () => {
-        if (!activeChapter || activeChapter.status !== 'ready' || activeChapter.isCompleted) {
-            return
-        }
-
-        await runAction(
-            () =>
-                dashboardApi.completeDidacticUnitChapter(
-                    didacticUnitId,
-                    activeChapter.chapterIndex
-                ),
-            { chapterIndex: activeChapter.chapterIndex }
-        )
-    }
-
     const isRevisionCurrent = (revision: DidacticUnitRevisionViewModel) => {
         if (!activeChapterDetail) {
             return false
@@ -712,15 +766,18 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
         )
     }
 
-    const getStatusIcon = (status: DidacticUnitEditorChapter['status']) => {
-        switch (status) {
-            case 'ready':
-                return <CheckCircle2 size={14} className="text-[#4ADE80]" />
-            case 'pending':
-                return <Sparkles size={14} className="text-[#4ADE80]" />
-            case 'failed':
-                return <AlertCircle size={14} className="text-red-400" />
-        }
+    const getStatusIcon = (chapter: DidacticUnitEditorChapter) => {
+        const isGenerating =
+            isStreamingGeneration &&
+            activeGeneratingChapterIndex !== null &&
+            activeGeneratingChapterIndex === chapter.chapterIndex
+        return (
+            <ChapterStatusIcon
+                status={chapter.status}
+                isCompleted={chapter.isCompleted}
+                isGenerating={isGenerating}
+            />
+        )
     }
 
     const isPendingChapter = activeChapter.status === 'pending'
@@ -735,10 +792,11 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
     const rightContentPage = visibleContentPages[contentPageOffset + 1]
     const spreadStartPage = contentPageOffset + 1
     const spreadEndPage = Math.min(contentPageOffset + 2, Math.max(visibleContentPages.length, 1))
+    const totalContentPages = Math.max(visibleContentPages.length, 1)
     const spreadPageLabel =
         spreadStartPage === spreadEndPage
-            ? `Page ${spreadStartPage}`
-            : `Pages ${spreadStartPage}-${spreadEndPage}`
+            ? `Page ${spreadStartPage} of ${totalContentPages}`
+            : `Pages ${spreadStartPage}-${spreadEndPage} of ${totalContentPages}`
 
     const updatePaginatedContentPage = (pageIndex: number, markdown: string) => {
         setContentPageDrafts((previous) => {
@@ -787,7 +845,7 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
             >
                 <div className="flex h-full flex-col overflow-hidden p-6 pb-12 md:p-8 md:pb-14">
                     <div className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-[#86868B]">
-                        Chapter Content
+                        Module Content
                     </div>
                     <div className="relative min-h-0 flex-1 overflow-hidden">
                         <LexicalMarkdownEditor
@@ -804,7 +862,7 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                                           updatePaginatedContentPage(pageIndex, nextMarkdown)
                                     : undefined
                             }
-                            placeholder="Write the chapter content here..."
+                            placeholder="Write the module content here..."
                         />
                     </div>
 
@@ -825,15 +883,6 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                     width: `${spreadMetrics.spreadWidth}px`,
                 }}
             >
-                <button
-                    className="absolute left-[-56px] top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-[#E5E5E7] bg-white transition-all hover:scale-110 hover:bg-[#F5F5F7] disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:scale-100 md:left-[-76px] md:h-12 md:w-12"
-                    disabled={!canGoPrev}
-                    onClick={goToPrevSpread}
-                    type="button"
-                >
-                    <ChevronLeft size={20} className="text-[#1D1D1F]" />
-                </button>
-
                 <AnimatePresence mode="wait">
                     <Motion.div
                         key={`spread-${currentSpread}-${spreadMetrics.pageWidth}-${spreadMetrics.pageHeight}`}
@@ -855,7 +904,7 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                                     <div className="mb-4 flex-shrink-0 space-y-2">
                                         <div className="flex items-center gap-2">
                                             <span className="rounded-full bg-[#F5F5F7] px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-[#86868B]">
-                                                Chapter {activeChapter.chapterIndex + 1}
+                                                Module {activeChapter.chapterIndex + 1}
                                             </span>
                                             <span
                                                 className={cn(
@@ -917,7 +966,7 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                                                           updatePaginatedContentPage(0, nextMarkdown)
                                                     : undefined
                                             }
-                                            placeholder="Write the chapter content here..."
+                                            placeholder="Write the module content here..."
                                         />
                                     </div>
 
@@ -943,72 +992,79 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                         })}
                     </Motion.div>
                 </AnimatePresence>
+            </div>
 
+            <div
+                className="mt-3 flex max-w-full items-center justify-center gap-1.5 md:gap-2"
+                style={{ marginTop: `${spreadMetrics.indicatorGap}px` }}
+            >
                 <button
-                    className="absolute right-[-56px] top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-[#E5E5E7] bg-white transition-all hover:scale-110 hover:bg-[#F5F5F7] disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:scale-100 md:right-[-76px] md:h-12 md:w-12"
+                    aria-label="Previous pages"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#E5E5E7] bg-white shadow-md transition-all hover:bg-[#F5F5F7] disabled:cursor-not-allowed disabled:opacity-30 md:h-10 md:w-10"
+                    disabled={!canGoPrev}
+                    onClick={goToPrevSpread}
+                    type="button"
+                >
+                    <ChevronLeft size={20} className="text-[#1D1D1F]" />
+                </button>
+                <div className="min-w-0 max-w-[min(100vw-8rem,720px)] flex-1 rounded-full border border-[#E5E5E7] bg-white/90 px-3 py-2 shadow-lg backdrop-blur-sm md:px-5 md:py-3">
+                    <AnimatePresence initial={false} mode="wait">
+                        {editable ? (
+                            <Motion.div
+                                key="toolbar-pill"
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                className="flex flex-wrap items-center justify-center gap-2 md:gap-3"
+                                exit={{ opacity: 0, scale: 0.97, y: 6 }}
+                                initial={{ opacity: 0, scale: 0.97, y: 6 }}
+                                transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                            >
+                                <ChapterStyleMenu
+                                    value={draft.presentationSettings}
+                                    onChange={(presentationSettings) =>
+                                        setDraft((previous) =>
+                                            previous
+                                                ? { ...previous, presentationSettings }
+                                                : previous
+                                        )
+                                    }
+                                />
+                                <div className="hidden h-6 w-px bg-[#E5DED0] md:block" />
+                                <LexicalToolbar activeEditor={activeLexicalEditor} />
+                            </Motion.div>
+                        ) : (
+                            <Motion.div
+                                key="status-pill"
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                className="flex items-center justify-center gap-2 md:gap-3"
+                                exit={{ opacity: 0, scale: 0.97, y: -6 }}
+                                initial={{ opacity: 0, scale: 0.97, y: -6 }}
+                                transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                            >
+                                {isActiveChapterStreaming && (
+                                    <span className="flex items-center gap-1 text-[11px] font-medium text-[#4E8B63] md:text-[13px]">
+                                        <Loader2 size={12} className="animate-spin" />
+                                        Streaming
+                                    </span>
+                                )}
+                                {isActiveChapterStreaming && (
+                                    <span className="text-[11px] text-[#D1D5DB]">•</span>
+                                )}
+                                <span className="text-[11px] text-[#86868B] md:text-[13px]">
+                                    {spreadPageLabel}
+                                </span>
+                            </Motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
+                <button
+                    aria-label="Next pages"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#E5E5E7] bg-white shadow-md transition-all hover:bg-[#F5F5F7] disabled:cursor-not-allowed disabled:opacity-30 md:h-10 md:w-10"
                     disabled={!canGoNext}
                     onClick={goToNextSpread}
                     type="button"
                 >
                     <ChevronRight size={20} className="text-[#1D1D1F]" />
                 </button>
-            </div>
-
-            <div
-                className="mt-3 rounded-full border border-[#E5E5E7] bg-white/90 px-4 py-2 shadow-lg backdrop-blur-sm md:px-6 md:py-3"
-                style={{ marginTop: `${spreadMetrics.indicatorGap}px` }}
-            >
-                <AnimatePresence initial={false} mode="wait">
-                    {editable ? (
-                        <Motion.div
-                            key="toolbar-pill"
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            className="flex flex-wrap items-center justify-center gap-2 md:gap-3"
-                            exit={{ opacity: 0, scale: 0.97, y: 6 }}
-                            initial={{ opacity: 0, scale: 0.97, y: 6 }}
-                            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-                        >
-                            <ChapterStyleMenu
-                                value={draft.presentationSettings}
-                                onChange={(presentationSettings) =>
-                                    setDraft((previous) =>
-                                        previous
-                                            ? { ...previous, presentationSettings }
-                                            : previous
-                                    )
-                                }
-                            />
-                            <div className="hidden h-6 w-px bg-[#E5DED0] md:block" />
-                            <LexicalToolbar activeEditor={activeLexicalEditor} />
-                        </Motion.div>
-                    ) : (
-                        <Motion.div
-                            key="status-pill"
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            className="flex items-center gap-2 md:gap-3"
-                            exit={{ opacity: 0, scale: 0.97, y: -6 }}
-                            initial={{ opacity: 0, scale: 0.97, y: -6 }}
-                            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-                        >
-                            <FileText size={16} className="text-[#86868B]" />
-                            <span className="text-[11px] font-medium text-[#1D1D1F] md:text-[13px]">
-                                Chapter workspace
-                            </span>
-                            {isActiveChapterStreaming && (
-                                <>
-                                    <span className="text-[11px] text-[#D1D5DB]">•</span>
-                                    <span className="flex items-center gap-1 text-[11px] font-medium text-[#4E8B63] md:text-[13px]">
-                                        <Loader2 size={12} className="animate-spin" />
-                                        Streaming
-                                    </span>
-                                </>
-                            )}
-                            <span className="text-[11px] text-[#86868B] md:text-[13px]">
-                                {spreadPageLabel}
-                            </span>
-                        </Motion.div>
-                    )}
-                </AnimatePresence>
             </div>
         </>
     )
@@ -1073,7 +1129,7 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                                 <span className="flex-1 truncate text-[14px] font-medium">
                                     {chapter.title}
                                 </span>
-                                <div className="flex-shrink-0">{getStatusIcon(chapter.status)}</div>
+                                <div className="flex-shrink-0">{getStatusIcon(chapter)}</div>
                             </>
                         </button>
                     ))}
@@ -1108,27 +1164,17 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
             <main className="relative flex h-full flex-1 flex-col overflow-hidden">
                 <header className="z-10 flex h-[64px] shrink-0 items-center justify-between border-b border-[#E5E5E7] bg-white/80 px-6 backdrop-blur-md">
                     <div className="flex items-center gap-4">
-                        <div className="flex flex-col">
-                            <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-[#86868B]">
-                                <span>Units</span>
-                                <ChevronRight size={10} />
-                                <span>{workspace.folder.name}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                {FolderIcon && (
-                                    <span
-                                        className="flex h-6 w-6 items-center justify-center rounded-md"
-                                        style={{
-                                            backgroundColor: `${workspace.folder.color}1A`,
-                                            color: workspace.folder.color,
-                                        }}
-                                    >
-                                        <FolderIcon size={14} strokeWidth={2} />
-                                    </span>
-                                )}
-                                <h1 className="max-w-[300px] truncate text-[14px] font-semibold text-[#1D1D1F]">
-                                    {workspace.title}
-                                </h1>
+                        <div className="flex flex-col gap-0.5">
+                            <h1 className="max-w-[560px] truncate text-[20px] font-bold text-[#1D1D1F]">
+                                {workspace.title}
+                            </h1>
+                            <div className="flex items-baseline gap-1.5">
+                                <span className="text-[11px] leading-none">
+                                    {getFolderEmoji(workspace.folder.icon)}
+                                </span>
+                                <span className="text-[11px] font-medium text-[#AEAEB2]">
+                                    {workspace.folder.name}
+                                </span>
                             </div>
                         </div>
                     </div>
@@ -1165,9 +1211,7 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                                     >
                                         <RotateCcw size={16} className="text-[#86868B]" />
                                         <span>
-                                            {activeChapter.status === 'ready'
-                                                ? `Regenerate Chapter (${unitGenerationTier})`
-                                                : `Retry Chapter (${unitGenerationTier})`}
+                                            {activeChapter.status === 'ready' ? 'Regenerate' : 'Retry'}
                                         </span>
                                     </button>
                                 )}
@@ -1201,19 +1245,6 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                                     <span>Cancel</span>
                                 </button>
                             )}
-                            <button
-                                className="rounded-full p-1.5 text-[#86868B] transition-all hover:bg-[#F5F5F7]"
-                                onClick={() => void handleComplete()}
-                                type="button"
-                            >
-                                <CheckCheck size={20} />
-                            </button>
-                            <button
-                                className="rounded-full p-1.5 text-[#86868B] transition-all hover:bg-[#F5F5F7]"
-                                type="button"
-                            >
-                                <MoreHorizontal size={20} />
-                            </button>
                         </div>
                     </div>
                 </header>
@@ -1243,15 +1274,15 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                                     <div className="space-y-2">
                                         <h3 className="text-xl font-semibold">
                                             {hasConfiguredGenerationTier
-                                                ? 'Chapter queued for generation'
-                                                : 'Chapter not generated yet'}
+                                                ? 'Module queued for generation'
+                                                : 'Module not generated yet'}
                                         </h3>
                                         <p className="max-w-[300px] text-sm text-[#86868B]">
                                             {hasConfiguredGenerationTier
                                                 ? isStreamingGeneration && activeGeneratingChapterIndex !== null
-                                                    ? `Chapter ${activeGeneratingChapterIndex + 1} is generating now. Open that chapter to watch the live stream, or wait here until this one begins.`
-                                                    : 'The unit generator is preparing the remaining chapters automatically.'
-                                                : 'This unit predates automatic generation startup. Pick a model once to begin generating the chapter queue.'}
+                                                    ? `Module ${activeGeneratingChapterIndex + 1} is generating now. Open that module to watch the live stream, or wait here until this one begins.`
+                                                    : 'The unit generator is preparing the remaining modules automatically.'
+                                                : 'This unit predates automatic generation startup. Pick a model once to begin generating the module queue.'}
                                         </p>
                                     </div>
                                     {!hasConfiguredGenerationTier && (
@@ -1285,7 +1316,7 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                                     <div className="space-y-2">
                                         <h3 className="text-xl font-semibold">Generation Failed</h3>
                                         <p className="max-w-[300px] text-sm text-[#86868B]">
-                                            We encountered an issue generating this chapter. Retry it to keep the unit generation moving.
+                                            We encountered an issue generating this module. Retry it to keep the unit generation moving.
                                         </p>
                                     </div>
                                     <div className="flex flex-wrap justify-center gap-3">
@@ -1295,7 +1326,7 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                                                 onClick={() => void handlePrimaryGeneration()}
                                                 type="button"
                                             >
-                                                Retry Chapter
+                                                Retry Module
                                             </button>
                                         ) : (
                                             <>
@@ -1327,9 +1358,9 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <h3 className="text-xl font-semibold">Loading chapter</h3>
+                                        <h3 className="text-xl font-semibold">Loading module</h3>
                                         <p className="max-w-[300px] text-sm text-[#86868B]">
-                                            We are preparing the current chapter workspace.
+                                            We are preparing the current module workspace.
                                         </p>
                                     </div>
                                 </div>
@@ -1349,7 +1380,7 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                             <div className="mb-6 flex items-center justify-between">
                                 <div>
                                     <div className="text-[11px] font-medium uppercase tracking-wide text-[#86868B]">
-                                        Chapter history
+                                        Module history
                                     </div>
                                     <h3 className="mt-1 text-[20px] font-bold text-[#1D1D1F]">
                                         {activeChapter.title}
@@ -1367,7 +1398,7 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                             <div className="space-y-3">
                                 {revisions.length === 0 && (
                                     <div className="rounded-2xl border border-[#E5E5E7] bg-[#F5F5F7] p-4 text-[13px] text-[#86868B]">
-                                        No revisions yet for this chapter.
+                                        No revisions yet for this module.
                                     </div>
                                 )}
                                 {revisions.map((revision) => {

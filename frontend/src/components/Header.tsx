@@ -7,7 +7,11 @@ function Header() {
     return (
         <header className="max-w-[1440px] flex items-center justify-between gap-24 my-10">
             <Link to="/">
-                <img src="/assets/logos/logo-horizontal.png" alt="Didactio" className="h-[60px]" />
+                <img
+                    src="/assets/logos/logo-horizontal.png"
+                    alt="Didactio"
+                    className="block h-auto max-h-[60px] w-auto max-w-full object-contain"
+                />
             </Link>
 
             <nav className="bg-dark rounded-md px-8 py-3 w-[650px] flex items-center justify-center gap-18 shadow-card hover:shadow-elevated transition-shadow">

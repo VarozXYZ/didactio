@@ -13,6 +13,7 @@ function splitSections(
     let currentHeading = ''
     let currentBody: string[] = []
     const prefix = '#'.repeat(headingDepth)
+    let activeFenceMarker: '```' | '~~~' | null = null
 
     const pushCurrent = () => {
         if (!currentHeading) {
@@ -26,7 +27,19 @@ function splitSections(
     }
 
     for (const line of lines) {
-        if (line.startsWith(`${prefix} `)) {
+        const trimmedLine = line.trimStart()
+
+        if (trimmedLine.startsWith('```') || trimmedLine.startsWith('~~~')) {
+            const fenceMarker = trimmedLine.startsWith('```') ? '```' : '~~~'
+
+            if (activeFenceMarker === fenceMarker) {
+                activeFenceMarker = null
+            } else if (activeFenceMarker === null) {
+                activeFenceMarker = fenceMarker
+            }
+        }
+
+        if (activeFenceMarker === null && line.startsWith(`${prefix} `)) {
             pushCurrent()
             currentHeading = cleanHeading(line)
             currentBody = []
@@ -60,7 +73,7 @@ export function normalizeGeneratedChapterMarkdown(
     const normalizedMarkdown = bodyWithoutTopLevelTitle || trimmed
 
     return {
-        title: normalizedTitle || `Chapter ${chapterIndex + 1}`,
+        title: normalizedTitle || `Module ${chapterIndex + 1}`,
         markdown: normalizedMarkdown,
     }
 }

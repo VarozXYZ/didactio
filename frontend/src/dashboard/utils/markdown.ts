@@ -139,16 +139,152 @@ function repairRunOnHeading(line: string): string {
     return `${marker} ${heading}\n\n${remainder}`
 }
 
+function promoteStandaloneNumberedHeading(
+    line: string,
+    previousLine: string | undefined,
+    nextLine: string | undefined
+): string {
+    const trimmedLine = line.trim()
+
+    if (!trimmedLine || /^#{1,6}\s/.test(trimmedLine)) {
+        return line
+    }
+
+    const match = trimmedLine.match(/^(\d+(?:\.\d+)+)\.?\s+(.+)$/)
+    if (!match) {
+        return line
+    }
+
+    const body = match[2].trim()
+    if (
+        body.length < 4 ||
+        body.length > 90 ||
+        /[.!?]$/.test(body)
+    ) {
+        return line
+    }
+
+    const previousTrimmed = previousLine?.trim() ?? ''
+    const nextTrimmed = nextLine?.trim() ?? ''
+
+    if (
+        previousTrimmed &&
+        !/[.!?:]$/.test(previousTrimmed) &&
+        !/^#{1,6}\s/.test(previousTrimmed)
+    ) {
+        return line
+    }
+
+    if (!nextTrimmed || /^(?:[-*]\s|\d+\.\s)/.test(nextTrimmed)) {
+        return line
+    }
+
+    const level = Math.min(6, match[1].split('.').length)
+    return `${'#'.repeat(level)} ${trimmedLine}`
+}
+
 function repairAiMarkdown(markdown: string): string {
-    return markdown
+    const repairedMarkdown = markdown
         .replace(/\*\*([^\n*]+)\n\s*\n([^\n*]+)\*\*/g, '**$1 $2**')
         .replace(/:\s+(1\.\s+)/g, ':\n\n$1')
         .replace(/([.!?])\s+(\d+\.\s+)/g, '$1\n\n$2')
-        .split('\n')
-        .map((line) => repairRunOnHeading(line))
+    const repairedLines = repairedMarkdown.split('\n')
+
+    return repairedLines
+        .map((line, index, lines) =>
+            promoteStandaloneNumberedHeading(
+                repairRunOnHeading(line),
+                lines[index - 1],
+                lines[index + 1]
+            )
+        )
         .join('\n')
         .replace(/\n{3,}/g, '\n\n')
         .trim()
+}
+
+function renumberMarkdownHeadings(markdown: string): string {
+    const lines = markdown.split('\n')
+    let activeFenceMarker: '```' | '~~~' | null = null
+    let minimumHeadingDepth: number | null = null
+
+    for (const line of lines) {
+        const trimmedLine = line.trimStart()
+
+        if (trimmedLine.startsWith('```') || trimmedLine.startsWith('~~~')) {
+            const fenceMarker = trimmedLine.startsWith('```') ? '```' : '~~~'
+            activeFenceMarker =
+                activeFenceMarker === fenceMarker
+                    ? null
+                    : activeFenceMarker === null
+                      ? fenceMarker
+                      : activeFenceMarker
+        }
+
+        if (activeFenceMarker !== null) {
+            continue
+        }
+
+        const headingMatch = line.match(/^(#{1,6})\s+(.+)$/)
+        if (!headingMatch) {
+            continue
+        }
+
+        const depth = headingMatch[1].length
+        minimumHeadingDepth =
+            minimumHeadingDepth === null ? depth : Math.min(minimumHeadingDepth, depth)
+    }
+
+    if (minimumHeadingDepth === null) {
+        return markdown
+    }
+
+    activeFenceMarker = null
+    const headingCounters = [0, 0, 0, 0, 0, 0]
+
+    return lines
+        .map((line) => {
+            const trimmedLine = line.trimStart()
+
+            if (trimmedLine.startsWith('```') || trimmedLine.startsWith('~~~')) {
+                const fenceMarker = trimmedLine.startsWith('```') ? '```' : '~~~'
+                activeFenceMarker =
+                    activeFenceMarker === fenceMarker
+                        ? null
+                        : activeFenceMarker === null
+                          ? fenceMarker
+                          : activeFenceMarker
+                return line
+            }
+
+            if (activeFenceMarker !== null) {
+                return line
+            }
+
+            const headingMatch = line.match(/^(#{1,6})\s+(.+)$/)
+            if (!headingMatch) {
+                return line
+            }
+
+            const hashes = headingMatch[1]
+            const body = headingMatch[2]
+                .replace(/^\d+(?:\.\d+)*\.\s+/, '')
+                .trim()
+
+            const normalizedLevel = Math.max(
+                1,
+                Math.min(6, hashes.length - minimumHeadingDepth + 1)
+            )
+
+            headingCounters[normalizedLevel - 1] += 1
+            for (let index = normalizedLevel; index < headingCounters.length; index += 1) {
+                headingCounters[index] = 0
+            }
+
+            const prefix = headingCounters.slice(0, normalizedLevel).join('.')
+            return `${hashes} ${prefix}. ${body}`
+        })
+        .join('\n')
 }
 
 function collapseWhitespace(value: string): string {
@@ -410,6 +546,16 @@ export function normalizeStoredMarkdown(value: string | null | undefined): strin
     }
 
     return repairAiMarkdown(htmlToMarkdown(trimmedValue))
+}
+
+export function formatModuleMarkdownForRender(markdown: string): string {
+    const normalizedMarkdown = normalizeStoredMarkdown(markdown)
+
+    if (!normalizedMarkdown) {
+        return ''
+    }
+
+    return renumberMarkdownHeadings(normalizedMarkdown)
 }
 
 export function markdownToHtml(markdown: string): string {

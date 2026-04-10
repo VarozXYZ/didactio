@@ -40,11 +40,29 @@ function CreateUnitButton({ onClick }: { onClick: () => void }) {
                     cursor: 'pointer',
                     transform: pressed ? 'scale(0.988)' : 'none',
                     transition: 'transform 0.12s ease, box-shadow 0.22s ease',
-                    boxShadow: hovered
-                        ? '0 8px 24px rgba(0,0,0,0.5), 0 3px 8px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -3px 8px rgba(0,0,0,0.25)'
-                        : '0 6px 18px rgba(0,0,0,0.45), 0 2px 6px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1), inset 0 -2px 6px rgba(0,0,0,0.22)',
+                    // Keep only subtle insets here; the outer shadow animates via a dedicated layer below.
+                    boxShadow:
+                        'inset 0 1px 0 rgba(255,255,255,0.10), inset 0 -2px 8px rgba(0,0,0,0.30)',
                 }}
             >
+                {/* Animated elevation shadow layer (animates better than box-shadow interpolation). */}
+                <div
+                    aria-hidden="true"
+                    style={{
+                        position: 'absolute',
+                        inset: 0,
+                        borderRadius: '14px',
+                        pointerEvents: 'none',
+                        zIndex: 0,
+                        transform: hovered ? 'translateY(-1px)' : 'translateY(0px)',
+                        opacity: hovered ? 1 : 0,
+                        transition:
+                            'opacity 220ms cubic-bezier(0.16, 1, 0.3, 1), transform 220ms cubic-bezier(0.16, 1, 0.3, 1)',
+                        boxShadow:
+                            '0 20px 52px -22px rgba(0,0,0,0.78), 0 12px 26px -18px rgba(0,0,0,0.58)',
+                    }}
+                />
+
                 {/* Spinning gradient — only mounted while hovering, restarts on each new hover */}
                 {hovered && (
                     <div
@@ -65,7 +83,7 @@ function CreateUnitButton({ onClick }: { onClick: () => void }) {
                             background: 'conic-gradient(from 0deg, #3434c3 0deg, #337ECF 45deg, #8DD598 90deg, #11A07D 135deg, #FADF52 180deg, #EFA047 225deg, #E01D50 270deg, #BB2081 315deg, #3434c3 360deg)',
                             WebkitMaskImage: 'conic-gradient(from 0deg, black 0deg, black var(--arc-end), transparent calc(var(--arc-end) + 12deg), transparent 360deg)',
                             maskImage: 'conic-gradient(from 0deg, black 0deg, black var(--arc-end), transparent calc(var(--arc-end) + 12deg), transparent 360deg)',
-                            zIndex: 0,
+                            zIndex: 1,
                         }}
                     />
                 )}
@@ -74,7 +92,7 @@ function CreateUnitButton({ onClick }: { onClick: () => void }) {
                 <div
                     style={{
                         position: 'relative',
-                        zIndex: 1,
+                        zIndex: 2,
                         background: '#0f0f12',
                         borderRadius: '12px',
                     }}

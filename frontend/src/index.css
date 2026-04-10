@@ -76,6 +76,11 @@ body {
     -webkit-line-clamp: 2;
 }
 
+@keyframes toast-shrink {
+    from { transform: scaleX(1); }
+    to   { transform: scaleX(0); }
+}
+
 @keyframes generatingPulse {
     0%,
     100% {

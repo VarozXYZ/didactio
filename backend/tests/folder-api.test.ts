@@ -63,6 +63,22 @@ describe('folder api', () => {
         expect(secondList.find((folder) => folder.name === 'Mathematics')?.unitCount).toBe(1)
     })
 
+    it('does not duplicate default folders when initial dashboard requests run in parallel', async () => {
+        const app = createTestApp()
+
+        const [foldersResponse, didacticUnitsResponse] = await Promise.all([
+            request(app).get('/api/folders'),
+            request(app).get('/api/didactic-unit'),
+        ])
+
+        expect(foldersResponse.status).toBe(200)
+        expect(didacticUnitsResponse.status).toBe(200)
+
+        const folders = await listFolders(app)
+        expect(folders).toHaveLength(9)
+        expect(new Set(folders.map((folder) => folder.name)).size).toBe(9)
+    })
+
     it('creates custom folders and rejects duplicates', async () => {
         const app = createTestApp()
 

@@ -160,6 +160,23 @@ describe('didactic-unit API coverage', () => {
         expect(
             runsResponse.body.runs.filter((run: { stage: string }) => run.stage === 'chapter')
         ).toHaveLength(2)
+        expect(
+            runsResponse.body.runs.find(
+                (run: { stage: string; chapterIndex?: number }) =>
+                    run.stage === 'chapter' && run.chapterIndex === 0
+            )
+        ).toMatchObject({
+            telemetry: {
+                finishReason: 'stop',
+                totalUsage: {
+                    totalTokens: 30,
+                },
+                response: {
+                    id: 'mock-response-id',
+                },
+                gatewayGenerationId: 'mock-generation-id',
+            },
+        })
     })
 
     it('generates and regenerates a syllabus directly without exposing the prompt step', async () => {

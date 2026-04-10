@@ -11,6 +11,7 @@ export type DashboardItemKind = 'didacticUnit'
 export interface DashboardFolderSummary {
     id: string
     name: string
+    slug: string
     icon: string
     color: string
     kind: 'default' | 'custom'

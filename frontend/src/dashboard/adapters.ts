@@ -84,6 +84,7 @@ export function adaptFolderSummary(folder: Omit<BackendFolder, 'unitCount'>) {
     return {
         id: folder.id,
         name: folder.name,
+        slug: folder.slug,
         icon: folder.icon,
         color: folder.color,
         kind: folder.kind,

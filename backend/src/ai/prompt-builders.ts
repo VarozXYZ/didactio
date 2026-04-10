@@ -455,7 +455,7 @@ export function buildChapterMarkdownPrompt(input: {
         ]),
         buildSection('Pedagogical Requirements', [
             previousBridge,
-            'Each lesson must be written as a cohesive mini-chapter, not a list of tips.',
+            'Each lesson must be written as a cohesive mini-module section, not a list of tips.',
             'Use a 70/30 balance of conceptual depth and applied practice.',
             'Include all of these organically, not as a repetitive checklist:',
             '1. A detailed conceptual explanation',
@@ -516,7 +516,7 @@ export function buildLearnerSummaryPrompt(input: {
         buildSection('Authoring Profile', buildAuthoringContext(input.authoring)),
         buildSection('Current Artifact Target', [
             `Topic: ${input.topic}`,
-            `Chapter or unit title: ${input.chapterTitle}`,
+            `Module or unit title: ${input.chapterTitle}`,
         ]),
         buildSection('Output Contract', [
             'Return markdown with exactly 2 sections:',

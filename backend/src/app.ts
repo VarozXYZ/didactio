@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import express from 'express'
 import {
     type AiConfig,
@@ -80,6 +81,7 @@ import {
     disconnectedMongoHealthStatus,
     type MongoHealthStatus,
 } from './mongo/mongo-connection.js'
+import { createLogger, type Logger } from './logging/logger.js'
 import { buildChapterGenerationPrompt } from './providers/chapter-generator.js'
 
 export interface CreateAppOptions {
@@ -89,6 +91,7 @@ export interface CreateAppOptions {
     aiConfigStore?: AiConfigStore
     aiService?: AiService
     mongoHealth?: MongoHealthStatus
+    logger?: Logger
 }
 
 function asRequestWithMockOwner(request: express.Request): RequestWithMockOwner {
@@ -99,7 +102,7 @@ function parseChapterIndex(value: string): number {
     const chapterIndex = Number.parseInt(value, 10)
 
     if (!Number.isInteger(chapterIndex) || chapterIndex < 0) {
-        throw new Error('chapterIndex must be a non-negative integer.')
+        throw new Error('moduleIndex must be a non-negative integer.')
     }
 
     return chapterIndex
@@ -489,6 +492,7 @@ async function recordCompletedSyllabusRun(
             prompt: result.prompt,
             syllabus: didacticUnit.syllabus!,
             createdAt: didacticUnit.syllabusGeneratedAt ?? new Date().toISOString(),
+            telemetry: result.telemetry,
         })
     )
 }
@@ -544,6 +548,8 @@ async function recordCompletedChapterRun(
             prompt: result.prompt,
             chapter: generatedChapter,
             createdAt: generatedChapter.generatedAt,
+            rawOutput: result.markdown,
+            telemetry: result.telemetry,
         })
     )
 }
@@ -572,7 +578,7 @@ async function recordFailedChapterRun(
             error:
                 error instanceof Error
                     ? error.message
-                    : 'Didactic unit chapter generation failed.',
+                    : 'Didactic unit module generation failed.',
             createdAt: new Date().toISOString(),
         })
     )
@@ -584,11 +590,43 @@ export function createApp(options: CreateAppOptions) {
     const generationRunStore = options.generationRunStore
     const folderStore = options.folderStore
     const aiConfigStore = options.aiConfigStore ?? new InMemoryAiConfigStore()
-    const aiService = options.aiService ?? new GatewayAiService()
+    const logger =
+        options.logger ??
+        createLogger({
+            name: 'didactio-backend',
+        })
+    const appLogger = logger.child({ component: 'app' })
+    const aiService = options.aiService ?? new GatewayAiService({ logger })
     const mongoHealth = options.mongoHealth ?? disconnectedMongoHealthStatus
 
     app.use(express.json())
     app.use(attachMockOwner)
+    app.use((request, response, next) => {
+        const requestId = randomUUID()
+        const startedAt = Date.now()
+        response.setHeader('X-Request-Id', requestId)
+
+        appLogger.info('HTTP request started', {
+            requestId,
+            method: request.method,
+            path: request.originalUrl,
+        })
+
+        response.on('finish', () => {
+            const requestWithMockOwner = request as Partial<RequestWithMockOwner>
+
+            appLogger.info('HTTP request completed', {
+                requestId,
+                method: request.method,
+                path: request.originalUrl,
+                statusCode: response.statusCode,
+                durationMs: Date.now() - startedAt,
+                ownerId: requestWithMockOwner.mockOwner?.id,
+            })
+        })
+
+        next()
+    })
 
     app.get('/api/health', (request, response) => {
         const requestWithMockOwner = asRequestWithMockOwner(request)
@@ -827,7 +865,7 @@ export function createApp(options: CreateAppOptions) {
         const requestWithMockOwner = asRequestWithMockOwner(request)
         const didacticUnit = await didacticUnitStore.getById(
             requestWithMockOwner.mockOwner.id,
-            request.params.id
+            String(request.params.id)
         )
 
         if (!didacticUnit) {
@@ -857,7 +895,7 @@ export function createApp(options: CreateAppOptions) {
         const requestWithMockOwner = asRequestWithMockOwner(request)
         const didacticUnit = await didacticUnitStore.getById(
             requestWithMockOwner.mockOwner.id,
-            request.params.id
+            String(request.params.id)
         )
 
         if (!didacticUnit) {
@@ -910,7 +948,7 @@ export function createApp(options: CreateAppOptions) {
         const requestWithMockOwner = asRequestWithMockOwner(request)
         const didacticUnit = await didacticUnitStore.getById(
             requestWithMockOwner.mockOwner.id,
-            request.params.id
+            String(request.params.id)
         )
 
         if (!didacticUnit) {
@@ -986,7 +1024,7 @@ export function createApp(options: CreateAppOptions) {
         const requestWithMockOwner = asRequestWithMockOwner(request)
         const didacticUnit = await didacticUnitStore.getById(
             requestWithMockOwner.mockOwner.id,
-            request.params.id
+            String(request.params.id)
         )
 
         if (!didacticUnit) {
@@ -1096,7 +1134,7 @@ export function createApp(options: CreateAppOptions) {
         const requestWithMockOwner = asRequestWithMockOwner(request)
         const didacticUnit = await didacticUnitStore.getById(
             requestWithMockOwner.mockOwner.id,
-            request.params.id
+            String(request.params.id)
         )
 
         if (!didacticUnit) {
@@ -1147,7 +1185,7 @@ export function createApp(options: CreateAppOptions) {
         const requestWithMockOwner = asRequestWithMockOwner(request)
         const didacticUnit = await didacticUnitStore.getById(
             requestWithMockOwner.mockOwner.id,
-            request.params.id
+            String(request.params.id)
         )
 
         if (!didacticUnit) {
@@ -1226,7 +1264,7 @@ export function createApp(options: CreateAppOptions) {
         const requestWithMockOwner = asRequestWithMockOwner(request)
         const didacticUnit = await didacticUnitStore.getById(
             requestWithMockOwner.mockOwner.id,
-            request.params.id
+            String(request.params.id)
         )
 
         if (!didacticUnit) {
@@ -1268,7 +1306,7 @@ export function createApp(options: CreateAppOptions) {
         const requestWithMockOwner = asRequestWithMockOwner(request)
         const didacticUnit = await didacticUnitStore.getById(
             requestWithMockOwner.mockOwner.id,
-            request.params.id
+            String(request.params.id)
         )
 
         if (!didacticUnit) {
@@ -1639,11 +1677,11 @@ export function createApp(options: CreateAppOptions) {
         response.end()
     })
 
-    app.get('/api/didactic-unit/:id/chapters', async (request, response) => {
+    app.get(['/api/didactic-unit/:id/chapters', '/api/didactic-unit/:id/modules'], async (request, response) => {
         const requestWithMockOwner = asRequestWithMockOwner(request)
         const didacticUnit = await didacticUnitStore.getById(
             requestWithMockOwner.mockOwner.id,
-            request.params.id
+            String(request.params.id)
         )
 
         if (!didacticUnit) {
@@ -1670,11 +1708,11 @@ export function createApp(options: CreateAppOptions) {
         })
     })
 
-    app.get('/api/didactic-unit/:id/chapters/:chapterIndex', async (request, response) => {
+    app.get(['/api/didactic-unit/:id/chapters/:chapterIndex', '/api/didactic-unit/:id/modules/:chapterIndex'], async (request, response) => {
         const requestWithMockOwner = asRequestWithMockOwner(request)
         const didacticUnit = await didacticUnitStore.getById(
             requestWithMockOwner.mockOwner.id,
-            request.params.id
+            String(request.params.id)
         )
 
         if (!didacticUnit) {
@@ -1684,20 +1722,20 @@ export function createApp(options: CreateAppOptions) {
 
         let chapterIndex
         try {
-            chapterIndex = parseChapterIndex(request.params.chapterIndex)
+            chapterIndex = parseChapterIndex(String(request.params.chapterIndex))
         } catch (error) {
             response.status(400).json({
                 error:
                     error instanceof Error
                         ? error.message
-                        : 'Invalid didactic unit chapter lookup request.',
+                        : 'Invalid didactic unit module lookup request.',
             })
             return
         }
 
         const plannedChapter = didacticUnit.chapters[chapterIndex]
         if (!plannedChapter) {
-            response.status(404).json({ error: 'Didactic unit chapter not found.' })
+            response.status(404).json({ error: 'Didactic unit module not found.' })
             return
         }
 
@@ -1734,11 +1772,11 @@ export function createApp(options: CreateAppOptions) {
         })
     })
 
-    app.get('/api/didactic-unit/:id/chapters/:chapterIndex/revisions', async (request, response) => {
+    app.get(['/api/didactic-unit/:id/chapters/:chapterIndex/revisions', '/api/didactic-unit/:id/modules/:chapterIndex/revisions'], async (request, response) => {
         const requestWithMockOwner = asRequestWithMockOwner(request)
         const didacticUnit = await didacticUnitStore.getById(
             requestWithMockOwner.mockOwner.id,
-            request.params.id
+            String(request.params.id)
         )
 
         if (!didacticUnit) {
@@ -1748,13 +1786,13 @@ export function createApp(options: CreateAppOptions) {
 
         let chapterIndex
         try {
-            chapterIndex = parseChapterIndex(request.params.chapterIndex)
+            chapterIndex = parseChapterIndex(String(request.params.chapterIndex))
         } catch (error) {
             response.status(400).json({
                 error:
                     error instanceof Error
                         ? error.message
-                        : 'Invalid didactic unit chapter revision lookup request.',
+                        : 'Invalid didactic unit module revision lookup request.',
             })
             return
         }
@@ -1764,7 +1802,7 @@ export function createApp(options: CreateAppOptions) {
             .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
 
         if (revisions.length === 0) {
-            response.status(404).json({ error: 'Didactic unit chapter revisions not found.' })
+            response.status(404).json({ error: 'Didactic unit module revisions not found.' })
             return
         }
 
@@ -1775,7 +1813,7 @@ export function createApp(options: CreateAppOptions) {
         const requestWithMockOwner = asRequestWithMockOwner(request)
         const didacticUnit = await didacticUnitStore.getById(
             requestWithMockOwner.mockOwner.id,
-            request.params.id
+            String(request.params.id)
         )
 
         if (!didacticUnit) {
@@ -1793,11 +1831,11 @@ export function createApp(options: CreateAppOptions) {
         })
     })
 
-    app.post('/api/didactic-unit/:id/chapters/:chapterIndex/complete', async (request, response) => {
+    app.post(['/api/didactic-unit/:id/chapters/:chapterIndex/complete', '/api/didactic-unit/:id/modules/:chapterIndex/complete'], async (request, response) => {
         const requestWithMockOwner = asRequestWithMockOwner(request)
         const didacticUnit = await didacticUnitStore.getById(
             requestWithMockOwner.mockOwner.id,
-            request.params.id
+            String(request.params.id)
         )
 
         if (!didacticUnit) {
@@ -1807,13 +1845,13 @@ export function createApp(options: CreateAppOptions) {
 
         let chapterIndex
         try {
-            chapterIndex = parseChapterIndex(request.params.chapterIndex)
+            chapterIndex = parseChapterIndex(String(request.params.chapterIndex))
         } catch (error) {
             response.status(400).json({
                 error:
                     error instanceof Error
                         ? error.message
-                        : 'Invalid didactic unit chapter completion request.',
+                        : 'Invalid didactic unit module completion request.',
             })
             return
         }
@@ -1829,18 +1867,18 @@ export function createApp(options: CreateAppOptions) {
             const message =
                 error instanceof Error
                     ? error.message
-                    : 'Didactic unit chapter completion failed.'
+                    : 'Didactic unit module completion failed.'
             response.status(
-                message === 'Generated didactic unit chapter not found.' ? 404 : 409
+                message === 'Generated didactic unit module not found.' ? 404 : 409
             ).json({ error: message })
         }
     })
 
-    app.patch('/api/didactic-unit/:id/chapters/:chapterIndex', async (request, response) => {
+    app.patch(['/api/didactic-unit/:id/chapters/:chapterIndex', '/api/didactic-unit/:id/modules/:chapterIndex'], async (request, response) => {
         const requestWithMockOwner = asRequestWithMockOwner(request)
         const didacticUnit = await didacticUnitStore.getById(
             requestWithMockOwner.mockOwner.id,
-            request.params.id
+            String(request.params.id)
         )
 
         if (!didacticUnit) {
@@ -1850,13 +1888,13 @@ export function createApp(options: CreateAppOptions) {
 
         let chapterIndex
         try {
-            chapterIndex = parseChapterIndex(request.params.chapterIndex)
+            chapterIndex = parseChapterIndex(String(request.params.chapterIndex))
         } catch (error) {
             response.status(400).json({
                 error:
                     error instanceof Error
                         ? error.message
-                        : 'Invalid didactic unit chapter update request.',
+                        : 'Invalid didactic unit module update request.',
             })
             return
         }
@@ -1869,7 +1907,7 @@ export function createApp(options: CreateAppOptions) {
                 error:
                     error instanceof Error
                         ? error.message
-                        : 'Invalid didactic unit chapter update request.',
+                        : 'Invalid didactic unit module update request.',
             })
             return
         }
@@ -1914,9 +1952,9 @@ export function createApp(options: CreateAppOptions) {
             const message =
                 error instanceof Error
                     ? error.message
-                    : 'Didactic unit chapter update failed.'
+                    : 'Didactic unit module update failed.'
             response.status(
-                message === 'Generated didactic unit chapter not found.' ? 404 : 409
+                message === 'Generated didactic unit module not found.' ? 404 : 409
             ).json({ error: message })
         }
     })
@@ -1948,7 +1986,7 @@ export function createApp(options: CreateAppOptions) {
                 error:
                     error instanceof Error
                         ? error.message
-                        : `Invalid didactic unit chapter ${revisionSource} request.`,
+                        : `Invalid didactic unit module ${revisionSource} request.`,
             })
             return
         }
@@ -1957,14 +1995,14 @@ export function createApp(options: CreateAppOptions) {
             revisionSource === 'ai_regeneration' &&
             !hasGeneratedDidacticUnitChapter(didacticUnit, chapterIndex)
         ) {
-            response.status(404).json({ error: 'Generated didactic unit chapter not found.' })
+            response.status(404).json({ error: 'Generated didactic unit module not found.' })
             return
         }
 
         const plannedChapter = didacticUnit.chapters[chapterIndex]
         if (!plannedChapter) {
             response.status(400).json({
-                error: 'Chapter index is out of range for the approved syllabus.',
+                error: 'Module index is out of range for the approved syllabus.',
             })
             return
         }
@@ -1981,7 +2019,7 @@ export function createApp(options: CreateAppOptions) {
                 error:
                     error instanceof Error
                         ? error.message
-                        : `Invalid didactic unit chapter ${revisionSource} request.`,
+                        : `Invalid didactic unit module ${revisionSource} request.`,
             })
             return
         }
@@ -2024,7 +2062,7 @@ export function createApp(options: CreateAppOptions) {
                           onStart: async (selection) => {
                               writeNdjsonEvent(response, {
                                   type: 'start',
-                                  stage: 'chapter',
+                                  stage: 'module',
                                   provider: selection.provider,
                                   model: selection.model,
                               })
@@ -2102,7 +2140,7 @@ export function createApp(options: CreateAppOptions) {
             )
             const resolved = resolveStageConfigError(
                 error,
-                'Didactic unit chapter generation failed.'
+                'Didactic unit module generation failed.'
             )
 
             if (isStreaming) {
@@ -2112,31 +2150,31 @@ export function createApp(options: CreateAppOptions) {
             }
 
             response.status(
-                resolved.message === 'Chapter index is out of range for the approved syllabus.'
+                resolved.message === 'Module index is out of range for the approved syllabus.'
                     ? 400
                     : resolved.status
             ).json({ error: resolved.message })
         }
     }
 
-    app.post('/api/didactic-unit/:id/chapters/:chapterIndex/generate', async (request, response) =>
+    app.post(['/api/didactic-unit/:id/chapters/:chapterIndex/generate', '/api/didactic-unit/:id/modules/:chapterIndex/generate'], async (request, response) =>
         runChapterGeneration(request, response, 'ai_generation', false)
     )
 
     app.post(
-        '/api/didactic-unit/:id/chapters/:chapterIndex/generate/stream',
+        ['/api/didactic-unit/:id/chapters/:chapterIndex/generate/stream', '/api/didactic-unit/:id/modules/:chapterIndex/generate/stream'],
         async (request, response) =>
             runChapterGeneration(request, response, 'ai_generation', true)
     )
 
     app.post(
-        '/api/didactic-unit/:id/chapters/:chapterIndex/regenerate',
+        ['/api/didactic-unit/:id/chapters/:chapterIndex/regenerate', '/api/didactic-unit/:id/modules/:chapterIndex/regenerate'],
         async (request, response) =>
             runChapterGeneration(request, response, 'ai_regeneration', false)
     )
 
     app.post(
-        '/api/didactic-unit/:id/chapters/:chapterIndex/regenerate/stream',
+        ['/api/didactic-unit/:id/chapters/:chapterIndex/regenerate/stream', '/api/didactic-unit/:id/modules/:chapterIndex/regenerate/stream'],
         async (request, response) =>
             runChapterGeneration(request, response, 'ai_regeneration', true)
     )
