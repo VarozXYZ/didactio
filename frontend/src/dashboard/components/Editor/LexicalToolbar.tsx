@@ -31,9 +31,11 @@ import {
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
+import { cn } from '@/lib/utils'
 
 type LexicalToolbarProps = {
     activeEditor: LexicalEditor | null
+    compact?: boolean
 }
 
 type BlockType = 'paragraph' | 'h1' | 'h2' | 'h3' | 'code'
@@ -50,11 +52,13 @@ const BLOCK_TYPE_OPTIONS: Array<{ value: BlockType; label: string }> = [
 const COLOR_SWATCHES = ['#1D1D1F', '#404040', '#6D28D9', '#2563EB', '#059669', '#DC2626']
 
 function ToolbarButton({
+    compact = false,
     disabled = false,
     label,
     icon,
     onClick,
 }: {
+    compact?: boolean
     disabled?: boolean
     label: string
     icon: ReactNode
@@ -64,25 +68,38 @@ function ToolbarButton({
         <button
             type="button"
             disabled={disabled}
+            aria-label={compact ? label : undefined}
             onClick={onClick}
-            className="flex h-9 items-center gap-2 rounded-full border border-transparent px-3 text-[12px] font-medium text-[#1D1D1F] transition-all hover:border-[#E3E1DA] hover:bg-[#F7F4EC] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-transparent disabled:hover:bg-transparent"
+            className={cn(
+                'flex shrink-0 items-center justify-center rounded-full border border-transparent text-[12px] font-medium text-[#1D1D1F] transition-all hover:border-[#E3E1DA] hover:bg-[#F7F4EC] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-transparent disabled:hover:bg-transparent',
+                compact ? 'h-8 w-8 px-0' : 'h-9 gap-2 px-3'
+            )}
         >
             {icon}
-            <span>{label}</span>
+            {!compact ? <span>{label}</span> : null}
         </button>
     )
 }
 
-function ToolbarDivider() {
-    return <div className="mx-1 hidden h-6 w-px bg-[#E5DED0] sm:block" />
+function ToolbarDivider({ compact = false }: { compact?: boolean }) {
+    return (
+        <div
+            className={cn(
+                'mx-0.5 h-6 w-px shrink-0 bg-[#E5DED0]',
+                compact ? 'block' : 'mx-1 hidden sm:block'
+            )}
+        />
+    )
 }
 
 function ToolbarMenuButton({
+    compact = false,
     icon,
     label,
     isOpen,
     onClick,
 }: {
+    compact?: boolean
     icon: ReactNode
     label: string
     isOpen: boolean
@@ -91,16 +108,19 @@ function ToolbarMenuButton({
     return (
         <button
             type="button"
+            aria-label={compact ? label : undefined}
             onClick={onClick}
-            className={`flex h-9 items-center gap-2 rounded-full border px-3 text-[12px] font-medium transition-all ${
+            className={cn(
+                'flex shrink-0 items-center rounded-full border text-[12px] font-medium transition-all',
+                compact ? 'h-8 gap-1 px-2' : 'h-9 gap-2 px-3',
                 isOpen
                     ? 'border-[#D9D1C1] bg-[#F7F4EC] text-[#1D1D1F]'
                     : 'border-transparent text-[#1D1D1F] hover:border-[#E3E1DA] hover:bg-[#F7F4EC]'
-            }`}
+            )}
         >
             {icon}
-            <span>{label}</span>
-            <ChevronDown size={14} className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+            {!compact ? <span>{label}</span> : null}
+            <ChevronDown size={14} className={`shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
         </button>
     )
 }
@@ -159,7 +179,7 @@ function ToolbarMenuItem({
     )
 }
 
-export function LexicalToolbar({ activeEditor }: LexicalToolbarProps) {
+export function LexicalToolbar({ activeEditor, compact = false }: LexicalToolbarProps) {
     const [canUndo, setCanUndo] = useState(false)
     const [canRedo, setCanRedo] = useState(false)
     const [blockType, setBlockType] = useState<BlockType>('paragraph')
@@ -273,28 +293,31 @@ export function LexicalToolbar({ activeEditor }: LexicalToolbarProps) {
     return (
         <div
             ref={toolbarRef}
-            className="flex flex-wrap items-center justify-center gap-1.5"
+            className={cn('flex shrink-0 flex-nowrap items-center', compact ? 'gap-0.5' : 'gap-1.5')}
         >
             <ToolbarButton
+                compact={compact}
                 disabled={!activeEditor || !resolvedCanUndo}
-                icon={<Undo2 size={15} />}
+                icon={<Undo2 size={compact ? 14 : 15} />}
                 label="Undo"
                 onClick={() => activeEditor?.dispatchCommand(UNDO_COMMAND, undefined)}
             />
             <ToolbarButton
+                compact={compact}
                 disabled={!activeEditor || !resolvedCanRedo}
-                icon={<Redo2 size={15} />}
+                icon={<Redo2 size={compact ? 14 : 15} />}
                 label="Redo"
                 onClick={() => activeEditor?.dispatchCommand(REDO_COMMAND, undefined)}
             />
 
-            <ToolbarDivider />
+            <ToolbarDivider compact={compact} />
 
             <ToolbarMenu
                 isOpen={openMenu === 'blockType'}
                 anchor={
                     <ToolbarMenuButton
-                        icon={<Type size={15} />}
+                        compact={compact}
+                        icon={<Type size={compact ? 14 : 15} />}
                         label={BLOCK_TYPE_OPTIONS.find((option) => option.value === resolvedBlockType)?.label ?? 'Paragraph'}
                         isOpen={openMenu === 'blockType'}
                         onClick={() =>
@@ -317,7 +340,8 @@ export function LexicalToolbar({ activeEditor }: LexicalToolbarProps) {
                 isOpen={openMenu === 'fontColor'}
                 anchor={
                     <ToolbarMenuButton
-                        icon={<Palette size={15} />}
+                        compact={compact}
+                        icon={<Palette size={compact ? 14 : 15} />}
                         label="Color"
                         isOpen={openMenu === 'fontColor'}
                         onClick={() =>
@@ -361,40 +385,51 @@ export function LexicalToolbar({ activeEditor }: LexicalToolbarProps) {
                 </div>
             </ToolbarMenu>
 
-            <ToolbarDivider />
+            <ToolbarDivider compact={compact} />
 
             <ToolbarButton
-                icon={<Bold size={15} />}
+                compact={compact}
+                icon={<Bold size={compact ? 14 : 15} />}
                 label="Bold"
                 onClick={() => activeEditor?.dispatchCommand(FORMAT_TEXT_COMMAND, 'bold')}
             />
             <ToolbarButton
-                icon={<Italic size={15} />}
+                compact={compact}
+                icon={<Italic size={compact ? 14 : 15} />}
                 label="Italic"
                 onClick={() => activeEditor?.dispatchCommand(FORMAT_TEXT_COMMAND, 'italic')}
             />
             <ToolbarButton
-                icon={<Underline size={15} />}
+                compact={compact}
+                icon={<Underline size={compact ? 14 : 15} />}
                 label="Underline"
                 onClick={() => activeEditor?.dispatchCommand(FORMAT_TEXT_COMMAND, 'underline')}
             />
-            <ToolbarButton icon={<Link2 size={15} />} label="Link" onClick={toggleLink} />
             <ToolbarButton
-                icon={<List size={15} />}
+                compact={compact}
+                icon={<Link2 size={compact ? 14 : 15} />}
+                label="Link"
+                onClick={toggleLink}
+            />
+            <ToolbarButton
+                compact={compact}
+                icon={<List size={compact ? 14 : 15} />}
                 label="Bullets"
                 onClick={() =>
                     activeEditor?.dispatchCommand(INSERT_UNORDERED_LIST_COMMAND, undefined)
                 }
             />
             <ToolbarButton
-                icon={<ListOrdered size={15} />}
+                compact={compact}
+                icon={<ListOrdered size={compact ? 14 : 15} />}
                 label="Numbered"
                 onClick={() =>
                     activeEditor?.dispatchCommand(INSERT_ORDERED_LIST_COMMAND, undefined)
                 }
             />
             <ToolbarButton
-                icon={<Code2 size={15} />}
+                compact={compact}
+                icon={<Code2 size={compact ? 14 : 15} />}
                 label="Code"
                 onClick={() => applyBlockType('code')}
             />

@@ -9,15 +9,37 @@ import {
 const MOBILE_BREAKPOINT = 768
 const HEADER_HEIGHT = 64
 const OPEN_SIDEBAR_WIDTH = 260
-export const ACTIVITIES_PAGE = '__ACTIVITIES_PAGE__'
 const PAGE_WIDTH_RATIO = 0.72
+const POST_MODULE_ACTION_GAP = 24
 
-export type MeasuredModulePage = {
-    kind: 'content' | 'activities'
+type ContentMeasuredModulePage = {
+    kind: 'content'
     markdown: string
     startCharacterOffset: number
     endCharacterOffset: number
 }
+
+type ContentWithActionsMeasuredModulePage = {
+    kind: 'content_with_actions'
+    markdown: string
+    startCharacterOffset: number
+    endCharacterOffset: number
+    hasNextModule: boolean
+    primaryActionLabel: string
+}
+
+type PostModuleActionsMeasuredPage = {
+    kind: 'post_module_actions'
+    startCharacterOffset: number
+    endCharacterOffset: number
+    hasNextModule: boolean
+    primaryActionLabel: string
+}
+
+export type MeasuredModulePage =
+    | ContentMeasuredModulePage
+    | ContentWithActionsMeasuredModulePage
+    | PostModuleActionsMeasuredPage
 
 type AnnotatedMarkdownPageBlock = MarkdownPageBlock & {
     startCharacterOffset: number
@@ -63,6 +85,18 @@ function renderBlock(
     }
 
     return renderParagraphMarkdown(block.text, { continued: block.continued, ...options })
+}
+
+function isMeasuredPageWithMarkdown(
+    page: MeasuredModulePage
+): page is ContentMeasuredModulePage | ContentWithActionsMeasuredModulePage {
+    return page.kind === 'content' || page.kind === 'content_with_actions'
+}
+
+function isMeasuredPageWithReadableContent(
+    page: MeasuredModulePage
+): page is ContentMeasuredModulePage | ContentWithActionsMeasuredModulePage {
+    return isMeasuredPageWithMarkdown(page)
 }
 
 function annotateBlocks(blocks: MarkdownPageBlock[]): AnnotatedMarkdownPageBlock[] {
@@ -257,7 +291,7 @@ function paginateBlocks({
     return pages
 }
 
-function buildMeasuredPage(blocks: AnnotatedMarkdownPageBlock[]): MeasuredModulePage {
+function buildMeasuredPage(blocks: AnnotatedMarkdownPageBlock[]): ContentMeasuredModulePage {
     return {
         kind: 'content',
         markdown: renderBlocksToMarkdown(blocks).join('\n\n'),
@@ -266,12 +300,64 @@ function buildMeasuredPage(blocks: AnnotatedMarkdownPageBlock[]): MeasuredModule
     }
 }
 
+function createPostModuleActionMeasurementMarkup(input: {
+    hasNextModule: boolean
+    primaryActionLabel: string
+}): string {
+    const eyebrow = input.hasNextModule ? 'Ready to continue' : 'Unit complete'
+    const body = input.hasNextModule
+        ? 'You can keep your momentum going with the next module, or come back later for practice exercises.'
+        : 'You have reached the end of this unit. Practice exercises are coming soon, and you can wrap up for now.'
+
+    return `
+        <div class="space-y-4">
+            <div class="space-y-2">
+                <p class="text-[10px] font-bold uppercase tracking-[0.24em] text-[#86868B]">
+                    ${escapeHtml(eyebrow)}
+                </p>
+                <p class="text-sm font-medium leading-[1.6] text-[#4B5563]">
+                    ${escapeHtml(body)}
+                </p>
+            </div>
+            <div class="grid gap-2">
+                <button type="button" disabled class="w-full rounded-2xl border border-[#E5E5E7] bg-[#F8F8F9] px-4 py-3 text-left text-sm font-semibold text-[#A1A1AA]">
+                    Quick Check · Coming soon
+                </button>
+                <button type="button" disabled class="w-full rounded-2xl border border-[#E5E5E7] bg-[#F8F8F9] px-4 py-3 text-left text-sm font-semibold text-[#A1A1AA]">
+                    Applied Practice · Coming soon
+                </button>
+                <button type="button" class="w-full rounded-2xl bg-[#111827] px-4 py-3 text-sm font-semibold text-white">
+                    ${escapeHtml(input.primaryActionLabel)}
+                </button>
+            </div>
+        </div>
+    `
+}
+
+function canMergeTerminalActionPage({
+    lastPage,
+    pageLimit,
+    proseMeasure,
+    actionMeasure,
+}: {
+    lastPage: ContentMeasuredModulePage
+    pageLimit: number
+    proseMeasure: HTMLDivElement
+    actionMeasure: HTMLDivElement
+}): boolean {
+    proseMeasure.innerHTML = markdownToHtml(lastPage.markdown)
+    const proseHeight = proseMeasure.scrollHeight
+    const actionHeight = actionMeasure.scrollHeight
+
+    return proseHeight + POST_MODULE_ACTION_GAP + actionHeight <= pageLimit + 1
+}
+
 export function getReadCharacterCountForSpread(
     pages: MeasuredModulePage[],
     spreadIndex: number
 ): number {
     const spreadPages = pages.slice(spreadIndex * 2, spreadIndex * 2 + 2)
-    const contentPages = spreadPages.filter((page) => page.kind === 'content')
+    const contentPages = spreadPages.filter(isMeasuredPageWithReadableContent)
 
     if (contentPages.length === 0) {
         return 0
@@ -284,18 +370,18 @@ export function findResumeSpreadIndex(
     pages: MeasuredModulePage[],
     readCharacterCount: number
 ): number {
-    const contentPages = pages.filter((page) => page.kind === 'content')
-
-    if (contentPages.length === 0) {
+    if (pages.length === 0) {
         return 0
     }
 
-    const firstUnreadPageIndex = contentPages.findIndex(
-        (page) => page.endCharacterOffset > readCharacterCount
+    const firstUnreadPageIndex = pages.findIndex(
+        (page) =>
+            isMeasuredPageWithReadableContent(page) &&
+            page.endCharacterOffset > readCharacterCount
     )
 
     if (firstUnreadPageIndex === -1) {
-        return Math.max(0, Math.ceil(contentPages.length / 2) - 1)
+        return Math.max(0, Math.floor((pages.length - 1) / 2))
     }
 
     return Math.floor(firstUnreadPageIndex / 2)
@@ -345,12 +431,14 @@ export function measurePages({
     pageWidth,
     pageHeight,
     chapterIndex,
+    hasNextModule,
 }: {
     activeChapter: UnitChapter
     content: string
     pageWidth: number
     pageHeight: number
     chapterIndex: number
+    hasNextModule: boolean
 }): MeasuredModulePage[] {
     if (!content || !pageWidth || !pageHeight) return []
     const renderedContent = formatModuleMarkdownForRender(content)
@@ -363,6 +451,7 @@ export function measurePages({
     const measurementBuffer = isMobile ? 10 : 14
     const contentWidth = Math.max(240, pageWidth - horizontalPadding * 2)
     const contentLimit = Math.max(160, pageHeight - topPadding - bottomPadding)
+    const primaryActionLabel = hasNextModule ? 'Next module' : 'Finish unit 🎉'
 
     const sandbox = document.createElement('div')
     sandbox.style.position = 'fixed'
@@ -382,8 +471,16 @@ export function measurePages({
     headerMeasure.style.width = `${contentWidth}px`
     headerMeasure.innerHTML = createHeaderMarkup(activeChapter, chapterIndex)
 
+    const actionMeasure = document.createElement('div')
+    actionMeasure.style.width = `${contentWidth}px`
+    actionMeasure.innerHTML = createPostModuleActionMeasurementMarkup({
+        hasNextModule,
+        primaryActionLabel,
+    })
+
     sandbox.appendChild(headerMeasure)
     sandbox.appendChild(proseMeasure)
+    sandbox.appendChild(actionMeasure)
     document.body.appendChild(sandbox)
 
     const firstPageLimit = Math.max(
@@ -398,24 +495,46 @@ export function measurePages({
         return proseMeasure.scrollHeight <= limit + 1
     }
 
-    const pages = paginateBlocks({
+    const contentPages = paginateBlocks({
         blocks,
         firstPageLimit,
         regularPageLimit,
         fitsWithinLimit,
     }).map((pageBlocks) => buildMeasuredPage(pageBlocks))
 
+    const totalCharacterCount = contentPages.at(-1)?.endCharacterOffset ?? 0
+    const lastContentPage = contentPages.at(-1)
+    const canCollapseTerminalPage =
+        lastContentPage !== undefined &&
+        canMergeTerminalActionPage({
+            lastPage: lastContentPage,
+            pageLimit: contentPages.length === 1 ? firstPageLimit : regularPageLimit,
+            proseMeasure,
+            actionMeasure,
+        })
+
     document.body.removeChild(sandbox)
 
-    const totalCharacterCount = pages.at(-1)?.endCharacterOffset ?? 0
+    if (lastContentPage && canCollapseTerminalPage) {
+        return [
+            ...contentPages.slice(0, -1),
+            {
+                ...lastContentPage,
+                kind: 'content_with_actions',
+                hasNextModule,
+                primaryActionLabel,
+            },
+        ]
+    }
 
     return [
-        ...pages,
+        ...contentPages,
         {
-            kind: 'activities',
-            markdown: ACTIVITIES_PAGE,
+            kind: 'post_module_actions',
             startCharacterOffset: totalCharacterCount,
             endCharacterOffset: totalCharacterCount,
+            hasNextModule,
+            primaryActionLabel,
         },
     ]
 }

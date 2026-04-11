@@ -6,6 +6,7 @@ import type { ChapterPresentationSettings } from '../../types'
 type ChapterStyleMenuProps = {
     value: ChapterPresentationSettings
     onChange: (value: ChapterPresentationSettings) => void
+    compact?: boolean
 }
 
 const FONT_FAMILY_OPTIONS: Array<{
@@ -70,7 +71,7 @@ function OptionButton({
     )
 }
 
-export function ChapterStyleMenu({ value, onChange }: ChapterStyleMenuProps) {
+export function ChapterStyleMenu({ value, onChange, compact = false }: ChapterStyleMenuProps) {
     const [isOpen, setIsOpen] = useState(false)
     const containerRef = useRef<HTMLDivElement | null>(null)
 
@@ -86,18 +87,21 @@ export function ChapterStyleMenu({ value, onChange }: ChapterStyleMenuProps) {
     }, [])
 
     return (
-        <div ref={containerRef} className="relative">
+        <div ref={containerRef} className="relative shrink-0">
             <button
                 type="button"
+                aria-label={compact ? 'Module style' : undefined}
                 onClick={() => setIsOpen((current) => !current)}
-                className={`flex h-9 items-center gap-2 rounded-full border px-3 text-[12px] font-medium transition-all ${
+                className={`flex h-9 items-center rounded-full border text-[12px] font-medium transition-all ${
+                    compact ? 'gap-1 px-2' : 'gap-2 px-3'
+                } ${
                     isOpen
                         ? 'border-[#D9D1C1] bg-[#F7F4EC] text-[#1D1D1F]'
                         : 'border-transparent text-[#1D1D1F] hover:border-[#E3E1DA] hover:bg-[#F7F4EC]'
                 }`}
             >
                 <Settings2 size={15} />
-                <span>Module Style</span>
+                {!compact ? <span>Module Style</span> : null}
                 <ChevronDown size={14} className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} />
             </button>
 
