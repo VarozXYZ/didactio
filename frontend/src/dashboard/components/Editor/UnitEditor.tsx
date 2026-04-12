@@ -31,6 +31,16 @@ import { clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 import { toastError } from '@/hooks/use-toast'
 import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
@@ -249,6 +259,7 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
     const [isPostModuleActionPending, setIsPostModuleActionPending] = useState(false)
     const [isEditMode, setIsEditMode] = useState(false)
     const [isHistoryOpen, setIsHistoryOpen] = useState(false)
+    const [regenerateConfirmOpen, setRegenerateConfirmOpen] = useState(false)
     const [currentSpread, setCurrentSpread] = useState(0)
     const [contentPageDrafts, setContentPageDrafts] = useState<string[]>([])
     const [activeLexicalEditor, setActiveLexicalEditor] = useState<LexicalEditor | null>(null)
@@ -1200,7 +1211,7 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
         primaryActionLabel: string
         compact?: boolean
     }) => (
-        <div className={cn('flex-shrink-0 space-y-4', compact && 'pt-4')}>
+        <div className="flex-shrink-0 space-y-4">
             <div className="space-y-2">
                 <div className="text-[11px] font-bold uppercase tracking-[0.24em] text-[#86868B]">
                     {hasNextModule ? 'Ready to continue' : 'Unit complete'}
@@ -1274,10 +1285,20 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                     <div className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-[#86868B]">
                         Module Content
                     </div>
-                    <div className="relative min-h-0 flex-1 overflow-hidden">
+                    <div
+                        className={cn(
+                            'relative flex min-h-0 flex-1 flex-col',
+                            extraContent ? 'overflow-y-auto' : 'overflow-hidden'
+                        )}
+                    >
                         <LexicalMarkdownEditor
                             key={`content-${didacticUnitId}-${activeChapter.chapterIndex}-${pageIndex}-${editable ? 'edit' : 'read'}`}
-                            contentClassName="h-full min-h-full overflow-hidden leading-[1.9] text-[#1D1D1F] outline-none"
+                            contentClassName={cn(
+                                'leading-[1.9] text-[#1D1D1F] outline-none',
+                                extraContent
+                                    ? 'min-h-0 w-full shrink-0 overflow-visible pb-1'
+                                    : 'h-full min-h-full overflow-hidden'
+                            )}
                             baseTextStyle={draft.presentationSettings}
                             editable={editable}
                             editorId={`content-${didacticUnitId}-${activeChapter.chapterIndex}-${pageIndex}-${editable ? 'edit' : 'read'}`}
@@ -1291,8 +1312,10 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                             }
                             placeholder="Write the module content here..."
                         />
+                        {extraContent ? (
+                            <div className="mt-5 shrink-0">{extraContent}</div>
+                        ) : null}
                     </div>
-                    {extraContent ? <div className="mt-5">{extraContent}</div> : null}
 
                     <div className="absolute bottom-4 right-6 text-[10px] font-medium text-[#86868B] md:bottom-6 md:right-10">
                         {pageNumber}
@@ -1369,10 +1392,20 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                     <div className="my-3 h-[1px] w-full bg-[#E5E5E7]" />
                 </div>
 
-                <div className="relative min-h-0 flex-1 overflow-hidden">
+                <div
+                    className={cn(
+                        'relative flex min-h-0 flex-1 flex-col',
+                        extraContent ? 'overflow-y-auto' : 'overflow-hidden'
+                    )}
+                >
                     <LexicalMarkdownEditor
                         key={`content-${didacticUnitId}-${activeChapter.chapterIndex}-0-${editable ? 'edit' : 'read'}`}
-                        contentClassName="h-full min-h-full overflow-hidden leading-[1.9] text-[#1D1D1F] outline-none"
+                        contentClassName={cn(
+                            'leading-[1.9] text-[#1D1D1F] outline-none',
+                            extraContent
+                                ? 'min-h-0 w-full shrink-0 overflow-visible pb-1'
+                                : 'h-full min-h-full overflow-hidden'
+                        )}
                         baseTextStyle={draft.presentationSettings}
                         editable={editable}
                         editorId={`content-${didacticUnitId}-${activeChapter.chapterIndex}-0-${editable ? 'edit' : 'read'}`}
@@ -1386,8 +1419,10 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                         }
                         placeholder="Write the module content here..."
                     />
+                    {extraContent ? (
+                        <div className="mt-5 shrink-0">{extraContent}</div>
+                    ) : null}
                 </div>
-                {extraContent ? <div className="mt-5">{extraContent}</div> : null}
 
                 <div className="absolute bottom-4 right-6 text-[10px] font-medium text-[#86868B] md:bottom-6 md:right-10">
                     {pageNumber}
@@ -1421,7 +1456,7 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                         <div className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-[#86868B]">
                             Next Steps
                         </div>
-                        <div className="flex min-h-0 flex-1 flex-col justify-center">
+                        <div className="flex min-h-0 flex-1 flex-col justify-start">
                             {renderPostModuleActionBody({
                                 hasNextModule: page.hasNextModule,
                                 primaryActionLabel: page.primaryActionLabel,
@@ -1549,14 +1584,16 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                 )}
                 <div
                     className={cn(
-                        'min-w-0 rounded-full border border-[#E5E5E7] bg-white/90 py-2 shadow-lg backdrop-blur-sm md:py-3',
+                        'rounded-full border border-[#E5E5E7] bg-white/90 py-2 shadow-lg backdrop-blur-sm md:py-3',
                         editable
-                            ? 'flex-none overflow-visible px-2 md:px-4'
-                            : 'max-w-[min(100vw-8rem,720px)] flex-1 overflow-visible px-3 md:px-5'
+                            ? 'w-max max-w-full shrink-0 flex-none overflow-x-auto overflow-y-hidden px-2 md:px-4 [-webkit-overflow-scrolling:touch]'
+                            : 'min-w-0 max-w-[min(100vw-8rem,720px)] flex-1 overflow-visible px-3 md:px-5'
                     )}
                     style={
                         editable
-                            ? { width: spreadMetrics.spreadWidth, maxWidth: 'min(100%, 100vw - 2rem)' }
+                            ? {
+                                  maxWidth: `min(${spreadMetrics.spreadWidth}px, calc(100vw - 2rem))`,
+                              }
                             : undefined
                     }
                 >
@@ -1857,7 +1894,7 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                                     activeChapter.status === 'failed') && (
                                     <button
                                         className="flex items-center gap-2 rounded-full border border-[#D4D7DD] bg-white px-3 py-1.5 text-[13px] font-medium text-[#1D1D1F] transition-all hover:bg-[#F5F5F7]"
-                                        onClick={() => void handlePrimaryGeneration()}
+                                        onClick={() => setRegenerateConfirmOpen(true)}
                                         type="button"
                                     >
                                         <RotateCcw size={16} className="text-[#86868B]" />
@@ -2139,6 +2176,49 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                     )}
                 </AnimatePresence>
             </main>
+
+            <AlertDialog open={regenerateConfirmOpen} onOpenChange={setRegenerateConfirmOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            {activeChapter.status === 'ready'
+                                ? 'Regenerate this module?'
+                                : 'Retry generating this module?'}
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {activeChapter.status === 'ready' ? (
+                                <>
+                                    The module will be generated again and the text you see now will
+                                    be replaced. Earlier snapshots stay available: open{' '}
+                                    <strong className="font-medium text-[#1D1D1F]">
+                                        Version History
+                                    </strong>{' '}
+                                    in the header to review or restore a previous version.
+                                </>
+                            ) : (
+                                <>
+                                    We will run generation again for this module. If a snapshot was
+                                    already saved, you can open it from{' '}
+                                    <strong className="font-medium text-[#1D1D1F]">
+                                        Version History
+                                    </strong>{' '}
+                                    in the header.
+                                </>
+                            )}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => {
+                                void handlePrimaryGeneration()
+                            }}
+                        >
+                            {activeChapter.status === 'ready' ? 'Regenerate' : 'Retry'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     )
 }
