@@ -111,8 +111,9 @@ export interface PlanningDetailViewModel {
 export type EditorChapterStatus = 'pending' | 'ready' | 'failed'
 
 export interface ChapterPresentationSettings {
-    paragraphFontFamily: 'sans' | 'serif' | 'mono'
-    paragraphFontSize: '14px' | '16px' | '18px' | '20px'
+    sizeProfile: 'small' | 'regular' | 'large'
+    bodyFontFamily: string      // FontId from typography.ts
+    headingFontFamily: string   // FontId from typography.ts
     paragraphAlign: 'left' | 'center' | 'right' | 'justify'
 }
 

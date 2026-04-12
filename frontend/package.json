@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@chenglou/pretext": "^0.0.5",
     "@lexical/code": "^0.42.0",
     "@lexical/history": "^0.42.0",
     "@lexical/html": "^0.42.0",
@@ -61,5 +62,31 @@
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.4",
     "vite": "^7.2.4"
+  },
+  "optionalDependencies": {
+    "@swc/core-darwin-arm64": "^1.15.10",
+    "@swc/core-darwin-x64": "^1.15.10",
+    "@swc/core-linux-arm64-gnu": "^1.15.10",
+    "@swc/core-linux-arm64-musl": "^1.15.10",
+    "@swc/core-linux-x64-gnu": "^1.15.10",
+    "@swc/core-linux-x64-musl": "^1.15.10",
+    "@swc/core-win32-arm64-msvc": "^1.15.10",
+    "@swc/core-win32-x64-msvc": "^1.15.10",
+    "@tailwindcss/oxide-darwin-arm64": "^4.1.18",
+    "@tailwindcss/oxide-darwin-x64": "^4.1.18",
+    "@tailwindcss/oxide-linux-arm64-gnu": "^4.1.18",
+    "@tailwindcss/oxide-linux-arm64-musl": "^4.1.18",
+    "@tailwindcss/oxide-linux-x64-gnu": "^4.1.18",
+    "@tailwindcss/oxide-linux-x64-musl": "^4.1.18",
+    "@tailwindcss/oxide-win32-arm64-msvc": "^4.1.18",
+    "@tailwindcss/oxide-win32-x64-msvc": "^4.1.18",
+    "lightningcss-darwin-arm64": "^1.30.2",
+    "lightningcss-darwin-x64": "^1.30.2",
+    "lightningcss-linux-arm64-gnu": "^1.30.2",
+    "lightningcss-linux-arm64-musl": "^1.30.2",
+    "lightningcss-linux-x64-gnu": "^1.30.2",
+    "lightningcss-linux-x64-musl": "^1.30.2",
+    "lightningcss-win32-arm64-msvc": "^1.30.2",
+    "lightningcss-win32-x64-msvc": "^1.30.2"
   }
 }

@@ -36,6 +36,8 @@ import {
     normalizeMarkdownForStorage,
 } from '../../utils/markdown'
 import type { ChapterPresentationSettings } from '../../types'
+import { resolveTypography, makeTypographyVars, type FontId, type SizeProfile } from '../../utils/typography'
+import { loadFonts } from '../../utils/fontLoader'
 
 type LexicalMarkdownEditorProps = {
     baseTextStyle?: ChapterPresentationSettings
@@ -51,9 +53,10 @@ type LexicalMarkdownEditorProps = {
 
 const lexicalTheme = {
     heading: {
-        h1: 'mb-4 text-2xl font-bold leading-tight text-[#1D1D1F]',
-        h2: 'mb-4 text-xl font-bold leading-tight text-[#1D1D1F]',
-        h3: 'mb-3 text-lg font-semibold leading-tight text-[#1D1D1F]',
+        // Font-size and font-family come from the .typography-scope CSS vars set on the wrapper.
+        h1: 'mb-4 font-bold leading-tight text-[#1D1D1F]',
+        h2: 'mb-4 font-bold leading-tight text-[#1D1D1F]',
+        h3: 'mb-3 font-semibold leading-tight text-[#1D1D1F]',
     },
     link: 'text-[#2D8F4B] underline underline-offset-2',
     list: {
@@ -227,17 +230,6 @@ function FocusPlugin({ onFocusEditor }: { onFocusEditor?: (editor: LexicalEditor
     return null
 }
 
-function resolveFontFamily(value: ChapterPresentationSettings['paragraphFontFamily']) {
-    switch (value) {
-        case 'serif':
-            return 'Georgia, serif'
-        case 'mono':
-            return '"Courier New", monospace'
-        default:
-            return 'Inter, system-ui, sans-serif'
-    }
-}
-
 export function LexicalMarkdownEditor({
     baseTextStyle,
     editable,
@@ -249,13 +241,31 @@ export function LexicalMarkdownEditor({
     contentClassName,
     placeholderClassName,
 }: LexicalMarkdownEditorProps) {
-    const resolvedBaseTextStyle = {
-        fontFamily: resolveFontFamily(baseTextStyle?.paragraphFontFamily ?? 'sans'),
-        fontSize: baseTextStyle?.paragraphFontSize ?? '16px',
-        textAlign: baseTextStyle?.paragraphAlign ?? 'left',
-    } as const
+    const resolved = resolveTypography({
+        sizeProfile: (baseTextStyle?.sizeProfile ?? 'regular') as SizeProfile,
+        bodyFontId: (baseTextStyle?.bodyFontFamily ?? 'inter') as FontId,
+        headingFontId: (baseTextStyle?.headingFontFamily ?? 'inter') as FontId,
+        isMobile: false,  // editor always renders at desktop sizes
+    })
+
+    // Load selected fonts so previews and rendering are correct.
+    useEffect(() => {
+        const fontsToLoad: FontId[] = []
+        if (baseTextStyle?.bodyFontFamily) fontsToLoad.push(baseTextStyle.bodyFontFamily as FontId)
+        if (baseTextStyle?.headingFontFamily) fontsToLoad.push(baseTextStyle.headingFontFamily as FontId)
+        if (fontsToLoad.length > 0) void loadFonts(fontsToLoad)
+    }, [baseTextStyle?.bodyFontFamily, baseTextStyle?.headingFontFamily])
+
+    const contentStyle = {
+        fontFamily: resolved.body.family,
+        fontSize: `${resolved.body.sizePx}px`,
+        textAlign: (baseTextStyle?.paragraphAlign ?? 'left') as 'left' | 'center' | 'right' | 'justify',
+    }
+
+    const typographyVars = makeTypographyVars(resolved)
 
     return (
+        <div className="typography-scope" style={typographyVars}>
         <LexicalComposer
             initialConfig={{
                 editable,
@@ -286,7 +296,7 @@ export function LexicalMarkdownEditor({
                     <ContentEditable
                         className={contentClassName}
                         spellCheck={editable}
-                        style={resolvedBaseTextStyle}
+                        style={contentStyle}
                     />
                 }
                 placeholder={
@@ -312,5 +322,6 @@ export function LexicalMarkdownEditor({
                 <MarkdownSyncPlugin onMarkdownChange={onMarkdownChange} />
             )}
         </LexicalComposer>
+        </div>
     )
 }

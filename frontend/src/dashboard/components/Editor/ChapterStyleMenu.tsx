@@ -1,7 +1,8 @@
-import { AlignCenter, AlignJustify, AlignLeft, AlignRight, Check, ChevronDown, Settings2, Type } from 'lucide-react'
+import { AlignCenter, AlignJustify, AlignLeft, AlignRight, ChevronDown, Settings2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import type { ReactNode } from 'react'
 import type { ChapterPresentationSettings } from '../../types'
+import { FONT_CATALOG, type FontId, type SizeProfile } from '../../utils/typography'
+import { loadFonts } from '../../utils/fontLoader'
 
 type ChapterStyleMenuProps = {
     value: ChapterPresentationSettings
@@ -9,24 +10,10 @@ type ChapterStyleMenuProps = {
     compact?: boolean
 }
 
-const FONT_FAMILY_OPTIONS: Array<{
-    value: ChapterPresentationSettings['paragraphFontFamily']
-    label: string
-    previewFontFamily: string
-}> = [
-    { value: 'sans', label: 'Sans', previewFontFamily: 'Inter, system-ui, sans-serif' },
-    { value: 'serif', label: 'Serif', previewFontFamily: 'Georgia, serif' },
-    { value: 'mono', label: 'Mono', previewFontFamily: '"Courier New", monospace' },
-]
-
-const FONT_SIZE_OPTIONS: Array<{
-    value: ChapterPresentationSettings['paragraphFontSize']
-    label: string
-}> = [
-    { value: '14px', label: '14px' },
-    { value: '16px', label: '16px' },
-    { value: '18px', label: '18px' },
-    { value: '20px', label: '20px' },
+const SIZE_PROFILES: Array<{ value: SizeProfile; label: string; sampleSize: number }> = [
+    { value: 'small',   label: 'Small',   sampleSize: 12 },
+    { value: 'regular', label: 'Regular', sampleSize: 14 },
+    { value: 'large',   label: 'Large',   sampleSize: 17 },
 ]
 
 const ALIGN_OPTIONS: Array<{
@@ -34,11 +21,13 @@ const ALIGN_OPTIONS: Array<{
     label: string
     icon: typeof AlignLeft
 }> = [
-    { value: 'left', label: 'Left', icon: AlignLeft },
-    { value: 'center', label: 'Center', icon: AlignCenter },
-    { value: 'right', label: 'Right', icon: AlignRight },
+    { value: 'left',    label: 'Left',    icon: AlignLeft },
+    { value: 'center',  label: 'Center',  icon: AlignCenter },
+    { value: 'right',   label: 'Right',   icon: AlignRight },
     { value: 'justify', label: 'Justify', icon: AlignJustify },
 ]
+
+const FONT_IDS = Object.keys(FONT_CATALOG) as FontId[]
 
 function SectionLabel({ children }: { children: string }) {
     return (
@@ -48,26 +37,35 @@ function SectionLabel({ children }: { children: string }) {
     )
 }
 
-function OptionButton({
-    active,
-    children,
-    onClick,
+function FontPicker({
+    value,
+    onChange,
 }: {
-    active?: boolean
-    children: ReactNode
-    onClick: () => void
+    value: string
+    onChange: (fontId: FontId) => void
 }) {
     return (
-        <button
-            type="button"
-            onClick={onClick}
-            className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left text-[12px] transition-colors ${
-                active ? 'bg-[#F5F1E7] text-[#1D1D1F]' : 'text-[#4B4B52] hover:bg-[#F8F6F1]'
-            }`}
-        >
-            <span className="flex items-center gap-2">{children}</span>
-            {active ? <Check size={14} className="text-[#2E7D32]" /> : null}
-        </button>
+        <div className="max-h-[148px] overflow-y-auto rounded-xl border border-[#EDE8DF] bg-[#FAFAF8]">
+            {FONT_IDS.map((fontId) => {
+                const entry = FONT_CATALOG[fontId]
+                const isActive = value === fontId
+                return (
+                    <button
+                        key={fontId}
+                        type="button"
+                        onClick={() => onChange(fontId)}
+                        className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-[13px] transition-colors first:rounded-t-xl last:rounded-b-xl ${
+                            isActive
+                                ? 'bg-[#F0ECE2] text-[#1D1D1F]'
+                                : 'text-[#4B4B52] hover:bg-[#F5F2EA]'
+                        }`}
+                    >
+                        <span style={{ fontFamily: entry.family }}>{entry.label}</span>
+                        {isActive ? <span className="text-[10px] text-[#2E7D32]">✓</span> : null}
+                    </button>
+                )
+            })}
+        </div>
     )
 }
 
@@ -75,13 +73,19 @@ export function ChapterStyleMenu({ value, onChange, compact = false }: ChapterSt
     const [isOpen, setIsOpen] = useState(false)
     const containerRef = useRef<HTMLDivElement | null>(null)
 
+    // Load all catalog fonts when the menu opens so previews render correctly.
+    useEffect(() => {
+        if (isOpen) {
+            void loadFonts(FONT_IDS)
+        }
+    }, [isOpen])
+
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (!containerRef.current?.contains(event.target as Node)) {
                 setIsOpen(false)
             }
         }
-
         document.addEventListener('mousedown', handleClickOutside)
         return () => document.removeEventListener('mousedown', handleClickOutside)
     }, [])
@@ -106,76 +110,71 @@ export function ChapterStyleMenu({ value, onChange, compact = false }: ChapterSt
             </button>
 
             {isOpen ? (
-                <div className="absolute bottom-[calc(100%+10px)] left-0 z-30 w-[280px] rounded-3xl border border-[#E7E1D6] bg-white p-3 shadow-[0_18px_48px_rgba(28,24,18,0.12)]">
-                    <SectionLabel>Body font</SectionLabel>
-                    <div className="space-y-1">
-                        {FONT_FAMILY_OPTIONS.map((option) => (
-                            <OptionButton
-                                key={option.value}
-                                active={value.paragraphFontFamily === option.value}
-                                onClick={() =>
-                                    onChange({
-                                        ...value,
-                                        paragraphFontFamily: option.value,
-                                    })
-                                }
-                            >
-                                <Type size={15} />
-                                <span style={{ fontFamily: option.previewFontFamily }}>
-                                    {option.label}
-                                </span>
-                            </OptionButton>
-                        ))}
-                    </div>
+                <div className="absolute bottom-[calc(100%+10px)] left-0 z-30 w-[300px] rounded-3xl border border-[#E7E1D6] bg-white p-4 shadow-[0_18px_48px_rgba(28,24,18,0.12)]">
 
-                    <div className="mt-3 border-t border-[#EEE8DC] pt-3">
-                        <SectionLabel>Body size</SectionLabel>
-                        <div className="grid grid-cols-2 gap-2">
-                            {FONT_SIZE_OPTIONS.map((option) => (
+                    {/* Size profile */}
+                    <SectionLabel>Text size</SectionLabel>
+                    <div className="grid grid-cols-3 gap-1.5">
+                        {SIZE_PROFILES.map((profile) => {
+                            const isActive = (value.sizeProfile ?? 'regular') === profile.value
+                            return (
                                 <button
-                                    key={option.value}
+                                    key={profile.value}
                                     type="button"
-                                    onClick={() =>
-                                        onChange({
-                                            ...value,
-                                            paragraphFontSize: option.value,
-                                        })
-                                    }
-                                    className={`rounded-xl border px-3 py-2 text-[12px] font-medium transition-colors ${
-                                        value.paragraphFontSize === option.value
+                                    onClick={() => onChange({ ...value, sizeProfile: profile.value })}
+                                    className={`flex flex-col items-center gap-1 rounded-xl border py-2 transition-colors ${
+                                        isActive
                                             ? 'border-[#D9D1C1] bg-[#F5F1E7] text-[#1D1D1F]'
                                             : 'border-[#ECE7DE] text-[#4B4B52] hover:bg-[#F8F6F1]'
                                     }`}
                                 >
-                                    {option.label}
+                                    <span style={{ fontSize: profile.sampleSize }} className="font-medium leading-none text-[#1D1D1F]">
+                                        Aa
+                                    </span>
+                                    <span className="text-[10px] font-medium">{profile.label}</span>
                                 </button>
-                            ))}
-                        </div>
+                            )
+                        })}
                     </div>
 
+                    {/* Body font */}
+                    <div className="mt-3 border-t border-[#EEE8DC] pt-3">
+                        <SectionLabel>Body font</SectionLabel>
+                        <FontPicker
+                            value={value.bodyFontFamily ?? 'inter'}
+                            onChange={(fontId) => onChange({ ...value, bodyFontFamily: fontId })}
+                        />
+                    </div>
+
+                    {/* Heading font */}
+                    <div className="mt-3 border-t border-[#EEE8DC] pt-3">
+                        <SectionLabel>Heading font</SectionLabel>
+                        <FontPicker
+                            value={value.headingFontFamily ?? 'inter'}
+                            onChange={(fontId) => onChange({ ...value, headingFontFamily: fontId })}
+                        />
+                    </div>
+
+                    {/* Alignment */}
                     <div className="mt-3 border-t border-[#EEE8DC] pt-3">
                         <SectionLabel>Alignment</SectionLabel>
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-4 gap-1.5">
                             {ALIGN_OPTIONS.map((option) => {
                                 const Icon = option.icon
+                                const isActive = value.paragraphAlign === option.value
                                 return (
                                     <button
                                         key={option.value}
                                         type="button"
-                                        onClick={() =>
-                                            onChange({
-                                                ...value,
-                                                paragraphAlign: option.value,
-                                            })
-                                        }
-                                        className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-[12px] font-medium transition-colors ${
-                                            value.paragraphAlign === option.value
+                                        title={option.label}
+                                        onClick={() => onChange({ ...value, paragraphAlign: option.value })}
+                                        className={`flex items-center justify-center rounded-xl border py-2 transition-colors ${
+                                            isActive
                                                 ? 'border-[#D9D1C1] bg-[#F5F1E7] text-[#1D1D1F]'
                                                 : 'border-[#ECE7DE] text-[#4B4B52] hover:bg-[#F8F6F1]'
                                         }`}
                                     >
                                         <Icon size={15} />
-                                        <span>{option.label}</span>
                                     </button>
                                 )
                             })}

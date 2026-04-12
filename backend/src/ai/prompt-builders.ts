@@ -206,9 +206,17 @@ function buildSection(title: string, lines: string[]): string {
 }
 
 export function buildGatewaySystemPrompt(
-    stage: 'moderation' | 'questionnaire' | 'syllabus' | 'summary' | 'chapter'
+    stage:
+        | 'folder_classification'
+        | 'moderation'
+        | 'questionnaire'
+        | 'syllabus'
+        | 'summary'
+        | 'chapter'
 ): string {
     switch (stage) {
+        case 'folder_classification':
+            return 'You classify educational units into an existing folder. Return only the requested structured object.'
         case 'moderation':
             return 'You are a prompt filter and improver for an educational course creation platform. Return only the requested structured object.'
         case 'questionnaire':
@@ -264,6 +272,7 @@ export function buildModerationPrompt(input: {
             : '',
         buildSection('Output Contract', [
             'Return whether the prompt is approved, a normalized topic title, an improved topic brief targeting the requested level, and concise reasoning notes.',
+            'Use these exact JSON keys: approved, notes, normalizedTopic, improvedTopicBrief, reasoningNotes.',
             'Preserve the authoring context in the improved brief so downstream generations inherit it.',
             shouldClassifyFolder
                 ? 'Return folderName exactly as written in the available folder list. If uncertain, use General.'
@@ -293,8 +302,11 @@ export function buildQuestionnairePrompt(input: {
             input.improvedTopicBrief ? `Improved topic brief: ${input.improvedTopicBrief}` : '',
         ]),
         buildSection('Output Contract', [
+            'Return a single JSON object with a top-level questions array.',
             'Use these exact ids in this exact order: topic_knowledge_level, related_knowledge_level, learning_goal.',
+            'For each question, use these exact keys: id, prompt, type, options.',
             'Use single_select for fixed choices and long_text for open responses.',
+            'Do not use question ids as top-level object keys.',
             'Keep prompts concise, learner-facing, and useful for planning.',
             'Keep the questionnaire aligned with the authoring profile.',
         ]),
@@ -373,6 +385,9 @@ export function buildSyllabusMarkdownPrompt(input: {
         ]),
         buildSection('Output Contract', [
             'Return a strict structured syllabus object.',
+            'Use these exact top-level keys: topic, title, keywords, description, modules.',
+            'For each module, use these exact keys: title, overview, lessons.',
+            'For each lesson, use these exact keys: title, contentOutline.',
             `Create exactly ${targetModuleCount} modules.`,
             'Do not include durations or time estimates anywhere.',
             'Use a keywords string, not a keywords array.',

@@ -96,39 +96,48 @@ body {
     animation: generatingPulse 1.5s ease-in-out infinite;
 }
 
-.prose h2 {
+/* ─── Typography CSS custom properties ────────────────────────────────────────
+   These vars are set at runtime by makeTypographyVars() / applyTypographyVars()
+   from typography.ts, on the editor wrapper and the measurement sandbox div.
+   The defaults below match the "regular" profile with Inter font.
+   ─────────────────────────────────────────────────────────────────────────── */
+:root {
+    --typo-body-family:    Inter;
+    --typo-body-size:      16px;
+    --typo-heading-family: Inter;
+    --typo-h1-size:        24px;
+    --typo-h2-size:        20px;
+    --typo-h3-size:        18px;
+}
+
+.prose h2,
+.typography-scope h2 {
     margin-top: 1.2em;
     margin-bottom: 0.5em;
     color: #1d1d1f;
-    font-size: 18px;
+    font-family: var(--typo-heading-family, Inter);
+    font-size: var(--typo-h2-size, 20px);
     font-weight: 700;
     letter-spacing: -0.01em;
 }
 
-@media (min-width: 768px) {
-    .prose h2 {
-        font-size: 20px;
-    }
-}
-
-.prose h3 {
+.prose h3,
+.typography-scope h3 {
     margin-top: 1em;
     margin-bottom: 0.4em;
     color: #1d1d1f;
-    font-size: 16px;
+    font-family: var(--typo-heading-family, Inter);
+    font-size: var(--typo-h3-size, 18px);
     font-weight: 600;
     letter-spacing: -0.01em;
 }
 
-@media (min-width: 768px) {
-    .prose h3 {
-        font-size: 18px;
-    }
-}
-
-.prose p {
+.prose p,
+.typography-scope p {
     margin-bottom: 0.8em;
     color: #1d1d1f;
+    font-family: var(--typo-body-family, Inter);
+    font-size: var(--typo-body-size, 16px);
     line-height: 1.9;
     text-align: justify;
     text-justify: inter-word;
@@ -157,14 +166,19 @@ body {
 }
 
 .prose ul,
-.prose ol {
+.prose ol,
+.typography-scope ul,
+.typography-scope ol {
     margin-top: 0.5em;
     margin-bottom: 0.8em;
     padding-left: 1.2em;
+    font-family: var(--typo-body-family, Inter);
+    font-size: var(--typo-body-size, 16px);
     text-align: justify;
 }
 
-.prose li {
+.prose li,
+.typography-scope li {
     margin-bottom: 0.3em;
     line-height: 1.9;
 }

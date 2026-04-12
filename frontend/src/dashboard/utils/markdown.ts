@@ -1,6 +1,6 @@
 import { toMarkdown } from 'mdast-util-to-markdown'
 import { toString } from 'mdast-util-to-string'
-import type { RootContent } from 'mdast'
+import type { PhrasingContent, RootContent } from 'mdast'
 import rehypeStringify from 'rehype-stringify'
 import remarkGfm from 'remark-gfm'
 import remarkParse from 'remark-parse'
@@ -20,9 +20,27 @@ export type MarkdownPageBlock =
           markdown: string
           text: string
           continued: boolean
+          // Inline AST nodes for rich Pretext measurement (absent on continued splits).
+          inlineChildren?: readonly PhrasingContent[]
       }
     | {
           type: 'markdown'
+          markdown: string
+          text: string
+          // Set for h1-h3 headings; absent for code blocks, tables, hr, etc.
+          headingLevel?: 1 | 2 | 3
+          inlineChildren?: readonly PhrasingContent[]
+      }
+    | {
+          type: 'splittable_list'
+          ordered: boolean
+          spread: boolean
+          items: Array<{
+              markdown: string
+              text: string
+              // Inline AST from the first paragraph child of this list item.
+              inlineChildren?: readonly PhrasingContent[]
+          }>
           markdown: string
           text: string
       }
@@ -594,22 +612,75 @@ export function extractMarkdownBlocks(markdown: string): MarkdownPageBlock[] {
     const blocks: MarkdownPageBlock[] = []
 
     tree.children.forEach((node) => {
-        const nodeMarkdown = normalizeTopLevelMarkdown(node)
-
-        if (!nodeMarkdown) {
-            return
-        }
-
         if (node.type === 'paragraph') {
+            const nodeMarkdown = normalizeTopLevelMarkdown(node)
+            if (!nodeMarkdown) return
             blocks.push({
                 type: 'paragraph',
                 continued: false,
                 markdown: nodeMarkdown,
                 text: toString(node).replace(/\s+/g, ' ').trim(),
+                inlineChildren: node.children,
             })
             return
         }
 
+        if (node.type === 'heading' && (node.depth === 1 || node.depth === 2 || node.depth === 3)) {
+            const nodeMarkdown = normalizeTopLevelMarkdown(node)
+            if (!nodeMarkdown) return
+            blocks.push({
+                type: 'markdown',
+                markdown: nodeMarkdown,
+                text: toString(node).replace(/\s+/g, ' ').trim(),
+                headingLevel: node.depth as 1 | 2 | 3,
+                inlineChildren: node.children as unknown as readonly PhrasingContent[],
+            })
+            return
+        }
+
+        if (node.type === 'list' && node.children.length > 0) {
+            const isOrdered = node.ordered ?? false
+            const isSpread = node.spread ?? false
+            const baseStart = node.start ?? 1
+            const separator = isSpread ? '\n\n' : '\n'
+
+            const items = node.children.map((listItem, i) => {
+                const singleItemList = {
+                    type: 'list' as const,
+                    ordered: isOrdered,
+                    start: isOrdered ? baseStart + i : undefined,
+                    spread: isSpread,
+                    children: [listItem],
+                }
+                const itemMarkdown = normalizeTopLevelMarkdown(singleItemList as unknown as RootContent)
+                // Inline children come from the first paragraph inside the list item.
+                const firstPara = listItem.children.find((c) => c.type === 'paragraph')
+                const inlineChildren = firstPara && 'children' in firstPara
+                    ? (firstPara.children as unknown as readonly PhrasingContent[])
+                    : undefined
+                return {
+                    markdown: itemMarkdown,
+                    text: toString(listItem).replace(/\s+/g, ' ').trim(),
+                    inlineChildren,
+                }
+            }).filter((item) => item.markdown)
+
+            if (items.length === 0) return
+
+            const fullMarkdown = items.map((item) => item.markdown.trim()).join(separator)
+            blocks.push({
+                type: 'splittable_list',
+                ordered: isOrdered,
+                spread: isSpread,
+                items,
+                markdown: fullMarkdown,
+                text: items.map((item) => item.text).join(' '),
+            })
+            return
+        }
+
+        const nodeMarkdown = normalizeTopLevelMarkdown(node)
+        if (!nodeMarkdown) return
         blocks.push({
             type: 'markdown',
             markdown: nodeMarkdown,

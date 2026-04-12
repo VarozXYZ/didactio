@@ -108,9 +108,18 @@ export function normalizeStreamedSyllabusPreview(
 }
 
 const STEPS = [
-    { label: 'Topic', subtitle: 'Define your unit' },
-    { label: 'Questionnaire', subtitle: 'Learner input' },
-    { label: 'Syllabus', subtitle: 'Review & approve' },
+    {
+        label: 'Topic',
+        description: 'Tell us what you want to learn and how deep you want to go.',
+    },
+    {
+        label: 'Questionnaire',
+        description: 'A few quick questions so we can match the content to your level.',
+    },
+    {
+        label: 'Syllabus',
+        description: 'See what your unit will cover and give it the green light.',
+    },
 ] as const
 
 function isSyllabusStage(nextAction: string): boolean {
@@ -388,49 +397,53 @@ export function CreateUnitWizard({
             <div className="flex min-h-0 max-h-[calc(100dvh-0.75rem)] w-full max-w-[920px] overflow-hidden rounded-[22px] sm:max-h-[calc(100dvh-1.5rem)]"
                  style={{ background: 'rgba(255,255,255,0.72)', backdropFilter: 'blur(40px) saturate(1.6)', boxShadow: '0 2px 0 rgba(255,255,255,0.8) inset, 0 32px_80px rgba(0,0,0,0.22), 0 0 0 1px rgba(255,255,255,0.5)', border: '1px solid rgba(255,255,255,0.55)' }}>
                 {/* Stepper sidebar */}
-                <div className="flex w-[196px] shrink-0 flex-col justify-between px-5 py-5"
-                     style={{ background: 'rgba(255,255,255,0.45)', borderRight: '1px solid rgba(0,0,0,0.06)' }}>
-                    <div>
-                        <div className="mb-6">
-                            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#86868B]">New Unit</p>
-                        </div>
-
-                        <nav className="flex flex-col gap-1">
-                            {STEPS.map((step, index) => {
-                                const isCompleted = index < currentStep
-                                const isCurrent = index === currentStep
-                                const isFuture = index > currentStep
-
-                                return (
-                                    <div key={step.label} className="flex items-start gap-3">
-                                        {/* Vertical track */}
-                                        <div className="flex flex-col items-center">
-                                            <span
-                                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-[10px] text-[11px] font-bold transition-all ${
-                                            isCompleted
-                                                ? 'bg-[#11A07D] text-white'
-                                                : isCurrent
-                                                  ? 'bg-[#1D1D1F] text-white shadow-[0_2px_8px_rgba(0,0,0,0.15)]'
-                                                  : 'bg-black/[0.06] text-[#C7C7CC]'
-                                        }`}
-                                            >
-                                                {isCompleted ? <Check size={12} strokeWidth={3} /> : index + 1}
-                                            </span>
-                                            {index < STEPS.length - 1 && (
-                                                <div className={`my-1 h-5 w-px ${isCompleted ? 'bg-[#11A07D]/40' : 'bg-black/[0.06]'}`} />
-                                            )}
-                                        </div>
-                                        <div className={`min-w-0 pt-[3px] ${isFuture ? 'opacity-40' : ''}`}>
-                                            <div className={`text-[13px] font-semibold leading-tight ${isCurrent ? 'text-[#1D1D1F]' : isCompleted ? 'text-[#6E6E73]' : 'text-[#AEAEB2]'}`}>
-                                                {step.label}
-                                            </div>
-                                            <div className={`text-[11px] leading-snug ${isCurrent ? 'text-[#86868B]' : 'text-[#AEAEB2]'}`}>{step.subtitle}</div>
-                                        </div>
-                                    </div>
-                                )
-                            })}
-                        </nav>
+                <div className="flex w-[232px] shrink-0 flex-col"
+                     style={{ background: 'rgba(248,248,250,0.7)', borderRight: '1px solid rgba(0,0,0,0.06)' }}>
+                    <div className="px-5 pt-5 pb-4 shrink-0">
+                        <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#AEAEB2]">New Unit</p>
                     </div>
+
+                    <nav className="flex flex-1 flex-col">
+                        {STEPS.map((step, index) => {
+                            const isCompleted = index < currentStep
+                            const isCurrent = index === currentStep
+
+                            return (
+                                <div
+                                    key={step.label}
+                                    className={`relative flex flex-1 flex-col px-6 py-6 transition-all ${
+                                        index < STEPS.length - 1 ? 'border-b border-black/[0.05]' : ''
+                                    } ${isCurrent ? 'bg-white/60' : ''}`}
+                                >
+                                    <div className={`absolute left-0 top-0 bottom-0 w-[3px] transition-all ${
+                                        isCurrent ? 'bg-[#1D1D1F]' : isCompleted ? 'bg-[#11A07D]/60' : 'bg-transparent'
+                                    }`} />
+
+                                    <span className={`mb-3.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-[7px] text-[11px] font-bold transition-all ${
+                                        isCompleted
+                                            ? 'bg-[#11A07D] text-white'
+                                            : isCurrent
+                                              ? 'bg-[#1D1D1F] text-white'
+                                              : 'bg-black/[0.06] text-[#C7C7CC]'
+                                    }`}>
+                                        {isCompleted ? <Check size={11} strokeWidth={3} /> : index + 1}
+                                    </span>
+
+                                    <span className={`mb-2.5 block text-[14px] font-semibold leading-tight transition-all ${
+                                        isCurrent ? 'text-[#1D1D1F]' : isCompleted ? 'text-[#6E6E73]' : 'text-[#C7C7CC]'
+                                    }`}>
+                                        {step.label}
+                                    </span>
+
+                                    <p className={`text-[12.5px] leading-relaxed transition-all ${
+                                        isCurrent ? 'text-[#6E6E73]' : isCompleted ? 'text-[#AEAEB2]' : 'text-[#D1D1D6]'
+                                    }`}>
+                                        {step.description}
+                                    </p>
+                                </div>
+                            )
+                        })}
+                    </nav>
                 </div>
 
                 {/* Content area */}

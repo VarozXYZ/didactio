@@ -70,12 +70,30 @@ function resolveActivityDate(value: string | undefined, fallback: string): strin
     return value?.trim() ? value : fallback
 }
 
-function resolvePresentationSettings(
+export function resolvePresentationSettings(
     settings?: BackendChapterPresentationSettings
 ): ChapterPresentationSettings {
+    // Map legacy paragraphFontFamily → bodyFontFamily
+    const legacyFontMap: Record<string, string> = { sans: 'inter', serif: 'merriweather', mono: 'inter' }
+    // Map legacy paragraphFontSize → sizeProfile
+    const legacySizeMap: Record<string, 'small' | 'regular' | 'large'> = {
+        '14px': 'small', '16px': 'regular', '18px': 'large', '20px': 'large',
+    }
+
+    const bodyFontFamily =
+        settings?.bodyFontFamily ??
+        legacyFontMap[settings?.paragraphFontFamily ?? ''] ??
+        'inter'
+
+    const sizeProfile =
+        settings?.sizeProfile ??
+        legacySizeMap[settings?.paragraphFontSize ?? ''] ??
+        'regular'
+
     return {
-        paragraphFontFamily: settings?.paragraphFontFamily ?? 'sans',
-        paragraphFontSize: settings?.paragraphFontSize ?? '16px',
+        sizeProfile,
+        bodyFontFamily,
+        headingFontFamily: settings?.headingFontFamily ?? 'inter',
         paragraphAlign: settings?.paragraphAlign ?? 'left',
     }
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react'
+import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import {
     Navigate,
     Route,
@@ -71,6 +71,7 @@ export default function DashboardApp() {
     const [allFolders, setAllFolders] = useState<BackendFolder[]>([])
     const [isLoadingIndex, setIsLoadingIndex] = useState(true)
     const [refreshKey, setRefreshKey] = useState(0)
+    const pendingEditorRefreshRef = useRef(false)
     const [modalState, setModalState] = useState<{
         isOpen: boolean
         didacticUnitId: string | null
@@ -153,6 +154,24 @@ export default function DashboardApp() {
     const refreshDashboard = () => {
         setRefreshKey((previous) => previous + 1)
     }
+
+    const refreshDashboardFromEditor = () => {
+        pendingEditorRefreshRef.current = true
+
+        if (!isDidacticUnitEditorRoute) {
+            pendingEditorRefreshRef.current = false
+            refreshDashboard()
+        }
+    }
+
+    useEffect(() => {
+        if (isDidacticUnitEditorRoute || !pendingEditorRefreshRef.current) {
+            return
+        }
+
+        pendingEditorRefreshRef.current = false
+        refreshDashboard()
+    }, [isDidacticUnitEditorRoute])
 
     const createFolder = async (name: string, icon: string, color: string) => {
         await dashboardApi.createFolder({ name, icon, color })
@@ -268,7 +287,7 @@ export default function DashboardApp() {
             <Routes>
                 <Route
                     path="unit/:didacticUnitId"
-                    element={<DidacticUnitRoute onDataChanged={refreshDashboard} />}
+                    element={<DidacticUnitRoute onDataChanged={refreshDashboardFromEditor} />}
                 />
                 <Route path="*" element={<Navigate replace to="/dashboard" />} />
             </Routes>

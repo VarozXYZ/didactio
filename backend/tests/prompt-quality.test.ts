@@ -45,6 +45,13 @@ describe('prompt quality helpers', () => {
         expect(prompt).toContain('folderName exactly as written')
     })
 
+    it('uses a dedicated folder classification system prompt', () => {
+        const prompt = buildGatewaySystemPrompt('folder_classification')
+
+        expect(prompt).toContain('classify educational units')
+        expect(prompt).toContain('requested structured object')
+    })
+
     it('builds a syllabus prompt with learner profile and strict structured output instructions', () => {
         const prompt = buildSyllabusMarkdownPrompt({
             topic: 'Python programming',

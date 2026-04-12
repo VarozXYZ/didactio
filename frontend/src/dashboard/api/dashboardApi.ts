@@ -23,9 +23,14 @@ export interface BackendFolder {
 }
 
 export type BackendChapterPresentationSettings = {
-    paragraphFontFamily: 'sans' | 'serif' | 'mono'
-    paragraphFontSize: '14px' | '16px' | '18px' | '20px'
-    paragraphAlign: 'left' | 'center' | 'right' | 'justify'
+    // New shape
+    sizeProfile?: 'small' | 'regular' | 'large'
+    bodyFontFamily?: string
+    headingFontFamily?: string
+    paragraphAlign?: 'left' | 'center' | 'right' | 'justify'
+    // Legacy fields (older persisted data)
+    paragraphFontFamily?: 'sans' | 'serif' | 'mono'
+    paragraphFontSize?: '14px' | '16px' | '18px' | '20px'
 }
 
 export type BackendAiModelConfig = {

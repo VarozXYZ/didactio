@@ -1,5 +1,5 @@
 import React, { useState, type Dispatch, type SetStateAction, type FormEvent } from 'react'
-import { ChevronDown, Plus, FolderPlus } from 'lucide-react'
+import { ChevronDown, Plus, FolderPlus, CircleHelp } from 'lucide-react'
 import { FolderFormModal } from '../../Dashboard/Sidebar/FolderFormModal'
 import type { BackendFolder } from '../../../api/dashboardApi'
 import { Progress } from '@/components/ui/progress'
@@ -122,14 +122,34 @@ function segmentedGridColsClass(count: number): string {
     return 'grid-cols-2'
 }
 
+function FieldTooltip({ text }: { text: string }) {
+    return (
+        <span className="group relative inline-flex">
+            <button
+                type="button"
+                tabIndex={0}
+                aria-label={text}
+                className="inline-flex h-4 w-4 items-center justify-center rounded-full text-[#AEAEB2] transition-colors hover:text-[#6E6E73] focus:outline-none focus:ring-2 focus:ring-[#11A07D]/30"
+            >
+                <CircleHelp size={14} />
+            </button>
+            <span className="pointer-events-none absolute left-full top-1/2 z-20 ml-2 w-64 -translate-y-1/2 rounded-[10px] bg-[#1D1D1F] px-3 py-2 text-left text-[12px] font-medium leading-5 text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
+                {text}
+            </span>
+        </span>
+    )
+}
+
 function SegmentedControl<T extends string>({
     label,
+    tooltip,
     value,
     onChange,
     options,
     colorsFor,
 }: {
     label: string
+    tooltip?: string
     value: T
     onChange: (v: T) => void
     options: Array<{ value: T; label: string }>
@@ -138,7 +158,10 @@ function SegmentedControl<T extends string>({
     const cols = segmentedGridColsClass(options.length)
     return (
         <div className="w-full min-w-0">
-            <div className="mb-2 text-[12px] font-medium text-[#86868B]">{label}</div>
+            <div className="mb-2 flex items-center gap-1.5 text-[12px] font-medium text-[#86868B]">
+                <span>{label}</span>
+                {tooltip ? <FieldTooltip text={tooltip} /> : null}
+            </div>
             <div
                 className={`grid w-full gap-0.5 rounded-[14px] p-0.5 ${cols}`}
                 style={{ background: 'rgba(0,0,0,0.06)', border: '1px solid rgba(0,0,0,0.07)' }}
@@ -337,6 +360,7 @@ export function TopicStep({
             <div className="flex flex-col gap-4">
                 <SegmentedControl
                     label="Level"
+                    tooltip="Sets the learner experience assumed by the unit."
                     value={draftLevel}
                     onChange={(v) => setDraftLevel(v)}
                     options={LEVEL_OPTIONS}
@@ -344,6 +368,7 @@ export function TopicStep({
                 />
                 <SegmentedControl
                     label="Depth"
+                    tooltip="Controls how detailed and technical the unit is."
                     value={draftDepth}
                     onChange={(v) => setDraftDepth(v)}
                     options={DEPTH_OPTIONS}
@@ -351,6 +376,7 @@ export function TopicStep({
                 />
                 <SegmentedControl
                     label="Length"
+                    tooltip="Sets the overall scope and amount of content."
                     value={draftLength}
                     onChange={(v) => setDraftLength(v)}
                     options={LENGTH_OPTIONS}

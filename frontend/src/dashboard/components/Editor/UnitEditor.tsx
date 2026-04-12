@@ -49,7 +49,9 @@ import {
 import {
     adaptDidacticUnitEditor,
     adaptDidacticUnitRevisions,
+    resolvePresentationSettings,
 } from '../../adapters'
+import { loadFonts } from '../../utils/fontLoader'
 import {
     calculateSpreadMetrics,
     findResumeSpreadIndex,
@@ -212,7 +214,7 @@ function buildDraft(
     return {
         title: detail?.title ?? chapter.title,
         contentMarkdown: normalizeStoredMarkdown(detail?.content ?? chapter.content),
-        presentationSettings: detail?.presentationSettings ?? chapter.presentationSettings,
+        presentationSettings: resolvePresentationSettings(detail?.presentationSettings) ?? chapter.presentationSettings,
     }
 }
 
@@ -262,6 +264,9 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
         height: typeof window !== 'undefined' ? window.innerHeight : 900,
         width: typeof window !== 'undefined' ? window.innerWidth : 1440,
     }))
+    const [fontsReady, setFontsReady] = useState(() =>
+        typeof document !== 'undefined' ? document.fonts.status === 'loaded' : false
+    )
     const saveTimeoutRef = useRef<number | null>(null)
     const preserveViewOnNextWorkspaceRef = useRef(false)
     const activeChapterIndexRef = useRef(0)
@@ -279,6 +284,33 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
     const activeChapterDetail = activeChapter
         ? chapterDetails[activeChapter.chapterIndex]
         : undefined
+    const activeChapterLayoutSnapshot = useMemo(
+        () =>
+            activeChapter
+                ? {
+                      chapterIndex: activeChapter.chapterIndex,
+                      title: activeChapter.title,
+                      summary: activeChapter.summary,
+                      status: activeChapter.status,
+                      readingTime: activeChapter.readingTime,
+                      level: activeChapter.level,
+                  }
+                : null,
+        [
+            activeChapter?.chapterIndex,
+            activeChapter?.title,
+            activeChapter?.summary,
+            activeChapter?.status,
+            activeChapter?.readingTime,
+            activeChapter?.level,
+        ]
+    )
+    const activeDraftContent = draft?.contentMarkdown ?? ''
+    const hasNextActiveModule = useMemo(
+        () =>
+            activeChapter ? activeChapter.chapterIndex < (workspace?.chapters.length ?? 0) - 1 : false,
+        [activeChapter?.chapterIndex, workspace?.chapters.length]
+    )
     const activeRuns = [] as BackendGenerationRun[]
 
 
@@ -407,7 +439,16 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
         setIsEditMode(false)
         setActiveLexicalEditor(null)
         setCurrentSpread(0)
-    }, [activeChapter, activeChapterDetail, workspace])
+    }, [
+        workspace,
+        activeChapter?.chapterIndex,
+        activeChapter?.title,
+        activeChapter?.content,
+        activeChapter?.presentationSettings,
+        activeChapterDetail?.title,
+        activeChapterDetail?.content,
+        activeChapterDetail?.presentationSettings,
+    ])
 
     useEffect(() => {
         if (
@@ -456,6 +497,22 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
         []
     )
 
+    const activeDraftSettings = draft?.presentationSettings
+
+    useEffect(() => {
+        if (fontsReady) return
+        void document.fonts.ready.then(() => setFontsReady(true))
+    }, [fontsReady])
+
+    // When presentation fonts change, wait for them to finish loading before paginating.
+    useEffect(() => {
+        const bodyFont = activeDraftSettings?.bodyFontFamily
+        const headingFont = activeDraftSettings?.headingFontFamily
+        if (!bodyFont && !headingFont) return
+        setFontsReady(false)
+        void loadFonts([bodyFont, headingFont].filter(Boolean) as Parameters<typeof loadFonts>[0]).then(() => setFontsReady(true))
+    }, [activeDraftSettings?.bodyFontFamily, activeDraftSettings?.headingFontFamily])
+
     const spreadMetrics = useMemo(
         () =>
             calculateSpreadMetrics({
@@ -466,23 +523,25 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
     )
     const measuredReadPages = useMemo(
         () =>
-            draft && activeChapter && workspace
+            fontsReady && activeChapterLayoutSnapshot && activeDraftContent
                 ? measurePages({
-                      activeChapter,
-                      chapterIndex: activeChapter.chapterIndex,
-                      content: draft.contentMarkdown,
-                      hasNextModule:
-                          activeChapter.chapterIndex < workspace.chapters.length - 1,
+                      activeChapter: activeChapterLayoutSnapshot,
+                      chapterIndex: activeChapterLayoutSnapshot.chapterIndex,
+                      content: activeDraftContent,
+                      hasNextModule: hasNextActiveModule,
                       pageHeight: spreadMetrics.pageHeight,
                       pageWidth: spreadMetrics.pageWidth,
+                      presentationSettings: activeDraftSettings,
                   })
                 : [],
         [
-            activeChapter,
-            draft,
+            fontsReady,
+            activeChapterLayoutSnapshot,
+            activeDraftContent,
+            hasNextActiveModule,
             spreadMetrics.pageHeight,
             spreadMetrics.pageWidth,
-            workspace,
+            activeDraftSettings,
         ]
     )
     const paginatedContentPages = useMemo(
@@ -1349,6 +1408,7 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
         }
 
         if (page.kind === 'post_module_actions') {
+            if (isActiveChapterStreaming) return null
             return (
                 <div
                     className="relative overflow-hidden rounded-[16px] border border-[#E5E5E7] bg-white shadow-[0_8px_60px_rgba(0,0,0,0.08)] md:rounded-[24px]"
@@ -1379,7 +1439,7 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
             editable: false,
             markdown: page.markdown,
             extraContent:
-                page.kind === 'content_with_actions'
+                page.kind === 'content_with_actions' && !isActiveChapterStreaming
                     ? renderPostModuleActionBody({
                           hasNextModule: page.hasNextModule,
                           primaryActionLabel: page.primaryActionLabel,
@@ -1423,7 +1483,7 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                                     editable: false,
                                     markdown: leftReadPage.markdown,
                                     extraContent:
-                                        leftReadPage.kind === 'content_with_actions'
+                                        leftReadPage.kind === 'content_with_actions' && !isActiveChapterStreaming
                                             ? renderPostModuleActionBody({
                                                   hasNextModule: leftReadPage.hasNextModule,
                                                   primaryActionLabel:

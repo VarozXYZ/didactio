@@ -57,26 +57,33 @@ export function QuestionnaireStep({
                             {question.prompt}
                         </label>
                         {question.type === 'single_select' ? (
-                            <div className="flex flex-wrap gap-1.5">
-                                {question.options?.map((option) => (
-                                    <button
-                                        key={option.value}
-                                        type="button"
-                                        onClick={() =>
-                                            setQuestionnaireAnswers((prev) => ({
-                                                ...prev,
-                                                [question.id]: option.value,
-                                            }))
-                                        }
-                                        className={`rounded-lg px-3 py-1.5 text-[13px] font-medium transition-all ${
-                                            questionnaireAnswers[question.id] === option.value
-                                                ? 'bg-[#1D1D1F] text-white'
-                                                : 'border border-[#E5E5E7] bg-[#F5F5F7] text-[#6E6E73] hover:border-[#D1D1D6] hover:text-[#1D1D1F]'
-                                        }`}
-                                    >
-                                        {option.label}
-                                    </button>
-                                ))}
+                            <div className="flex flex-col gap-1.5 mt-1">
+                                {question.options?.map((option, optIndex) => {
+                                    const letter = String.fromCharCode(97 + optIndex)
+                                    const isSelected = questionnaireAnswers[question.id] === option.value
+                                    return (
+                                        <button
+                                            key={option.value}
+                                            type="button"
+                                            onClick={() =>
+                                                setQuestionnaireAnswers((prev) => ({
+                                                    ...prev,
+                                                    [question.id]: option.value,
+                                                }))
+                                            }
+                                            className={`flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-left text-[13px] transition-all ${
+                                                isSelected
+                                                    ? 'bg-[#1D1D1F] text-white'
+                                                    : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#EBEBED]'
+                                            }`}
+                                        >
+                                            <span className={`shrink-0 text-[12px] font-semibold ${isSelected ? 'text-white/60' : 'text-[#86868B]'}`}>
+                                                {letter}.
+                                            </span>
+                                            {option.label}
+                                        </button>
+                                    )
+                                })}
                             </div>
                         ) : (
                             <textarea

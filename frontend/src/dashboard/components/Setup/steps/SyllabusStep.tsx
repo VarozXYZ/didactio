@@ -1,6 +1,19 @@
 import { type Dispatch, type SetStateAction, useRef, useState, useEffect, useCallback } from 'react'
 import { ChevronRight, Sparkles } from 'lucide-react'
 
+function SparkleFilledIcon({ size = 16 }: { size?: number }) {
+    return (
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width={size} height={size} fill="none" aria-hidden="true">
+            <path
+                fill="currentColor"
+                fillRule="evenodd"
+                d="M9 4.5a.75.75 0 0 1 .721.544l.813 2.846a3.75 3.75 0 0 0 2.576 2.576l2.846.813a.75.75 0 0 1 0 1.442l-2.846.813a3.75 3.75 0 0 0-2.576 2.576l-.813 2.846a.75.75 0 0 1-1.442 0l-.813-2.846a3.75 3.75 0 0 0-2.576-2.576l-2.846-.813a.75.75 0 0 1 0-1.442l2.846-.813A3.75 3.75 0 0 0 7.466 7.89l.813-2.846A.75.75 0 0 1 9 4.5m9-3a.75.75 0 0 1 .728.568l.258 1.036a2.63 2.63 0 0 0 1.91 1.91l1.036.258a.75.75 0 0 1 0 1.456l-1.036.258a2.63 2.63 0 0 0-1.91 1.91l-.258 1.036a.75.75 0 0 1-1.456 0l-.258-1.036a2.63 2.63 0 0 0-1.91-1.91l-1.036-.258a.75.75 0 0 1 0-1.456l1.036-.258a2.63 2.63 0 0 0 1.91-1.91l.258-1.036A.75.75 0 0 1 18 1.5M16.5 15a.75.75 0 0 1 .712.513l.394 1.183c.15.447.5.799.948.948l1.183.395a.75.75 0 0 1 0 1.422l-1.183.395a1.5 1.5 0 0 0-.948.948l-.395 1.183a.75.75 0 0 1-1.422 0l-.395-1.183a1.5 1.5 0 0 0-.948-.948l-1.183-.395a.75.75 0 0 1 0-1.422l1.183-.395a1.5 1.5 0 0 0 .948-.948l.395-1.183A.75.75 0 0 1 16.5 15"
+                clipRule="evenodd"
+            />
+        </svg>
+    )
+}
+
 function StartGenerationButton({ onClick, disabled, label }: { onClick: () => void; disabled: boolean; label: string }) {
     const [hovered, setHovered] = useState(false)
     const [pressed, setPressed] = useState(false)
@@ -72,9 +85,7 @@ function StartGenerationButton({ onClick, disabled, label }: { onClick: () => vo
                     style={{ position: 'relative', zIndex: 2, background: '#0f0f12', borderRadius: '12px' }}
                     className="flex select-none items-center gap-2.5 px-5 py-[11px] text-[14px] font-semibold text-white"
                 >
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M13 21h8M15 5l4 4m2.174-2.188a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/>
-                    </svg>
+                    <SparkleFilledIcon size={16} />
                     {label}
                 </div>
             </button>
@@ -441,25 +452,32 @@ export function SyllabusStep({
                     {/* Q2 — No path: context + regenerate */}
                     {hasChosen && reviewDecision === 'reject' && (
                         <div className="animate-in fade-in slide-in-from-bottom-2 w-full max-w-lg duration-200">
-                            <div className="flex items-end gap-3">
+                            <div className="flex items-stretch gap-3">
                                 {/* Auto-growing input */}
-                                <textarea
-                                    rows={1}
-                                    value={regenerationContext}
-                                    onChange={(e) => {
-                                        setRegenerationContext(e.target.value)
-                                        e.target.style.height = 'auto'
-                                        e.target.style.height = `${e.target.scrollHeight}px`
-                                    }}
-                                    placeholder="What would you like changed?"
-                                    className="min-h-[42px] flex-1 resize-none overflow-hidden rounded-[14px] px-4 py-2.5 text-[13px] leading-relaxed text-[#1D1D1F] placeholder:italic placeholder:text-[#AEAEB2]/50 focus:outline-none"
-                                    style={{
-                                        background: 'rgba(255,255,255,0.7)',
-                                        border: '1px solid rgba(0,0,0,0.07)',
-                                        backdropFilter: 'blur(12px)',
-                                        boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.04)',
-                                    }}
-                                />
+                                <div className="relative min-h-[76px] flex-1">
+                                    {!regenerationContext && (
+                                        <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-4 text-center text-[13px] italic leading-relaxed text-[#AEAEB2]/50">
+                                            What would you like changed?
+                                        </div>
+                                    )}
+                                    <textarea
+                                        rows={1}
+                                        value={regenerationContext}
+                                        onChange={(e) => {
+                                            setRegenerationContext(e.target.value)
+                                            e.target.style.height = 'auto'
+                                            e.target.style.height = `${e.target.scrollHeight}px`
+                                        }}
+                                        placeholder=""
+                                        className="min-h-[76px] w-full resize-none overflow-hidden rounded-[14px] px-4 py-2.5 text-[13px] leading-relaxed text-[#1D1D1F] focus:outline-none"
+                                        style={{
+                                            background: 'rgba(255,255,255,0.7)',
+                                            border: '1px solid rgba(0,0,0,0.07)',
+                                            backdropFilter: 'blur(12px)',
+                                            boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.04)',
+                                        }}
+                                    />
+                                </div>
                                 {/* Right column: tier + button */}
                                 <div className="flex shrink-0 flex-col items-stretch gap-2">
                                     <div className="inline-flex self-center rounded-[10px] bg-[#F5F5F7] p-0.5" style={{ border: '1px solid rgba(0,0,0,0.06)' }}>

@@ -261,10 +261,17 @@ const CONTENT_LENGTH_TOKENS: Record<DidacticUnitLength, number> = {
 }
 
 function resolveStageMaxOutputTokens(
-    stage: 'moderation' | 'questionnaire' | 'syllabus' | 'summary' | 'chapter',
+    stage:
+        | 'folder_classification'
+        | 'moderation'
+        | 'questionnaire'
+        | 'syllabus'
+        | 'summary'
+        | 'chapter',
     length?: DidacticUnitLength
 ): number {
     switch (stage) {
+        case 'folder_classification':
         case 'moderation':
             return 1200
         case 'questionnaire':
@@ -373,6 +380,16 @@ function validateReferenceSyllabusLength(
     }
 
     return syllabus
+}
+
+function ensureReferenceSyllabusTopic(
+    syllabus: Omit<DidacticUnitReferenceSyllabus, 'topic'> & { topic?: string },
+    fallbackTopic: string
+): DidacticUnitReferenceSyllabus {
+    return {
+        ...syllabus,
+        topic: syllabus.topic?.trim() || fallbackTopic.trim(),
+    }
 }
 
 export class GatewayAiService implements AiService {
@@ -518,10 +535,10 @@ export class GatewayAiService implements AiService {
         try {
             const result = await generateObject({
                 model: this.gateway(selection.modelId),
-                system: buildGatewaySystemPrompt('moderation'),
+                system: buildGatewaySystemPrompt('folder_classification'),
                 prompt,
                 schema: folderClassificationSchema,
-                maxOutputTokens: resolveStageMaxOutputTokens('moderation'),
+                maxOutputTokens: resolveStageMaxOutputTokens('folder_classification'),
                 abortSignal: input.abortSignal,
             })
             const telemetry = await this.enrichAiCallTelemetry(
@@ -942,7 +959,10 @@ export class GatewayAiService implements AiService {
                 model: selection.model,
                 prompt,
                 telemetry,
-                syllabus: validateReferenceSyllabusLength(object, input.length),
+                syllabus: validateReferenceSyllabusLength(
+                    ensureReferenceSyllabusTopic(object, input.topic),
+                    input.length
+                ),
             }
 
             this.logAiCallCompleted('syllabus', selection, telemetry, {
