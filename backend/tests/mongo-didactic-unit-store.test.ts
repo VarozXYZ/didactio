@@ -1,73 +1,80 @@
-import { describe, expect, it, vi } from 'vitest'
-import { MongoDidacticUnitStore } from '../src/didactic-unit/mongo-didactic-unit-store.js'
-import type { DidacticUnit } from '../src/didactic-unit/create-didactic-unit.js'
+import {describe, expect, it, vi} from "vitest";
+import {MongoDidacticUnitStore} from "../src/didactic-unit/mongo-didactic-unit-store.js";
+import type {DidacticUnit} from "../src/didactic-unit/create-didactic-unit.js";
 
 function createStoredDidacticUnit(): DidacticUnit {
-    return {
-        id: 'didactic-unit-1',
-        ownerId: 'mock-user',
-        title: 'Next.js Learning Path',
-        topic: 'next.js framework',
-        provider: 'openai',
-        status: 'ready_for_content_generation',
-        nextAction: 'view_didactic_unit',
-        overview: 'A focused syllabus.',
-        learningGoals: ['Understand routing'],
-        chapters: [
-            {
-                title: 'Foundations',
-                overview: 'Learn the basics.',
-                keyPoints: ['Routing'],
-            },
-        ],
-        questionnaireAnswers: [
-            {
-                questionId: 'learning_goal',
-                value: 'Build production-ready applications',
-            },
-        ],
-        createdAt: '2026-03-12T00:00:00.000Z',
-        updatedAt: '2026-03-12T00:00:00.000Z',
-    }
+	return {
+		id: "didactic-unit-1",
+		ownerId: "mock-user",
+		title: "Next.js Learning Path",
+		topic: "next.js framework",
+		provider: "openai",
+		status: "ready_for_content_generation",
+		nextAction: "view_didactic_unit",
+		overview: "A focused syllabus.",
+		learningGoals: ["Understand routing"],
+		chapters: [
+			{
+				title: "Foundations",
+				overview: "Learn the basics.",
+				keyPoints: ["Routing"],
+			},
+		],
+		questionnaireAnswers: [
+			{
+				questionId: "learning_goal",
+				value: "Build production-ready applications",
+			},
+		],
+		createdAt: "2026-03-12T00:00:00.000Z",
+		updatedAt: "2026-03-12T00:00:00.000Z",
+	};
 }
 
-describe('MongoDidacticUnitStore', () => {
-    it('saves, looks up, and lists didactic units through the collection', async () => {
-        const didacticUnit = createStoredDidacticUnit()
-        const updateOne = vi.fn().mockResolvedValue(undefined)
-        const findOne = vi.fn().mockResolvedValue({ ...didacticUnit, _id: 'mongo-1' })
-        const toArray = vi.fn().mockResolvedValue([{ ...didacticUnit, _id: 'mongo-1' }])
-        const sort = vi.fn().mockReturnValue({ toArray })
-        const find = vi.fn().mockReturnValue({ sort })
-        const collection = {
-            updateOne,
-            findOne,
-            find,
-        }
-        const database = {
-            collection: vi.fn().mockReturnValue(collection),
-        }
+describe("MongoDidacticUnitStore", () => {
+	it("saves, looks up, and lists didactic units through the collection", async () => {
+		const didacticUnit = createStoredDidacticUnit();
+		const updateOne = vi.fn().mockResolvedValue(undefined);
+		const findOne = vi
+			.fn()
+			.mockResolvedValue({...didacticUnit, _id: "mongo-1"});
+		const toArray = vi
+			.fn()
+			.mockResolvedValue([{...didacticUnit, _id: "mongo-1"}]);
+		const sort = vi.fn().mockReturnValue({toArray});
+		const find = vi.fn().mockReturnValue({sort});
+		const collection = {
+			updateOne,
+			findOne,
+			find,
+		};
+		const database = {
+			collection: vi.fn().mockReturnValue(collection),
+		};
 
-        const store = new MongoDidacticUnitStore(database as never)
+		const store = new MongoDidacticUnitStore(database as never);
 
-        await store.save(didacticUnit)
-        const didacticUnitById = await store.getById('mock-user', 'didactic-unit-1')
-        const listedDidacticUnits = await store.listByOwner('mock-user')
+		await store.save(didacticUnit);
+		const didacticUnitById = await store.getById(
+			"mock-user",
+			"didactic-unit-1",
+		);
+		const listedDidacticUnits = await store.listByOwner("mock-user");
 
-        expect(updateOne).toHaveBeenCalledWith(
-            { id: didacticUnit.id },
-            { $set: didacticUnit },
-            { upsert: true }
-        )
-        expect(findOne).toHaveBeenCalledWith({
-            id: 'didactic-unit-1',
-            ownerId: 'mock-user',
-        })
-        expect(find).toHaveBeenCalledWith({
-            ownerId: 'mock-user',
-        })
-        expect(sort).toHaveBeenCalledWith({ updatedAt: -1 })
-        expect(didacticUnitById).toEqual(didacticUnit)
-        expect(listedDidacticUnits).toEqual([didacticUnit])
-    })
-})
+		expect(updateOne).toHaveBeenCalledWith(
+			{id: didacticUnit.id},
+			{$set: didacticUnit},
+			{upsert: true},
+		);
+		expect(findOne).toHaveBeenCalledWith({
+			id: "didactic-unit-1",
+			ownerId: "mock-user",
+		});
+		expect(find).toHaveBeenCalledWith({
+			ownerId: "mock-user",
+		});
+		expect(sort).toHaveBeenCalledWith({updatedAt: -1});
+		expect(didacticUnitById).toEqual(didacticUnit);
+		expect(listedDidacticUnits).toEqual([didacticUnit]);
+	});
+});

@@ -1,125 +1,140 @@
-import request from 'supertest'
-import { expect } from 'vitest'
-import type { DidacticUnitProvider } from '../../src/didactic-unit/planning.js'
-import { createTestApp } from './create-test-app.js'
+import request from "supertest";
+import {expect} from "vitest";
+import type {DidacticUnitProvider} from "../../src/didactic-unit/planning.js";
+import {createTestApp} from "./create-test-app.js";
 
-type TestApp = ReturnType<typeof createTestApp>
+type TestApp = ReturnType<typeof createTestApp>;
 
 export async function createDidacticUnit(
-    app: TestApp,
-    input: {
-        topic?: string
-        provider?: DidacticUnitProvider
-    } = {}
+	app: TestApp,
+	input: {
+		topic?: string;
+		provider?: DidacticUnitProvider;
+	} = {},
 ) {
-    const response = await request(app)
-        .post('/api/didactic-unit')
-        .send({
-            topic: input.topic ?? 'next.js framework',
-            provider: input.provider,
-        })
+	const response = await request(app)
+		.post("/api/didactic-unit")
+		.send({
+			topic: input.topic ?? "next.js framework",
+			provider: input.provider,
+		});
 
-    expect(response.status).toBe(201)
-    return response.body as { id: string; topic: string; provider: DidacticUnitProvider }
+	expect(response.status).toBe(201);
+	return response.body as {
+		id: string;
+		topic: string;
+		provider: DidacticUnitProvider;
+	};
 }
 
-export async function advanceToQuestionnaireAnswered(app: TestApp, didacticUnitId: string) {
-    const moderationResponse = await request(app)
-        .post(`/api/didactic-unit/${didacticUnitId}/moderate`)
-        .send({ tier: 'cheap' })
+export async function advanceToQuestionnaireAnswered(
+	app: TestApp,
+	didacticUnitId: string,
+) {
+	const moderationResponse = await request(app)
+		.post(`/api/didactic-unit/${didacticUnitId}/moderate`)
+		.send({tier: "cheap"});
 
-    expect(moderationResponse.status).toBe(200)
+	expect(moderationResponse.status).toBe(200);
 
-    const questionnaireResponse = await request(app)
-        .post(`/api/didactic-unit/${didacticUnitId}/questionnaire/generate`)
-        .send({ tier: 'cheap' })
+	const questionnaireResponse = await request(app)
+		.post(`/api/didactic-unit/${didacticUnitId}/questionnaire/generate`)
+		.send({tier: "cheap"});
 
-    expect(questionnaireResponse.status).toBe(200)
+	expect(questionnaireResponse.status).toBe(200);
 
-    const answers = questionnaireResponse.body.questionnaire.questions.map(
-        (question: { id: string }) => ({
-            questionId: question.id,
-            value: `answer-for-${question.id}`,
-        })
-    )
+	const answers = questionnaireResponse.body.questionnaire.questions.map(
+		(question: {id: string}) => ({
+			questionId: question.id,
+			value: `answer-for-${question.id}`,
+		}),
+	);
 
-    const answeredResponse = await request(app)
-        .patch(`/api/didactic-unit/${didacticUnitId}/questionnaire/answers`)
-        .send({ answers })
+	const answeredResponse = await request(app)
+		.patch(`/api/didactic-unit/${didacticUnitId}/questionnaire/answers`)
+		.send({answers});
 
-    expect(answeredResponse.status).toBe(200)
-    return answeredResponse.body as { id: string }
+	expect(answeredResponse.status).toBe(200);
+	return answeredResponse.body as {id: string};
 }
 
 export async function createSyllabusReadyDidacticUnit(app: TestApp) {
-    const created = await createDidacticUnit(app)
+	const created = await createDidacticUnit(app);
 
-    await advanceToQuestionnaireAnswered(app, created.id)
+	await advanceToQuestionnaireAnswered(app, created.id);
 
-    const syllabusResponse = await request(app)
-        .post(`/api/didactic-unit/${created.id}/syllabus/generate`)
-        .send({ tier: 'cheap' })
+	const syllabusResponse = await request(app)
+		.post(`/api/didactic-unit/${created.id}/syllabus/generate`)
+		.send({tier: "cheap"});
 
-    expect(syllabusResponse.status).toBe(200)
+	expect(syllabusResponse.status).toBe(200);
 
-    return syllabusResponse.body as { id: string; syllabus: { chapters: unknown[] } }
+	return syllabusResponse.body as {
+		id: string;
+		syllabus: {chapters: unknown[]};
+	};
 }
 
 export async function createSyllabusReadyDidacticUnitWithProvider(
-    app: TestApp,
-    input: {
-        topic?: string
-        provider?: DidacticUnitProvider
-    } = {}
+	app: TestApp,
+	input: {
+		topic?: string;
+		provider?: DidacticUnitProvider;
+	} = {},
 ) {
-    const created = await createDidacticUnit(app, input)
+	const created = await createDidacticUnit(app, input);
 
-    await advanceToQuestionnaireAnswered(app, created.id)
+	await advanceToQuestionnaireAnswered(app, created.id);
 
-    const syllabusResponse = await request(app)
-        .post(`/api/didactic-unit/${created.id}/syllabus/generate`)
-        .send({ tier: 'cheap' })
+	const syllabusResponse = await request(app)
+		.post(`/api/didactic-unit/${created.id}/syllabus/generate`)
+		.send({tier: "cheap"});
 
-    expect(syllabusResponse.status).toBe(200)
+	expect(syllabusResponse.status).toBe(200);
 
-    return syllabusResponse.body as {
-        id: string
-        provider: DidacticUnitProvider
-        syllabus: { chapters: unknown[] }
-    }
+	return syllabusResponse.body as {
+		id: string;
+		provider: DidacticUnitProvider;
+		syllabus: {chapters: unknown[]};
+	};
 }
 
 export async function createApprovedDidacticUnit(
-    app: TestApp,
-    input: {
-        topic?: string
-        provider?: DidacticUnitProvider
-    } = {}
+	app: TestApp,
+	input: {
+		topic?: string;
+		provider?: DidacticUnitProvider;
+	} = {},
 ) {
-    const syllabusReady = await createSyllabusReadyDidacticUnitWithProvider(app, input)
+	const syllabusReady = await createSyllabusReadyDidacticUnitWithProvider(
+		app,
+		input,
+	);
 
-    const approvedResponse = await request(app)
-        .post(`/api/didactic-unit/${syllabusReady.id}/approve-syllabus`)
-        .send({})
+	const approvedResponse = await request(app)
+		.post(`/api/didactic-unit/${syllabusReady.id}/approve-syllabus`)
+		.send({});
 
-    expect(approvedResponse.status).toBe(200)
+	expect(approvedResponse.status).toBe(200);
 
-    return approvedResponse.body as { id: string }
+	return approvedResponse.body as {id: string};
 }
 
 export async function generateDidacticUnitChapter(
-    app: TestApp,
-    didacticUnitId: string,
-    chapterIndex = 0
+	app: TestApp,
+	didacticUnitId: string,
+	chapterIndex = 0,
 ) {
-    const response = await request(app)
-        .post(`/api/didactic-unit/${didacticUnitId}/chapters/${chapterIndex}/generate`)
-        .send({ tier: 'cheap' })
+	const response = await request(app)
+		.post(
+			`/api/didactic-unit/${didacticUnitId}/chapters/${chapterIndex}/generate`,
+		)
+		.send({tier: "cheap"});
 
-    expect(response.status).toBe(200)
+	expect(response.status).toBe(200);
 
-    return response.body as {
-        id: string
-        generatedChapters?: Array<{ chapterIndex: number; content: string }>
-    }
+	return response.body as {
+		id: string;
+		generatedChapters?: Array<{chapterIndex: number; content: string}>;
+	};
 }

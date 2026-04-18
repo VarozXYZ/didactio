@@ -1,5 +1,5 @@
 import { type Dispatch, type SetStateAction } from 'react'
-import { Sparkles } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import type { PlanningDetailViewModel } from '../../../types'
 import { Progress } from '@/components/ui/progress'
 
@@ -28,7 +28,7 @@ export function QuestionnaireStep({
         return (
             <div className="flex flex-col items-center justify-center py-16">
                 <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-[14px] bg-[#EAF9EF]">
-                    <Sparkles size={20} className="text-[#4ADE80]" />
+                    <Loader2 size={20} className="animate-spin text-[#4ADE80]" />
                 </div>
                 <p className="mb-6 text-[14px] font-medium text-[#1D1D1F]">Generating questionnaire...</p>
                 <div className="w-48">

@@ -1,8 +1,7 @@
-import AuthScreen from '../components/AuthScreen'
+import AuthScreen from "../components/AuthScreen";
 
 function RegisterPage() {
-    return <AuthScreen mode="register" />
+	return <AuthScreen mode="register" />;
 }
 
-export default RegisterPage
-
+export default RegisterPage;

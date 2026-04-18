@@ -1,35 +1,37 @@
-import { getAppEnv, loadEnv } from './config/env.js'
-import { createApp } from './app.js'
-import { MongoDidacticUnitStore } from './didactic-unit/mongo-didactic-unit-store.js'
-import { MongoFolderStore } from './folders/mongo-folder-store.js'
-import { MongoGenerationRunStore } from './generation-runs/mongo-generation-run-store.js'
-import { createLogger } from './logging/logger.js'
-import { connectMongo, getMongoHealthStatus } from './mongo/mongo-connection.js'
+import {getAppEnv, loadEnv} from "./config/env.js";
+import {createApp} from "./app.js";
+import {MongoDidacticUnitStore} from "./didactic-unit/mongo-didactic-unit-store.js";
+import {MongoFolderStore} from "./folders/mongo-folder-store.js";
+import {MongoGenerationRunStore} from "./generation-runs/mongo-generation-run-store.js";
+import {createLogger} from "./logging/logger.js";
+import {connectMongo, getMongoHealthStatus} from "./mongo/mongo-connection.js";
 
-loadEnv()
+loadEnv();
 
-const env = getAppEnv()
+const env = getAppEnv();
 const logger = createLogger({
-    name: 'didactio-backend',
-    level: env.logLevel,
-    logFilePath: env.logFilePath,
-})
-const mongoConnection = await connectMongo(env)
+	name: "didactio-backend",
+	level: env.logLevel,
+	logFilePath: env.logFilePath,
+});
+const mongoConnection = await connectMongo(env);
 
-const didacticUnitStore = new MongoDidacticUnitStore(mongoConnection.database)
-const generationRunStore = new MongoGenerationRunStore(mongoConnection.database)
-const folderStore = new MongoFolderStore(mongoConnection.database)
+const didacticUnitStore = new MongoDidacticUnitStore(mongoConnection.database);
+const generationRunStore = new MongoGenerationRunStore(
+	mongoConnection.database,
+);
+const folderStore = new MongoFolderStore(mongoConnection.database);
 const app = createApp({
-    didacticUnitStore,
-    generationRunStore,
-    folderStore,
-    mongoHealth: getMongoHealthStatus(mongoConnection),
-    logger,
-})
+	didacticUnitStore,
+	generationRunStore,
+	folderStore,
+	mongoHealth: getMongoHealthStatus(mongoConnection),
+	logger,
+});
 
 app.listen(env.port, () => {
-    logger.info('Backend server listening', {
-        port: env.port,
-        url: `http://localhost:${env.port}`,
-    })
-})
+	logger.info("Backend server listening", {
+		port: env.port,
+		url: `http://localhost:${env.port}`,
+	});
+});

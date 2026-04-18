@@ -1,51 +1,54 @@
-import type { Db, Document } from 'mongodb'
+import type {Db, Document} from "mongodb";
 import type {
-    GenerationRun,
-    GenerationRunStore,
-} from './generation-run-store.js'
+	GenerationRun,
+	GenerationRunStore,
+} from "./generation-run-store.js";
 
-type GenerationRunDocument = GenerationRun & Document
+type GenerationRunDocument = GenerationRun & Document;
 
-function stripMongoId(document: GenerationRunDocument | null): GenerationRun | null {
-    if (!document) {
-        return null
-    }
+function stripMongoId(
+	document: GenerationRunDocument | null,
+): GenerationRun | null {
+	if (!document) {
+		return null;
+	}
 
-    const { _id: _ignored, ...run } = document
-    return run as GenerationRun
+	const {_id: _ignored, ...run} = document;
+	return run as GenerationRun;
 }
 
 export class MongoGenerationRunStore implements GenerationRunStore {
-    private readonly collection
+	private readonly collection;
 
-    constructor(database: Db) {
-        this.collection = database.collection<GenerationRunDocument>('generationRuns')
-    }
+	constructor(database: Db) {
+		this.collection =
+			database.collection<GenerationRunDocument>("generationRuns");
+	}
 
-    async save(run: GenerationRun): Promise<void> {
-        await this.collection.updateOne(
-            { id: run.id },
-            {
-                $set: run,
-            },
-            { upsert: true }
-        )
-    }
+	async save(run: GenerationRun): Promise<void> {
+		await this.collection.updateOne(
+			{id: run.id},
+			{
+				$set: run,
+			},
+			{upsert: true},
+		);
+	}
 
-    async listByDidacticUnit(
-        ownerId: string,
-        didacticUnitId: string
-    ): Promise<GenerationRun[]> {
-        const documents = await this.collection
-            .find({
-                ownerId,
-                didacticUnitId,
-            })
-            .sort({ createdAt: -1 })
-            .toArray()
+	async listByDidacticUnit(
+		ownerId: string,
+		didacticUnitId: string,
+	): Promise<GenerationRun[]> {
+		const documents = await this.collection
+			.find({
+				ownerId,
+				didacticUnitId,
+			})
+			.sort({createdAt: -1})
+			.toArray();
 
-        return documents
-            .map((document) => stripMongoId(document))
-            .filter((document): document is GenerationRun => document !== null)
-    }
+		return documents
+			.map((document) => stripMongoId(document))
+			.filter((document): document is GenerationRun => document !== null);
+	}
 }

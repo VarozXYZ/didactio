@@ -1,13 +1,13 @@
-import PricingPlans from '../components/PricingPlans'
-import PricingFaq from '../components/PricingFaq'
+import PricingPlans from "../components/PricingPlans";
+import PricingFaq from "../components/PricingFaq";
 
 function PricingPage() {
-    return (
-        <>
-            <PricingPlans />
-            <PricingFaq />
-        </>
-    )
+	return (
+		<>
+			<PricingPlans />
+			<PricingFaq />
+		</>
+	);
 }
 
-export default PricingPage
+export default PricingPage;

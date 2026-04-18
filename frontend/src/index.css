@@ -1,99 +1,103 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@400;500;600;700&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@400;500;600;700&display=swap");
 
 @import "tailwindcss";
 @source "../../node_modules/streamdown/dist/*.js";
 
 @theme {
-    --color-dark: #323030;
-    --color-accent: #34C759;
-    --color-secondary: #D9D9D9;
+	--color-dark: #323030;
+	--color-accent: #34c759;
+	--color-secondary: #d9d9d9;
 
-    --font-sora: "Sora", sans-serif;
-    --font-inter: "Inter", sans-serif;
+	--font-sora: "Sora", sans-serif;
+	--font-inter: "Inter", sans-serif;
 
-    --font-weight-hairline: 100;
-    --font-weight-extra-light: 100;
-    --font-weight-thin: 200;
-    --font-weight-light: 300;
-    --font-weight-normal: 400;
-    --font-weight-medium: 500;
-    --font-weight-semibold: 600;
-    --font-weight-bold: 700;
-    --font-weight-extrabold: 800;
-    --font-weight-extra-bold: 800;
-    --font-weight-black: 900;
+	--font-weight-hairline: 100;
+	--font-weight-extra-light: 100;
+	--font-weight-thin: 200;
+	--font-weight-light: 300;
+	--font-weight-normal: 400;
+	--font-weight-medium: 500;
+	--font-weight-semibold: 600;
+	--font-weight-bold: 700;
+	--font-weight-extrabold: 800;
+	--font-weight-extra-bold: 800;
+	--font-weight-black: 900;
 
-    --radius-sm: 5px;
-    --radius-md: 15px;
-    --radius-mm: 50px;
-    --radius-ml: 75px;
-    --radius-lg: 100px;
-    --radius-xl: 100px;
+	--radius-sm: 5px;
+	--radius-md: 15px;
+	--radius-mm: 50px;
+	--radius-ml: 75px;
+	--radius-lg: 100px;
+	--radius-xl: 100px;
 
-    --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.08);
-    --shadow-elevated: 0 8px 30px rgba(0, 0, 0, 0.12);
+	--shadow-card: 0 4px 20px rgba(0, 0, 0, 0.08);
+	--shadow-elevated: 0 8px 30px rgba(0, 0, 0, 0.12);
 }
 
 html {
-    scroll-behavior: smooth;
+	scroll-behavior: smooth;
 }
 
 html,
 body,
 #root {
-    min-height: 100%;
+	min-height: 100%;
 }
 
 :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --radius: 0.625rem;
+	--background: oklch(1 0 0);
+	--foreground: oklch(0.145 0 0);
+	--card: oklch(1 0 0);
+	--card-foreground: oklch(0.145 0 0);
+	--muted: oklch(0.97 0 0);
+	--muted-foreground: oklch(0.556 0 0);
+	--border: oklch(0.922 0 0);
+	--input: oklch(0.922 0 0);
+	--primary: oklch(0.205 0 0);
+	--primary-foreground: oklch(0.985 0 0);
+	--radius: 0.625rem;
 }
 
 body {
-    margin: 0;
-    font-family: var(--font-inter);
-    color: var(--color-dark);
-    background-color: #FFFFFF;
+	margin: 0;
+	font-family: var(--font-inter);
+	color: var(--color-dark);
+	background-color: #ffffff;
 }
 
 * {
-    box-sizing: border-box;
+	box-sizing: border-box;
 }
 
 .line-clamp-2 {
-    display: -webkit-box;
-    overflow: hidden;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
+	display: -webkit-box;
+	overflow: hidden;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
 }
 
 @keyframes toast-shrink {
-    from { transform: scaleX(1); }
-    to   { transform: scaleX(0); }
+	from {
+		transform: scaleX(1);
+	}
+	to {
+		transform: scaleX(0);
+	}
 }
 
 @keyframes generatingPulse {
-    0%,
-    100% {
-        opacity: 1;
-    }
+	0%,
+	100% {
+		opacity: 1;
+	}
 
-    50% {
-        opacity: 0.3;
-    }
+	50% {
+		opacity: 0.3;
+	}
 }
 
 .generating-pulse {
-    animation: generatingPulse 1.5s ease-in-out infinite;
+	animation: generatingPulse 1.5s ease-in-out infinite;
 }
 
 /* ─── Typography CSS custom properties ────────────────────────────────────────
@@ -102,217 +106,217 @@ body {
    The defaults below match the "regular" profile with Inter font.
    ─────────────────────────────────────────────────────────────────────────── */
 :root {
-    --typo-body-family:    Inter;
-    --typo-body-size:      16px;
-    --typo-heading-family: Inter;
-    --typo-h1-size:        24px;
-    --typo-h2-size:        20px;
-    --typo-h3-size:        18px;
+	--typo-body-family: Inter;
+	--typo-body-size: 16px;
+	--typo-heading-family: Inter;
+	--typo-h1-size: 24px;
+	--typo-h2-size: 20px;
+	--typo-h3-size: 18px;
 }
 
 .prose h2,
 .typography-scope h2 {
-    margin-top: 1.2em;
-    margin-bottom: 0.5em;
-    color: #1d1d1f;
-    font-family: var(--typo-heading-family, Inter);
-    font-size: var(--typo-h2-size, 20px);
-    font-weight: 700;
-    letter-spacing: -0.01em;
+	margin-top: 1.2em;
+	margin-bottom: 0.5em;
+	color: #1d1d1f;
+	font-family: var(--typo-heading-family, Inter);
+	font-size: var(--typo-h2-size, 20px);
+	font-weight: 700;
+	letter-spacing: -0.01em;
 }
 
 .prose h3,
 .typography-scope h3 {
-    margin-top: 1em;
-    margin-bottom: 0.4em;
-    color: #1d1d1f;
-    font-family: var(--typo-heading-family, Inter);
-    font-size: var(--typo-h3-size, 18px);
-    font-weight: 600;
-    letter-spacing: -0.01em;
+	margin-top: 1em;
+	margin-bottom: 0.4em;
+	color: #1d1d1f;
+	font-family: var(--typo-heading-family, Inter);
+	font-size: var(--typo-h3-size, 18px);
+	font-weight: 600;
+	letter-spacing: -0.01em;
 }
 
 .prose p,
 .typography-scope p {
-    margin-bottom: 0.8em;
-    color: #1d1d1f;
-    font-family: var(--typo-body-family, Inter);
-    font-size: var(--typo-body-size, 16px);
-    line-height: 1.9;
-    text-align: justify;
-    text-justify: inter-word;
-    text-wrap: pretty;
-    hyphens: auto;
-    overflow-wrap: normal;
-    word-break: normal;
+	margin-bottom: 0.8em;
+	color: #1d1d1f;
+	font-family: var(--typo-body-family, Inter);
+	font-size: var(--typo-body-size, 16px);
+	line-height: 1.9;
+	text-align: justify;
+	text-justify: inter-word;
+	text-wrap: pretty;
+	hyphens: auto;
+	overflow-wrap: normal;
+	word-break: normal;
 }
 
 .prose p.paragraph-fragment {
-    margin-bottom: 0.24em;
+	margin-bottom: 0.24em;
 }
 
 .prose p.paragraph-fragment-last {
-    margin-bottom: 0.8em;
+	margin-bottom: 0.8em;
 }
 
 .prose strong {
-    color: #1d1d1f;
-    font-weight: 700;
+	color: #1d1d1f;
+	font-weight: 700;
 }
 
 .prose em {
-    color: #86868b;
-    font-style: italic;
+	color: #86868b;
+	font-style: italic;
 }
 
 .prose ul,
 .prose ol,
 .typography-scope ul,
 .typography-scope ol {
-    margin-top: 0.5em;
-    margin-bottom: 0.8em;
-    padding-left: 1.2em;
-    font-family: var(--typo-body-family, Inter);
-    font-size: var(--typo-body-size, 16px);
-    text-align: justify;
+	margin-top: 0.5em;
+	margin-bottom: 0.8em;
+	padding-left: 1.2em;
+	font-family: var(--typo-body-family, Inter);
+	font-size: var(--typo-body-size, 16px);
+	text-align: justify;
 }
 
 .prose li,
 .typography-scope li {
-    margin-bottom: 0.3em;
-    line-height: 1.9;
+	margin-bottom: 0.3em;
+	line-height: 1.9;
 }
 
 .prose table {
-    display: block;
-    width: 100%;
-    margin: 1.1em 0 1.2em;
-    overflow-x: auto;
-    border-collapse: separate;
-    border-spacing: 0;
-    border: 1px solid #e5e5e7;
-    border-radius: 14px;
-    background: #fbfbfc;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+	display: block;
+	width: 100%;
+	margin: 1.1em 0 1.2em;
+	overflow-x: auto;
+	border-collapse: separate;
+	border-spacing: 0;
+	border: 1px solid #e5e5e7;
+	border-radius: 14px;
+	background: #fbfbfc;
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
 .prose thead {
-    background: #f3f4f6;
+	background: #f3f4f6;
 }
 
 .prose th,
 .prose td {
-    min-width: 96px;
-    padding: 0.75rem 0.9rem;
-    border-bottom: 1px solid #e5e5e7;
-    vertical-align: top;
-    text-align: left;
-    white-space: nowrap;
+	min-width: 96px;
+	padding: 0.75rem 0.9rem;
+	border-bottom: 1px solid #e5e5e7;
+	vertical-align: top;
+	text-align: left;
+	white-space: nowrap;
 }
 
 .prose th {
-    color: #1d1d1f;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
+	color: #1d1d1f;
+	font-size: 12px;
+	font-weight: 700;
+	letter-spacing: 0.03em;
+	text-transform: uppercase;
 }
 
 .prose td {
-    color: #374151;
-    font-size: 14px;
-    line-height: 1.6;
+	color: #374151;
+	font-size: 14px;
+	line-height: 1.6;
 }
 
 .prose tbody tr:last-child td {
-    border-bottom: 0;
+	border-bottom: 0;
 }
 
 .prose code {
-    padding: 0.12rem 0.35rem;
-    border-radius: 6px;
-    background: #f3f4f6;
-    color: #14532d;
-    font-size: 0.92em;
-    font-weight: 600;
+	padding: 0.12rem 0.35rem;
+	border-radius: 6px;
+	background: #f3f4f6;
+	color: #14532d;
+	font-size: 0.92em;
+	font-weight: 600;
 }
 
 .prose pre {
-    overflow-x: auto;
-    border-radius: 14px;
-    background: #111827;
-    color: #f9fafb;
+	overflow-x: auto;
+	border-radius: 14px;
+	background: #111827;
+	color: #f9fafb;
 }
 
 .prose hr {
-    margin: 1.4rem 0;
-    border: 0;
-    border-top: 1px solid #e5e5e7;
+	margin: 1.4rem 0;
+	border: 0;
+	border-top: 1px solid #e5e5e7;
 }
 
 .lexical-horizontal-rule {
-    margin: 1.4rem 0;
-    border: 0;
-    border-top: 1px solid #e5e5e7;
+	margin: 1.4rem 0;
+	border: 0;
+	border-top: 1px solid #e5e5e7;
 }
 
 .lexical-table {
-    box-sizing: border-box;
-    max-width: 100%;
-    width: 100%;
-    margin: 1rem 0 1.2rem;
-    border-collapse: separate;
-    border-spacing: 0;
-    border-radius: 14px;
-    overflow: hidden;
-    background: #fbfbfc;
-    box-shadow: inset 0 0 0 1px #e5e5e7;
-    table-layout: fixed;
+	box-sizing: border-box;
+	max-width: 100%;
+	width: 100%;
+	margin: 1rem 0 1.2rem;
+	border-collapse: separate;
+	border-spacing: 0;
+	border-radius: 14px;
+	overflow: hidden;
+	background: #fbfbfc;
+	box-shadow: inset 0 0 0 1px #e5e5e7;
+	table-layout: fixed;
 }
 
 .lexical-table-row {
-    background: transparent;
+	background: transparent;
 }
 
 .lexical-table-cell {
-    min-width: 96px;
-    padding: 0.75rem 0.9rem;
-    border-right: 1px solid #e5e5e7;
-    border-bottom: 1px solid #e5e5e7;
-    vertical-align: top;
-    color: #374151;
+	min-width: 96px;
+	padding: 0.75rem 0.9rem;
+	border-right: 1px solid #e5e5e7;
+	border-bottom: 1px solid #e5e5e7;
+	vertical-align: top;
+	color: #374151;
 }
 
 .lexical-table-cell:last-child {
-    border-right: 0;
+	border-right: 0;
 }
 
 .lexical-table tr:last-child .lexical-table-cell {
-    border-bottom: 0;
+	border-bottom: 0;
 }
 
 .lexical-table-cell-header {
-    background: #f3f4f6;
-    color: #111827;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
+	background: #f3f4f6;
+	color: #111827;
+	font-size: 12px;
+	font-weight: 700;
+	letter-spacing: 0.03em;
+	text-transform: uppercase;
 }
 
 ::-webkit-scrollbar {
-    width: 5px;
+	width: 5px;
 }
 
 ::-webkit-scrollbar-track {
-    background: transparent;
+	background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-    background: #d1d1d6;
-    border-radius: 10px;
+	background: #d1d1d6;
+	border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: #86868b;
+	background: #86868b;
 }
