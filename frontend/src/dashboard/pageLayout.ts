@@ -26,8 +26,12 @@ import {
 
 const MOBILE_BREAKPOINT = 768
 const HEADER_HEIGHT = 64
-const OPEN_SIDEBAR_WIDTH = 260
-const PAGE_WIDTH_RATIO = 0.72
+// Must match the editor aside (`w-[280px]` in UnitEditor).
+const OPEN_SIDEBAR_WIDTH = 280
+// Page width ÷ page height. Desktop is tuned for a balance between readable line length and card shape.
+const PAGE_WIDTH_RATIO_DESKTOP = 0.76
+// Mobile is a rough default only; dedicated mobile layout is planned separately.
+const PAGE_WIDTH_RATIO_MOBILE = 0.72
 const POST_MODULE_ACTION_GAP = 24
 
 type ContentMeasuredModulePage = {
@@ -172,8 +176,21 @@ function annotateBlocks(
     })
 }
 
-function renderBlocksToMarkdown(blocks: MarkdownPageBlock[]): string[] {
-    return blocks.map((block) => renderBlock(block))
+/** Join blocks for storage / HTML render. Continued paragraph fragments use MD hard breaks so they stay one `<p>`. */
+function joinBlocksMarkdown(blocks: MarkdownPageBlock[]): string {
+    if (blocks.length === 0) return ''
+    let out = renderBlock(blocks[0])
+    for (let i = 1; i < blocks.length; i++) {
+        const prev = blocks[i - 1]
+        const curr = blocks[i]
+        const continuedPara =
+            curr.type === 'paragraph' &&
+            curr.continued &&
+            prev.type === 'paragraph'
+        out += continuedPara ? '  \n' : '\n\n'
+        out += renderBlock(curr)
+    }
+    return out
 }
 
 function splitParagraphToFit({
@@ -203,7 +220,9 @@ function splitParagraphToFit({
         return { fittingBlock: null, remainder: { ...block } }
     }
 
-    const fittingLineCount = Math.floor(availableHeight / measurement.lineHeightPx)
+    // Count lines that fit including this block's vertical margins (must match measureBlockHeight).
+    const verticalMargins = measurement.marginTopPx + measurement.marginBottomPx
+    const fittingLineCount = Math.floor((availableHeight - verticalMargins) / measurement.lineHeightPx)
     if (fittingLineCount <= 0) {
         return { fittingBlock: null, remainder: { ...block } }
     }
@@ -527,9 +546,7 @@ function validatePagesWithDom(
     for (let i = 0; i < pages.length; i++) {
         const page = pages[i]
         const limit = (validated.length === 0 ? firstPageLimit : regularPageLimit) + 1
-        proseMeasure.innerHTML = markdownToHtml(
-            renderBlocksToMarkdown(page).join('\n\n')
-        )
+        proseMeasure.innerHTML = markdownToHtml(joinBlocksMarkdown(page))
 
         if (proseMeasure.scrollHeight <= limit) {
             validated.push(page)
@@ -558,7 +575,7 @@ function validatePagesWithDom(
 function buildMeasuredPage(blocks: AnnotatedMarkdownPageBlock[]): ContentMeasuredModulePage {
     return {
         kind: 'content',
-        markdown: renderBlocksToMarkdown(blocks).join('\n\n'),
+        markdown: joinBlocksMarkdown(blocks),
         startCharacterOffset: blocks[0]?.startCharacterOffset ?? 0,
         endCharacterOffset: blocks.at(-1)?.endCharacterOffset ?? 0,
     }
@@ -712,15 +729,16 @@ export function measurePages({
 
     const isMobile = pageWidth < 420
 
-    // Responsive padding: proportional to page dimensions, smoothly scaled.
-    const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v))
-    const horizontalPadding = clamp(Math.round(pageWidth  * 0.06), 20, 40)
-    const topPadding        = clamp(Math.round(pageHeight * 0.04), 20, 36)
-    const bottomPadding     = clamp(Math.round(pageHeight * 0.055), 30, 50)
-    const measurementBuffer = isMobile ? 14 : 18
+    // Padding constants must exactly match the page card wrapper CSS:
+    //   mobile:   p-6 pb-12  → 24px top/sides, 48px bottom
+    //   desktop:  md:p-8 md:pb-14 → 32px top/sides, 56px bottom
+    const pagePaddingSide   = isMobile ? 24 : 32
+    const pagePaddingTop    = isMobile ? 24 : 32
+    const pagePaddingBottom = isMobile ? 48 : 56
+    const measurementBuffer = isMobile ? 8 : 6
 
-    const contentWidth = Math.max(240, pageWidth - horizontalPadding * 2)
-    const contentLimit = Math.max(160, pageHeight - topPadding - bottomPadding)
+    const contentWidth = Math.max(240, pageWidth - pagePaddingSide * 2)
+    const contentLimit = Math.max(160, pageHeight - pagePaddingTop - pagePaddingBottom)
     const primaryActionLabel = hasNextModule ? 'Next module' : 'Finish unit 🎉'
 
     const typography = presentationSettings
@@ -752,6 +770,12 @@ export function measurePages({
     headerMeasure.style.overflow = 'hidden'
     headerMeasure.innerHTML = createHeaderMarkup(activeChapter, chapterIndex)
 
+    // Measure the "Module Content" label that sits above the content area on
+    // every non-first page (matches the label in renderContentPage).
+    const labelMeasure = document.createElement('div')
+    labelMeasure.style.width = `${contentWidth}px`
+    labelMeasure.innerHTML = '<div class="mb-3 text-[11px] font-semibold uppercase tracking-wide">Module Content</div>'
+
     const actionMeasure = document.createElement('div')
     actionMeasure.style.width = `${contentWidth}px`
     actionMeasure.innerHTML = createPostModuleActionMeasurementMarkup({
@@ -760,6 +784,7 @@ export function measurePages({
     })
 
     sandbox.appendChild(headerMeasure)
+    sandbox.appendChild(labelMeasure)
     sandbox.appendChild(proseMeasure)
     sandbox.appendChild(actionMeasure)
     document.body.appendChild(sandbox)
@@ -768,7 +793,7 @@ export function measurePages({
         140,
         contentLimit - headerMeasure.scrollHeight - measurementBuffer
     )
-    const regularPageLimit = Math.max(140, contentLimit - measurementBuffer)
+    const regularPageLimit = Math.max(140, contentLimit - labelMeasure.scrollHeight - measurementBuffer)
     const blocks = annotateBlocks(extractMarkdownBlocks(renderedContent), typography)
 
     const domMeasureBlock = (block: MarkdownPageBlock): number => {
@@ -884,7 +909,7 @@ export function paginateMarkdownContent({
     })
 
     const pages = validatePagesWithDom(rawPages, regularPageLimit, regularPageLimit, proseMeasure).map(
-        (pageBlocks) => renderBlocksToMarkdown(pageBlocks).join('\n\n')
+        (pageBlocks) => joinBlocksMarkdown(pageBlocks)
     )
 
     document.body.removeChild(sandbox)
@@ -900,16 +925,22 @@ export function calculateSpreadMetrics({
     viewportHeight: number
 }) {
     const isMobile = viewportWidth < MOBILE_BREAKPOINT
-    const stagePaddingX = isMobile ? 16 : 32
+    const pageWidthRatio = isMobile ? PAGE_WIDTH_RATIO_MOBILE : PAGE_WIDTH_RATIO_DESKTOP
     const stagePaddingTop = isMobile ? 16 : 24
     const stagePaddingBottom = isMobile ? 20 : 32
     const indicatorHeight = isMobile ? 42 : 48
     const indicatorGap = isMobile ? 12 : 16
-    const arrowAllowance = isMobile ? 84 : 136
-    const spreadGap = isMobile ? 16 : Math.max(28, Math.min(44, viewportWidth * 0.014))
+    const arrowAllowance = isMobile ? 64 : 84
+    // Horizontal padding inside main below header (keep in sync with UnitEditor stage `px-*`).
+    const mainStageHorizontalGutter = isMobile ? 24 : 48
+    // Must match the flex `gap` between the two page cards (`gap-4 md:gap-8` in UnitEditor).
+    const spreadGap = isMobile ? 16 : 32
     const availableWidth = Math.max(
         360,
-        viewportWidth - OPEN_SIDEBAR_WIDTH - stagePaddingX * 2 - arrowAllowance
+        viewportWidth -
+            OPEN_SIDEBAR_WIDTH -
+            mainStageHorizontalGutter -
+            arrowAllowance
     )
     const availableHeight = Math.max(
         420,
@@ -920,11 +951,11 @@ export function calculateSpreadMetrics({
             indicatorHeight -
             indicatorGap
     )
-    const maxPageHeight = Math.min(availableHeight, isMobile ? 680 : viewportHeight * 0.82)
-    const spreadWidthByHeight = maxPageHeight * PAGE_WIDTH_RATIO * 2 + spreadGap
-    const spreadWidth = Math.min(availableWidth, spreadWidthByHeight, isMobile ? 980 : 1900)
+    const maxPageHeight = Math.min(availableHeight, isMobile ? 680 : viewportHeight * 0.88)
+    const spreadWidthByHeight = maxPageHeight * pageWidthRatio * 2 + spreadGap
+    const spreadWidth = Math.min(availableWidth, spreadWidthByHeight, isMobile ? 980 : 2000)
     const pageWidth = (spreadWidth - spreadGap) / 2
-    const pageHeight = Math.min(maxPageHeight, pageWidth / PAGE_WIDTH_RATIO)
+    const pageHeight = Math.min(maxPageHeight, pageWidth / pageWidthRatio)
 
     return {
         indicatorGap,

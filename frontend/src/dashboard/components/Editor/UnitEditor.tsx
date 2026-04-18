@@ -1205,11 +1205,9 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
     const renderPostModuleActionBody = ({
         hasNextModule,
         primaryActionLabel,
-        compact = false,
     }: {
         hasNextModule: boolean
         primaryActionLabel: string
-        compact?: boolean
     }) => (
         <div className="flex-shrink-0 space-y-4">
             <div className="space-y-2">
@@ -1478,7 +1476,6 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                     ? renderPostModuleActionBody({
                           hasNextModule: page.hasNextModule,
                           primaryActionLabel: page.primaryActionLabel,
-                          compact: true,
                       })
                     : undefined,
             pageIndex: pageNumber - 1,
@@ -1523,7 +1520,6 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                                                   hasNextModule: leftReadPage.hasNextModule,
                                                   primaryActionLabel:
                                                       leftReadPage.primaryActionLabel,
-                                                  compact: true,
                                               })
                                             : undefined,
                                     pageNumber: 1,
@@ -1937,7 +1933,7 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                     </div>
                 </header>
 
-                <div className="relative flex flex-1 flex-col items-center justify-center bg-[#F5F5F7] px-4 py-4 md:px-8 md:py-6">
+                <div className="relative flex flex-1 flex-col items-center justify-center bg-[#F5F5F7] px-3 py-4 md:px-6 md:py-6">
                     {activeChapter.status === 'ready' || isActiveChapterStreaming ? (
                         renderLexicalSpread(isEditMode)
                     ) : (

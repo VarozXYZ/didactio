@@ -57,6 +57,9 @@ const lexicalTheme = {
         h1: 'mb-4 font-bold leading-tight text-[#1D1D1F]',
         h2: 'mb-4 font-bold leading-tight text-[#1D1D1F]',
         h3: 'mb-3 font-semibold leading-tight text-[#1D1D1F]',
+        h4: 'mb-2 font-semibold leading-tight text-[#1D1D1F]',
+        h5: 'mb-2 font-semibold leading-tight text-[#1D1D1F]',
+        h6: 'mb-2 font-semibold leading-tight text-[#1D1D1F]',
     },
     link: 'text-[#2D8F4B] underline underline-offset-2',
     list: {
