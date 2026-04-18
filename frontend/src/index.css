@@ -1,9 +1,8 @@
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@400;500;600;700&display=swap");
 
 @import "tailwindcss";
-@source "../../node_modules/streamdown/dist/*.js";
 
-@theme {
+:root {
 	--color-dark: #323030;
 	--color-accent: #34c759;
 	--color-secondary: #d9d9d9;
@@ -73,6 +72,7 @@ body {
 	display: -webkit-box;
 	overflow: hidden;
 	-webkit-box-orient: vertical;
+	line-clamp: 2;
 	-webkit-line-clamp: 2;
 }
 
