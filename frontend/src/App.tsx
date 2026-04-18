@@ -1,4 +1,5 @@
 import {Route, Routes, useLocation} from "react-router-dom";
+import {RequireAuth} from "./auth/RequireAuth";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 import HomePage from "./pages/HomePage";
@@ -7,11 +8,15 @@ import ContactPage from "./pages/ContactPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import DashboardPage from "./pages/DashboardPage";
+import AuthCallbackPage from "./pages/AuthCallbackPage";
 
 function App() {
 	const location = useLocation();
 	const isAuthRoute =
-		location.pathname === "/login" || location.pathname === "/register";
+		location.pathname === "/login" ||
+		location.pathname === "/register" ||
+		location.pathname === "/auth/callback" ||
+		location.pathname === "/oauth/callback";
 	const isDashboardRoute = location.pathname.startsWith("/dashboard");
 	const hideMainChrome = isAuthRoute || isDashboardRoute;
 
@@ -33,7 +38,16 @@ function App() {
 					<Route path="/contact" element={<ContactPage />} />
 					<Route path="/login" element={<LoginPage />} />
 					<Route path="/register" element={<RegisterPage />} />
-					<Route path="/dashboard/*" element={<DashboardPage />} />
+					<Route path="/auth/callback" element={<AuthCallbackPage />} />
+					<Route path="/oauth/callback" element={<AuthCallbackPage />} />
+					<Route
+						path="/dashboard/*"
+						element={
+							<RequireAuth>
+								<DashboardPage />
+							</RequireAuth>
+						}
+					/>
 					<Route path="*" element={<HomePage />} />
 				</Routes>
 			</main>

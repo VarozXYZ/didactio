@@ -1,6 +1,9 @@
 import {Lock} from "lucide-react";
+import {useAuth} from "../../../../auth/AuthProvider";
 
 export function SecurityView() {
+	const {user} = useAuth();
+
 	return (
 		<div className="flex min-w-0 flex-1 flex-col">
 			<header className="flex h-[80px] shrink-0 items-center border-b border-[#E5E5E7] bg-white/80 px-8 backdrop-blur-md">
@@ -18,42 +21,20 @@ export function SecurityView() {
 				<div className="max-w-[700px] space-y-6">
 					<div className="rounded-[12px] border border-[#E5E5E7] bg-white p-8">
 						<h2 className="mb-6 text-[18px] font-bold text-[#1D1D1F]">
-							Change Password
+							Google Sign-In
 						</h2>
 						<div className="space-y-4">
-							<div>
-								<label className="mb-2 block text-[13px] font-semibold text-[#1D1D1F]">
-									Current Password
-								</label>
-								<input
-									type="password"
-									className="w-full rounded-[8px] border border-[#E5E5E7] px-4 py-3 text-[14px] focus:border-[#4ADE80] focus:outline-none"
-								/>
+							<p className="rounded-[8px] border border-[#E5E5E7] bg-[#F5F5F7] px-4 py-3 text-[14px] text-[#1D1D1F]">
+								Your account currently signs in through Google.
+								Password management is unavailable in this
+								version of Didactio.
+							</p>
+							<div className="rounded-[8px] border border-[#E5E5E7] bg-white px-4 py-3 text-[14px] text-[#1D1D1F]">
+								<div className="font-semibold">Signed in as</div>
+								<div className="mt-1 text-[#86868B]">
+									{user?.email ?? "Unknown account"}
+								</div>
 							</div>
-							<div>
-								<label className="mb-2 block text-[13px] font-semibold text-[#1D1D1F]">
-									New Password
-								</label>
-								<input
-									type="password"
-									className="w-full rounded-[8px] border border-[#E5E5E7] px-4 py-3 text-[14px] focus:border-[#4ADE80] focus:outline-none"
-								/>
-							</div>
-							<div>
-								<label className="mb-2 block text-[13px] font-semibold text-[#1D1D1F]">
-									Confirm New Password
-								</label>
-								<input
-									type="password"
-									className="w-full rounded-[8px] border border-[#E5E5E7] px-4 py-3 text-[14px] focus:border-[#4ADE80] focus:outline-none"
-								/>
-							</div>
-							<button
-								type="button"
-								className="w-full rounded-[8px] bg-[#1D1D1F] px-4 py-3 text-[14px] font-semibold text-white transition-all hover:bg-[#333333]"
-							>
-								Update Password
-							</button>
 						</div>
 					</div>
 
@@ -70,9 +51,10 @@ export function SecurityView() {
 							</div>
 							<button
 								type="button"
-								className="rounded-[8px] bg-[#4ADE80] px-4 py-2 text-[13px] font-semibold text-white transition-all hover:bg-[#3BCD6F]"
+								disabled
+								className="cursor-not-allowed rounded-[8px] bg-[#D1D1D6] px-4 py-2 text-[13px] font-semibold text-white"
 							>
-								Enable
+								Coming soon
 							</button>
 						</div>
 					</div>
@@ -84,14 +66,9 @@ export function SecurityView() {
 						<div className="space-y-4">
 							{[
 								{
-									device: "MacBook Pro",
-									location: "New York, US",
+									device: "Current browser session",
+									location: user?.locale ?? "Locale unavailable",
 									time: "Active now",
-								},
-								{
-									device: "iPhone 15",
-									location: "New York, US",
-									time: "2 hours ago",
 								},
 							].map((session, index) => (
 								<div
@@ -115,14 +92,7 @@ export function SecurityView() {
 											</div>
 										</div>
 									</div>
-									{index !== 0 && (
-										<button
-											type="button"
-											className="text-[13px] font-medium text-red-500 hover:underline"
-										>
-											Sign Out
-										</button>
-									)}
+									{index !== 0 && null}
 								</div>
 							))}
 						</div>

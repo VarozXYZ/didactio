@@ -1,6 +1,7 @@
 import {useState} from "react";
 import type {FormEvent} from "react";
-import {Link, useNavigate} from "react-router-dom";
+import {Link, useLocation} from "react-router-dom";
+import {useAuth} from "../auth/AuthProvider";
 
 type AuthMode = "login" | "register";
 
@@ -8,12 +9,28 @@ type AuthScreenProps = {
 	mode: AuthMode;
 };
 
-function SocialButton({label, iconSrc}: {label: string; iconSrc: string}) {
+function SocialButton({
+	label,
+	iconSrc,
+	disabled = false,
+	onClick,
+}: {
+	label: string;
+	iconSrc: string;
+	disabled?: boolean;
+	onClick?: () => void;
+}) {
 	return (
 		<button
 			type="button"
 			aria-label={label}
-			className="h-13 w-full cursor-pointer rounded-sm border border-dark/15 bg-white px-5 font-sora text-xl font-semibold text-dark/95 shadow-sm transition-colors hover:bg-dark/3"
+			disabled={disabled}
+			onClick={onClick}
+			className={`h-13 w-full rounded-sm border px-5 font-sora text-xl font-semibold shadow-sm transition-colors ${
+				disabled ?
+					"cursor-not-allowed border-dark/15 bg-white px-5 text-dark/45 opacity-55 grayscale"
+				:	"cursor-pointer border-dark/15 bg-white text-dark/95 hover:bg-dark/3"
+			}`}
 		>
 			<span className="flex items-center justify-center">
 				<img
@@ -27,7 +44,8 @@ function SocialButton({label, iconSrc}: {label: string; iconSrc: string}) {
 }
 
 function AuthScreen({mode}: AuthScreenProps) {
-	const navigate = useNavigate();
+	const location = useLocation();
+	const {beginGoogleLogin, error} = useAuth();
 	const isLogin = mode === "login";
 	const [showPassword, setShowPassword] = useState(false);
 	const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -35,28 +53,23 @@ function AuthScreen({mode}: AuthScreenProps) {
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
 	const [confirmPassword, setConfirmPassword] = useState("");
-	const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
-	const [isSubmitting, setIsSubmitting] = useState(false);
+	const locationState = location.state as {authError?: string} | null;
 
 	const title = isLogin ? "Welcome back" : "Create your account";
 	const subtitle =
 		isLogin ?
-			"This frontend runs in demo mode. Continue to open the dashboard experience."
-		:	"Create a demo entry and continue directly into the dashboard experience.";
+			"Sign in to access the dashboard."
+		:	"Sign up to access the dashboard.";
+	const authErrorMessage = locationState?.authError ?? error;
 
-	async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+	function handleSubmit(event: FormEvent<HTMLFormElement>) {
 		event.preventDefault();
-		setNoticeMessage("Demo mode active. Redirecting to the dashboard...");
-		setIsSubmitting(true);
-		window.setTimeout(() => {
-			navigate("/dashboard", {replace: true});
-		}, 300);
 	}
 
 	return (
 		<section className="grid min-h-screen w-full lg:grid-cols-[1.05fr_1fr]">
 			<aside className="relative min-h-[330px] overflow-hidden bg-accent">
-				<div className="absolute inset-0 bg-[radial-gradient(circle,rgba(50,48,48,0.24)_2px,transparent_2px)] [background-size:46px_46px]" />
+				<div className="absolute inset-0 bg-[radial-gradient(circle,rgba(50,48,48,0.18)_2px,transparent_2px)] [background-size:46px_46px]" />
 				<div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-dark/20" />
 
 				<div className="relative z-10 flex h-full flex-col justify-center px-8 py-14 sm:px-12 lg:px-16">
@@ -83,21 +96,23 @@ function AuthScreen({mode}: AuthScreenProps) {
 						<p className="mt-4 font-inter text-xl text-dark/65">
 							{subtitle}
 						</p>
-						<p className="mt-5 rounded-sm border border-accent/20 bg-accent/10 px-4 py-3 font-inter text-base text-dark/75">
-							Authentication is intentionally disconnected in this
-							frontend build. These forms now act as demo entry
-							points.
-						</p>
+						{authErrorMessage && (
+							<p className="mt-5 rounded-sm border border-red-200 bg-red-50 px-4 py-3 font-inter text-base text-red-700">
+								{authErrorMessage}
+							</p>
+						)}
 					</header>
 
 					<div className="mt-14 grid grid-cols-1 gap-4 sm:grid-cols-2">
 						<SocialButton
 							label="Google"
 							iconSrc="/assets/brands/google.png"
+							onClick={beginGoogleLogin}
 						/>
 						<SocialButton
 							label="Microsoft"
 							iconSrc="/assets/brands/microsoft.png"
+							disabled
 						/>
 					</div>
 
@@ -124,7 +139,8 @@ function AuthScreen({mode}: AuthScreenProps) {
 									onChange={(event) =>
 										setFullName(event.target.value)
 									}
-									className="mt-4 h-13 w-full rounded-sm border border-dark/15 bg-white px-4 font-inter text-xl text-dark outline-none transition-shadow placeholder:text-dark/40 focus:ring-2 focus:ring-accent/50"
+									disabled
+									className="mt-4 h-13 w-full cursor-not-allowed rounded-sm border border-dark/15 bg-white px-4 font-inter text-xl text-dark/55 outline-none transition-shadow placeholder:text-dark/40 opacity-60"
 								/>
 							</label>
 						)}
@@ -142,7 +158,8 @@ function AuthScreen({mode}: AuthScreenProps) {
 								onChange={(event) =>
 									setEmail(event.target.value)
 								}
-								className="mt-4 h-13 w-full rounded-sm border border-dark/15 bg-white px-4 font-inter text-xl text-dark outline-none transition-shadow placeholder:text-dark/40 focus:ring-2 focus:ring-accent/50"
+								disabled
+								className="mt-4 h-13 w-full cursor-not-allowed rounded-sm border border-dark/15 bg-white px-4 font-inter text-xl text-dark/55 outline-none transition-shadow placeholder:text-dark/40 opacity-60"
 							/>
 						</label>
 
@@ -164,14 +181,16 @@ function AuthScreen({mode}: AuthScreenProps) {
 									onChange={(event) =>
 										setPassword(event.target.value)
 									}
-									className="h-13 w-full rounded-sm border border-dark/15 bg-white px-4 pr-12 font-inter text-xl text-dark outline-none transition-shadow placeholder:text-dark/40 focus:ring-2 focus:ring-accent/50"
+									disabled
+									className="h-13 w-full cursor-not-allowed rounded-sm border border-dark/15 bg-white px-4 pr-12 font-inter text-xl text-dark/55 outline-none transition-shadow placeholder:text-dark/40 opacity-60"
 								/>
 								<button
 									type="button"
 									onClick={() =>
 										setShowPassword((value) => !value)
 									}
-									className="absolute right-4 top-1/2 -translate-y-1/2 cursor-pointer font-inter text-sm text-dark/45 hover:text-dark/75"
+									disabled
+									className="absolute right-4 top-1/2 -translate-y-1/2 cursor-not-allowed font-inter text-sm text-dark/45 opacity-60"
 									aria-label={
 										showPassword ? "Hide password" : (
 											"Show password"
@@ -204,7 +223,8 @@ function AuthScreen({mode}: AuthScreenProps) {
 												event.target.value,
 											)
 										}
-										className="h-13 w-full rounded-sm border border-dark/15 bg-white px-4 pr-12 font-inter text-xl text-dark outline-none transition-shadow placeholder:text-dark/40 focus:ring-2 focus:ring-accent/50"
+										disabled
+										className="h-13 w-full cursor-not-allowed rounded-sm border border-dark/15 bg-white px-4 pr-12 font-inter text-xl text-dark/55 outline-none transition-shadow placeholder:text-dark/40 opacity-60"
 									/>
 									<button
 										type="button"
@@ -213,7 +233,8 @@ function AuthScreen({mode}: AuthScreenProps) {
 												(value) => !value,
 											)
 										}
-										className="absolute right-4 top-1/2 -translate-y-1/2 cursor-pointer font-inter text-sm text-dark/45 hover:text-dark/75"
+										disabled
+										className="absolute right-4 top-1/2 -translate-y-1/2 cursor-not-allowed font-inter text-sm text-dark/45 opacity-60"
 										aria-label={
 											showConfirmPassword ?
 												"Hide confirm password"
@@ -230,7 +251,8 @@ function AuthScreen({mode}: AuthScreenProps) {
 							<div className="flex justify-end">
 								<a
 									href="#"
-									className="font-inter text-lg font-semibold text-accent hover:text-accent/80"
+									onClick={(event) => event.preventDefault()}
+									className="pointer-events-none font-inter text-lg font-semibold text-accent"
 								>
 									Forgot password?
 								</a>
@@ -241,22 +263,12 @@ function AuthScreen({mode}: AuthScreenProps) {
 							</p>
 						}
 
-						{noticeMessage && (
-							<p className="rounded-sm border border-accent/30 bg-accent/10 px-3 py-2 font-inter text-sm text-dark/75">
-								{noticeMessage}
-							</p>
-						)}
-
 						<button
 							type="submit"
-							disabled={isSubmitting}
-							className="mt-4 h-13 w-full cursor-pointer rounded-sm bg-accent font-sora text-xl font-semibold text-white shadow-card transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-70"
+							disabled
+							className="mt-4 h-13 w-full cursor-not-allowed rounded-sm bg-accent font-sora text-xl font-semibold text-white shadow-card opacity-60"
 						>
-							{isSubmitting ?
-								"Opening dashboard..."
-							: isLogin ?
-								"Log In"
-							:	"Create account"}
+							{isLogin ? "Log In" : "Create account"}
 						</button>
 					</form>
 

@@ -1,5 +1,9 @@
 import {randomUUID} from "node:crypto";
+import cookieParser from "cookie-parser";
+import cors from "cors";
 import express from "express";
+import helmet from "helmet";
+import passport from "passport";
 import {
 	type AiConfig,
 	type AiConfigStore,
@@ -83,9 +87,26 @@ import {
 	type SyllabusGenerationRunRecord,
 } from "./generation-runs/generation-run-store.js";
 import {
-	attachMockOwner,
-	type RequestWithMockOwner,
-} from "./middleware/mock-owner.js";
+	InMemoryCreditTransactionStore,
+} from "./auth/adapters/memory/credit-transaction-store.js";
+import {InMemorySessionStore} from "./auth/adapters/memory/session-store.js";
+import {InMemoryUserStore} from "./auth/adapters/memory/user-store.js";
+import {createAdminRouter} from "./auth/admin/routes.js";
+import type {AuthConfig} from "./auth/core/types.js";
+import {AuthService} from "./auth/core/service.js";
+import type {
+	AuthenticatedPrincipal,
+	CreditTransactionStore,
+	SessionStore,
+	UserStore,
+} from "./auth/core/types.js";
+import {createAuthRouter} from "./auth/http/routes.js";
+import {
+	authErrorHandler,
+	createRequireAuth,
+	createRequireRole,
+} from "./auth/http/middleware.js";
+import {configureGooglePassport} from "./auth/passport/google.js";
 import {
 	disconnectedMongoHealthStatus,
 	type MongoHealthStatus,
@@ -101,12 +122,30 @@ export interface CreateAppOptions {
 	aiService?: AiService;
 	mongoHealth?: MongoHealthStatus;
 	logger?: Logger;
+	authConfig: AuthConfig;
+	userStore?: UserStore;
+	sessionStore?: SessionStore;
+	creditTransactionStore?: CreditTransactionStore;
+	testPrincipal?: AuthenticatedPrincipal;
 }
 
-function asRequestWithMockOwner(
-	request: express.Request,
-): RequestWithMockOwner {
-	return request as unknown as RequestWithMockOwner;
+interface RequestWithMockOwner extends express.Request {
+	mockOwner: {
+		id: string;
+	};
+}
+
+function asRequestWithMockOwner(request: express.Request): RequestWithMockOwner {
+	const ownerId = request.auth?.sub;
+	if (!ownerId) {
+		throw new Error("Authentication required.");
+	}
+
+	return Object.assign(request, {
+		mockOwner: {
+			id: ownerId,
+		},
+	});
 }
 
 function parseChapterIndex(value: string): number {
@@ -706,6 +745,7 @@ export function createApp(options: CreateAppOptions) {
 	const generationRunStore = options.generationRunStore;
 	const folderStore = options.folderStore;
 	const aiConfigStore = options.aiConfigStore ?? new InMemoryAiConfigStore();
+	const authConfig = options.authConfig;
 	const logger =
 		options.logger ??
 		createLogger({
@@ -714,9 +754,46 @@ export function createApp(options: CreateAppOptions) {
 	const appLogger = logger.child({component: "app"});
 	const aiService = options.aiService ?? new GatewayAiService({logger});
 	const mongoHealth = options.mongoHealth ?? disconnectedMongoHealthStatus;
+	const userStore = options.userStore ?? new InMemoryUserStore();
+	const sessionStore = options.sessionStore ?? new InMemorySessionStore();
+	const creditTransactionStore =
+		options.creditTransactionStore ?? new InMemoryCreditTransactionStore();
+	const authService = new AuthService(
+		userStore,
+		sessionStore,
+		creditTransactionStore,
+		authConfig,
+	);
+	const requireAuth = createRequireAuth(authConfig);
+	const requireAdmin = createRequireRole("admin");
 
+	configureGooglePassport(authConfig);
+	if (authConfig.trustProxy) {
+		app.set("trust proxy", 1);
+	}
+
+	app.use(
+		cors({
+			origin(origin, callback) {
+				if (
+					!origin ||
+					authConfig.corsAllowedOrigins.length === 0 ||
+					authConfig.corsAllowedOrigins.includes(origin)
+				) {
+					callback(null, true);
+					return;
+				}
+
+				callback(new Error("Origin not allowed by CORS"));
+			},
+			credentials: true,
+		}),
+	);
+	app.use(helmet());
 	app.use(express.json());
-	app.use(attachMockOwner);
+	app.use(express.urlencoded({extended: true}));
+	app.use(cookieParser());
+	app.use(passport.initialize());
 	app.use((request, response, next) => {
 		const requestId = randomUUID();
 		const startedAt = Date.now();
@@ -738,20 +815,41 @@ export function createApp(options: CreateAppOptions) {
 				path: request.originalUrl,
 				statusCode: response.statusCode,
 				durationMs: Date.now() - startedAt,
-				ownerId: requestWithMockOwner.mockOwner?.id,
+				ownerId: request.auth?.sub,
 			});
 		});
 
 		next();
 	});
 
-	app.get("/api/health", (request, response) => {
-		const requestWithMockOwner = asRequestWithMockOwner(request);
+	app.locals.authService = authService;
+	app.locals.authConfig = authConfig;
+	app.locals.userStore = userStore;
+	app.locals.sessionStore = sessionStore;
+	app.locals.creditTransactionStore = creditTransactionStore;
+
+	app.use("/auth", createAuthRouter(authConfig, authService, passport));
+	app.use("/api", (request, response, next) => {
+		if (request.path === "/health") {
+			next();
+			return;
+		}
+
+		if (!request.headers.authorization && options.testPrincipal) {
+			request.auth = options.testPrincipal;
+			next();
+			return;
+		}
+
+		requireAuth(request, response, next);
+	});
+	app.use("/api/admin", requireAdmin, createAdminRouter(authService));
+
+	app.get("/api/health", (_request, response) => {
 
 		response.json({
 			status: "ok",
 			service: "didactio-backend",
-			mockOwnerId: requestWithMockOwner.mockOwner.id,
 			mongo: mongoHealth,
 		});
 	});
@@ -2636,6 +2734,8 @@ export function createApp(options: CreateAppOptions) {
 		async (request, response) =>
 			runChapterGeneration(request, response, "ai_regeneration", true),
 	);
+
+	app.use(authErrorHandler);
 
 	return app;
 }

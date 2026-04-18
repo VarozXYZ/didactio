@@ -11,6 +11,7 @@ import {
 	Palette,
 	PenLine,
 	Plus,
+	LogOut,
 	Settings2,
 	Trash2,
 	User,
@@ -46,6 +47,7 @@ import type {
 } from "../../../types";
 import {getFolderEmoji} from "../../../utils/folderDisplay";
 import {getMoveTargetFolders} from "../../../utils/folderTargets";
+import {useAuth} from "../../../../auth/AuthProvider";
 
 type SidebarProps = {
 	isSidebarOpen: boolean;
@@ -93,6 +95,7 @@ export function Sidebar({
 	onMoveToFolder,
 	items,
 }: SidebarProps) {
+	const {user, logout} = useAuth();
 	const [folderModal, setFolderModal] = useState<
 		| {open: false}
 		| {
@@ -128,6 +131,14 @@ export function Sidebar({
 		{id: "preferences", icon: Palette, label: "Preferences"},
 		{id: "analytics", icon: BarChart3, label: "Usage & Analytics"},
 	];
+	const initials =
+		user?.displayName
+			.split(" ")
+			.map((part) => part[0])
+			.join("")
+			.slice(0, 2)
+			.toUpperCase() ?? "DU";
+	const [pictureFailed, setPictureFailed] = useState(false);
 
 	return (
 		<>
@@ -480,30 +491,61 @@ export function Sidebar({
 				<div className="shrink-0 border-t border-[#E5E5E7] p-4">
 					{isSidebarOpen ?
 						<div className="flex items-center gap-3">
-							<div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#4ADE80] to-[#2D8F4B] text-sm font-semibold text-white">
-								JD
-							</div>
+							{user?.pictureUrl && !pictureFailed ?
+								<img
+									src={user.pictureUrl}
+									alt={user.displayName}
+									referrerPolicy="no-referrer"
+									onError={() => setPictureFailed(true)}
+									className="h-9 w-9 rounded-full object-cover"
+								/>
+							:	<div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#4ADE80] to-[#2D8F4B] text-sm font-semibold text-white">
+									{initials}
+								</div>
+							}
 							<div className="min-w-0 flex-1">
 								<div className="truncate text-[13px] font-semibold text-[#1D1D1F]">
-									John Doe
+									{user?.displayName ?? "Didactio User"}
 								</div>
 								<div className="text-[11px] text-[#86868B]">
-									Pro Plan
+									{user?.email ?? "Signed in with Google"}
 								</div>
 							</div>
-							<button
-								type="button"
-								className="rounded-lg p-1 transition-all hover:bg-[#F5F5F7]"
-							>
-								<MoreVertical
-									size={16}
-									className="text-[#86868B]"
-								/>
-							</button>
+							<DropdownMenu>
+								<DropdownMenuTrigger asChild>
+									<button
+										type="button"
+										className="rounded-lg p-1 transition-all hover:bg-[#F5F5F7]"
+									>
+										<MoreVertical
+											size={16}
+											className="text-[#86868B]"
+										/>
+									</button>
+								</DropdownMenuTrigger>
+								<DropdownMenuContent side="top" align="end">
+									<DropdownMenuItem
+										onSelect={() => {
+											void logout();
+										}}
+									>
+										<LogOut />
+										Sign out
+									</DropdownMenuItem>
+								</DropdownMenuContent>
+							</DropdownMenu>
 						</div>
-					:	<div className="mx-auto flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#4ADE80] to-[#2D8F4B] text-sm font-semibold text-white">
-							JD
-						</div>
+					:	(user?.pictureUrl && !pictureFailed ?
+							<img
+								src={user.pictureUrl}
+								alt={user.displayName}
+								referrerPolicy="no-referrer"
+								onError={() => setPictureFailed(true)}
+								className="mx-auto h-9 w-9 rounded-full object-cover"
+							/>
+						:	<div className="mx-auto flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#4ADE80] to-[#2D8F4B] text-sm font-semibold text-white">
+								{initials}
+							</div>)
 					}
 				</div>
 			</motion.aside>

@@ -1,6 +1,11 @@
 import {Sparkles} from "lucide-react";
+import {useAuth} from "../../../../auth/AuthProvider";
 
 export function SubscriptionView() {
+	const {user} = useAuth();
+	const credits = user?.credits ?? {bronze: 0, silver: 0, gold: 0};
+	const totalCredits = credits.bronze + credits.silver + credits.gold;
+
 	return (
 		<div className="flex min-w-0 flex-1 flex-col">
 			<header className="flex h-[80px] shrink-0 items-center border-b border-[#E5E5E7] bg-white/80 px-8 backdrop-blur-md">
@@ -68,27 +73,40 @@ export function SubscriptionView() {
 						<div className="mb-4 flex items-center justify-between">
 							<div>
 								<div className="text-[32px] font-bold text-[#1D1D1F]">
-									1,245
+									{totalCredits}
 								</div>
 								<div className="text-[13px] text-[#86868B]">
-									Credits remaining
+									Total coins available
 								</div>
 							</div>
-							<button
-								type="button"
-								className="rounded-[8px] border border-[#E5E5E7] px-5 py-2.5 text-[14px] font-semibold transition-all hover:border-[#4ADE80] hover:bg-[#4ADE80]/5"
-							>
-								Buy More
-							</button>
+							<div className="rounded-[8px] border border-[#E5E5E7] px-5 py-2.5 text-[14px] font-semibold text-[#86868B]">
+								Managed by admins
+							</div>
 						</div>
-						<div className="h-3 w-full overflow-hidden rounded-full bg-[#F5F5F7]">
-							<div
-								className="h-full bg-[#4ADE80]"
-								style={{width: "62%"}}
-							/>
+						<div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+							{[
+								{label: "Bronze", value: credits.bronze, color: "#9A6B3D"},
+								{label: "Silver", value: credits.silver, color: "#8B98A7"},
+								{label: "Gold", value: credits.gold, color: "#D4A72C"},
+							].map((coin) => (
+								<div
+									key={coin.label}
+									className="rounded-[10px] border border-[#E5E5E7] bg-[#F5F5F7] p-4"
+								>
+									<div className="text-[12px] font-semibold uppercase tracking-wide text-[#86868B]">
+										{coin.label}
+									</div>
+									<div
+										className="mt-2 text-[28px] font-bold"
+										style={{color: coin.color}}
+									>
+										{coin.value}
+									</div>
+								</div>
+							))}
 						</div>
 						<p className="mt-3 text-[12px] text-[#86868B]">
-							You've used 380 credits this month
+							Balances are synced from your authenticated account.
 						</p>
 					</div>
 
@@ -119,18 +137,18 @@ export function SubscriptionView() {
 								{[
 									{
 										date: "Jan 1, 2026",
-										desc: "Pro Plan - Monthly",
-										amount: "$29.00",
+										desc: "Initial wallet enabled",
+										amount: `${credits.gold} gold available`,
 									},
 									{
-										date: "Dec 1, 2025",
-										desc: "Pro Plan - Monthly",
-										amount: "$29.00",
+										date: "Jan 1, 2026",
+										desc: "Silver coin balance",
+										amount: `${credits.silver} silver available`,
 									},
 									{
-										date: "Nov 1, 2025",
-										desc: "Pro Plan - Monthly",
-										amount: "$29.00",
+										date: "Jan 1, 2026",
+										desc: "Bronze coin balance",
+										amount: `${credits.bronze} bronze available`,
 									},
 								].map((item) => (
 									<tr
@@ -147,12 +165,9 @@ export function SubscriptionView() {
 											{item.amount}
 										</td>
 										<td className="px-6 py-4">
-											<button
-												type="button"
-												className="text-[13px] font-medium text-[#4ADE80] hover:underline"
-											>
-												Download
-											</button>
+											<span className="text-[13px] font-medium text-[#86868B]">
+												Synced
+											</span>
 										</td>
 									</tr>
 								))}

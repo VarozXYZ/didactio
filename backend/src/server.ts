@@ -1,4 +1,8 @@
 import {getAppEnv, loadEnv} from "./config/env.js";
+import {loadAuthConfigFromEnv} from "./auth/core/config.js";
+import {MongoCreditTransactionStore} from "./auth/mongo-credit-transaction-store.js";
+import {MongoSessionStore} from "./auth/mongo-session-store.js";
+import {MongoUserStore} from "./auth/mongo-user-store.js";
 import {createApp} from "./app.js";
 import {MongoDidacticUnitStore} from "./didactic-unit/mongo-didactic-unit-store.js";
 import {MongoFolderStore} from "./folders/mongo-folder-store.js";
@@ -14,6 +18,7 @@ const logger = createLogger({
 	level: env.logLevel,
 	logFilePath: env.logFilePath,
 });
+const authConfig = loadAuthConfigFromEnv();
 const mongoConnection = await connectMongo(env);
 
 const didacticUnitStore = new MongoDidacticUnitStore(mongoConnection.database);
@@ -21,10 +26,19 @@ const generationRunStore = new MongoGenerationRunStore(
 	mongoConnection.database,
 );
 const folderStore = new MongoFolderStore(mongoConnection.database);
+const userStore = new MongoUserStore(mongoConnection.database);
+const sessionStore = new MongoSessionStore(mongoConnection.database);
+const creditTransactionStore = new MongoCreditTransactionStore(
+	mongoConnection.database,
+);
 const app = createApp({
 	didacticUnitStore,
 	generationRunStore,
 	folderStore,
+	authConfig,
+	userStore,
+	sessionStore,
+	creditTransactionStore,
 	mongoHealth: getMongoHealthStatus(mongoConnection),
 	logger,
 });

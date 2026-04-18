@@ -1,4 +1,17 @@
+import {useState} from "react";
+import {useAuth} from "../../../../auth/AuthProvider";
+
 export function ProfileView() {
+	const {user} = useAuth();
+	const [pictureFailed, setPictureFailed] = useState(false);
+	const initials =
+		user?.displayName
+			.split(" ")
+			.map((part) => part[0])
+			.join("")
+			.slice(0, 2)
+			.toUpperCase() ?? "DU";
+
 	return (
 		<div className="flex min-w-0 flex-1 flex-col">
 			<header className="flex h-[80px] shrink-0 items-center border-b border-[#E5E5E7] bg-white/80 px-8 backdrop-blur-md">
@@ -19,23 +32,22 @@ export function ProfileView() {
 							Profile Photo
 						</h2>
 						<div className="flex items-center gap-6">
-							<div className="flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-[#4ADE80] to-[#2D8F4B] text-3xl font-bold text-white">
-								JD
-							</div>
-							<div className="flex gap-3">
-								<button
-									type="button"
-									className="rounded-[8px] bg-[#1D1D1F] px-4 py-2 text-[13px] font-semibold text-white transition-all hover:bg-[#333333]"
-								>
-									Upload Photo
-								</button>
-								<button
-									type="button"
-									className="rounded-[8px] border border-[#E5E5E7] px-4 py-2 text-[13px] font-semibold transition-all hover:border-[#4ADE80] hover:bg-[#4ADE80]/5"
-								>
-									Remove
-								</button>
-							</div>
+							{user?.pictureUrl && !pictureFailed ?
+								<img
+									src={user.pictureUrl}
+									alt={user.displayName}
+									referrerPolicy="no-referrer"
+									onError={() => setPictureFailed(true)}
+									className="h-24 w-24 rounded-full object-cover"
+								/>
+							:	<div className="flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-[#4ADE80] to-[#2D8F4B] text-3xl font-bold text-white">
+									{initials}
+								</div>
+							}
+							<p className="text-[13px] text-[#86868B]">
+								Your Google profile photo is used automatically
+								for now.
+							</p>
 						</div>
 					</div>
 
@@ -48,38 +60,32 @@ export function ProfileView() {
 								<label className="mb-2 block text-[13px] font-semibold text-[#1D1D1F]">
 									Full Name
 								</label>
-								<input
-									type="text"
-									defaultValue="John Doe"
-									className="w-full rounded-[8px] border border-[#E5E5E7] px-4 py-3 text-[14px] focus:border-[#4ADE80] focus:outline-none"
-								/>
+								<div className="w-full rounded-[8px] border border-[#E5E5E7] bg-[#F5F5F7] px-4 py-3 text-[14px] text-[#1D1D1F]">
+									{user?.displayName ?? "Unknown user"}
+								</div>
 							</div>
 							<div>
 								<label className="mb-2 block text-[13px] font-semibold text-[#1D1D1F]">
 									Email Address
 								</label>
-								<input
-									type="email"
-									defaultValue="john.doe@example.com"
-									className="w-full rounded-[8px] border border-[#E5E5E7] px-4 py-3 text-[14px] focus:border-[#4ADE80] focus:outline-none"
-								/>
+								<div className="w-full rounded-[8px] border border-[#E5E5E7] bg-[#F5F5F7] px-4 py-3 text-[14px] text-[#1D1D1F]">
+									{user?.email ?? "No email available"}
+								</div>
 							</div>
 							<div>
 								<label className="mb-2 block text-[13px] font-semibold text-[#1D1D1F]">
-									Bio
+									Locale
 								</label>
-								<textarea
-									rows={4}
-									placeholder="Tell us about yourself..."
-									className="w-full resize-none rounded-[8px] border border-[#E5E5E7] px-4 py-3 text-[14px] focus:border-[#4ADE80] focus:outline-none"
-								/>
+								<div className="w-full rounded-[8px] border border-[#E5E5E7] bg-[#F5F5F7] px-4 py-3 text-[14px] text-[#1D1D1F]">
+									{user?.locale ?? "Not provided by Google"}
+								</div>
 							</div>
-							<button
-								type="button"
-								className="w-full rounded-[8px] bg-[#1D1D1F] px-4 py-3 text-[14px] font-semibold text-white transition-all hover:bg-[#333333]"
-							>
-								Save Changes
-							</button>
+							<div className="rounded-[8px] border border-[#E5E5E7] bg-[#F5F5F7] px-4 py-3 text-[14px] text-[#1D1D1F]">
+								<div className="font-semibold">Account Role</div>
+								<div className="mt-1 text-[#86868B]">
+									{user?.role === "admin" ? "Admin" : "User"}
+								</div>
+							</div>
 						</div>
 					</div>
 				</div>

@@ -13,6 +13,10 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': 'http://localhost:3000',
+      '/auth/google': 'http://localhost:3000',
+      '/auth/refresh': 'http://localhost:3000',
+      '/auth/logout': 'http://localhost:3000',
+      '/auth/me': 'http://localhost:3000',
     },
   },
 })

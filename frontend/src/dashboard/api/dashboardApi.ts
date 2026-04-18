@@ -1,3 +1,4 @@
+import {authClient} from "../../auth/authClient";
 import type {PlanningQuestion, PlanningSyllabus} from "../types";
 
 export class DashboardApiError extends Error {
@@ -268,12 +269,11 @@ type StreamHandlers = {
 };
 
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
-	const response = await fetch(path, {
+	const response = await authClient.authorizedFetch(path, {
+		...init,
 		headers: {
-			"Content-Type": "application/json",
 			...(init?.headers ?? {}),
 		},
-		...init,
 	});
 
 	if (!response.ok) {
@@ -303,15 +303,14 @@ async function streamNdjson<T>(
 	handlers: StreamHandlers,
 	init?: RequestInit,
 ): Promise<T> {
-	const response = await fetch(path, {
-		headers: {
-			"Content-Type": "application/json",
-			...(init?.headers ?? {}),
-		},
+	const response = await authClient.authorizedFetch(path, {
 		method: "POST",
 		body: JSON.stringify({}),
 		...init,
 		signal: handlers.signal,
+		headers: {
+			...(init?.headers ?? {}),
+		},
 	});
 
 	if (!response.ok) {

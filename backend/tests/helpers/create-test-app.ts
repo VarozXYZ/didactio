@@ -1,3 +1,7 @@
+import {InMemoryCreditTransactionStore} from "../../src/auth/adapters/memory/credit-transaction-store.js";
+import {InMemorySessionStore} from "../../src/auth/adapters/memory/session-store.js";
+import {InMemoryUserStore} from "../../src/auth/adapters/memory/user-store.js";
+import type {AuthConfig} from "../../src/auth/core/types.js";
 import {
 	InMemoryDidacticUnitStore,
 	type DidacticUnitStore,
@@ -19,6 +23,31 @@ import {
 import type {MongoHealthStatus} from "../../src/mongo/mongo-connection.js";
 import {createMockAiService} from "./mock-ai-service.js";
 
+export function buildTestAuthConfig(): AuthConfig {
+	return {
+		googleClientId: "google-client-id",
+		googleClientSecret: "google-client-secret",
+		googleCallbackUrl: "http://localhost:3000/auth/google/callback",
+		jwtAccessSecret: "test-access-secret-should-be-at-least-32-chars",
+		jwtRefreshSecret: "test-refresh-secret-should-be-at-least-32chars",
+		jwtIssuer: "didactio-test",
+		jwtAudience: "web",
+		accessTokenTtlSeconds: 900,
+		refreshTokenTtlSeconds: 1209600,
+		cookie: {
+			name: "refresh_token",
+			secure: false,
+			sameSite: "lax",
+		},
+		cookieSecret: "test-cookie-secret-should-be-at-least-32chars",
+		allowedRedirectUrls: ["http://localhost:5173/auth/callback"],
+		defaultRedirectUrl: "http://localhost:5173/auth/callback",
+		adminEmails: ["admin@example.com"],
+		trustProxy: false,
+		corsAllowedOrigins: ["http://localhost:5173"],
+	};
+}
+
 interface CreateTestAppOptions {
 	didacticUnitStore?: DidacticUnitStore;
 	generationRunStore?: GenerationRunStore;
@@ -26,6 +55,8 @@ interface CreateTestAppOptions {
 	aiConfigStore?: AiConfigStore;
 	aiService?: AiService;
 	mongoHealth?: MongoHealthStatus;
+	authConfig?: AuthConfig;
+	disableAuthBypass?: boolean;
 }
 
 export function createTestApp(options: CreateTestAppOptions = {}) {
@@ -38,6 +69,20 @@ export function createTestApp(options: CreateTestAppOptions = {}) {
 		aiConfigStore: options.aiConfigStore ?? new InMemoryAiConfigStore(),
 		aiService: options.aiService ?? createMockAiService(),
 		mongoHealth: options.mongoHealth,
+		authConfig: options.authConfig ?? buildTestAuthConfig(),
+		userStore: new InMemoryUserStore(),
+		sessionStore: new InMemorySessionStore(),
+		creditTransactionStore: new InMemoryCreditTransactionStore(),
+		testPrincipal:
+			options.disableAuthBypass ?
+				undefined
+			:	{
+					sub: "mock-user",
+					sid: "test-session",
+					provider: "google",
+					email: "user@example.com",
+					role: "user",
+				},
 	};
 
 	return createApp(appOptions);
