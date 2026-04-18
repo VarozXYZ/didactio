@@ -1849,7 +1849,7 @@ export function UnitEditor({ didacticUnitId, onDataChanged }: UnitEditorProps) {
                 <header className="z-10 flex h-[64px] shrink-0 items-center justify-between border-b border-[#E5E5E7] bg-white/80 px-6 backdrop-blur-md">
                     <div className="flex items-center gap-4">
                         <div className="flex flex-col gap-0.5">
-                            <h1 className="max-w-[560px] truncate text-[20px] font-bold text-[#1D1D1F]">
+                            <h1 className="text-[20px] font-bold text-[#1D1D1F]">
                                 {workspace.title}
                             </h1>
                             <div className="flex items-baseline gap-1.5">

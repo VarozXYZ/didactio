@@ -468,8 +468,13 @@ function paginateBlocks({
                 currentBlocks.splice(-2)
                 mutableBlocks.splice(blockIndex, 0, secondLastBlock, lastBlock)
             } else if (currentBlocks.length >= 2 && isHeading(lastBlock)) {
-                currentBlocks.pop()
-                mutableBlocks.splice(blockIndex, 0, lastBlock)
+                // Cascade-pop consecutive trailing headings: a single pop can leave
+                // a parent section heading (e.g. "2. Lesson 2…") stranded alone at
+                // the bottom once its sub-heading was moved forward.
+                while (currentBlocks.length >= 2 && isHeading(currentBlocks.at(-1)!)) {
+                    const orphan = currentBlocks.pop()!
+                    mutableBlocks.splice(blockIndex, 0, orphan)
+                }
             }
 
             pages.push(currentBlocks)
