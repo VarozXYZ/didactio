@@ -18,6 +18,7 @@ function createStoredDidacticUnit(): DidacticUnit {
 				title: "Foundations",
 				overview: "Learn the basics.",
 				keyPoints: ["Routing"],
+				lessons: [],
 			},
 		],
 		questionnaireAnswers: [
@@ -28,7 +29,7 @@ function createStoredDidacticUnit(): DidacticUnit {
 		],
 		createdAt: "2026-03-12T00:00:00.000Z",
 		updatedAt: "2026-03-12T00:00:00.000Z",
-	};
+	} as unknown as DidacticUnit;
 }
 
 describe("MongoDidacticUnitStore", () => {

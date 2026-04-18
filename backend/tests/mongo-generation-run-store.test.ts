@@ -31,17 +31,19 @@ function createStoredRuns(): GenerationRun[] {
 			model: "gpt-4o-mini",
 			prompt: "Generate a syllabus for next.js framework.",
 			syllabus: {
-				title: "Next.js Learning Path",
-				overview: "A focused syllabus.",
-				learningGoals: ["Understand routing"],
-				chapters: [
-					{
-						title: "Foundations",
-						overview: "Learn the basics.",
-						keyPoints: ["Routing"],
-					},
-				],
-			},
+                title: "Next.js Learning Path",
+                overview: "A focused syllabus.",
+                learningGoals: ["Understand routing"],
+                chapters: [
+                    {
+                        title: "Foundations",
+                        overview: "Learn the basics.",
+                        keyPoints: ["Routing"],
+                        lessons: []
+                    },
+                ],
+                keywords: []
+            },
 			status: "completed",
 			createdAt: "2026-03-12T00:00:00.000Z",
 		},

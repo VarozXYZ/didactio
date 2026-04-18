@@ -170,18 +170,19 @@ describe("folder api", () => {
 
 	it("falls back to General when moderation returns an unknown folder name", async () => {
 		const aiService = createMockAiService();
-		aiService.moderateTopic = async (input) => ({
-			provider: "mock-provider",
-			model: "mock-model",
-			prompt: `Moderate ${input.topic}`,
-			approved: true,
-			notes: "Approved.",
-			normalizedTopic: input.topic.trim(),
-			improvedTopicBrief: `Create a practical didactic unit about ${input.topic.trim()}.`,
-			reasoningNotes: "Topic is safe.",
-			folderName: "Definitely Not A Real Folder",
-			folderReasoning: "Hallucinated folder name for test coverage.",
-		});
+		aiService.moderateTopic = async (input) =>
+			({
+				provider: "mock-provider",
+				model: "mock-model",
+				prompt: `Moderate ${input.topic}`,
+				approved: true,
+				notes: "Approved.",
+				normalizedTopic: input.topic.trim(),
+				improvedTopicBrief: `Create a practical didactic unit about ${input.topic.trim()}.`,
+				reasoningNotes: "Topic is safe.",
+				folderName: "Definitely Not A Real Folder",
+				folderReasoning: "Hallucinated folder name for test coverage.",
+			}) as Awaited<ReturnType<typeof aiService.moderateTopic>>;
 
 		const app = createTestApp({aiService});
 

@@ -14,6 +14,7 @@ import {
 const authoring = {
 	language: "English",
 	tone: "professional" as const,
+	learnerLevel: "beginner" as const,
 };
 
 describe("prompt quality helpers", () => {
