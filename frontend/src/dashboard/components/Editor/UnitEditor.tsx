@@ -235,6 +235,8 @@ function cn(...inputs: Array<string | false | null | undefined>) {
 	return twMerge(clsx(inputs));
 }
 
+const STREAMING_MARKDOWN_FLUSH_MS = 350;
+
 function isMeasuredPageWithMarkdown(
 	page: MeasuredModulePage,
 ): page is Extract<
@@ -367,8 +369,8 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	const isEditModeRef = useRef(false);
 	const generationQueueBlockedRef = useRef(false);
 	const isGenerationQueueRunningRef = useRef(false);
-	const streamingFrameRef = useRef<number | null>(null);
-	const latestStreamingMarkdownRef = useRef("");
+	const streamingMarkdownBufferRef = useRef("");
+	const streamingMarkdownFlushTimeoutRef = useRef<number | null>(null);
 
 	const activeChapter = useMemo(
 		() =>
@@ -614,25 +616,12 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			if (saveTimeoutRef.current) {
 				window.clearTimeout(saveTimeoutRef.current);
 			}
-			if (streamingFrameRef.current !== null) {
-				window.cancelAnimationFrame(streamingFrameRef.current);
+			if (streamingMarkdownFlushTimeoutRef.current) {
+				window.clearTimeout(streamingMarkdownFlushTimeoutRef.current);
 			}
 		},
 		[],
 	);
-
-	const queueStreamingMarkdown = useCallback((markdown: string) => {
-		latestStreamingMarkdownRef.current = markdown;
-
-		if (streamingFrameRef.current !== null) {
-			return;
-		}
-
-		streamingFrameRef.current = window.requestAnimationFrame(() => {
-			streamingFrameRef.current = null;
-			setStreamingMarkdown(latestStreamingMarkdownRef.current);
-		});
-	}, []);
 
 	const activeDraftSettings = draft?.presentationSettings;
 
@@ -888,6 +877,41 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		);
 	};
 
+	const clearStreamingMarkdownFlush = useCallback(() => {
+		if (streamingMarkdownFlushTimeoutRef.current) {
+			window.clearTimeout(streamingMarkdownFlushTimeoutRef.current);
+			streamingMarkdownFlushTimeoutRef.current = null;
+		}
+	}, []);
+
+	const flushStreamingMarkdown = useCallback(() => {
+		clearStreamingMarkdownFlush();
+		setStreamingMarkdown(streamingMarkdownBufferRef.current);
+	}, [clearStreamingMarkdownFlush]);
+
+	const resetStreamingMarkdown = useCallback(() => {
+		clearStreamingMarkdownFlush();
+		streamingMarkdownBufferRef.current = "";
+		setStreamingMarkdown("");
+	}, [clearStreamingMarkdownFlush]);
+
+	const queueStreamingMarkdown = useCallback(
+		(event: {delta: string; markdown?: string}) => {
+			streamingMarkdownBufferRef.current =
+				event.markdown ?? `${streamingMarkdownBufferRef.current}${event.delta}`;
+
+			if (streamingMarkdownFlushTimeoutRef.current !== null) {
+				return;
+			}
+
+			streamingMarkdownFlushTimeoutRef.current = window.setTimeout(
+				flushStreamingMarkdown,
+				STREAMING_MARKDOWN_FLUSH_MS,
+			);
+		},
+		[flushStreamingMarkdown],
+	);
+
 	const refreshWorkspaceAfterGeneration = useCallback(async () => {
 		onDataChanged();
 
@@ -914,12 +938,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			setIsSubmitting(true);
 			setIsStreamingGeneration(true);
 			setActiveGeneratingChapterIndex(chapter.chapterIndex);
-			if (streamingFrameRef.current !== null) {
-				window.cancelAnimationFrame(streamingFrameRef.current);
-				streamingFrameRef.current = null;
-			}
-			latestStreamingMarkdownRef.current = "";
-			setStreamingMarkdown("");
+			resetStreamingMarkdown();
 
 			try {
 				if (chapter.status === "ready") {
@@ -929,7 +948,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 						tier,
 						{
 							onPartialMarkdown: (event) => {
-								queueStreamingMarkdown(event.markdown);
+								queueStreamingMarkdown(event);
 							},
 						},
 					);
@@ -940,12 +959,13 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 						tier,
 						{
 							onPartialMarkdown: (event) => {
-								queueStreamingMarkdown(event.markdown);
+								queueStreamingMarkdown(event);
 							},
 						},
 					);
 				}
 
+				flushStreamingMarkdown();
 				setUnitGenerationTier((previousTier) => previousTier ?? tier);
 				await refreshWorkspaceAfterGeneration();
 			} catch (actionError) {
@@ -959,15 +979,16 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				setIsSubmitting(false);
 				setIsStreamingGeneration(false);
 				setActiveGeneratingChapterIndex(null);
-				if (streamingFrameRef.current !== null) {
-					window.cancelAnimationFrame(streamingFrameRef.current);
-					streamingFrameRef.current = null;
-				}
-				latestStreamingMarkdownRef.current = "";
-				setStreamingMarkdown("");
+				resetStreamingMarkdown();
 			}
 		},
-		[didacticUnitId, queueStreamingMarkdown, refreshWorkspaceAfterGeneration],
+		[
+			didacticUnitId,
+			flushStreamingMarkdown,
+			queueStreamingMarkdown,
+			refreshWorkspaceAfterGeneration,
+			resetStreamingMarkdown,
+		],
 	);
 
 	const handlePrimaryGeneration = async (
@@ -1007,12 +1028,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		try {
 			for (const chapter of pendingChapters) {
 				setActiveGeneratingChapterIndex(chapter.chapterIndex);
-				if (streamingFrameRef.current !== null) {
-					window.cancelAnimationFrame(streamingFrameRef.current);
-					streamingFrameRef.current = null;
-				}
-				latestStreamingMarkdownRef.current = "";
-				setStreamingMarkdown("");
+				resetStreamingMarkdown();
 
 				await dashboardApi.streamGenerateDidacticUnitChapter(
 					didacticUnitId,
@@ -1020,11 +1036,12 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 					unitGenerationTier,
 					{
 						onPartialMarkdown: (event) => {
-							queueStreamingMarkdown(event.markdown);
+							queueStreamingMarkdown(event);
 						},
 					},
 				);
 
+				flushStreamingMarkdown();
 				await refreshWorkspaceAfterGeneration();
 			}
 		} catch (actionError) {
@@ -1040,17 +1057,14 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			setIsSubmitting(false);
 			setIsStreamingGeneration(false);
 			setActiveGeneratingChapterIndex(null);
-			if (streamingFrameRef.current !== null) {
-				window.cancelAnimationFrame(streamingFrameRef.current);
-				streamingFrameRef.current = null;
-			}
-			latestStreamingMarkdownRef.current = "";
-			setStreamingMarkdown("");
+			resetStreamingMarkdown();
 		}
 	}, [
 		didacticUnitId,
+		flushStreamingMarkdown,
 		queueStreamingMarkdown,
 		refreshWorkspaceAfterGeneration,
+		resetStreamingMarkdown,
 		unitGenerationTier,
 		workspace,
 	]);

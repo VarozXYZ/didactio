@@ -2594,11 +2594,10 @@ export function createApp(options: CreateAppOptions) {
 									model: selection.model,
 								});
 							},
-							onMarkdown: async (delta, markdown) => {
+							onMarkdown: async (delta) => {
 								writeNdjsonEvent(response, {
 									type: "partial_markdown",
 									delta,
-									markdown,
 								});
 							},
 						},

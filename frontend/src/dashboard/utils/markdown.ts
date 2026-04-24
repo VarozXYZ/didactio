@@ -509,6 +509,10 @@ function htmlToMarkdown(value: string): string {
 		.trim();
 }
 
+function looksLikeHtml(value: string): boolean {
+	return /<\/?[a-z][\w:-]*(?:\s[^>]*)?>/i.test(value);
+}
+
 type TableCellNode = {
 	children?: RootContent[];
 };
@@ -591,7 +595,7 @@ export function normalizeStoredMarkdown(
 		return "";
 	}
 
-	if (!trimmedValue.includes("<")) {
+	if (!looksLikeHtml(trimmedValue)) {
 		return repairAiMarkdown(trimmedValue);
 	}
 

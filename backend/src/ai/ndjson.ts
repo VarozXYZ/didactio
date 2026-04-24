@@ -2,7 +2,7 @@ import type express from "express";
 
 export type NdjsonEvent =
 	| {type: "start"; stage: string; provider: string; model: string}
-	| {type: "partial_markdown"; delta: string; markdown: string}
+	| {type: "partial_markdown"; delta: string; markdown?: string}
 	| {type: "partial_structured"; data: unknown}
 	| {type: "complete"; data: unknown}
 	| {type: "error"; message: string};

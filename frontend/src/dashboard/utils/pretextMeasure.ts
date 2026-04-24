@@ -16,6 +16,23 @@ export type BlockMeasurement = {
 	marginBottomPx: number;
 };
 
+const MEASUREMENT_CACHE_LIMIT = 2500;
+const measurementCache = new Map<string, BlockMeasurement>();
+
+function setCachedMeasurement(
+	key: string,
+	measurement: BlockMeasurement,
+): BlockMeasurement {
+	if (measurementCache.size >= MEASUREMENT_CACHE_LIMIT) {
+		const oldestKey = measurementCache.keys().next().value;
+		if (oldestKey !== undefined) {
+			measurementCache.delete(oldestKey);
+		}
+	}
+
+	measurementCache.set(key, measurement);
+	return measurement;
+}
 
 function makeBlock(
 	plainText: string,
@@ -25,12 +42,24 @@ function makeBlock(
 	marginBottomPx: number,
 ): BlockMeasurement {
 	const safeText = plainText.trim() || " ";
-	return {
+	const cacheKey = [
+		fontString,
+		lineHeightPx,
+		marginTopPx,
+		marginBottomPx,
+		safeText,
+	].join("\u0000");
+	const cached = measurementCache.get(cacheKey);
+	if (cached) {
+		return cached;
+	}
+
+	return setCachedMeasurement(cacheKey, {
 		prepared: prepareWithSegments(safeText, fontString),
 		lineHeightPx,
 		marginTopPx,
 		marginBottomPx,
-	};
+	});
 }
 
 export function prepareParagraphBlock(

@@ -36,6 +36,34 @@ const PAGE_WIDTH_RATIO_DESKTOP = 0.76;
 // Mobile is a rough default only; dedicated mobile layout is planned separately.
 const PAGE_WIDTH_RATIO_MOBILE = 0.72;
 const POST_MODULE_ACTION_GAP = 24;
+const DOM_BLOCK_HEIGHT_CACHE_LIMIT = 2000;
+
+const domBlockHeightCache = new Map<string, number>();
+
+function setCachedDomBlockHeight(key: string, height: number): number {
+	if (domBlockHeightCache.size >= DOM_BLOCK_HEIGHT_CACHE_LIMIT) {
+		const oldestKey = domBlockHeightCache.keys().next().value;
+		if (oldestKey !== undefined) {
+			domBlockHeightCache.delete(oldestKey);
+		}
+	}
+
+	domBlockHeightCache.set(key, height);
+	return height;
+}
+
+function makeTypographyCacheKey(typography: ResolvedTypography): string {
+	return [
+		typography.body.family,
+		typography.body.sizePx,
+		typography.h1.family,
+		typography.h1.sizePx,
+		typography.h2.family,
+		typography.h2.sizePx,
+		typography.h3.family,
+		typography.h3.sizePx,
+	].join(":");
+}
 
 type ContentMeasuredModulePage = {
 	kind: "content";
@@ -578,7 +606,7 @@ function paginateBlocks({
 			const secondLastBlock = currentBlocks.at(-2);
 
 			if (
-				currentBlocks.length >= 2 &&
+				currentBlocks.length > 2 &&
 				secondLastBlock &&
 				isHeading(secondLastBlock) &&
 				isShortIntro(lastBlock)
@@ -596,6 +624,10 @@ function paginateBlocks({
 					const orphan = currentBlocks.pop()!;
 					mutableBlocks.splice(blockIndex, 0, orphan);
 				}
+			}
+
+			if (currentBlocks.length === 0) {
+				continue;
 			}
 
 			pages.push(currentBlocks);
@@ -673,9 +705,23 @@ function validatePagesWithDom(
 		const page = pages[i];
 		const limit =
 			(validated.length === 0 ? firstPageLimit : regularPageLimit) + 1;
-		proseMeasure.innerHTML = markdownToHtml(joinBlocksMarkdown(page));
+		const pageMarkdown = joinBlocksMarkdown(page);
+		const cacheKey = [
+			"page",
+			proseMeasure.style.cssText,
+			pageMarkdown,
+		].join("\u0000");
+		const pageHeight =
+			domBlockHeightCache.get(cacheKey) ??
+			(() => {
+				proseMeasure.innerHTML = markdownToHtml(pageMarkdown);
+				return setCachedDomBlockHeight(
+					cacheKey,
+					proseMeasure.scrollHeight,
+				);
+			})();
 
-		if (proseMeasure.scrollHeight <= limit) {
+		if (pageHeight <= limit) {
 			validated.push(page);
 			continue;
 		}
@@ -943,10 +989,23 @@ export function measurePages({
 		extractMarkdownBlocks(renderedContent),
 		typography,
 	);
+	const typographyCacheKey = makeTypographyCacheKey(typography);
 
 	const domMeasureBlock = (block: MarkdownPageBlock): number => {
-		proseMeasure.innerHTML = markdownToHtml(renderBlock(block));
-		return proseMeasure.scrollHeight;
+		const renderedBlock = renderBlock(block);
+		const cacheKey = [
+			"block",
+			contentWidth,
+			typographyCacheKey,
+			renderedBlock,
+		].join("\u0000");
+		const cachedHeight = domBlockHeightCache.get(cacheKey);
+		if (cachedHeight !== undefined) {
+			return cachedHeight;
+		}
+
+		proseMeasure.innerHTML = markdownToHtml(renderedBlock);
+		return setCachedDomBlockHeight(cacheKey, proseMeasure.scrollHeight);
 	};
 
 	const rawPages = paginateBlocks({
@@ -1047,10 +1106,23 @@ export function paginateMarkdownContent({
 	document.body.appendChild(sandbox);
 
 	const blocks = annotateBlocks(extractMarkdownBlocks(content), typography);
+	const typographyCacheKey = makeTypographyCacheKey(typography);
 
 	const domMeasureBlock = (block: MarkdownPageBlock): number => {
-		proseMeasure.innerHTML = markdownToHtml(renderBlock(block));
-		return proseMeasure.scrollHeight;
+		const renderedBlock = renderBlock(block);
+		const cacheKey = [
+			"block",
+			contentWidth,
+			typographyCacheKey,
+			renderedBlock,
+		].join("\u0000");
+		const cachedHeight = domBlockHeightCache.get(cacheKey);
+		if (cachedHeight !== undefined) {
+			return cachedHeight;
+		}
+
+		proseMeasure.innerHTML = markdownToHtml(renderedBlock);
+		return setCachedDomBlockHeight(cacheKey, proseMeasure.scrollHeight);
 	};
 
 	const rawPages = paginateBlocks({
