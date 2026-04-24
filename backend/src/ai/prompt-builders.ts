@@ -521,6 +521,8 @@ export function buildChapterMarkdownPrompt(input: {
 			"Start directly with the instructional body.",
 			"Do not include JSON, code fences, or commentary outside markdown.",
 			"Use natural, topic-specific markdown headings throughout the module body.",
+			"Use markdown heading syntax for subsection labels (for example, #### A useful subheading); do not use standalone bold lines as headings.",
+			"Place blank lines between headings, paragraphs, and lists so each block renders separately.",
 		]),
 	].join("\n\n");
 }

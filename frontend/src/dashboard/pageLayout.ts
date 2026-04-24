@@ -36,6 +36,8 @@ const PAGE_WIDTH_RATIO_DESKTOP = 0.76;
 // Mobile is a rough default only; dedicated mobile layout is planned separately.
 const PAGE_WIDTH_RATIO_MOBILE = 0.72;
 const POST_MODULE_ACTION_GAP = 24;
+const FIRST_PAGE_HEADER_BOTTOM_GAP = 16;
+const CONTENT_PAGE_LABEL_BOTTOM_GAP = 12;
 const DOM_BLOCK_HEIGHT_CACHE_LIMIT = 2000;
 
 const domBlockHeightCache = new Map<string, number>();
@@ -107,6 +109,39 @@ type AnnotatedMarkdownPageBlock = MarkdownPageBlock & {
 	// Present for splittable_list — one entry per item.
 	itemMeasurements?: BlockMeasurement[];
 };
+
+function isHeadingBlock(block: AnnotatedMarkdownPageBlock): boolean {
+	return block.type === "markdown" && /^#{1,6}\s/.test(block.markdown);
+}
+
+function isShortIntroBlock(block: AnnotatedMarkdownPageBlock): boolean {
+	return block.type === "paragraph" && block.text.length < 80;
+}
+
+function pullTrailingOrphanBlocksForward(
+	blocks: AnnotatedMarkdownPageBlock[],
+): AnnotatedMarkdownPageBlock[] {
+	const movedBlocks: AnnotatedMarkdownPageBlock[] = [];
+
+	const lastBlock = blocks.at(-1);
+	const secondLastBlock = blocks.at(-2);
+
+	if (
+		blocks.length > 2 &&
+		lastBlock &&
+		secondLastBlock &&
+		isHeadingBlock(secondLastBlock) &&
+		isShortIntroBlock(lastBlock)
+	) {
+		movedBlocks.unshift(...blocks.splice(-2));
+	} else {
+		while (blocks.length >= 2 && isHeadingBlock(blocks.at(-1)!)) {
+			movedBlocks.unshift(blocks.pop()!);
+		}
+	}
+
+	return movedBlocks;
+}
 
 function escapeHtml(value: string): string {
 	return value
@@ -597,33 +632,9 @@ function paginateBlocks({
 			// When a heading (or heading + short intro paragraph) ends up as the
 			// last content on a page with no following content, move it forward so
 			// it stays with what comes next.
-			const isHeading = (b: AnnotatedMarkdownPageBlock) =>
-				b.type === "markdown" && /^#{1,6}\s/.test(b.markdown);
-			const isShortIntro = (b: AnnotatedMarkdownPageBlock) =>
-				b.type === "paragraph" && b.text.length < 80;
-
-			const lastBlock = currentBlocks.at(-1)!;
-			const secondLastBlock = currentBlocks.at(-2);
-
-			if (
-				currentBlocks.length > 2 &&
-				secondLastBlock &&
-				isHeading(secondLastBlock) &&
-				isShortIntro(lastBlock)
-			) {
-				currentBlocks.splice(-2);
-				mutableBlocks.splice(blockIndex, 0, secondLastBlock, lastBlock);
-			} else if (currentBlocks.length >= 2 && isHeading(lastBlock)) {
-				// Cascade-pop consecutive trailing headings: a single pop can leave
-				// a parent section heading (e.g. "2. Lesson 2…") stranded alone at
-				// the bottom once its sub-heading was moved forward.
-				while (
-					currentBlocks.length >= 2 &&
-					isHeading(currentBlocks.at(-1)!)
-				) {
-					const orphan = currentBlocks.pop()!;
-					mutableBlocks.splice(blockIndex, 0, orphan);
-				}
+			const orphanBlocks = pullTrailingOrphanBlocksForward(currentBlocks);
+			if (orphanBlocks.length > 0) {
+				mutableBlocks.splice(blockIndex, 0, ...orphanBlocks);
 			}
 
 			if (currentBlocks.length === 0) {
@@ -732,13 +743,21 @@ function validatePagesWithDom(
 		}
 
 		const overflow = page.at(-1)!;
-		validated.push(page.slice(0, -1));
+		const retainedBlocks = page.slice(0, -1);
+		const carriedBlocks = [
+			...pullTrailingOrphanBlocksForward(retainedBlocks),
+			overflow,
+		];
+
+		if (retainedBlocks.length > 0) {
+			validated.push(retainedBlocks);
+		}
 
 		const nextPage = pages[i + 1];
 		if (nextPage) {
-			pages[i + 1] = [overflow, ...nextPage];
+			pages[i + 1] = [...carriedBlocks, ...nextPage];
 		} else {
-			pages.push([overflow]);
+			pages.push(carriedBlocks);
 		}
 	}
 
@@ -979,11 +998,17 @@ export function measurePages({
 
 	const firstPageLimit = Math.max(
 		140,
-		contentLimit - headerMeasure.scrollHeight - measurementBuffer,
+		contentLimit -
+			headerMeasure.scrollHeight -
+			FIRST_PAGE_HEADER_BOTTOM_GAP -
+			measurementBuffer,
 	);
 	const regularPageLimit = Math.max(
 		140,
-		contentLimit - labelMeasure.scrollHeight - measurementBuffer,
+		contentLimit -
+			labelMeasure.scrollHeight -
+			CONTENT_PAGE_LABEL_BOTTOM_GAP -
+			measurementBuffer,
 	);
 	const blocks = annotateBlocks(
 		extractMarkdownBlocks(renderedContent),

@@ -104,6 +104,12 @@ function isTitleLikeToken(token: string): boolean {
 	return false;
 }
 
+function isStructuredLessonHeading(body: string): boolean {
+	return /^(?:\d+(?:\.\d+)*\.\s*)?(?:lesson|module|chapter|section)\s+\d+\s*:/i.test(
+		body,
+	);
+}
+
 function repairRunOnHeading(line: string): string {
 	const match = line.match(/^(#{1,6})\s+(.+)$/);
 
@@ -114,7 +120,7 @@ function repairRunOnHeading(line: string): string {
 	const marker = match[1];
 	const body = match[2].trim();
 
-	if (body.length < 50) {
+	if (body.length < 50 || isStructuredLessonHeading(body)) {
 		return line;
 	}
 
@@ -172,6 +178,46 @@ function repairRunOnHeading(line: string): string {
 	return `${marker} ${heading}\n\n${remainder}`;
 }
 
+function repairStandaloneBoldLineBreaks(markdown: string): string {
+	const lines = markdown.split("\n");
+	const repairedLines: string[] = [];
+	let activeFenceMarker: "```" | "~~~" | null = null;
+
+	lines.forEach((line, index) => {
+		const trimmedLine = line.trim();
+		const nextTrimmedLine = lines[index + 1]?.trim() ?? "";
+
+		repairedLines.push(line);
+
+		if (trimmedLine.startsWith("```") || trimmedLine.startsWith("~~~")) {
+			const fenceMarker = trimmedLine.startsWith("```") ? "```" : "~~~";
+			activeFenceMarker =
+				activeFenceMarker === fenceMarker ? null
+				: activeFenceMarker === null ? fenceMarker
+				: activeFenceMarker;
+			return;
+		}
+
+		if (activeFenceMarker !== null || !nextTrimmedLine) {
+			return;
+		}
+
+		const boldOnlyMatch = trimmedLine.match(/^\*\*([^*\n]+)\*\*$/);
+		if (!boldOnlyMatch) {
+			return;
+		}
+
+		const label = boldOnlyMatch[1].trim();
+		if (/^[a-d][).]\s+/i.test(label)) {
+			return;
+		}
+
+		repairedLines.push("");
+	});
+
+	return repairedLines.join("\n");
+}
+
 function promoteStandaloneNumberedHeading(
 	line: string,
 	previousLine: string | undefined,
@@ -213,10 +259,12 @@ function promoteStandaloneNumberedHeading(
 }
 
 function repairAiMarkdown(markdown: string): string {
-	const repairedMarkdown = markdown
-		.replace(/\*\*([^\n*]+)\n\s*\n([^\n*]+)\*\*/g, "**$1 $2**")
-		.replace(/:\s+(1\.\s+)/g, ":\n\n$1")
-		.replace(/([.!?])\s+(\d+\.\s+)/g, "$1\n\n$2");
+	const repairedMarkdown = repairStandaloneBoldLineBreaks(
+		markdown
+			.replace(/\*\*([^\n*]+)\n\s*\n([^\n*]+)\*\*/g, "**$1 $2**")
+			.replace(/:\s+(1\.\s+)/g, ":\n\n$1")
+			.replace(/([.!?])\s+(\d+\.\s+)/g, "$1\n\n$2"),
+	);
 	const repairedLines = repairedMarkdown.split("\n");
 
 	return repairedLines
