@@ -367,6 +367,8 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	const isEditModeRef = useRef(false);
 	const generationQueueBlockedRef = useRef(false);
 	const isGenerationQueueRunningRef = useRef(false);
+	const streamingFrameRef = useRef<number | null>(null);
+	const latestStreamingMarkdownRef = useRef("");
 
 	const activeChapter = useMemo(
 		() =>
@@ -379,6 +381,11 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	);
 	const activeChapterDetail =
 		activeChapter ? chapterDetails[activeChapter.chapterIndex] : undefined;
+	const isActiveChapterStreaming =
+		isStreamingGeneration &&
+		activeChapter !== null &&
+		activeGeneratingChapterIndex !== null &&
+		activeGeneratingChapterIndex === activeChapter.chapterIndex;
 	const activeChapterLayoutSnapshot = useMemo(
 		() =>
 			activeChapter ?
@@ -607,9 +614,25 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			if (saveTimeoutRef.current) {
 				window.clearTimeout(saveTimeoutRef.current);
 			}
+			if (streamingFrameRef.current !== null) {
+				window.cancelAnimationFrame(streamingFrameRef.current);
+			}
 		},
 		[],
 	);
+
+	const queueStreamingMarkdown = useCallback((markdown: string) => {
+		latestStreamingMarkdownRef.current = markdown;
+
+		if (streamingFrameRef.current !== null) {
+			return;
+		}
+
+		streamingFrameRef.current = window.requestAnimationFrame(() => {
+			streamingFrameRef.current = null;
+			setStreamingMarkdown(latestStreamingMarkdownRef.current);
+		});
+	}, []);
 
 	const activeDraftSettings = draft?.presentationSettings;
 
@@ -884,9 +907,18 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			tier: BackendAiModelTier,
 		) => {
 			generationQueueBlockedRef.current = false;
+			setActiveChapterIndex(chapter.chapterIndex);
+			setCurrentSpread(0);
+			setIsEditMode(false);
+			setActiveLexicalEditor(null);
 			setIsSubmitting(true);
 			setIsStreamingGeneration(true);
 			setActiveGeneratingChapterIndex(chapter.chapterIndex);
+			if (streamingFrameRef.current !== null) {
+				window.cancelAnimationFrame(streamingFrameRef.current);
+				streamingFrameRef.current = null;
+			}
+			latestStreamingMarkdownRef.current = "";
 			setStreamingMarkdown("");
 
 			try {
@@ -897,7 +929,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 						tier,
 						{
 							onPartialMarkdown: (event) => {
-								setStreamingMarkdown(event.markdown);
+								queueStreamingMarkdown(event.markdown);
 							},
 						},
 					);
@@ -908,7 +940,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 						tier,
 						{
 							onPartialMarkdown: (event) => {
-								setStreamingMarkdown(event.markdown);
+								queueStreamingMarkdown(event.markdown);
 							},
 						},
 					);
@@ -927,10 +959,15 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				setIsSubmitting(false);
 				setIsStreamingGeneration(false);
 				setActiveGeneratingChapterIndex(null);
+				if (streamingFrameRef.current !== null) {
+					window.cancelAnimationFrame(streamingFrameRef.current);
+					streamingFrameRef.current = null;
+				}
+				latestStreamingMarkdownRef.current = "";
 				setStreamingMarkdown("");
 			}
 		},
-		[didacticUnitId, refreshWorkspaceAfterGeneration],
+		[didacticUnitId, queueStreamingMarkdown, refreshWorkspaceAfterGeneration],
 	);
 
 	const handlePrimaryGeneration = async (
@@ -970,6 +1007,11 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		try {
 			for (const chapter of pendingChapters) {
 				setActiveGeneratingChapterIndex(chapter.chapterIndex);
+				if (streamingFrameRef.current !== null) {
+					window.cancelAnimationFrame(streamingFrameRef.current);
+					streamingFrameRef.current = null;
+				}
+				latestStreamingMarkdownRef.current = "";
 				setStreamingMarkdown("");
 
 				await dashboardApi.streamGenerateDidacticUnitChapter(
@@ -978,7 +1020,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 					unitGenerationTier,
 					{
 						onPartialMarkdown: (event) => {
-							setStreamingMarkdown(event.markdown);
+							queueStreamingMarkdown(event.markdown);
 						},
 					},
 				);
@@ -998,10 +1040,16 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			setIsSubmitting(false);
 			setIsStreamingGeneration(false);
 			setActiveGeneratingChapterIndex(null);
+			if (streamingFrameRef.current !== null) {
+				window.cancelAnimationFrame(streamingFrameRef.current);
+				streamingFrameRef.current = null;
+			}
+			latestStreamingMarkdownRef.current = "";
 			setStreamingMarkdown("");
 		}
 	}, [
 		didacticUnitId,
+		queueStreamingMarkdown,
 		refreshWorkspaceAfterGeneration,
 		unitGenerationTier,
 		workspace,
@@ -1282,16 +1330,16 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 
 	if (isLoading) {
 		return (
-			<div className="flex min-w-0 flex-1 items-center justify-center text-[#86868B]">
-				Loading didactic unit workspace...
+			<div className="flex h-screen w-full items-center justify-center bg-[#F5F5F7]">
+				<Loader2 size={32} className="animate-spin text-[#86868B]" />
 			</div>
 		);
 	}
 
 	if (!workspace || !activeChapter || !draft) {
 		return (
-			<div className="flex min-w-0 flex-1 items-center justify-center text-[#86868B]">
-				Didactic unit workspace unavailable.
+			<div className="flex h-screen w-full items-center justify-center bg-[#F5F5F7]">
+				<Loader2 size={32} className="animate-spin text-[#86868B]" />
 			</div>
 		);
 	}
@@ -1312,10 +1360,6 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 
 	const isPendingChapter = activeChapter.status === "pending";
 	const isFailedChapter = activeChapter.status === "failed";
-	const isActiveChapterStreaming =
-		isStreamingGeneration &&
-		activeGeneratingChapterIndex !== null &&
-		activeGeneratingChapterIndex === activeChapter.chapterIndex;
 	const hasConfiguredGenerationTier = unitGenerationTier !== null;
 	const contentPageOffset = currentSpread * 2;
 	const leftReadPage = measuredReadPages[contentPageOffset];

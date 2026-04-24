@@ -55,6 +55,7 @@ type LexicalMarkdownEditorProps = {
 };
 
 const lexicalTheme = {
+	code: "lexical-code-block",
 	heading: {
 		// Font-size and font-family come from the .typography-scope CSS vars set on the wrapper.
 		h1: "mb-4 font-bold leading-tight text-[#1D1D1F]",
@@ -83,6 +84,7 @@ const lexicalTheme = {
 	tableRow: "lexical-table-row",
 	text: {
 		bold: "font-semibold",
+		code: "lexical-inline-code",
 		italic: "italic",
 		strikethrough: "line-through",
 		underline: "underline",

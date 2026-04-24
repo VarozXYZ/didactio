@@ -1,7 +1,7 @@
 import {Plus} from "lucide-react";
 import {useState} from "react";
 
-function CreateUnitButton({onClick}: {onClick: () => void}) {
+export function CreateUnitButton({onClick, label = "New unit"}: {onClick: () => void; label?: string}) {
 	const [hovered, setHovered] = useState(false);
 	const [pressed, setPressed] = useState(false);
 	const [spinKey, setSpinKey] = useState(0);
@@ -39,7 +39,7 @@ function CreateUnitButton({onClick}: {onClick: () => void}) {
 				style={{
 					position: "relative",
 					overflow: "hidden",
-					padding: "2px",
+					padding: "3px",
 					border: "none",
 					borderRadius: "14px",
 					background: "#0f0f12",
@@ -109,7 +109,7 @@ function CreateUnitButton({onClick}: {onClick: () => void}) {
 					className="flex select-none items-center gap-2.5 px-5 py-[11px] text-[14px] font-semibold text-white"
 				>
 					<Plus size={17} strokeWidth={2.5} />
-					New unit
+					{label}
 				</div>
 			</button>
 		</>

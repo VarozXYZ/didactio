@@ -41,11 +41,53 @@ const Toast = React.forwardRef<
 	React.ElementRef<typeof ToastPrimitives.Root>,
 	React.ComponentPropsWithoutRef<typeof ToastPrimitives.Root> &
 		VariantProps<typeof toastVariants>
->(({className, variant, children, duration = 5000, ...props}, ref) => {
+>(({className, variant, children, duration = 5000, open, onOpenChange, ...props}, ref) => {
+	const timerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+	const startRef = React.useRef(0);
+	const remainingRef = React.useRef(duration);
+
+	// Keep a stable ref to onOpenChange so the effect doesn't need it as a dependency.
+	const onOpenChangeRef = React.useRef(onOpenChange);
+	React.useLayoutEffect(() => {
+		onOpenChangeRef.current = onOpenChange;
+	});
+
+	const schedule = React.useCallback((ms: number) => {
+		if (!ms || ms === Infinity) return;
+		startRef.current = Date.now();
+		timerRef.current = setTimeout(() => onOpenChangeRef.current?.(false), ms);
+	}, []);
+
+	// Start the timer once when the toast opens; don't reset on unrelated re-renders.
+	React.useEffect(() => {
+		if (!open || !duration || duration === Infinity) return;
+		remainingRef.current = duration;
+		schedule(duration);
+		return () => {
+			if (timerRef.current != null) clearTimeout(timerRef.current);
+		};
+	}, [open, duration, schedule]);
+
+	const handlePause = React.useCallback(() => {
+		if (timerRef.current == null) return;
+		clearTimeout(timerRef.current);
+		timerRef.current = null;
+		remainingRef.current -= Date.now() - startRef.current;
+	}, []);
+
+	const handleResume = React.useCallback(() => {
+		if (timerRef.current != null) return;
+		schedule(Math.max(remainingRef.current, 0));
+	}, [schedule]);
+
 	return (
 		<ToastPrimitives.Root
 			ref={ref}
-			duration={duration}
+			duration={Infinity}
+			open={open}
+			onOpenChange={onOpenChange}
+			onPause={handlePause}
+			onResume={handleResume}
 			className={cn(toastVariants({variant}), className)}
 			{...props}
 		>
@@ -54,7 +96,7 @@ const Toast = React.forwardRef<
 				<div
 					className="absolute bottom-0 left-0 h-[3px] w-full origin-left bg-red-400/50 group-hover:[animation-play-state:paused]"
 					style={{
-						animation: `toast-shrink ${duration + 150}ms linear forwards`,
+						animation: `toast-shrink ${duration}ms linear forwards`,
 					}}
 				/>
 			)}

@@ -268,13 +268,41 @@ type StreamHandlers = {
 	) => void;
 };
 
+function asDashboardApiError(error: unknown): DashboardApiError {
+	if (error instanceof DashboardApiError) {
+		return error;
+	}
+
+	if (error instanceof DOMException && error.name === "AbortError") {
+		return new DashboardApiError("The request was cancelled.", 499);
+	}
+
+	if (error instanceof TypeError) {
+		return new DashboardApiError(
+			"Could not reach the server. Please try again.",
+			0,
+		);
+	}
+
+	if (error instanceof Error) {
+		return new DashboardApiError(error.message, 500);
+	}
+
+	return new DashboardApiError("Request failed.", 500);
+}
+
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
-	const response = await authClient.authorizedFetch(path, {
-		...init,
-		headers: {
-			...(init?.headers ?? {}),
-		},
-	});
+	let response: Response;
+	try {
+		response = await authClient.authorizedFetch(path, {
+			...init,
+			headers: {
+				...(init?.headers ?? {}),
+			},
+		});
+	} catch (error) {
+		throw asDashboardApiError(error);
+	}
 
 	if (!response.ok) {
 		let message = `Request failed with status ${response.status}.`;
@@ -303,15 +331,20 @@ async function streamNdjson<T>(
 	handlers: StreamHandlers,
 	init?: RequestInit,
 ): Promise<T> {
-	const response = await authClient.authorizedFetch(path, {
-		method: "POST",
-		body: JSON.stringify({}),
-		...init,
-		signal: handlers.signal,
-		headers: {
-			...(init?.headers ?? {}),
-		},
-	});
+	let response: Response;
+	try {
+		response = await authClient.authorizedFetch(path, {
+			method: "POST",
+			body: JSON.stringify({}),
+			...init,
+			signal: handlers.signal,
+			headers: {
+				...(init?.headers ?? {}),
+			},
+		});
+	} catch (error) {
+		throw asDashboardApiError(error);
+	}
 
 	if (!response.ok) {
 		let message = `Request failed with status ${response.status}.`;
@@ -341,7 +374,13 @@ async function streamNdjson<T>(
 	let completedData: T | null = null;
 
 	while (true) {
-		const {done, value} = await reader.read();
+		let chunk;
+		try {
+			chunk = await reader.read();
+		} catch (error) {
+			throw asDashboardApiError(error);
+		}
+		const {done, value} = chunk;
 
 		if (done) {
 			break;

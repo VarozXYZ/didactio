@@ -445,9 +445,7 @@ export function SyllabusStep({
 			{/* Waiting state */}
 			{isWaiting && (
 				<div className="flex flex-col items-center justify-center py-12">
-					<div className="mb-4 flex h-12 w-12 items-center justify-center rounded-[14px] bg-[#EAF9EF]">
-						<Loader2 size={20} className="animate-spin text-[#4ADE80]" />
-					</div>
+					<Loader2 size={28} className="mb-4 animate-spin text-[#4ADE80]" />
 					<p className="mb-4 text-[14px] font-medium text-[#1D1D1F]">
 						Generating syllabus…
 					</p>

@@ -5,6 +5,7 @@ import {
 	CreditCard,
 	FolderInput,
 	FolderPen,
+	LayoutGrid,
 	Lock,
 	MoreHorizontal,
 	MoreVertical,
@@ -170,8 +171,25 @@ export function Sidebar({
 				</div>
 
 				<div className="flex-1 overflow-y-auto px-3">
+					<div className="mb-4 mt-4 space-y-0.5">
+						<button
+							type="button"
+							onClick={() => setActiveSection("all-units")}
+							className={`flex w-full items-center gap-3 rounded-[10px] px-3 py-2.5 transition-all ${
+								activeSection === "all-units" ?
+									"bg-[#F5F5F7] text-[#1D1D1F]"
+								:	"text-[#86868B] hover:bg-[#F5F5F7]/50 hover:text-[#1D1D1F]"
+							} ${!isSidebarOpen ? "justify-center" : ""}`}
+						>
+							<LayoutGrid size={18} />
+							{isSidebarOpen && (
+								<span className="text-[14px] font-medium">Library</span>
+							)}
+						</button>
+					</div>
+
 					{isSidebarOpen && (
-						<div className="mb-2 mt-6 px-3 text-[10px] font-bold uppercase tracking-widest text-[#86868B]">
+						<div className="mb-2 px-3 text-[10px] font-bold uppercase tracking-widest text-[#86868B]">
 							MY FOLDERS
 						</div>
 					)}

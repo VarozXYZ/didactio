@@ -1,5 +1,5 @@
-import {Grid3x3, List, Search} from "lucide-react";
-import {AllUnitsHeader} from "./AllUnitsHeader";
+import {BookOpen, Grid3x3, List, Search} from "lucide-react";
+import {AllUnitsHeader, CreateUnitButton} from "./AllUnitsHeader";
 import {UnitsGrid} from "./UnitsGrid";
 import {UnitsTable} from "./UnitsTable";
 import type {BackendFolder} from "../../../api/dashboardApi";
@@ -95,7 +95,26 @@ export function AllUnitsView({
 						</div>
 					</div>
 
-					{viewMode === "grid" ?
+					{filteredUnits.length === 0 ?
+						<div className="flex flex-col items-center justify-center py-24 text-center">
+							<div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-sm">
+								<BookOpen size={28} className="text-[#86868B]" />
+							</div>
+							{searchQuery ?
+								<>
+									<p className="text-[17px] font-semibold text-[#1D1D1F]">No results for &ldquo;{searchQuery}&rdquo;</p>
+									<p className="mt-1 text-[14px] text-[#86868B]">Try a different search term.</p>
+								</>
+							:	<>
+									<p className="text-[17px] font-semibold text-[#1D1D1F]">Your library is empty</p>
+									<p className="mt-1 max-w-xs text-[14px] text-[#86868B]">Create your first unit to start building your personal learning library.</p>
+									<div className="mt-5">
+										<CreateUnitButton onClick={onCreateUnit} label="Create your first unit" />
+									</div>
+								</>
+							}
+						</div>
+					: viewMode === "grid" ?
 						<UnitsGrid
 							allFolders={allFolders}
 							onDeleteItem={onDeleteItem}

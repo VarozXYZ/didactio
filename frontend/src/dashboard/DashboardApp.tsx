@@ -18,6 +18,7 @@ import {toastError} from "@/hooks/use-toast";
 import {dashboardApi} from "./api/dashboardApi";
 import {buildDashboardFolders, mergeDashboardItems} from "./adapters";
 import {AllUnitsView} from "./components/Dashboard/AllUnitsView/AllUnitsView";
+import {CreateUnitButton} from "./components/Dashboard/AllUnitsView/AllUnitsHeader";
 import {AnalyticsView} from "./components/Dashboard/SettingsViews/AnalyticsView";
 import {PreferencesView} from "./components/Dashboard/SettingsViews/PreferencesView";
 import {ProfileView} from "./components/Dashboard/SettingsViews/ProfileView";
@@ -310,7 +311,12 @@ export default function DashboardApp() {
 					/>
 				}
 			</div>
-		:	renderSettingsView(activeSection);
+		:	<div className="relative flex min-w-0 flex-1 flex-col">
+			{renderSettingsView(activeSection)}
+			<div className="absolute right-8 top-5">
+				<CreateUnitButton onClick={openCreateView} />
+			</div>
+		</div>;
 
 	if (isDidacticUnitEditorRoute) {
 		return (

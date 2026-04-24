@@ -390,13 +390,20 @@ function validateReferenceSyllabusLength(
 ): DidacticUnitReferenceSyllabus {
 	const expectedModuleCount = resolveTargetChapterCount(length);
 
-	if (syllabus.modules.length !== expectedModuleCount) {
+	if (syllabus.modules.length < expectedModuleCount) {
 		throw new Error(
 			`Syllabus generation returned ${syllabus.modules.length} modules; expected exactly ${expectedModuleCount}.`,
 		);
 	}
 
-	return syllabus;
+	if (syllabus.modules.length === expectedModuleCount) {
+		return syllabus;
+	}
+
+	return {
+		...syllabus,
+		modules: syllabus.modules.slice(0, expectedModuleCount),
+	};
 }
 
 function ensureReferenceSyllabusTopic(

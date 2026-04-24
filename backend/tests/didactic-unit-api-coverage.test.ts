@@ -1,5 +1,6 @@
 import request from "supertest";
 import {describe, expect, it} from "vitest";
+import type {AiService} from "../src/ai/service.js";
 import {createTestApp} from "./helpers/create-test-app.js";
 import {
 	createApprovedDidacticUnit,
@@ -8,6 +9,7 @@ import {
 	createDidacticUnit,
 	generateDidacticUnitChapter,
 } from "./helpers/didactic-unit-flow.js";
+import {createMockAiService} from "./helpers/mock-ai-service.js";
 
 describe("didactic-unit API coverage", () => {
 	it("gets a didactic unit by id with the complete approved syllabus payload", async () => {
@@ -354,5 +356,81 @@ describe("didactic-unit API coverage", () => {
 
 		expect(syllabusResponse.status).toBe(200);
 		expect(syllabusResponse.body.syllabus.chapters).toHaveLength(12);
+	});
+
+	it("trims extra textbook modules returned by streamed syllabus generation", async () => {
+		const baseAiService = createMockAiService();
+		const aiService: AiService = {
+			...baseAiService,
+			async generateSyllabus(input) {
+				const result = await baseAiService.generateSyllabus(input);
+				return {
+					...result,
+					syllabus: {
+						...result.syllabus,
+						modules: [
+							...result.syllabus.modules,
+							{
+								title: "Bonus module",
+								overview:
+									"A spillover module that should be trimmed.",
+								lessons: [
+									{
+										title: "Overflow lesson",
+										contentOutline: [
+											"Keep the syllabus within the requested size",
+										],
+									},
+								],
+							},
+						],
+					},
+				};
+			},
+		};
+		const app = createTestApp({aiService});
+
+		const createdResponse = await request(app)
+			.post("/api/didactic-unit")
+			.send({
+				topic: "python scripting",
+				length: "textbook",
+			});
+
+		expect(createdResponse.status).toBe(201);
+
+		await advanceToQuestionnaireAnswered(app, createdResponse.body.id);
+
+		const streamResponse = await request(app)
+			.post(
+				`/api/didactic-unit/${createdResponse.body.id}/syllabus/generate/stream`,
+			)
+			.send({tier: "cheap"});
+
+		expect(streamResponse.status).toBe(200);
+
+		const events = streamResponse.text
+			.trim()
+			.split("\n")
+			.map((line) => JSON.parse(line) as {type: string; data?: unknown});
+		const completeEvent = [...events]
+			.reverse()
+			.find((event) => event.type === "complete");
+
+		expect(events.some((event) => event.type === "error")).toBe(false);
+		expect(completeEvent).toBeTruthy();
+		expect(completeEvent?.data).toMatchObject({
+			id: createdResponse.body.id,
+			syllabus: {
+				chapters: expect.any(Array),
+			},
+		});
+		expect(
+			(
+				completeEvent?.data as {
+					syllabus: {chapters: unknown[]};
+				}
+			).syllabus.chapters,
+		).toHaveLength(12);
 	});
 });

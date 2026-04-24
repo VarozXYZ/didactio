@@ -13,6 +13,7 @@ import {
 } from "./planning.js";
 import type {DidacticUnit} from "./create-didactic-unit.js";
 import type {AuthoringConfig} from "../ai/config.js";
+import {resolveTargetChapterCount} from "../ai/prompt-builders.js";
 
 function withUpdatedAt<T extends DidacticUnit>(didacticUnit: T): T {
 	return {
@@ -93,6 +94,28 @@ function mergeAdditionalContext(
 	}
 
 	return `${normalizedExisting}\n\nAdditional syllabus guidance:\n${normalizedExtra}`;
+}
+
+function normalizeGeneratedReferenceSyllabus(
+	didacticUnit: DidacticUnit,
+	syllabus: DidacticUnitReferenceSyllabus,
+): DidacticUnitReferenceSyllabus {
+	const expectedModuleCount = resolveTargetChapterCount(didacticUnit.length);
+
+	if (syllabus.modules.length < expectedModuleCount) {
+		throw new Error(
+			`Syllabus generation returned ${syllabus.modules.length} modules; expected exactly ${expectedModuleCount}.`,
+		);
+	}
+
+	if (syllabus.modules.length === expectedModuleCount) {
+		return syllabus;
+	}
+
+	return {
+		...syllabus,
+		modules: syllabus.modules.slice(0, expectedModuleCount),
+	};
 }
 
 export function moderateDidacticUnitPlanning(
@@ -291,8 +314,12 @@ export function applyGeneratedDidacticUnitSyllabus(
 		);
 	}
 
+	const normalizedSyllabus = normalizeGeneratedReferenceSyllabus(
+		didacticUnit,
+		syllabus,
+	);
 	const compatibilitySyllabus =
-		adaptReferenceSyllabusToDidacticUnitSyllabus(syllabus);
+		adaptReferenceSyllabusToDidacticUnitSyllabus(normalizedSyllabus);
 
 	return withUpdatedAt({
 		...didacticUnit,
@@ -300,7 +327,7 @@ export function applyGeneratedDidacticUnitSyllabus(
 		overview: compatibilitySyllabus.overview,
 		learningGoals: [...compatibilitySyllabus.learningGoals],
 		keywords: [...compatibilitySyllabus.keywords],
-		modules: syllabus.modules.map((module) => ({
+		modules: normalizedSyllabus.modules.map((module) => ({
 			title: module.title,
 			overview: module.overview,
 			lessons: module.lessons.map((lesson) => ({
@@ -319,7 +346,7 @@ export function applyGeneratedDidacticUnitSyllabus(
 		})),
 		status: "syllabus_ready",
 		nextAction: "review_syllabus",
-		referenceSyllabus: syllabus,
+		referenceSyllabus: normalizedSyllabus,
 		syllabus: compatibilitySyllabus,
 		syllabusGeneratedAt: new Date().toISOString(),
 	});
