@@ -169,13 +169,14 @@ describe("didactic-unit API coverage", () => {
 			.put(
 				`/api/didactic-unit/${approved.id}/chapters/0/reading-progress`,
 			)
-			.send({readCharacterCount: 40});
+			.send({readCharacterCount: 40, lastVisitedPageIndex: 2});
 
 		expect(firstProgressResponse.status).toBe(200);
 		expect(firstProgressResponse.body.module).toMatchObject({
 			chapterIndex: 0,
 			readCharacterCount: 40,
 			totalCharacterCount: chapterResponse.body.totalCharacterCount,
+			lastVisitedPageIndex: 2,
 			isCompleted: false,
 		});
 		expect(firstProgressResponse.body.studyProgress).toMatchObject({
@@ -188,10 +189,21 @@ describe("didactic-unit API coverage", () => {
 			.put(
 				`/api/didactic-unit/${approved.id}/chapters/0/reading-progress`,
 			)
-			.send({readCharacterCount: 10});
+			.send({readCharacterCount: 10, lastVisitedPageIndex: 1});
 
 		expect(secondProgressResponse.status).toBe(200);
 		expect(secondProgressResponse.body.module.readCharacterCount).toBe(40);
+		expect(secondProgressResponse.body.module.lastVisitedPageIndex).toBe(1);
+
+		const listResponse = await request(app)
+			.get(`/api/didactic-unit/${approved.id}/chapters`)
+			.expect(200);
+		expect(listResponse.body.chapters[0].lastVisitedPageIndex).toBe(1);
+
+		const detailResponse = await request(app)
+			.get(`/api/didactic-unit/${approved.id}/chapters/0`)
+			.expect(200);
+		expect(detailResponse.body.lastVisitedPageIndex).toBe(1);
 	});
 
 	it("resets module reading progress when generated content is edited", async () => {

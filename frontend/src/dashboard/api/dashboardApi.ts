@@ -129,6 +129,7 @@ export interface BackendDidacticUnitChapterSummary {
 	hasGeneratedContent: boolean;
 	readCharacterCount: number;
 	totalCharacterCount: number;
+	lastVisitedPageIndex?: number;
 	isCompleted: boolean;
 	state: "pending" | "ready" | "failed";
 	generatedAt?: string;
@@ -145,6 +146,7 @@ export interface BackendDidacticUnitChapterDetail {
 	state: "pending" | "ready" | "failed";
 	readCharacterCount: number;
 	totalCharacterCount: number;
+	lastVisitedPageIndex?: number;
 	isCompleted: boolean;
 	generatedAt?: string;
 	updatedAt?: string;
@@ -698,12 +700,18 @@ export const dashboardApi = {
 		id: string,
 		chapterIndex: number,
 		readCharacterCount: number,
+		lastVisitedPageIndex?: number,
 	) {
 		return requestJson<BackendDidacticUnitReadingProgressResponse>(
 			`/api/didactic-unit/${id}/modules/${chapterIndex}/reading-progress`,
 			{
 				method: "PUT",
-				body: JSON.stringify({readCharacterCount}),
+				body: JSON.stringify({
+					readCharacterCount,
+					...(lastVisitedPageIndex !== undefined ?
+						{lastVisitedPageIndex}
+					: 	{}),
+				}),
 			},
 		);
 	},

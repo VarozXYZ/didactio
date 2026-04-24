@@ -5,6 +5,8 @@ export interface DidacticUnitModuleReadProgress {
 	moduleIndex: number;
 	readCharacterCount: number;
 	lastReadAt: string;
+	lastVisitedPageIndex?: number;
+	lastVisitedAt?: string;
 }
 
 function cleanToken(token: string): string {
@@ -380,6 +382,7 @@ export function updateDidacticUnitModuleReadProgress(
 	didacticUnit: DidacticUnit,
 	moduleIndex: number,
 	requestedReadCharacterCount: number,
+	requestedLastVisitedPageIndex?: number,
 ): DidacticUnit {
 	const generatedModule = getGeneratedModule(didacticUnit, moduleIndex);
 
@@ -399,14 +402,21 @@ export function updateDidacticUnitModuleReadProgress(
 		didacticUnit,
 		moduleIndex,
 	);
+	const previousReadCharacterCount = existingProgress?.readCharacterCount ?? 0;
 	const nextReadCharacterCount = Math.max(
-		existingProgress?.readCharacterCount ?? 0,
+		previousReadCharacterCount,
 		clampedRequestedReadCharacterCount,
 	);
+	const nextLastVisitedPageIndex =
+		requestedLastVisitedPageIndex ?? existingProgress?.lastVisitedPageIndex;
+	const didReadAdvance = nextReadCharacterCount > previousReadCharacterCount;
+	const didLastVisitedPageChange =
+		nextLastVisitedPageIndex !== existingProgress?.lastVisitedPageIndex;
 
 	if (
 		existingProgress &&
-		existingProgress.readCharacterCount === nextReadCharacterCount
+		existingProgress.readCharacterCount === nextReadCharacterCount &&
+		!didLastVisitedPageChange
 	) {
 		return didacticUnit;
 	}
@@ -419,7 +429,15 @@ export function updateDidacticUnitModuleReadProgress(
 		{
 			moduleIndex,
 			readCharacterCount: nextReadCharacterCount,
-			lastReadAt: updatedAt,
+			lastReadAt:
+				didReadAdvance || !existingProgress ?
+					updatedAt
+				: existingProgress.lastReadAt,
+			lastVisitedPageIndex: nextLastVisitedPageIndex,
+			lastVisitedAt:
+				requestedLastVisitedPageIndex !== undefined ?
+					updatedAt
+				: existingProgress?.lastVisitedAt,
 		},
 	].sort((left, right) => left.moduleIndex - right.moduleIndex);
 

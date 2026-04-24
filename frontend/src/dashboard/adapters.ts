@@ -260,6 +260,8 @@ function buildEditorChapter(
 			detail?.readCharacterCount ?? summary.readCharacterCount,
 		totalCharacterCount:
 			detail?.totalCharacterCount ?? summary.totalCharacterCount,
+		lastVisitedPageIndex:
+			detail?.lastVisitedPageIndex ?? summary.lastVisitedPageIndex,
 		presentationSettings: resolvePresentationSettings(
 			detail?.presentationSettings,
 		),

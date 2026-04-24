@@ -66,7 +66,6 @@ import {
 import {loadFonts} from "../../utils/fontLoader";
 import {
 	calculateSpreadMetrics,
-	findResumeSpreadIndex,
 	getReadCharacterCountForSpread,
 	getStatusPillClass,
 	measurePages,
@@ -228,6 +227,7 @@ type UnitEditorProps = {
 };
 
 type ChapterDraft = {
+	chapterIndex: number;
 	title: string;
 	contentMarkdown: string;
 	presentationSettings: ChapterPresentationSettings;
@@ -297,6 +297,7 @@ function buildDraft(
 	detail: BackendDidacticUnitChapterDetail | undefined,
 ): ChapterDraft {
 	return {
+		chapterIndex: chapter.chapterIndex,
 		title: detail?.title ?? chapter.title,
 		contentMarkdown: normalizeStoredMarkdown(
 			detail?.content ?? chapter.content,
@@ -346,6 +347,13 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 	const [regenerateConfirmOpen, setRegenerateConfirmOpen] = useState(false);
 	const [currentSpread, setCurrentSpread] = useState(0);
+	const [activeChapterActivation, setActiveChapterActivation] = useState({
+		chapterIndex: 0,
+		key: 0,
+	});
+	const [lastRestoredActivationKey, setLastRestoredActivationKey] = useState<
+		number | null
+	>(null);
 	const [contentPageDrafts, setContentPageDrafts] = useState<string[]>([]);
 	const [activeLexicalEditor, setActiveLexicalEditor] =
 		useState<LexicalEditor | null>(null);
@@ -371,6 +379,18 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	const isEditModeRef = useRef(false);
 	const generationQueueBlockedRef = useRef(false);
 	const isGenerationQueueRunningRef = useRef(false);
+	const readingProgressRequestIdRef = useRef(0);
+	const lastVisitedPageByChapterRef = useRef<Record<number, number | undefined>>(
+		{},
+	);
+	const isReadingProgressSaveInFlightRef = useRef(false);
+	const pendingReadingProgressSaveRef = useRef<{
+		chapter: DidacticUnitEditorChapter;
+		readCharacterCount: number;
+		lastVisitedPageIndex?: number;
+		resolve: (didPersist: boolean) => void;
+	} | null>(null);
+	const lastReadingProgressPayloadRef = useRef<string | null>(null);
 	const streamingMarkdownBufferRef = useRef("");
 	const streamingMarkdownFlushTimeoutRef = useRef<number | null>(null);
 
@@ -411,7 +431,16 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			activeChapter?.level,
 		],
 	);
-	const activeDraftContent = draft?.contentMarkdown ?? "";
+	const isDraftForActiveChapter =
+		draft !== null &&
+		activeChapter !== null &&
+		draft.chapterIndex === activeChapter.chapterIndex;
+	const activeDraftContent =
+		isDraftForActiveChapter ?
+			draft.contentMarkdown
+		: 	normalizeStoredMarkdown(
+				activeChapterDetail?.content ?? activeChapter?.content ?? "",
+			);
 	const hasNextActiveModule = useMemo(
 		() =>
 			activeChapter ?
@@ -486,11 +515,19 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 					chapterSummaries: chaptersResponse.chapters,
 					chapterDetails: detailMap,
 				});
+				nextWorkspace.chapters.forEach((chapter) => {
+					if (chapter.lastVisitedPageIndex !== undefined) {
+						lastVisitedPageByChapterRef.current[
+							chapter.chapterIndex
+						] = chapter.lastVisitedPageIndex;
+					}
+				});
+
 				const nextActiveChapter =
 					nextWorkspace.chapters.find(
 						(chapter) =>
 							chapter.chapterIndex ===
-							(preferredChapterIndex ?? activeChapterIndex),
+							(preferredChapterIndex ?? activeChapterIndexRef.current),
 					) ??
 					nextWorkspace.chapters[0] ??
 					null;
@@ -534,7 +571,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				}
 			}
 		},
-		[activeChapterIndex, didacticUnitId, loadRevisions],
+		[didacticUnitId, loadRevisions],
 	);
 
 	useEffect(() => {
@@ -543,6 +580,10 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 
 	useEffect(() => {
 		activeChapterIndexRef.current = activeChapterIndex;
+		setActiveChapterActivation((previousActivation) => ({
+			chapterIndex: activeChapterIndex,
+			key: previousActivation.key + 1,
+		}));
 	}, [activeChapterIndex]);
 
 	useEffect(() => {
@@ -550,7 +591,19 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	}, [isEditMode]);
 
 	useEffect(() => {
-		if (!workspace || !activeChapter) {
+		if (!activeChapter) {
+			return;
+		}
+
+		void loadRevisions(activeChapter.chapterIndex);
+	}, [activeChapter?.chapterIndex, loadRevisions]);
+
+	useEffect(() => {
+		lastReadingProgressPayloadRef.current = null;
+	}, [activeChapter?.chapterIndex, activeChapter?.totalCharacterCount]);
+
+	useEffect(() => {
+		if (!activeChapter) {
 			return;
 		}
 
@@ -563,9 +616,8 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 
 		setIsEditMode(false);
 		setActiveLexicalEditor(null);
-		setCurrentSpread(0);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [
-		workspace,
 		activeChapter?.chapterIndex,
 		activeChapter?.title,
 		activeChapter?.content,
@@ -625,7 +677,10 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		[],
 	);
 
-	const activeDraftSettings = draft?.presentationSettings;
+	const activeDraftSettings =
+		isDraftForActiveChapter ?
+			draft.presentationSettings
+		: 	activeChapter?.presentationSettings;
 
 	useEffect(() => {
 		if (fontsReady) return;
@@ -718,16 +773,37 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			return;
 		}
 
-		setCurrentSpread(
-			findResumeSpreadIndex(
-				measuredReadPages,
-				activeChapter.readCharacterCount,
-			),
+		if (
+			activeChapterActivation.chapterIndex !== activeChapter.chapterIndex ||
+			lastRestoredActivationKey === activeChapterActivation.key
+		) {
+			return;
+		}
+
+		const savedLastVisitedPageIndex =
+			lastVisitedPageByChapterRef.current[activeChapter.chapterIndex] ??
+			activeChapter.lastVisitedPageIndex ??
+			0;
+
+		if (
+			savedLastVisitedPageIndex > 0 &&
+			measuredReadPages.length <= savedLastVisitedPageIndex
+		) {
+			return;
+		}
+
+		const lastVisitedPageIndex = Math.max(
+			0,
+			Math.min(savedLastVisitedPageIndex, measuredReadPages.length - 1),
 		);
+		setCurrentSpread(Math.floor(lastVisitedPageIndex / 2));
+		setLastRestoredActivationKey(activeChapterActivation.key);
 	}, [
 		activeChapter?.chapterIndex,
-		activeChapter?.readCharacterCount,
+		activeChapter?.lastVisitedPageIndex,
+		activeChapterActivation,
 		isEditMode,
+		lastRestoredActivationKey,
 		measuredReadPages,
 	]);
 
@@ -779,9 +855,15 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			chapterIndex: number;
 			readCharacterCount: number;
 			totalCharacterCount: number;
+			lastVisitedPageIndex?: number;
 			studyProgressPercent?: number;
 			completedAt?: string;
 		}) => {
+			if (input.lastVisitedPageIndex !== undefined) {
+				lastVisitedPageByChapterRef.current[input.chapterIndex] =
+					input.lastVisitedPageIndex;
+			}
+
 			const isCompleted =
 				input.totalCharacterCount > 0 &&
 				input.readCharacterCount >= input.totalCharacterCount;
@@ -793,21 +875,39 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 					return currentDetails;
 				}
 
+				const nextDetail = {
+					...currentDetail,
+					readCharacterCount: Math.max(
+						currentDetail.readCharacterCount,
+						input.readCharacterCount,
+					),
+					totalCharacterCount: input.totalCharacterCount,
+					lastVisitedPageIndex:
+						input.lastVisitedPageIndex ??
+						currentDetail.lastVisitedPageIndex,
+					isCompleted,
+					completedAt:
+						isCompleted ?
+							(input.completedAt ?? currentDetail.completedAt)
+						: 	undefined,
+				};
+
+				if (
+					currentDetail.readCharacterCount ===
+						nextDetail.readCharacterCount &&
+					currentDetail.totalCharacterCount ===
+						nextDetail.totalCharacterCount &&
+					currentDetail.lastVisitedPageIndex ===
+						nextDetail.lastVisitedPageIndex &&
+					currentDetail.isCompleted === nextDetail.isCompleted &&
+					currentDetail.completedAt === nextDetail.completedAt
+				) {
+					return currentDetails;
+				}
+
 				return {
 					...currentDetails,
-					[input.chapterIndex]: {
-						...currentDetail,
-						readCharacterCount: Math.max(
-							currentDetail.readCharacterCount,
-							input.readCharacterCount,
-						),
-						totalCharacterCount: input.totalCharacterCount,
-						isCompleted,
-						completedAt:
-							isCompleted ?
-								(input.completedAt ?? currentDetail.completedAt)
-							:	undefined,
-					},
+					[input.chapterIndex]: nextDetail,
 				};
 			});
 
@@ -816,33 +916,56 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 					return currentWorkspace;
 				}
 
-				const chapters = currentWorkspace.chapters.map((chapter) =>
-					chapter.chapterIndex === input.chapterIndex ?
-						{
-							...chapter,
-							readCharacterCount: Math.max(
-								chapter.readCharacterCount,
-								input.readCharacterCount,
-							),
-							totalCharacterCount: input.totalCharacterCount,
-							isCompleted,
-							completedAt:
-								isCompleted ?
-									(input.completedAt ?? chapter.completedAt)
-								:	undefined,
-						}
-					:	chapter,
-				);
+				let didChapterChange = false;
+				const chapters = currentWorkspace.chapters.map((chapter) => {
+					if (chapter.chapterIndex !== input.chapterIndex) {
+						return chapter;
+					}
+
+					const nextChapter = {
+						...chapter,
+						readCharacterCount: Math.max(
+							chapter.readCharacterCount,
+							input.readCharacterCount,
+						),
+						totalCharacterCount: input.totalCharacterCount,
+						lastVisitedPageIndex:
+							input.lastVisitedPageIndex ??
+							chapter.lastVisitedPageIndex,
+						isCompleted,
+						completedAt:
+							isCompleted ?
+								(input.completedAt ?? chapter.completedAt)
+							: 	undefined,
+					};
+
+					didChapterChange =
+						chapter.readCharacterCount !==
+							nextChapter.readCharacterCount ||
+						chapter.totalCharacterCount !==
+							nextChapter.totalCharacterCount ||
+						chapter.lastVisitedPageIndex !==
+							nextChapter.lastVisitedPageIndex ||
+						chapter.isCompleted !== nextChapter.isCompleted ||
+						chapter.completedAt !== nextChapter.completedAt;
+
+					return didChapterChange ? nextChapter : chapter;
+				});
+				const progress =
+					input.studyProgressPercent ??
+					calculateUnitStudyProgressPercent(chapters, {
+						chapterIndex: input.chapterIndex,
+						readCharacterCount: input.readCharacterCount,
+						totalCharacterCount: input.totalCharacterCount,
+					});
+
+				if (!didChapterChange && currentWorkspace.progress === progress) {
+					return currentWorkspace;
+				}
 
 				return {
 					...currentWorkspace,
-					progress:
-						input.studyProgressPercent ??
-						calculateUnitStudyProgressPercent(chapters, {
-							chapterIndex: input.chapterIndex,
-							readCharacterCount: input.readCharacterCount,
-							totalCharacterCount: input.totalCharacterCount,
-						}),
+					progress,
 					chapters,
 				};
 			});
@@ -860,6 +983,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				chapterIndex: response.module.chapterIndex,
 				readCharacterCount: response.module.readCharacterCount,
 				totalCharacterCount: response.module.totalCharacterCount,
+				lastVisitedPageIndex: response.module.lastVisitedPageIndex,
 				studyProgressPercent:
 					response.studyProgress.studyProgressPercent,
 				completedAt: response.module.completedAt,
@@ -1184,10 +1308,11 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		);
 	};
 
-	const persistReadProgress = useCallback(
+	const sendReadingProgress = useCallback(
 		async (
 			chapter: DidacticUnitEditorChapter,
 			readCharacterCount: number,
+			lastVisitedPageIndex?: number,
 		): Promise<boolean> => {
 			if (
 				chapter.status !== "ready" ||
@@ -1196,28 +1321,71 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				return false;
 			}
 
-			if (readCharacterCount <= chapter.readCharacterCount) {
+			const clampedReadCharacterCount = Math.max(
+				0,
+				Math.min(
+					chapter.totalCharacterCount,
+					Math.floor(readCharacterCount),
+				),
+			);
+			const nextReadCharacterCount = Math.max(
+				chapter.readCharacterCount,
+				clampedReadCharacterCount,
+			);
+			const didReadAdvance =
+				nextReadCharacterCount > chapter.readCharacterCount;
+			const didVisitPage =
+				lastVisitedPageIndex !== undefined &&
+				lastVisitedPageIndex !== chapter.lastVisitedPageIndex;
+
+			if (!didReadAdvance && !didVisitPage) {
 				return true;
 			}
 
+			const payloadKey = [
+				chapter.chapterIndex,
+				chapter.totalCharacterCount,
+				nextReadCharacterCount,
+				lastVisitedPageIndex ?? "",
+			].join(":");
+
+			if (lastReadingProgressPayloadRef.current === payloadKey) {
+				return true;
+			}
+
+			lastReadingProgressPayloadRef.current = payloadKey;
+
 			applyReadingProgressLocally({
 				chapterIndex: chapter.chapterIndex,
-				readCharacterCount,
+				readCharacterCount: nextReadCharacterCount,
 				totalCharacterCount: chapter.totalCharacterCount,
+				lastVisitedPageIndex,
 			});
+
+			const requestId = readingProgressRequestIdRef.current + 1;
+			readingProgressRequestIdRef.current = requestId;
 
 			try {
 				const response =
 					await dashboardApi.updateDidacticUnitReadingProgress(
 						didacticUnitId,
 						chapter.chapterIndex,
-						readCharacterCount,
+						nextReadCharacterCount,
+						lastVisitedPageIndex,
 					);
 
-				reconcileReadingProgress(response);
-				onDataChanged();
+				if (requestId === readingProgressRequestIdRef.current) {
+					reconcileReadingProgress(response);
+					onDataChanged();
+				}
 				return true;
 			} catch (actionError) {
+				if (requestId !== readingProgressRequestIdRef.current) {
+					return true;
+				}
+
+				lastReadingProgressPayloadRef.current = null;
+
 				toastError(
 					actionError instanceof Error ?
 						actionError.message
@@ -1239,6 +1407,89 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		],
 	);
 
+	const flushReadingProgressSaveQueue = useCallback(() => {
+		if (isReadingProgressSaveInFlightRef.current) {
+			return;
+		}
+
+		const pendingSave = pendingReadingProgressSaveRef.current;
+		if (!pendingSave) {
+			return;
+		}
+
+		pendingReadingProgressSaveRef.current = null;
+		isReadingProgressSaveInFlightRef.current = true;
+
+		void (async () => {
+			const didPersist = await sendReadingProgress(
+				pendingSave.chapter,
+				pendingSave.readCharacterCount,
+				pendingSave.lastVisitedPageIndex,
+			);
+			pendingSave.resolve(didPersist);
+			isReadingProgressSaveInFlightRef.current = false;
+			flushReadingProgressSaveQueue();
+		})();
+	}, [sendReadingProgress]);
+
+	const persistReadProgress = useCallback(
+		(
+			chapter: DidacticUnitEditorChapter,
+			readCharacterCount: number,
+			lastVisitedPageIndex?: number,
+		): Promise<boolean> => {
+			if (
+				chapter.status !== "ready" ||
+				chapter.totalCharacterCount === 0
+			) {
+				return Promise.resolve(false);
+			}
+
+			const clampedReadCharacterCount = Math.max(
+				0,
+				Math.min(
+					chapter.totalCharacterCount,
+					Math.floor(readCharacterCount),
+				),
+			);
+			const nextReadCharacterCount = Math.max(
+				chapter.readCharacterCount,
+				clampedReadCharacterCount,
+			);
+			const didReadAdvance =
+				nextReadCharacterCount > chapter.readCharacterCount;
+			const didVisitPage =
+				lastVisitedPageIndex !== undefined &&
+				lastVisitedPageIndex !== chapter.lastVisitedPageIndex;
+
+			if (!didReadAdvance && !didVisitPage) {
+				return Promise.resolve(true);
+			}
+
+			applyReadingProgressLocally({
+				chapterIndex: chapter.chapterIndex,
+				readCharacterCount: nextReadCharacterCount,
+				totalCharacterCount: chapter.totalCharacterCount,
+				lastVisitedPageIndex,
+			});
+
+			return new Promise((resolve) => {
+				if (pendingReadingProgressSaveRef.current) {
+					pendingReadingProgressSaveRef.current.resolve(true);
+				}
+
+				pendingReadingProgressSaveRef.current = {
+					chapter,
+					readCharacterCount: nextReadCharacterCount,
+					lastVisitedPageIndex,
+					resolve,
+				};
+				flushReadingProgressSaveQueue();
+			});
+		},
+		[applyReadingProgressLocally, flushReadingProgressSaveQueue],
+	);
+
 	const handlePostModulePrimaryAction = useCallback(async () => {
 		if (!workspace || !activeChapter || isPostModuleActionPending) {
 			return;
@@ -1249,6 +1500,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		const didPersist = await persistReadProgress(
 			activeChapter,
 			activeChapter.totalCharacterCount,
+			Math.max(0, measuredReadPages.length - 1),
 		);
 
 		if (!didPersist) {
@@ -1273,6 +1525,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	}, [
 		activeChapter,
 		isPostModuleActionPending,
+		measuredReadPages.length,
 		navigate,
 		persistReadProgress,
 		workspace,
@@ -1286,42 +1539,62 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	const canGoPrev = currentSpread > 0;
 	const canGoNext = currentSpread < totalSpreads - 1;
 
+	const persistVisitedSpread = useCallback(
+		(nextSpread: number) => {
+			if (
+				isEditMode ||
+				!activeChapter ||
+				measuredReadPages.length === 0
+			) {
+				return;
+			}
+
+			const lastVisitedPageIndex = Math.max(
+				0,
+				Math.min(nextSpread * 2 + 1, measuredReadPages.length - 1),
+			);
+			const readCharacterCount = getReadCharacterCountForSpread(
+				measuredReadPages,
+				nextSpread,
+			);
+
+			void persistReadProgress(
+				activeChapter,
+				readCharacterCount,
+				lastVisitedPageIndex,
+			);
+		},
+		[activeChapter, isEditMode, measuredReadPages, persistReadProgress],
+	);
+
 	const goToNextSpread = useCallback(() => {
 		if (!canGoNext) {
 			return;
 		}
 
-		if (!isEditMode && activeChapter) {
-			const readCharacterCount = getReadCharacterCountForSpread(
-				measuredReadPages,
-				currentSpread,
-			);
-
-			if (readCharacterCount > 0) {
-				void persistReadProgress(activeChapter, readCharacterCount);
-			}
+		const nextSpread = Math.min(currentSpread + 1, totalSpreads - 1);
+		if (nextSpread === currentSpread) {
+			return;
 		}
 
-		setCurrentSpread((previousSpread) =>
-			previousSpread < totalSpreads - 1 ?
-				previousSpread + 1
-			:	previousSpread,
-		);
+		setCurrentSpread(nextSpread);
+		persistVisitedSpread(nextSpread);
 	}, [
-		activeChapter,
 		canGoNext,
 		currentSpread,
-		isEditMode,
-		measuredReadPages,
-		persistReadProgress,
+		persistVisitedSpread,
 		totalSpreads,
 	]);
 
 	const goToPrevSpread = useCallback(() => {
-		setCurrentSpread((previousSpread) =>
-			previousSpread > 0 ? previousSpread - 1 : 0,
-		);
-	}, []);
+		const nextSpread = Math.max(currentSpread - 1, 0);
+		if (nextSpread === currentSpread) {
+			return;
+		}
+
+		setCurrentSpread(nextSpread);
+		persistVisitedSpread(nextSpread);
+	}, [currentSpread, persistVisitedSpread]);
 
 	useEffect(() => {
 		if (currentSpread > totalSpreads - 1) {

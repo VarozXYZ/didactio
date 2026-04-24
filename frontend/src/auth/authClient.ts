@@ -146,6 +146,7 @@ export const authClient = {
 
 		let response = await fetch(input, {
 			...init,
+			cache: init.cache ?? "no-store",
 			headers,
 			credentials: "include",
 		});
@@ -167,6 +168,7 @@ export const authClient = {
 
 		response = await fetch(input, {
 			...init,
+			cache: init.cache ?? "no-store",
 			headers: retryHeaders,
 			credentials: "include",
 		});

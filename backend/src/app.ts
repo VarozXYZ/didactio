@@ -160,12 +160,16 @@ function parseChapterIndex(value: string): number {
 
 function parseModuleReadProgressInput(body: unknown): {
 	readCharacterCount: number;
+	lastVisitedPageIndex?: number;
 } {
 	if (!body || typeof body !== "object") {
 		throw new Error("Request body must be a JSON object.");
 	}
 
-	const payload = body as {readCharacterCount?: unknown};
+	const payload = body as {
+		readCharacterCount?: unknown;
+		lastVisitedPageIndex?: unknown;
+	};
 
 	if (
 		typeof payload.readCharacterCount !== "number" ||
@@ -180,8 +184,23 @@ function parseModuleReadProgressInput(body: unknown): {
 		);
 	}
 
+	if (
+		payload.lastVisitedPageIndex !== undefined &&
+		(
+			typeof payload.lastVisitedPageIndex !== "number" ||
+			!Number.isFinite(payload.lastVisitedPageIndex) ||
+			!Number.isInteger(payload.lastVisitedPageIndex) ||
+			payload.lastVisitedPageIndex < 0
+		)
+	) {
+		throw new Error(
+			"lastVisitedPageIndex must be a non-negative integer.",
+		);
+	}
+
 	return {
 		readCharacterCount: payload.readCharacterCount,
+		lastVisitedPageIndex: payload.lastVisitedPageIndex,
 	};
 }
 
@@ -621,13 +640,13 @@ function buildDidacticUnitModuleDetailResponse(input: {
 		input.didacticUnit,
 		input.moduleIndex,
 	);
+	const readProgress = getModuleReadProgressRecord(
+		input.didacticUnit,
+		input.moduleIndex,
+	);
 	const isCompleted =
 		totalCharacterCount > 0 && readCharacterCount >= totalCharacterCount;
-	const completedAt =
-		isCompleted ?
-			getModuleReadProgressRecord(input.didacticUnit, input.moduleIndex)
-				?.lastReadAt
-		:	undefined;
+	const completedAt = isCompleted ? readProgress?.lastReadAt : undefined;
 
 	return {
 		chapterIndex: input.moduleIndex,
@@ -648,6 +667,7 @@ function buildDidacticUnitModuleDetailResponse(input: {
 		totalCharacterCount,
 		isCompleted,
 		completedAt,
+		lastVisitedPageIndex: readProgress?.lastVisitedPageIndex,
 	};
 }
 
@@ -741,6 +761,7 @@ async function recordFailedChapterRun(
 
 export function createApp(options: CreateAppOptions) {
 	const app = express();
+	app.set("etag", false);
 	const didacticUnitStore = options.didacticUnitStore;
 	const generationRunStore = options.generationRunStore;
 	const folderStore = options.folderStore;
@@ -830,6 +851,14 @@ export function createApp(options: CreateAppOptions) {
 
 	app.use("/auth", createAuthRouter(authConfig, authService, passport));
 	app.use("/api", (request, response, next) => {
+		response.setHeader(
+			"Cache-Control",
+			"no-store, no-cache, must-revalidate, proxy-revalidate",
+		);
+		response.setHeader("Pragma", "no-cache");
+		response.setHeader("Expires", "0");
+		response.removeHeader("ETag");
+
 		if (request.path === "/health") {
 			next();
 			return;
@@ -2370,6 +2399,7 @@ export function createApp(options: CreateAppOptions) {
 						didacticUnit,
 						chapterIndex,
 						parsedInput.readCharacterCount,
+						parsedInput.lastVisitedPageIndex,
 					);
 				await didacticUnitStore.save(updatedDidacticUnit);
 

@@ -132,6 +132,7 @@ export interface DidacticUnitEditorChapter {
 	completedAt?: string;
 	readCharacterCount: number;
 	totalCharacterCount: number;
+	lastVisitedPageIndex?: number;
 	presentationSettings: ChapterPresentationSettings;
 }
 

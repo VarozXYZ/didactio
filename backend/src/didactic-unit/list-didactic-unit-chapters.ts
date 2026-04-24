@@ -16,6 +16,7 @@ export interface DidacticUnitChapterSummary {
 	generatedAt?: string;
 	updatedAt?: string;
 	completedAt?: string;
+	lastVisitedPageIndex?: number;
 }
 
 export function listDidacticUnitChapters(
@@ -36,11 +37,11 @@ export function listDidacticUnitChapters(
 		const isCompleted =
 			totalCharacterCount > 0 &&
 			readCharacterCount >= totalCharacterCount;
-		const completedAt =
-			isCompleted ?
-				getModuleReadProgressRecord(didacticUnit, chapterIndex)
-					?.lastReadAt
-			:	undefined;
+		const readProgress = getModuleReadProgressRecord(
+			didacticUnit,
+			chapterIndex,
+		);
+		const completedAt = isCompleted ? readProgress?.lastReadAt : undefined;
 
 		return {
 			chapterIndex,
@@ -53,6 +54,7 @@ export function listDidacticUnitChapters(
 			generatedAt: generatedChapter?.generatedAt,
 			updatedAt: generatedChapter?.updatedAt,
 			completedAt,
+			lastVisitedPageIndex: readProgress?.lastVisitedPageIndex,
 		};
 	});
 }
