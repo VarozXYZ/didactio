@@ -8,6 +8,7 @@ import {
 } from "react";
 import {
 	AlertCircle,
+	Check,
 	CheckCircle2,
 	ChevronLeft,
 	ChevronRight,
@@ -40,6 +41,7 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {Button} from "@/components/ui/button";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -2195,38 +2197,41 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 										</span>
 									</button>
 								)}
-							<button
-								className={cn(
-									"flex items-center gap-2 rounded-full px-4 py-1.5 text-[13px] font-medium transition-all",
-									isEditMode ?
-										"bg-[#4ADE80] text-white hover:bg-[#3BCD6F]"
-									:	"bg-[#1D1D1F] text-white hover:bg-[#333333]",
-								)}
-								onClick={() => {
-									if (isEditMode) {
-										void handleSave();
-										return;
-									}
-
-									enterEditMode();
-								}}
-								type="button"
-							>
-								<Edit3 size={16} />
-								<span>
-									{isEditMode ? "Save Changes" : "Edit Mode"}
-								</span>
-							</button>
-							{isEditMode && (
-								<button
-									className="flex items-center gap-2 rounded-full px-3 py-1.5 text-[13px] font-medium transition-all hover:bg-[#F5F5F7]"
-									onClick={exitEditMode}
+							{isEditMode ?
+								<div
+									className="flex h-8 w-[117px] overflow-hidden rounded-full border border-[#D4D7DD] bg-white shadow-sm"
+									role="group"
+									aria-label="Edit actions"
+								>
+									<Button
+										aria-label="Save changes"
+										className="h-full flex-1 rounded-none border-0 bg-[#4ADE80] px-0 text-white shadow-none hover:bg-[#3BCD6F] focus-visible:ring-[#4ADE80] focus-visible:ring-offset-0 active:translate-y-0"
+										onClick={() => void handleSave()}
+										size="icon-sm"
+										type="button"
+									>
+										<Check size={16} />
+									</Button>
+									<div className="w-px bg-[#D4D7DD]" />
+									<Button
+										aria-label="Cancel editing"
+										className="h-full flex-1 rounded-none border-0 bg-white px-0 text-[#86868B] shadow-none hover:bg-[#F5F5F7] hover:text-[#1D1D1F] focus-visible:ring-[#1D1D1F] focus-visible:ring-offset-0 active:translate-y-0"
+										onClick={exitEditMode}
+										size="icon-sm"
+										type="button"
+									>
+										<X size={16} />
+									</Button>
+								</div>
+							: 	<Button
+									className="h-8 w-[117px] gap-2 rounded-full bg-[#1D1D1F] px-4 py-1.5 text-[13px] font-medium text-white hover:bg-[#333333]"
+									onClick={enterEditMode}
 									type="button"
 								>
-									<X size={16} className="text-[#86868B]" />
-									<span>Cancel</span>
-								</button>
-							)}
+									<Edit3 size={16} />
+									<span>Edit Mode</span>
+								</Button>
+							}
 						</div>
 					</div>
 				</header>
