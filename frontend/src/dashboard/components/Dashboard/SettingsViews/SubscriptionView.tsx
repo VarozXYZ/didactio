@@ -1,10 +1,21 @@
+import {useEffect, useState} from "react";
 import {Sparkles} from "lucide-react";
 import {useAuth} from "../../../../auth/AuthProvider";
+import {authClient, type CreditTransaction} from "../../../../auth/authClient";
+import {CoinAmount, CoinIcon} from "@/components/Coin";
 
 export function SubscriptionView() {
 	const {user} = useAuth();
 	const credits = user?.credits ?? {bronze: 0, silver: 0, gold: 0};
 	const totalCredits = credits.bronze + credits.silver + credits.gold;
+	const [transactions, setTransactions] = useState<CreditTransaction[]>([]);
+
+	useEffect(() => {
+		void authClient
+			.listCreditTransactions()
+			.then((response) => setTransactions(response.transactions))
+			.catch(() => setTransactions([]));
+	}, []);
 
 	return (
 		<div className="flex min-w-0 flex-1 flex-col">
@@ -25,24 +36,24 @@ export function SubscriptionView() {
 						<div className="mb-6 flex items-start justify-between">
 							<div>
 								<h2 className="mb-1 text-[20px] font-bold text-[#1D1D1F]">
-									Pro Plan
+									Coin Wallet
 								</h2>
 								<p className="text-[13px] text-[#86868B]">
-									Unlimited AI generations and exports
+									Coins power syllabus creation, unit generation, and regeneration
 								</p>
 							</div>
 							<button
 								type="button"
 								className="rounded-[8px] bg-[#1D1D1F] px-5 py-2.5 text-[14px] font-semibold text-white transition-all hover:bg-[#333333]"
 							>
-								Manage Plan
+								Managed by admins
 							</button>
 						</div>
 
 						<div className="grid grid-cols-3 gap-4">
 							{[
 								"Unlimited didactic units",
-								"AI-powered content generation",
+								"Coin-backed content generation",
 								"Advanced analytics",
 								"Priority support",
 								"Export to PDF, SCORM",
@@ -85,22 +96,29 @@ export function SubscriptionView() {
 						</div>
 						<div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
 							{[
-								{label: "Bronze", value: credits.bronze, color: "#9A6B3D"},
-								{label: "Silver", value: credits.silver, color: "#8B98A7"},
-								{label: "Gold", value: credits.gold, color: "#D4A72C"},
+								{label: "Bronze", type: "bronze" as const, value: credits.bronze, color: "#9A6B3D"},
+								{label: "Silver", type: "silver" as const, value: credits.silver, color: "#8B98A7"},
+								{label: "Gold", type: "gold" as const, value: credits.gold, color: "#D4A72C"},
 							].map((coin) => (
 								<div
 									key={coin.label}
 									className="rounded-[10px] border border-[#E5E5E7] bg-[#F5F5F7] p-4"
 								>
 									<div className="text-[12px] font-semibold uppercase tracking-wide text-[#86868B]">
-										{coin.label}
+										<span className="inline-flex items-center gap-2">
+											<CoinIcon type={coin.type} size={20} />
+											{coin.label}
+										</span>
 									</div>
 									<div
 										className="mt-2 text-[28px] font-bold"
 										style={{color: coin.color}}
 									>
-										{coin.value}
+										<CoinAmount
+											type={coin.type}
+											amount={coin.value}
+											size={28}
+										/>
 									</div>
 								</div>
 							))}
@@ -134,39 +152,32 @@ export function SubscriptionView() {
 								</tr>
 							</thead>
 							<tbody>
-								{[
-									{
-										date: "Jan 1, 2026",
-										desc: "Initial wallet enabled",
-										amount: `${credits.gold} gold available`,
-									},
-									{
-										date: "Jan 1, 2026",
-										desc: "Silver coin balance",
-										amount: `${credits.silver} silver available`,
-									},
-									{
-										date: "Jan 1, 2026",
-										desc: "Bronze coin balance",
-										amount: `${credits.bronze} bronze available`,
-									},
-								].map((item) => (
+								{transactions.slice(0, 8).map((item) => (
 									<tr
-										key={item.date}
+										key={item.id}
 										className="border-b border-[#E5E5E7]"
 									>
 										<td className="px-6 py-4 text-[13px] text-[#1D1D1F]">
-											{item.date}
+											{new Date(
+												item.createdAt,
+											).toLocaleDateString()}
 										</td>
 										<td className="px-6 py-4 text-[13px] text-[#86868B]">
-											{item.desc}
+											{item.reason.replaceAll("_", " ")}
 										</td>
 										<td className="px-6 py-4 text-[13px] font-semibold text-[#1D1D1F]">
-											{item.amount}
+											<span className="inline-flex items-center gap-1">
+												{item.direction === "debit" ? "-" : "+"}
+												<CoinAmount
+													type={item.coinType}
+													amount={item.amount}
+													size={18}
+												/>
+											</span>
 										</td>
 										<td className="px-6 py-4">
 											<span className="text-[13px] font-medium text-[#86868B]">
-												Synced
+												{item.direction}
 											</span>
 										</td>
 									</tr>

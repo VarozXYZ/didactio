@@ -12,6 +12,7 @@ import {
 	buildQuestionnaireForDidacticUnit,
 } from "./planning.js";
 import type {DidacticUnit} from "./create-didactic-unit.js";
+import type {GenerationQuality} from "../credits/generation-pricing.js";
 import type {AuthoringConfig} from "../ai/config.js";
 import {resolveTargetChapterCount} from "../ai/prompt-builders.js";
 
@@ -399,7 +400,11 @@ export function updateDidacticUnitSyllabus(
 
 export function approveDidacticUnitSyllabus(
 	didacticUnit: DidacticUnit,
-	generationTier?: "cheap" | "premium",
+	input?: {
+		generationQuality?: GenerationQuality;
+		creditTransactionId?: string;
+		paidAt?: string;
+	},
 ): DidacticUnit {
 	if (didacticUnit.status !== "syllabus_ready" || !didacticUnit.syllabus) {
 		throw new Error(
@@ -411,7 +416,13 @@ export function approveDidacticUnitSyllabus(
 		...didacticUnit,
 		status: "syllabus_approved",
 		nextAction: "view_didactic_unit",
-		generationTier: generationTier ?? didacticUnit.generationTier,
+		generationQuality:
+			input?.generationQuality ?? didacticUnit.generationQuality,
+		unitGenerationPaidAt:
+			input?.paidAt ?? didacticUnit.unitGenerationPaidAt,
+		unitGenerationCreditTransactionId:
+			input?.creditTransactionId ??
+			didacticUnit.unitGenerationCreditTransactionId,
 		syllabusApprovedAt: new Date().toISOString(),
 	});
 }

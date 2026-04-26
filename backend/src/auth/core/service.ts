@@ -33,6 +33,12 @@ function emptyCredits(): CreditBalances {
 	};
 }
 
+const LAUNCH_GIFT_CREDITS: CreditBalances = {
+	bronze: 30,
+	silver: 15,
+	gold: 1,
+};
+
 export class AuthService {
 	constructor(
 		private readonly userStore: UserStore,
@@ -64,7 +70,9 @@ export class AuthService {
 		}
 
 		const role = this.resolveRoleForEmail(profile.email);
-		const user = await this.userStore.upsertFromGoogleProfile(profile, role);
+		const user = await this.ensureLaunchGift(
+			await this.userStore.upsertFromGoogleProfile(profile, role),
+		);
 		if (user.status !== "active") {
 			throw new AuthError("user_disabled", 403, "User is disabled.");
 		}
@@ -148,7 +156,8 @@ export class AuthService {
 			);
 		}
 
-		const user = await this.userStore.findById(session.userId);
+		const foundUser = await this.userStore.findById(session.userId);
+		const user = foundUser ? await this.ensureLaunchGift(foundUser) : null;
 		if (!user || user.status !== "active") {
 			await this.sessionStore.revokeAllForUser(session.userId);
 			throw new AuthError(
@@ -219,7 +228,8 @@ export class AuthService {
 	}
 
 	async getUserById(id: string): Promise<AuthUser | null> {
-		return this.userStore.findById(id);
+		const user = await this.userStore.findById(id);
+		return user ? this.ensureLaunchGift(user) : null;
 	}
 
 	async listUsers(): Promise<AuthUser[]> {
@@ -252,29 +262,25 @@ export class AuthService {
 			);
 		}
 
-		const user = await this.userStore.findById(input.userId);
+		const foundUser = await this.userStore.findById(input.userId);
+		const user = foundUser ? await this.ensureLaunchGift(foundUser) : null;
 		if (!user) {
 			throw new AuthError("user_not_found", 404, "User not found.");
 		}
 
-		const nextCredits = {
-			...(user.credits ?? emptyCredits()),
-		};
 		const delta = input.direction === "credit" ? input.amount : -input.amount;
-		const nextValue = nextCredits[input.coinType] + delta;
-
-		if (nextValue < 0) {
+		const updatedUser = await this.userStore.applyCreditDelta({
+			id: user.id,
+			coinType: input.coinType,
+			delta,
+			requireSufficientBalance: input.direction === "debit",
+		});
+		if (!updatedUser) {
 			throw new AuthError(
 				"insufficient_credits",
 				409,
 				"Credit adjustment would make the balance negative.",
 			);
-		}
-
-		nextCredits[input.coinType] = nextValue;
-		const updatedUser = await this.userStore.updateCredits(user.id, nextCredits);
-		if (!updatedUser) {
-			throw new AuthError("user_not_found", 404, "User not found.");
 		}
 
 		const transaction: CreditTransaction = {
@@ -293,6 +299,90 @@ export class AuthService {
 		return updatedUser;
 	}
 
+	async reserveUserCredits(input: {
+		userId: string;
+		coinType: CreditCoinType;
+		amount: number;
+		reason: string;
+		metadata?: unknown;
+	}): Promise<{user: AuthUser; transaction: CreditTransaction}> {
+		this.assertPositiveAmount(input.amount);
+		const foundUser = await this.userStore.findById(input.userId);
+		const user = foundUser ? await this.ensureLaunchGift(foundUser) : null;
+		if (!user) {
+			throw new AuthError("user_not_found", 404, "User not found.");
+		}
+
+		const updatedUser = await this.userStore.applyCreditDelta({
+			id: user.id,
+			coinType: input.coinType,
+			delta: -input.amount,
+			requireSufficientBalance: true,
+		});
+
+		if (!updatedUser) {
+			throw new AuthError(
+				"insufficient_credits",
+				402,
+				"Not enough coins for this generation.",
+				{
+					requiredCost: {
+						coinType: input.coinType,
+						amount: input.amount,
+					},
+					credits: user.credits ?? emptyCredits(),
+				},
+			);
+		}
+
+		const transaction = await this.createCreditTransaction({
+			userId: user.id,
+			coinType: input.coinType,
+			direction: "debit",
+			amount: input.amount,
+			reason: input.reason,
+			actorUserId: user.id,
+			metadata: input.metadata,
+		});
+
+		return {user: updatedUser, transaction};
+	}
+
+	async refundUserCredits(input: {
+		userId: string;
+		coinType: CreditCoinType;
+		amount: number;
+		reason: string;
+		metadata?: unknown;
+	}): Promise<AuthUser> {
+		this.assertPositiveAmount(input.amount);
+		const user = await this.userStore.applyCreditDelta({
+			id: input.userId,
+			coinType: input.coinType,
+			delta: input.amount,
+			requireSufficientBalance: false,
+		});
+		if (!user) {
+			throw new AuthError("user_not_found", 404, "User not found.");
+		}
+
+		await this.createCreditTransaction({
+			userId: input.userId,
+			coinType: input.coinType,
+			direction: "credit",
+			amount: input.amount,
+			reason: input.reason,
+			actorUserId: input.userId,
+			metadata: input.metadata,
+		});
+
+		return user;
+	}
+
+	async listUserCreditTransactions(userId: string): Promise<CreditTransaction[]> {
+		return this.creditTransactionStore.listByUserId(userId);
+	}
+
 	toPublicUser(user: AuthUser): PublicAuthUser {
 		return {
 			id: user.id,
@@ -307,8 +397,79 @@ export class AuthService {
 			role: user.role,
 			status: user.status,
 			credits: user.credits ?? emptyCredits(),
+			launchGiftGrantedAt: user.launchGiftGrantedAt?.toISOString(),
 			lastLoginAt: user.lastLoginAt?.toISOString(),
 		};
+	}
+
+	private assertPositiveAmount(amount: number): void {
+		if (!Number.isInteger(amount) || amount <= 0) {
+			throw new AuthError(
+				"invalid_credit_adjustment",
+				400,
+				"Credit adjustment amount must be a positive integer.",
+			);
+		}
+	}
+
+	private async ensureLaunchGift(user: AuthUser): Promise<AuthUser> {
+		if (user.launchGiftGrantedAt) {
+			return user;
+		}
+
+		const grantedAt = new Date();
+		const updatedUser = await this.userStore.grantLaunchCredits(
+			user.id,
+			LAUNCH_GIFT_CREDITS,
+			grantedAt,
+		);
+		if (!updatedUser) {
+			throw new AuthError("user_not_found", 404, "User not found.");
+		}
+
+		if (
+			updatedUser.launchGiftGrantedAt?.getTime() === grantedAt.getTime()
+		) {
+			await Promise.all(
+				(["bronze", "silver", "gold"] as const).map((coinType) =>
+					this.createCreditTransaction({
+						userId: user.id,
+						coinType,
+						direction: "credit",
+						amount: LAUNCH_GIFT_CREDITS[coinType],
+						reason: "launch_gift",
+						actorUserId: user.id,
+						metadata: {source: "launch_gift"},
+					}),
+				),
+			);
+		}
+
+		return updatedUser;
+	}
+
+	private async createCreditTransaction(input: {
+		userId: string;
+		coinType: CreditCoinType;
+		direction: CreditDirection;
+		amount: number;
+		reason: string;
+		actorUserId: string;
+		metadata?: unknown;
+	}): Promise<CreditTransaction> {
+		const transaction: CreditTransaction = {
+			id: crypto.randomUUID(),
+			userId: input.userId,
+			coinType: input.coinType,
+			direction: input.direction,
+			amount: input.amount,
+			reason: input.reason,
+			actorUserId: input.actorUserId,
+			metadata: input.metadata,
+			createdAt: new Date(),
+		};
+		await this.creditTransactionStore.create(transaction);
+		return transaction;
 	}
 
 	private buildPrincipal(

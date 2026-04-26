@@ -1,6 +1,7 @@
 import {getAppEnv} from "../config/env.js";
 
-export type AiModelTier = "cheap" | "premium";
+export type AiModelTier = "silver" | "gold";
+export type LegacyAiModelTier = "cheap" | "premium";
 export type AuthoringTone = "friendly" | "neutral" | "professional";
 export type AuthoringLearnerLevel = "beginner" | "intermediate" | "advanced";
 
@@ -17,12 +18,14 @@ export interface AuthoringConfig {
 }
 
 export interface AiConfig {
-	cheap: AiModelConfig;
-	premium: AiModelConfig;
+	silver: AiModelConfig;
+	gold: AiModelConfig;
 	authoring: AuthoringConfig;
 }
 
 export type PartialAiConfig = Partial<{
+	silver: Partial<AiModelConfig>;
+	gold: Partial<AiModelConfig>;
 	cheap: Partial<AiModelConfig>;
 	premium: Partial<AiModelConfig>;
 	authoring: Partial<AuthoringConfig>;
@@ -40,7 +43,7 @@ const AUTHORING_LEARNER_LEVELS: AuthoringLearnerLevel[] = [
 	"intermediate",
 	"advanced",
 ];
-const MODEL_TIERS: AiModelTier[] = ["cheap", "premium"];
+const MODEL_TIERS: AiModelTier[] = ["silver", "gold"];
 
 function normalizeNonEmptyString(value: unknown, fieldName: string): string {
 	const normalized = typeof value === "string" ? value.trim() : "";
@@ -124,11 +127,11 @@ export function getDefaultAiConfig(): AiConfig {
 	const env = getAppEnv();
 
 	return {
-		cheap: {
+		silver: {
 			provider: env.aiCheapProvider,
 			model: env.aiCheapModel,
 		},
-		premium: {
+		gold: {
 			provider: env.aiPremiumProvider,
 			model: env.aiPremiumModel,
 		},
@@ -181,11 +184,15 @@ export class InMemoryAiConfigStore implements AiConfigStore {
 	async update(ownerId: string, patch: PartialAiConfig): Promise<AiConfig> {
 		const current = await this.get(ownerId);
 		const next: AiConfig = {
-			cheap: normalizeModelConfig("cheap", patch.cheap, current.cheap),
-			premium: normalizeModelConfig(
-				"premium",
-				patch.premium,
-				current.premium,
+			silver: normalizeModelConfig(
+				"silver",
+				patch.silver ?? patch.cheap,
+				current.silver,
+			),
+			gold: normalizeModelConfig(
+				"gold",
+				patch.gold ?? patch.premium,
+				current.gold,
 			),
 			authoring: normalizeAuthoringConfig(
 				patch.authoring,
@@ -231,6 +238,36 @@ export function parseAiConfigPatch(body: unknown): PartialAiConfig {
 				rawConfig.model === undefined ?
 					undefined
 				:	normalizeNonEmptyString(rawConfig.model, `${tier}.model`),
+		};
+	}
+
+	const legacyMappings = [
+		["cheap", "silver"],
+		["premium", "gold"],
+	] as const;
+	for (const [legacyTier, nextTier] of legacyMappings) {
+		const value = payload[legacyTier];
+		if (value === undefined || patch[nextTier]) {
+			continue;
+		}
+
+		if (!value || typeof value !== "object") {
+			throw new AiConfigValidationError(`${legacyTier} must be a JSON object.`);
+		}
+
+		const rawConfig = value as Record<string, unknown>;
+		patch[nextTier] = {
+			provider:
+				rawConfig.provider === undefined ?
+					undefined
+				:	normalizeNonEmptyString(
+						rawConfig.provider,
+						`${legacyTier}.provider`,
+					),
+			model:
+				rawConfig.model === undefined ?
+					undefined
+				:	normalizeNonEmptyString(rawConfig.model, `${legacyTier}.model`),
 		};
 	}
 

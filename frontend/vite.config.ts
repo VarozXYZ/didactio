@@ -17,6 +17,7 @@ export default defineConfig({
       '/auth/refresh': 'http://localhost:3000',
       '/auth/logout': 'http://localhost:3000',
       '/auth/me': 'http://localhost:3000',
+      '/auth/credits': 'http://localhost:3000',
     },
   },
 })

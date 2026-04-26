@@ -318,6 +318,8 @@ export function buildQuestionnairePrompt(input: {
 			"Use these exact ids in this exact order: topic_knowledge_level, related_knowledge_level, learning_goal.",
 			"For each question, use these exact keys: id, prompt, type, options.",
 			"Use single_select for fixed choices and long_text for open responses.",
+			"For single_select questions, options must be an array of { value, label } objects.",
+			"For long_text questions, options must be null.",
 			"Do not use question ids as top-level object keys.",
 			"Keep prompts concise, learner-facing, and useful for planning.",
 			"Keep the questionnaire aligned with the authoring profile.",

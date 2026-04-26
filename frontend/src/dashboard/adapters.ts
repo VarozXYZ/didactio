@@ -219,6 +219,7 @@ export function adaptDidacticUnitPlanning(
 		level: detail.level,
 		depth: detail.depth,
 		length: detail.length,
+		generationQuality: detail.generationQuality,
 		questionnaireEnabled: detail.questionnaireEnabled,
 		questionnaire:
 			detail.questionnaire ?
@@ -283,6 +284,7 @@ export function adaptDidacticUnitEditor(input: {
 		status: resolveDisplayStatus(input.unit.status),
 		overview: input.unit.overview,
 		provider: input.unit.provider,
+		generationQuality: input.unit.generationQuality,
 		chapters: input.chapterSummaries.map((summary) =>
 			buildEditorChapter(
 				input.unit,

@@ -11,7 +11,9 @@ export class DashboardApiError extends Error {
 }
 
 type BackendProvider = string;
-export type BackendAiModelTier = "cheap" | "premium";
+export type BackendGenerationQuality = "silver" | "gold";
+export type BackendCoinType = "bronze" | "silver" | "gold";
+export type BackendAiModelTier = BackendGenerationQuality;
 
 export interface BackendFolder {
 	id: string;
@@ -47,8 +49,8 @@ export type BackendAuthoringConfig = {
 };
 
 export type BackendAiConfig = {
-	cheap: BackendAiModelConfig;
-	premium: BackendAiModelConfig;
+	silver: BackendAiModelConfig;
+	gold: BackendAiModelConfig;
 	authoring: BackendAuthoringConfig;
 };
 
@@ -102,6 +104,9 @@ export interface BackendDidacticUnitDetail {
 	depth: "basic" | "intermediate" | "technical";
 	length: "intro" | "short" | "long" | "textbook";
 	generationTier?: BackendAiModelTier;
+	generationQuality?: BackendGenerationQuality;
+	unitGenerationPaidAt?: string;
+	unitGenerationCreditTransactionId?: string;
 	questionnaireEnabled: boolean;
 	questionnaire?: BackendQuestionnaire;
 	questionnaireAnswers?: BackendQuestionAnswer[];
@@ -257,7 +262,7 @@ type NdjsonEvent =
 	| {type: "partial_markdown"; delta: string; markdown?: string}
 	| {type: "partial_structured"; data: unknown}
 	| {type: "complete"; data: unknown}
-	| {type: "error"; message: string};
+	| {type: "error"; message: string; data?: unknown};
 
 type StreamHandlers = {
 	signal?: AbortSignal;
@@ -310,9 +315,9 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
 		let message = `Request failed with status ${response.status}.`;
 
 		try {
-			const body = (await response.json()) as {error?: string};
+			const body = (await response.json()) as {error?: string; message?: string};
 			if (body.error) {
-				message = body.error;
+				message = body.message ?? body.error;
 			}
 		} catch {
 			// Keep default message.
@@ -352,9 +357,9 @@ async function streamNdjson<T>(
 		let message = `Request failed with status ${response.status}.`;
 
 		try {
-			const body = (await response.json()) as {error?: string};
+			const body = (await response.json()) as {error?: string; message?: string};
 			if (body.error) {
-				message = body.error;
+				message = body.message ?? body.error;
 			}
 		} catch {
 			// Keep default message.
@@ -547,25 +552,9 @@ export const dashboardApi = {
 			},
 		);
 	},
-	generateDidacticUnitSyllabus(
-		id: string,
-		tier: BackendAiModelTier,
-		input?: {context?: string},
-	) {
-		return requestJson<BackendDidacticUnitDetail>(
-			`/api/didactic-unit/${id}/syllabus/generate`,
-			{
-				method: "POST",
-				body: JSON.stringify({
-					tier,
-					...(input ?? {}),
-				}),
-			},
-		);
-	},
 	streamDidacticUnitSyllabus(
 		id: string,
-		tier: BackendAiModelTier,
+		quality: BackendGenerationQuality,
 		handlers: StreamHandlers,
 		input?: {context?: string},
 	) {
@@ -574,7 +563,7 @@ export const dashboardApi = {
 			handlers,
 			{
 				body: JSON.stringify({
-					tier,
+					quality,
 					...(input ?? {}),
 				}),
 			},
@@ -589,12 +578,12 @@ export const dashboardApi = {
 			},
 		);
 	},
-	approveDidacticUnitSyllabus(id: string, tier?: BackendAiModelTier) {
+	approveDidacticUnitSyllabus(id: string, quality: BackendGenerationQuality) {
 		return requestJson<BackendDidacticUnitDetail>(
 			`/api/didactic-unit/${id}/approve-syllabus`,
 			{
 				method: "POST",
-				body: JSON.stringify(tier ? {tier} : {}),
+				body: JSON.stringify({quality}),
 			},
 		);
 	},
@@ -628,34 +617,31 @@ export const dashboardApi = {
 	generateDidacticUnitChapter(
 		id: string,
 		chapterIndex: number,
-		tier: BackendAiModelTier,
 	) {
 		return requestJson<BackendDidacticUnitDetail>(
 			`/api/didactic-unit/${id}/modules/${chapterIndex}/generate`,
 			{
 				method: "POST",
-				body: JSON.stringify({tier}),
+				body: JSON.stringify({}),
 			},
 		);
 	},
 	streamGenerateDidacticUnitChapter(
 		id: string,
 		chapterIndex: number,
-		tier: BackendAiModelTier,
 		handlers: StreamHandlers,
 	) {
 		return streamNdjson<BackendDidacticUnitDetail>(
 			`/api/didactic-unit/${id}/modules/${chapterIndex}/generate/stream`,
 			handlers,
 			{
-				body: JSON.stringify({tier}),
+				body: JSON.stringify({}),
 			},
 		);
 	},
 	regenerateDidacticUnitChapter(
 		id: string,
 		chapterIndex: number,
-		tier: BackendAiModelTier,
 		input?: {instruction?: string},
 	) {
 		return requestJson<BackendDidacticUnitDetail>(
@@ -663,7 +649,6 @@ export const dashboardApi = {
 			{
 				method: "POST",
 				body: JSON.stringify({
-					tier,
 					...(input ?? {}),
 				}),
 			},
@@ -672,7 +657,6 @@ export const dashboardApi = {
 	streamRegenerateDidacticUnitChapter(
 		id: string,
 		chapterIndex: number,
-		tier: BackendAiModelTier,
 		handlers: StreamHandlers,
 		input?: {instruction?: string},
 	) {
@@ -681,7 +665,6 @@ export const dashboardApi = {
 			handlers,
 			{
 				body: JSON.stringify({
-					tier,
 					...(input ?? {}),
 				}),
 			},

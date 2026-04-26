@@ -5,6 +5,21 @@ import {createTestApp} from "./create-test-app.js";
 
 type TestApp = ReturnType<typeof createTestApp>;
 
+function parseStreamComplete<T>(body: string): T {
+	const completeLine = body
+		.split("\n")
+		.map((line) => line.trim())
+		.filter(Boolean)
+		.map((line) => JSON.parse(line) as {type: string; data?: unknown})
+		.find((event) => event.type === "complete");
+
+	if (!completeLine) {
+		throw new Error("Stream did not include a complete event.");
+	}
+
+	return completeLine.data as T;
+}
+
 export async function createDidacticUnit(
 	app: TestApp,
 	input: {
@@ -64,15 +79,15 @@ export async function createSyllabusReadyDidacticUnit(app: TestApp) {
 	await advanceToQuestionnaireAnswered(app, created.id);
 
 	const syllabusResponse = await request(app)
-		.post(`/api/didactic-unit/${created.id}/syllabus/generate`)
-		.send({tier: "cheap"});
+		.post(`/api/didactic-unit/${created.id}/syllabus/generate/stream`)
+		.send({quality: "silver"});
 
 	expect(syllabusResponse.status).toBe(200);
 
-	return syllabusResponse.body as {
+	return parseStreamComplete<{
 		id: string;
 		syllabus: {chapters: unknown[]};
-	};
+	}>(syllabusResponse.text);
 }
 
 export async function createSyllabusReadyDidacticUnitWithProvider(
@@ -87,16 +102,16 @@ export async function createSyllabusReadyDidacticUnitWithProvider(
 	await advanceToQuestionnaireAnswered(app, created.id);
 
 	const syllabusResponse = await request(app)
-		.post(`/api/didactic-unit/${created.id}/syllabus/generate`)
-		.send({tier: "cheap"});
+		.post(`/api/didactic-unit/${created.id}/syllabus/generate/stream`)
+		.send({quality: "silver"});
 
 	expect(syllabusResponse.status).toBe(200);
 
-	return syllabusResponse.body as {
+	return parseStreamComplete<{
 		id: string;
 		provider: DidacticUnitProvider;
 		syllabus: {chapters: unknown[]};
-	};
+	}>(syllabusResponse.text);
 }
 
 export async function createApprovedDidacticUnit(
@@ -113,7 +128,7 @@ export async function createApprovedDidacticUnit(
 
 	const approvedResponse = await request(app)
 		.post(`/api/didactic-unit/${syllabusReady.id}/approve-syllabus`)
-		.send({});
+		.send({quality: "silver"});
 
 	expect(approvedResponse.status).toBe(200);
 
@@ -129,7 +144,7 @@ export async function generateDidacticUnitChapter(
 		.post(
 			`/api/didactic-unit/${didacticUnitId}/chapters/${chapterIndex}/generate`,
 		)
-		.send({tier: "cheap"});
+		.send({});
 
 	expect(response.status).toBe(200);
 

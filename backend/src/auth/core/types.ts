@@ -24,6 +24,7 @@ export interface AuthUser {
 	role: UserRole;
 	status: AuthUserStatus;
 	credits: CreditBalances;
+	launchGiftGrantedAt?: Date;
 	createdAt: Date;
 	updatedAt: Date;
 	lastLoginAt?: Date;
@@ -136,6 +137,7 @@ export interface PublicAuthUser {
 	role: UserRole;
 	status: AuthUserStatus;
 	credits: CreditBalances;
+	launchGiftGrantedAt?: string;
 	lastLoginAt?: string;
 }
 
@@ -155,6 +157,17 @@ export interface UserStore {
 		id: string,
 		credits: CreditBalances,
 	): Promise<AuthUser | null>;
+	grantLaunchCredits(
+		id: string,
+		credits: CreditBalances,
+		grantedAt: Date,
+	): Promise<AuthUser | null>;
+	applyCreditDelta(input: {
+		id: string;
+		coinType: CreditCoinType;
+		delta: number;
+		requireSufficientBalance: boolean;
+	}): Promise<AuthUser | null>;
 }
 
 export interface SessionStore {

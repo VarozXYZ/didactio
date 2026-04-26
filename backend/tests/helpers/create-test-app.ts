@@ -60,6 +60,25 @@ interface CreateTestAppOptions {
 }
 
 export function createTestApp(options: CreateTestAppOptions = {}) {
+	const userStore = new InMemoryUserStore(
+		options.disableAuthBypass ?
+			[]
+		:	[
+				{
+					id: "mock-user",
+					provider: "google",
+					providerUserId: "mock-google-user",
+					email: "user@example.com",
+					emailVerified: true,
+					displayName: "Mock User",
+					role: "user",
+					status: "active",
+					credits: {bronze: 0, silver: 0, gold: 0},
+					createdAt: new Date("2026-01-01T00:00:00.000Z"),
+					updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+				},
+			],
+	);
 	const appOptions: CreateAppOptions = {
 		didacticUnitStore:
 			options.didacticUnitStore ?? new InMemoryDidacticUnitStore(),
@@ -70,7 +89,7 @@ export function createTestApp(options: CreateTestAppOptions = {}) {
 		aiService: options.aiService ?? createMockAiService(),
 		mongoHealth: options.mongoHealth,
 		authConfig: options.authConfig ?? buildTestAuthConfig(),
-		userStore: new InMemoryUserStore(),
+		userStore,
 		sessionStore: new InMemorySessionStore(),
 		creditTransactionStore: new InMemoryCreditTransactionStore(),
 		testPrincipal:

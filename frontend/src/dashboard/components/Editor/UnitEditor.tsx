@@ -52,7 +52,7 @@ import {
 import {useNavigate} from "react-router-dom";
 import {
 	type BackendDidacticUnitReadingProgressResponse,
-	type BackendAiModelTier,
+	type BackendGenerationQuality,
 	type BackendDidacticUnitChapterDetail,
 	type BackendGenerationRun,
 	DashboardApiError,
@@ -86,6 +86,9 @@ import {
 	normalizeStoredMarkdown,
 } from "../../utils/markdown";
 import {getFolderEmoji} from "../../utils/folderDisplay";
+import {useAuth} from "../../../auth/AuthProvider";
+import {CoinAmount} from "@/components/Coin";
+import {getModuleRegenerationCost} from "../../utils/coinPricing";
 
 function ChapterStatusIcon({
 	status,
@@ -361,7 +364,8 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	const [streamingMarkdown, setStreamingMarkdown] = useState("");
 	const [isStreamingGeneration, setIsStreamingGeneration] = useState(false);
 	const [unitGenerationTier, setUnitGenerationTier] =
-		useState<BackendAiModelTier | null>(null);
+		useState<BackendGenerationQuality | null>(null);
+	const {user, refreshUser} = useAuth();
 	const [activeGeneratingChapterIndex, setActiveGeneratingChapterIndex] =
 		useState<number | null>(null);
 	const [viewport, setViewport] = useState(() => ({
@@ -535,7 +539,10 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				setWorkspace(nextWorkspace);
 				setUnitGenerationTier(
 					(previousTier) =>
-						unit.generationTier ?? previousTier ?? null,
+						unit.generationQuality ??
+						unit.generationTier ??
+						previousTier ??
+						null,
 				);
 				setChapterDetails(detailsRecord);
 				setActiveChapterIndex(nextActiveChapter?.chapterIndex ?? 0);
@@ -1054,7 +1061,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	const streamChapterContent = useCallback(
 		async (
 			chapter: DidacticUnitEditorChapter,
-			tier: BackendAiModelTier,
+			tier: BackendGenerationQuality,
 		) => {
 			generationQueueBlockedRef.current = false;
 			setActiveChapterIndex(chapter.chapterIndex);
@@ -1067,11 +1074,10 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			resetStreamingMarkdown();
 
 			try {
-				if (chapter.status === "ready") {
+				if (chapter.status === "ready" || chapter.status === "failed") {
 					await dashboardApi.streamRegenerateDidacticUnitChapter(
 						didacticUnitId,
 						chapter.chapterIndex,
-						tier,
 						{
 							onPartialMarkdown: (event) => {
 								queueStreamingMarkdown(event);
@@ -1082,7 +1088,6 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 					await dashboardApi.streamGenerateDidacticUnitChapter(
 						didacticUnitId,
 						chapter.chapterIndex,
-						tier,
 						{
 							onPartialMarkdown: (event) => {
 								queueStreamingMarkdown(event);
@@ -1094,6 +1099,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				flushStreamingMarkdown();
 				setUnitGenerationTier((previousTier) => previousTier ?? tier);
 				await refreshWorkspaceAfterGeneration();
+				await refreshUser();
 			} catch (actionError) {
 				toastError(
 					actionError instanceof Error ?
@@ -1101,6 +1107,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 					:	"Didactic unit action failed.",
 				);
 				setIsSaving(false);
+				await refreshUser();
 			} finally {
 				setIsSubmitting(false);
 				setIsStreamingGeneration(false);
@@ -1113,12 +1120,13 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			flushStreamingMarkdown,
 			queueStreamingMarkdown,
 			refreshWorkspaceAfterGeneration,
+			refreshUser,
 			resetStreamingMarkdown,
 		],
 	);
 
 	const handlePrimaryGeneration = async (
-		tierOverride?: BackendAiModelTier,
+		tierOverride?: BackendGenerationQuality,
 	) => {
 		const tier = tierOverride ?? unitGenerationTier;
 
@@ -1156,19 +1164,27 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				setActiveGeneratingChapterIndex(chapter.chapterIndex);
 				resetStreamingMarkdown();
 
-				await dashboardApi.streamGenerateDidacticUnitChapter(
-					didacticUnitId,
-					chapter.chapterIndex,
-					unitGenerationTier,
-					{
-						onPartialMarkdown: (event) => {
-							queueStreamingMarkdown(event);
+				try {
+					await dashboardApi.streamGenerateDidacticUnitChapter(
+						didacticUnitId,
+						chapter.chapterIndex,
+						{
+							onPartialMarkdown: (event) => {
+								queueStreamingMarkdown(event);
+							},
 						},
-					},
-				);
+					);
 
-				flushStreamingMarkdown();
-				await refreshWorkspaceAfterGeneration();
+					flushStreamingMarkdown();
+				} catch (actionError) {
+					toastError(
+						actionError instanceof Error ?
+							actionError.message
+						:	"Module generation failed.",
+					);
+				} finally {
+					await refreshWorkspaceAfterGeneration();
+				}
 			}
 		} catch (actionError) {
 			generationQueueBlockedRef.current = true;
@@ -1650,6 +1666,14 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	const isPendingChapter = activeChapter.status === "pending";
 	const isFailedChapter = activeChapter.status === "failed";
 	const hasConfiguredGenerationTier = unitGenerationTier !== null;
+	const regenerationCost =
+		unitGenerationTier ?
+			getModuleRegenerationCost({quality: unitGenerationTier})
+		:	null;
+	const canPayRegeneration =
+		!regenerationCost ||
+		(user?.credits[regenerationCost.coinType] ?? 0) >=
+			regenerationCost.amount;
 	const contentPageOffset = currentSpread * 2;
 	const leftReadPage = measuredReadPages[contentPageOffset];
 	const rightReadPage = measuredReadPages[contentPageOffset + 1];
@@ -2257,6 +2281,12 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 							chapter.status === "ready" ? "Regenerate module"
 							: chapter.status === "failed" ? "Retry generation"
 							: "Generate module";
+						const chapterNeedsPaidRegeneration =
+							chapter.status === "ready" ||
+							chapter.status === "failed";
+						const canPayChapterAction =
+							!chapterNeedsPaidRegeneration ||
+							canPayRegeneration;
 						const canMarkRead =
 							chapter.status === "ready" && !chapter.isCompleted;
 
@@ -2324,7 +2354,10 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 										>
 											{canAiModule && unitGenerationTier ?
 												<DropdownMenuItem
-													disabled={aiBusy}
+													disabled={
+														aiBusy ||
+														!canPayChapterAction
+													}
 													onSelect={() => {
 														void streamChapterContent(
 															chapter,
@@ -2337,6 +2370,20 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 														className="text-[#86868B]"
 													/>
 													{aiLabel}
+													{chapterNeedsPaidRegeneration &&
+														regenerationCost && (
+															<span className="ml-auto">
+																<CoinAmount
+																	type={
+																		regenerationCost.coinType
+																	}
+																	amount={
+																		regenerationCost.amount
+																	}
+																	size={14}
+																/>
+															</span>
+														)}
 												</DropdownMenuItem>
 											:	null}
 											{(
@@ -2557,29 +2604,10 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 										</p>
 									</div>
 									{!hasConfiguredGenerationTier && (
-										<div className="flex flex-wrap justify-center gap-3">
-											<button
-												className="rounded-full border border-[#D4D7DD] bg-white px-8 py-2.5 text-sm font-semibold text-[#1D1D1F] transition-all hover:bg-[#F5F5F7] active:scale-95"
-												onClick={() =>
-													void handlePrimaryGeneration(
-														"cheap",
-													)
-												}
-												type="button"
-											>
-												Start with Cheap
-											</button>
-											<button
-												className="rounded-full bg-[#1D1D1F] px-8 py-2.5 text-sm font-semibold text-white transition-all hover:bg-[#333333] active:scale-95"
-												onClick={() =>
-													void handlePrimaryGeneration(
-														"premium",
-													)
-												}
-												type="button"
-											>
-												Start with Premium
-											</button>
+										<div className="rounded-[10px] border border-[#E5E5E7] bg-white px-4 py-2 text-sm text-[#6E6E73]">
+											Approve the syllabus with silver or
+											gold quality before generating
+											modules.
 										</div>
 									)}
 								</div>
@@ -2606,36 +2634,36 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 										{hasConfiguredGenerationTier ?
 											<button
 												className="rounded-full bg-[#1D1D1F] px-8 py-2.5 text-sm font-semibold text-white transition-all hover:bg-[#333333] active:scale-95"
+												disabled={
+													isSubmitting ||
+													!canPayRegeneration
+												}
 												onClick={() =>
 													void handlePrimaryGeneration()
 												}
 												type="button"
 											>
 												Retry Module
+												{regenerationCost && (
+													<span className="ml-2 inline-flex">
+														<CoinAmount
+															type={
+																regenerationCost.coinType
+															}
+															amount={
+																regenerationCost.amount
+															}
+															size={16}
+														/>
+													</span>
+												)}
 											</button>
 										:	<>
-												<button
-													className="rounded-full border border-[#D4D7DD] bg-white px-8 py-2.5 text-sm font-semibold text-[#1D1D1F] transition-all hover:bg-[#F5F5F7] active:scale-95"
-													onClick={() =>
-														void handlePrimaryGeneration(
-															"cheap",
-														)
-													}
-													type="button"
-												>
-													Retry Cheap
-												</button>
-												<button
-													className="rounded-full bg-[#1D1D1F] px-8 py-2.5 text-sm font-semibold text-white transition-all hover:bg-[#333333] active:scale-95"
-													onClick={() =>
-														void handlePrimaryGeneration(
-															"premium",
-														)
-													}
-													type="button"
-												>
-													Retry Premium
-												</button>
+												<div className="rounded-[10px] border border-[#E5E5E7] bg-white px-4 py-2 text-sm text-[#6E6E73]">
+													This unit needs a paid
+													silver or gold quality
+													before module retries.
+												</div>
 											</>
 										}
 									</div>

@@ -144,9 +144,17 @@ function StartGenerationButton({
 		</>
 	);
 }
-import type {BackendAiModelTier} from "../../../api/dashboardApi";
+import type {
+	BackendCoinType,
+	BackendGenerationQuality,
+} from "../../../api/dashboardApi";
 import type {PlanningDetailViewModel, PlanningSyllabus} from "../../../types";
 import {Progress} from "@/components/ui/progress";
+import {CoinAmount, CoinIcon} from "@/components/Coin";
+import {
+	getSyllabusGenerationCost,
+	getUnitGenerationCost,
+} from "../../../utils/coinPricing";
 
 type PartialPlanningSyllabus = {
 	title?: string;
@@ -169,16 +177,19 @@ type SyllabusStepProps = {
 	syllabusToRender: PlanningSyllabus | PartialPlanningSyllabus | null;
 	hasSyllabus: boolean;
 	isStreamingSyllabus: boolean;
-	activeGenerationTier: BackendAiModelTier | null;
+	activeGenerationTier: BackendGenerationQuality | null;
 	isSubmitting: boolean;
 	reviewDecision: "accept" | "reject";
 	setReviewDecision: Dispatch<SetStateAction<"accept" | "reject">>;
 	regenerationContext: string;
 	setRegenerationContext: Dispatch<SetStateAction<string>>;
-	selectedGenerationTier: BackendAiModelTier;
-	setSelectedGenerationTier: Dispatch<SetStateAction<BackendAiModelTier>>;
-	onGenerateSyllabus: (tier: BackendAiModelTier) => Promise<void>;
-	onStartGeneration: (tier: BackendAiModelTier) => Promise<void>;
+	selectedGenerationTier: BackendGenerationQuality;
+	setSelectedGenerationTier: Dispatch<SetStateAction<BackendGenerationQuality>>;
+	onGenerateSyllabus: (tier: BackendGenerationQuality) => Promise<void>;
+	onStartGeneration: (tier: BackendGenerationQuality) => Promise<void>;
+	credits: Record<BackendCoinType, number>;
+	canPaySyllabus: boolean;
+	canPaySelectedUnit: boolean;
 };
 
 function ChapterAccordion({
@@ -299,7 +310,7 @@ function SyllabusCard({
 }: {
 	syllabus: PlanningSyllabus | PartialPlanningSyllabus;
 	isStreaming: boolean;
-	activeTier: BackendAiModelTier | null;
+	activeTier: BackendGenerationQuality | null;
 }) {
 	const chapters = syllabus.chapters ?? [];
 	const [openIndex, setOpenIndex] = useState<number | null>(null);
@@ -428,10 +439,17 @@ export function SyllabusStep({
 	setSelectedGenerationTier,
 	onGenerateSyllabus,
 	onStartGeneration,
+	credits,
+	canPaySyllabus,
+	canPaySelectedUnit,
 }: SyllabusStepProps) {
-	void planning;
 	const isWaiting = !hasSyllabus && !syllabusToRender;
 	const [hasChosen, setHasChosen] = useState(false);
+	const syllabusCost = getSyllabusGenerationCost();
+	const unitCost = getUnitGenerationCost({
+		quality: selectedGenerationTier,
+		length: planning?.length ?? "short",
+	});
 
 	const choose = (decision: "accept" | "reject") => {
 		setReviewDecision(decision);
@@ -439,6 +457,13 @@ export function SyllabusStep({
 	};
 
 	const undoChoice = () => setHasChosen(false);
+	const qualityOptions: Array<{
+		quality: BackendGenerationQuality;
+		label: string;
+	}> = [
+		{quality: "silver", label: "Silver"},
+		{quality: "gold", label: "Gold"},
+	];
 
 	return (
 		<div className="space-y-4">
@@ -560,32 +585,47 @@ export function SyllabusStep({
 								className="inline-flex rounded-[10px] bg-[#F5F5F7] p-0.5"
 								style={{border: "1px solid rgba(0,0,0,0.06)"}}
 							>
-								<button
-									type="button"
-									onClick={() =>
-										setSelectedGenerationTier("cheap")
-									}
-									className={`rounded-[8px] px-4 py-1.5 text-[12px] font-medium transition-all ${
-										selectedGenerationTier === "cheap" ?
-											"bg-white text-[#1D1D1F] shadow-[0_1px_3px_rgba(0,0,0,0.08)]"
-										:	"text-[#6E6E73] hover:text-[#1D1D1F]"
-									}`}
-								>
-									Standard
-								</button>
-								<button
-									type="button"
-									onClick={() =>
-										setSelectedGenerationTier("premium")
-									}
-									className={`rounded-[8px] px-4 py-1.5 text-[12px] font-medium transition-all ${
-										selectedGenerationTier === "premium" ?
-											"bg-white text-[#1D1D1F] shadow-[0_1px_3px_rgba(0,0,0,0.08)]"
-										:	"text-[#6E6E73] hover:text-[#1D1D1F]"
-									}`}
-								>
-									Premium
-								</button>
+								{qualityOptions.map((option) => (
+									<button
+										key={option.quality}
+										type="button"
+										onClick={() =>
+											setSelectedGenerationTier(
+												option.quality,
+											)
+										}
+										className={`inline-flex items-center gap-1.5 rounded-[8px] px-4 py-1.5 text-[12px] font-medium transition-all ${
+											selectedGenerationTier ===
+											option.quality ?
+												"bg-white text-[#1D1D1F] shadow-[0_1px_3px_rgba(0,0,0,0.08)]"
+											:	"text-[#6E6E73] hover:text-[#1D1D1F]"
+										}`}
+									>
+										<CoinIcon
+											type={option.quality}
+											size={16}
+										/>
+										{option.label}
+									</button>
+								))}
+							</div>
+							<div className="flex items-center gap-3 text-[12px] text-[#6E6E73]">
+								<span>
+									Unit cost:{" "}
+									<CoinAmount
+										type={unitCost.coinType}
+										amount={unitCost.amount}
+										size={16}
+									/>
+								</span>
+								<span>
+									Balance:{" "}
+									<CoinAmount
+										type={unitCost.coinType}
+										amount={credits[unitCost.coinType]}
+										size={16}
+									/>
+								</span>
 							</div>
 							<StartGenerationButton
 								onClick={() =>
@@ -593,7 +633,7 @@ export function SyllabusStep({
 										selectedGenerationTier,
 									)
 								}
-								disabled={isSubmitting}
+								disabled={isSubmitting || !canPaySelectedUnit}
 								label={
 									isSubmitting ? "Starting…" : (
 										"Start learning"
@@ -635,7 +675,7 @@ export function SyllabusStep({
 										}}
 									/>
 								</div>
-								{/* Right column: tier + button */}
+								{/* Right column: quality + button */}
 								<div className="flex shrink-0 flex-col items-stretch gap-2">
 									<div
 										className="inline-flex self-center rounded-[10px] bg-[#F5F5F7] p-0.5"
@@ -643,48 +683,54 @@ export function SyllabusStep({
 											border: "1px solid rgba(0,0,0,0.06)",
 										}}
 									>
-										<button
-											type="button"
-											onClick={() =>
-												setSelectedGenerationTier(
-													"cheap",
-												)
-											}
-											className={`rounded-[8px] px-3 py-1 text-[12px] font-medium transition-all ${
-												(
+										{qualityOptions.map((option) => (
+											<button
+												key={option.quality}
+												type="button"
+												onClick={() =>
+													setSelectedGenerationTier(
+														option.quality,
+													)
+												}
+												className={`inline-flex items-center gap-1 rounded-[8px] px-3 py-1 text-[12px] font-medium transition-all ${
 													selectedGenerationTier ===
-													"cheap"
-												) ?
-													"bg-white text-[#1D1D1F] shadow-[0_1px_3px_rgba(0,0,0,0.08)]"
-												:	"text-[#6E6E73] hover:text-[#1D1D1F]"
-											}`}
-										>
-											Standard
-										</button>
-										<button
-											type="button"
-											onClick={() =>
-												setSelectedGenerationTier(
-													"premium",
-												)
+													option.quality ?
+														"bg-white text-[#1D1D1F] shadow-[0_1px_3px_rgba(0,0,0,0.08)]"
+													:	"text-[#6E6E73] hover:text-[#1D1D1F]"
+												}`}
+											>
+												<CoinIcon
+													type={option.quality}
+													size={15}
+												/>
+												{option.label}
+											</button>
+										))}
+									</div>
+									<div className="self-center text-[11px] text-[#6E6E73]">
+										Syllabus:{" "}
+										<CoinAmount
+											type={syllabusCost.coinType}
+											amount={syllabusCost.amount}
+											size={15}
+										/>{" "}
+										/ balance{" "}
+										<CoinAmount
+											type={syllabusCost.coinType}
+											amount={
+												credits[
+													syllabusCost.coinType
+												]
 											}
-											className={`rounded-[8px] px-3 py-1 text-[12px] font-medium transition-all ${
-												(
-													selectedGenerationTier ===
-													"premium"
-												) ?
-													"bg-white text-[#1D1D1F] shadow-[0_1px_3px_rgba(0,0,0,0.08)]"
-												:	"text-[#6E6E73] hover:text-[#1D1D1F]"
-											}`}
-										>
-											Premium
-										</button>
+											size={15}
+										/>
 									</div>
 									<button
 										type="button"
 										disabled={
 											isSubmitting ||
-											!regenerationContext.trim()
+											!regenerationContext.trim() ||
+											!canPaySyllabus
 										}
 										onClick={() =>
 											void onGenerateSyllabus(

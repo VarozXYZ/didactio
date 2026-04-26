@@ -94,6 +94,7 @@ export interface PlanningDetailViewModel {
 	level: "beginner" | "intermediate" | "advanced";
 	depth: "basic" | "intermediate" | "technical";
 	length: "intro" | "short" | "long" | "textbook";
+	generationQuality?: "silver" | "gold";
 	questionnaireEnabled: boolean;
 	questionnaire?: {
 		questions: PlanningQuestion[];
@@ -146,6 +147,7 @@ export interface DidacticUnitEditorViewModel {
 	status: string;
 	overview: string;
 	provider: string;
+	generationQuality?: "silver" | "gold";
 	chapters: DidacticUnitEditorChapter[];
 }
 

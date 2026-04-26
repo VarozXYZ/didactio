@@ -14,6 +14,7 @@ import type {
 	DidacticUnitSyllabus,
 	DidacticUnitSyllabusChapter,
 } from "./planning.js";
+import type {GenerationQuality} from "../credits/generation-pricing.js";
 import type {
 	DidacticUnitChapterCompletion,
 	DidacticUnitChapterRevision,
@@ -73,6 +74,9 @@ export interface DidacticUnit {
 	chapterRevisions?: DidacticUnitChapterRevision[];
 	continuitySummaries?: string[];
 	generationTier?: "cheap" | "premium";
+	generationQuality?: GenerationQuality;
+	unitGenerationPaidAt?: string;
+	unitGenerationCreditTransactionId?: string;
 	createdAt: string;
 	updatedAt: string;
 }

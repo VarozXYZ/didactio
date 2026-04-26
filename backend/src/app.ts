@@ -113,6 +113,16 @@ import {
 } from "./mongo/mongo-connection.js";
 import {createLogger, type Logger} from "./logging/logger.js";
 import {buildChapterGenerationPrompt} from "./providers/chapter-generator.js";
+import {AuthError} from "./auth/core/errors.js";
+import {
+	isGenerationQuality,
+	legacyTierToGenerationQuality,
+	resolveModuleRegenerationCost,
+	resolveSyllabusGenerationCost,
+	resolveUnitGenerationCost,
+	type GenerationCoinCost,
+	type GenerationQuality,
+} from "./credits/generation-pricing.js";
 
 export interface CreateAppOptions {
 	didacticUnitStore: DidacticUnitStore;
@@ -231,34 +241,28 @@ function parseAiModelTier(body: unknown): AiModelTier {
 		throw new Error("Request body must be a JSON object.");
 	}
 
-	const payload = body as {tier?: unknown};
+	const payload = body as {tier?: unknown; quality?: unknown};
+	const quality = legacyTierToGenerationQuality(payload.quality ?? payload.tier);
 
-	if (payload.tier !== "cheap" && payload.tier !== "premium") {
-		throw new Error('tier must be either "cheap" or "premium".');
+	if (!quality) {
+		throw new Error('quality must be either "silver" or "gold".');
 	}
 
-	return payload.tier;
+	return quality;
 }
 
-function parseOptionalAiModelTier(body: unknown): AiModelTier | undefined {
-	if (body === undefined || body === null) {
-		return undefined;
-	}
-
-	if (typeof body !== "object") {
+function parseGenerationQuality(body: unknown): GenerationQuality {
+	if (!body || typeof body !== "object") {
 		throw new Error("Request body must be a JSON object.");
 	}
 
-	const payload = body as {tier?: unknown};
-	if (payload.tier === undefined) {
-		return undefined;
+	const payload = body as {quality?: unknown; tier?: unknown};
+	const quality = legacyTierToGenerationQuality(payload.quality ?? payload.tier);
+	if (!isGenerationQuality(quality)) {
+		throw new Error('quality must be either "silver" or "gold".');
 	}
 
-	if (payload.tier !== "cheap" && payload.tier !== "premium") {
-		throw new Error('tier must be either "cheap" or "premium".');
-	}
-
-	return payload.tier;
+	return quality;
 }
 
 function parseOptionalSyllabusContext(body: unknown): string | undefined {
@@ -359,6 +363,12 @@ function buildDidacticUnitResponseFromFolders(
 		length: didacticUnit.length,
 		level: didacticUnit.level,
 		generationTier: didacticUnit.generationTier,
+		generationQuality:
+			didacticUnit.generationQuality ??
+			legacyTierToGenerationQuality(didacticUnit.generationTier),
+		unitGenerationPaidAt: didacticUnit.unitGenerationPaidAt,
+		unitGenerationCreditTransactionId:
+			didacticUnit.unitGenerationCreditTransactionId,
 		questionnaireEnabled: didacticUnit.questionnaireEnabled,
 		questionnaire: didacticUnit.questionnaire,
 		questionnaireAnswers: didacticUnit.questionnaireAnswers,
@@ -521,7 +531,7 @@ async function resolveAutoAssignedFolderSelection(input: {
 				description: buildFolderDescription(folder),
 			})),
 			config,
-			tier: "cheap",
+			tier: "silver",
 			abortSignal: input.abortSignal,
 		});
 
@@ -572,7 +582,7 @@ function resolveCompatibilityProvider(
 	requestedProvider: string,
 ): string {
 	return requestedProvider === "profile-config" ?
-			config.cheap.provider
+			config.silver.provider
 		:	requestedProvider;
 }
 
@@ -597,6 +607,59 @@ function createAbortSignal(request: express.Request): AbortSignal {
 	const controller = new AbortController();
 	request.on("close", () => controller.abort());
 	return controller.signal;
+}
+
+type CreditReservation = Awaited<
+	ReturnType<AuthService["reserveUserCredits"]>
+>;
+
+function sendAuthErrorResponse(
+	response: express.Response,
+	error: AuthError,
+): void {
+	response.status(error.statusCode).json({
+		error: error.code,
+		message: error.message,
+		...(error.details ?? {}),
+	});
+}
+
+async function reserveGenerationCredits(input: {
+	authService: AuthService;
+	ownerId: string;
+	cost: GenerationCoinCost;
+	reason: string;
+	metadata: Record<string, unknown>;
+}): Promise<CreditReservation> {
+	return input.authService.reserveUserCredits({
+		userId: input.ownerId,
+		coinType: input.cost.coinType,
+		amount: input.cost.amount,
+		reason: input.reason,
+		metadata: input.metadata,
+	});
+}
+
+async function refundGenerationCredits(input: {
+	authService: AuthService;
+	reservation: CreditReservation | null;
+	reason: string;
+	metadata: Record<string, unknown>;
+}): Promise<void> {
+	if (!input.reservation) {
+		return;
+	}
+
+	await input.authService.refundUserCredits({
+		userId: input.reservation.transaction.userId,
+		coinType: input.reservation.transaction.coinType,
+		amount: input.reservation.transaction.amount,
+		reason: input.reason,
+		metadata: {
+			...input.metadata,
+			refundedTransactionId: input.reservation.transaction.id,
+		},
+	});
 }
 
 async function recordCompletedSyllabusRun(
@@ -1306,7 +1369,7 @@ export function createApp(options: CreateAppOptions) {
 						}))
 					:	undefined,
 				config,
-				tier: "cheap",
+				tier: "silver",
 				abortSignal: createAbortSignal(request),
 			});
 
@@ -1407,7 +1470,7 @@ export function createApp(options: CreateAppOptions) {
 								}))
 							:	undefined,
 						config,
-						tier: "cheap",
+						tier: "silver",
 						abortSignal: createAbortSignal(request),
 					},
 					{
@@ -1725,108 +1788,6 @@ export function createApp(options: CreateAppOptions) {
 	);
 
 	app.post(
-		"/api/didactic-unit/:id/syllabus/generate",
-		async (request, response) => {
-			const requestWithMockOwner = asRequestWithMockOwner(request);
-			const didacticUnit = await didacticUnitStore.getById(
-				requestWithMockOwner.mockOwner.id,
-				request.params.id,
-			);
-
-			if (!didacticUnit) {
-				response.status(404).json({error: "Didactic unit not found."});
-				return;
-			}
-
-			let tier: AiModelTier;
-			try {
-				tier = parseAiModelTier(request.body);
-			} catch (error) {
-				response.status(400).json({
-					error:
-						error instanceof Error ?
-							error.message
-						:	"Invalid didactic unit syllabus generation request.",
-				});
-				return;
-			}
-
-			const config = await aiConfigStore.get(
-				requestWithMockOwner.mockOwner.id,
-			);
-			let preparedDidacticUnit: DidacticUnit | null = null;
-
-			let syllabusContext: string | undefined;
-			try {
-				syllabusContext = parseOptionalSyllabusContext(request.body);
-			} catch (error) {
-				response.status(400).json({
-					error:
-						error instanceof Error ?
-							error.message
-						:	"Invalid didactic unit syllabus generation request.",
-				});
-				return;
-			}
-
-			try {
-				preparedDidacticUnit = prepareDidacticUnitSyllabusGeneration(
-					didacticUnit,
-					config.authoring,
-					syllabusContext,
-				);
-				const result = await aiService.generateSyllabus({
-					topic: preparedDidacticUnit.topic,
-					level: preparedDidacticUnit.level,
-					improvedTopicBrief: preparedDidacticUnit.improvedTopicBrief,
-					syllabusPrompt: preparedDidacticUnit.syllabusPrompt ?? "",
-					questionnaireAnswers:
-						preparedDidacticUnit.questionnaireAnswers,
-					depth: preparedDidacticUnit.depth,
-					length: preparedDidacticUnit.length,
-					config,
-					tier,
-					abortSignal: createAbortSignal(request),
-				});
-				const updatedDidacticUnit = applyGeneratedDidacticUnitSyllabus(
-					preparedDidacticUnit,
-					result.syllabus,
-				);
-				updatedDidacticUnit.provider = result.provider;
-				await didacticUnitStore.save(updatedDidacticUnit);
-				await recordCompletedSyllabusRun(
-					generationRunStore,
-					updatedDidacticUnit,
-					result,
-				);
-				response.json(
-					await buildDidacticUnitResponse(
-						updatedDidacticUnit,
-						folderStore,
-					),
-				);
-			} catch (error) {
-				await recordFailedSyllabusRun(
-					generationRunStore,
-					didacticUnit,
-					preparedDidacticUnit?.syllabusPrompt ??
-						didacticUnit.syllabusPrompt ??
-						"",
-					config[tier],
-					error,
-				);
-				const resolved = resolveStageConfigError(
-					error,
-					"Didactic unit syllabus generation failed.",
-				);
-				response
-					.status(resolved.status)
-					.json({error: resolved.message});
-			}
-		},
-	);
-
-	app.post(
 		"/api/didactic-unit/:id/syllabus/generate/stream",
 		async (request, response) => {
 			const requestWithMockOwner = asRequestWithMockOwner(request);
@@ -1840,20 +1801,16 @@ export function createApp(options: CreateAppOptions) {
 				return;
 			}
 
-			openNdjsonStream(response);
-
 			let tier: AiModelTier;
 			try {
 				tier = parseAiModelTier(request.body);
 			} catch (error) {
-				writeNdjsonEvent(response, {
-					type: "error",
-					message:
+				response.status(400).json({
+					error:
 						error instanceof Error ?
 							error.message
 						:	"Invalid didactic unit syllabus generation request.",
 				});
-				response.end();
 				return;
 			}
 
@@ -1861,21 +1818,43 @@ export function createApp(options: CreateAppOptions) {
 				requestWithMockOwner.mockOwner.id,
 			);
 			let preparedDidacticUnit: DidacticUnit | null = null;
+			let reservation: CreditReservation | null = null;
 
 			let syllabusContext: string | undefined;
 			try {
 				syllabusContext = parseOptionalSyllabusContext(request.body);
 			} catch (error) {
-				writeNdjsonEvent(response, {
-					type: "error",
-					message:
+				response.status(400).json({
+					error:
 						error instanceof Error ?
 							error.message
 						:	"Invalid didactic unit syllabus generation request.",
 				});
-				response.end();
 				return;
 			}
+
+			try {
+				reservation = await reserveGenerationCredits({
+					authService,
+					ownerId: requestWithMockOwner.mockOwner.id,
+					cost: resolveSyllabusGenerationCost(),
+					reason: "syllabus_generation",
+					metadata: {
+						operation: "syllabus_generation",
+						didacticUnitId: didacticUnit.id,
+						quality: tier,
+						length: didacticUnit.length,
+					},
+				});
+			} catch (error) {
+				if (error instanceof AuthError) {
+					sendAuthErrorResponse(response, error);
+					return;
+				}
+				throw error;
+			}
+
+			openNdjsonStream(response);
 
 			try {
 				preparedDidacticUnit = prepareDidacticUnitSyllabusGeneration(
@@ -1945,6 +1924,20 @@ export function createApp(options: CreateAppOptions) {
 					config[tier],
 					error,
 				);
+				await refundGenerationCredits({
+					authService,
+					reservation,
+					reason: "syllabus_generation_refund",
+					metadata: {
+						operation: "syllabus_generation",
+						didacticUnitId: didacticUnit.id,
+						quality: tier,
+						error:
+							error instanceof Error ?
+								error.message
+							:	"Didactic unit syllabus generation failed.",
+					},
+				});
 				const resolved = resolveStageConfigError(
 					error,
 					"Didactic unit syllabus generation failed.",
@@ -2020,11 +2013,44 @@ export function createApp(options: CreateAppOptions) {
 				return;
 			}
 
+			let quality: GenerationQuality;
 			try {
-				const generationTier = parseOptionalAiModelTier(request.body);
+				quality = parseGenerationQuality(request.body);
+			} catch (error) {
+				response.status(400).json({
+					error:
+						error instanceof Error ?
+							error.message
+						:	"Invalid didactic unit syllabus approval request.",
+				});
+				return;
+			}
+
+			let reservation: CreditReservation | null = null;
+			try {
+				const cost = resolveUnitGenerationCost({
+					quality,
+					length: didacticUnit.length,
+				});
+				reservation = await reserveGenerationCredits({
+					authService,
+					ownerId: requestWithMockOwner.mockOwner.id,
+					cost,
+					reason: "unit_generation",
+					metadata: {
+						operation: "unit_generation",
+						didacticUnitId: didacticUnit.id,
+						quality,
+						length: didacticUnit.length,
+					},
+				});
 				const approvedDidacticUnit = approveDidacticUnitSyllabus(
 					didacticUnit,
-					generationTier,
+					{
+						generationQuality: quality,
+						creditTransactionId: reservation.transaction.id,
+						paidAt: reservation.transaction.createdAt.toISOString(),
+					},
 				);
 				await didacticUnitStore.save(approvedDidacticUnit);
 				response.json(
@@ -2034,6 +2060,26 @@ export function createApp(options: CreateAppOptions) {
 					),
 				);
 			} catch (error) {
+				if (reservation) {
+					await refundGenerationCredits({
+						authService,
+						reservation,
+						reason: "unit_generation_refund",
+						metadata: {
+							operation: "unit_generation",
+							didacticUnitId: didacticUnit.id,
+							quality,
+							error:
+								error instanceof Error ?
+									error.message
+								:	"Didactic unit syllabus approval failed.",
+						},
+					});
+				}
+				if (error instanceof AuthError) {
+					sendAuthErrorResponse(response, error);
+					return;
+				}
 				response.status(409).json({
 					error:
 						error instanceof Error ?
@@ -2041,90 +2087,6 @@ export function createApp(options: CreateAppOptions) {
 						:	"Didactic unit syllabus approval failed.",
 				});
 			}
-		},
-	);
-
-	app.post(
-		"/api/didactic-unit/:id/summary/generate/stream",
-		async (request, response) => {
-			const requestWithMockOwner = asRequestWithMockOwner(request);
-			const didacticUnit = await didacticUnitStore.getById(
-				requestWithMockOwner.mockOwner.id,
-				request.params.id,
-			);
-
-			if (!didacticUnit) {
-				response.status(404).json({error: "Didactic unit not found."});
-				return;
-			}
-
-			const sourceMarkdown = (didacticUnit.generatedChapters ?? [])
-				.map((chapter) => `# ${chapter.title}\n\n${chapter.markdown}`)
-				.join("\n\n");
-
-			openNdjsonStream(response);
-
-			let tier: AiModelTier;
-			try {
-				tier = parseAiModelTier(request.body);
-			} catch (error) {
-				writeNdjsonEvent(response, {
-					type: "error",
-					message:
-						error instanceof Error ?
-							error.message
-						:	"Invalid didactic unit summary generation request.",
-				});
-				response.end();
-				return;
-			}
-
-			try {
-				const config = await aiConfigStore.get(
-					requestWithMockOwner.mockOwner.id,
-				);
-				const result = await aiService.streamSummary(
-					{
-						topic: didacticUnit.topic,
-						chapterTitle: didacticUnit.title,
-						chapterMarkdown:
-							sourceMarkdown || didacticUnit.overview,
-						config,
-						tier,
-						abortSignal: createAbortSignal(request),
-					},
-					{
-						onStart: async (selection) => {
-							writeNdjsonEvent(response, {
-								type: "start",
-								stage: "summary",
-								provider: selection.provider,
-								model: selection.model,
-							});
-						},
-						onMarkdown: async (delta, markdown) => {
-							writeNdjsonEvent(response, {
-								type: "partial_markdown",
-								delta,
-								markdown,
-							});
-						},
-					},
-				);
-
-				writeNdjsonEvent(response, {type: "complete", data: result});
-			} catch (error) {
-				const resolved = resolveStageConfigError(
-					error,
-					"Didactic unit summary generation failed.",
-				);
-				writeNdjsonEvent(response, {
-					type: "error",
-					message: resolved.message,
-				});
-			}
-
-			response.end();
 		},
 	);
 
@@ -2541,16 +2503,6 @@ export function createApp(options: CreateAppOptions) {
 			return;
 		}
 
-		if (
-			revisionSource === "ai_regeneration" &&
-			!hasGeneratedDidacticUnitChapter(didacticUnit, chapterIndex)
-		) {
-			response
-				.status(404)
-				.json({error: "Generated didactic unit module not found."});
-			return;
-		}
-
 		const plannedChapter = didacticUnit.chapters[chapterIndex];
 		if (!plannedChapter) {
 			response.status(400).json({
@@ -2559,14 +2511,60 @@ export function createApp(options: CreateAppOptions) {
 			return;
 		}
 
+		const chapterRuns = (
+			await generationRunStore.listByDidacticUnit(
+				requestWithMockOwner.mockOwner.id,
+				didacticUnit.id,
+			)
+		).filter(
+			(run): run is ChapterGenerationRunRecord =>
+				run.stage === "chapter" && run.chapterIndex === chapterIndex,
+		);
+		const latestChapterRun = chapterRuns.sort(compareRunsByCreatedAtDesc)[0];
+		const hasGeneratedChapter = hasGeneratedDidacticUnitChapter(
+			didacticUnit,
+			chapterIndex,
+		);
+		const quality =
+			didacticUnit.generationQuality ??
+			legacyTierToGenerationQuality(didacticUnit.generationTier);
+
+		if (!quality || !didacticUnit.unitGenerationPaidAt) {
+			response.status(409).json({
+				error: "Unit generation must be paid for before modules can be generated.",
+			});
+			return;
+		}
+
+		if (
+			revisionSource === "ai_generation" &&
+			(hasGeneratedChapter || latestChapterRun)
+		) {
+			response.status(409).json({
+				error: "Initial module generation has already been attempted.",
+			});
+			return;
+		}
+
+		if (
+			revisionSource === "ai_regeneration" &&
+			!hasGeneratedChapter &&
+			latestChapterRun?.status !== "failed"
+		) {
+			response
+				.status(404)
+				.json({error: "Generated didactic unit module not found."});
+			return;
+		}
+
 		const config = await aiConfigStore.get(
 			requestWithMockOwner.mockOwner.id,
 		);
-		let tier: AiModelTier;
+		const tier: AiModelTier = quality;
 		let instruction: string | undefined;
+		let reservation: CreditReservation | null = null;
 
 		try {
-			tier = parseAiModelTier(request.body);
 			instruction = parseChapterGenerationInstruction(request.body);
 		} catch (error) {
 			response.status(400).json({
@@ -2576,6 +2574,31 @@ export function createApp(options: CreateAppOptions) {
 					:	`Invalid didactic unit module ${revisionSource} request.`,
 			});
 			return;
+		}
+
+		if (revisionSource === "ai_regeneration") {
+			try {
+				const cost = resolveModuleRegenerationCost({quality});
+				reservation = await reserveGenerationCredits({
+					authService,
+					ownerId: requestWithMockOwner.mockOwner.id,
+					cost,
+					reason: "module_regeneration",
+					metadata: {
+						operation: "module_regeneration",
+						didacticUnitId: didacticUnit.id,
+						chapterIndex,
+						quality,
+						length: didacticUnit.length,
+					},
+				});
+			} catch (error) {
+				if (error instanceof AuthError) {
+					sendAuthErrorResponse(response, error);
+					return;
+				}
+				throw error;
+			}
 		}
 
 		if (isStreaming) {
@@ -2694,6 +2717,23 @@ export function createApp(options: CreateAppOptions) {
 				),
 			);
 		} catch (error) {
+			if (reservation) {
+				await refundGenerationCredits({
+					authService,
+					reservation,
+					reason: "module_regeneration_refund",
+					metadata: {
+						operation: "module_regeneration",
+						didacticUnitId: didacticUnit.id,
+						chapterIndex,
+						quality,
+						error:
+							error instanceof Error ?
+								error.message
+							:	"Didactic unit module generation failed.",
+					},
+				});
+			}
 			await recordFailedChapterRun(
 				generationRunStore,
 				didacticUnit,

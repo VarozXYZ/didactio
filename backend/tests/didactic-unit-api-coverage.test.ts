@@ -11,6 +11,21 @@ import {
 } from "./helpers/didactic-unit-flow.js";
 import {createMockAiService} from "./helpers/mock-ai-service.js";
 
+function parseStreamComplete<T>(body: string): T {
+	const completeLine = body
+		.split("\n")
+		.map((line) => line.trim())
+		.filter(Boolean)
+		.map((line) => JSON.parse(line) as {type: string; data?: unknown})
+		.find((event) => event.type === "complete");
+
+	if (!completeLine) {
+		throw new Error("Stream did not include a complete event.");
+	}
+
+	return completeLine.data as T;
+}
+
 describe("didactic-unit API coverage", () => {
 	it("gets a didactic unit by id with the complete approved syllabus payload", async () => {
 		const app = createTestApp();
@@ -256,7 +271,7 @@ describe("didactic-unit API coverage", () => {
 
 		const regenerateResponse = await request(app)
 			.post(`/api/didactic-unit/${approved.id}/chapters/0/regenerate`)
-			.send({tier: "cheap"});
+			.send({});
 
 		expect(regenerateResponse.status).toBe(200);
 		expect(regenerateResponse.body).toMatchObject({
@@ -317,31 +332,34 @@ describe("didactic-unit API coverage", () => {
 		await advanceToQuestionnaireAnswered(app, created.id);
 
 		const firstGenerationResponse = await request(app)
-			.post(`/api/didactic-unit/${created.id}/syllabus/generate`)
-			.send({tier: "cheap"});
+			.post(`/api/didactic-unit/${created.id}/syllabus/generate/stream`)
+			.send({quality: "silver"});
 
 		expect(firstGenerationResponse.status).toBe(200);
-		expect(firstGenerationResponse.body).toMatchObject({
+		expect(parseStreamComplete(firstGenerationResponse.text)).toMatchObject({
 			id: created.id,
 			status: "syllabus_ready",
 			nextAction: "review_syllabus",
 		});
 
 		const regenerateResponse = await request(app)
-			.post(`/api/didactic-unit/${created.id}/syllabus/generate`)
+			.post(`/api/didactic-unit/${created.id}/syllabus/generate/stream`)
 			.send({
-				tier: "premium",
+				quality: "gold",
 				context:
 					"Lean further into practical exercises and project-based outcomes.",
 			});
 
 		expect(regenerateResponse.status).toBe(200);
-		expect(regenerateResponse.body).toMatchObject({
+		const regenerated = parseStreamComplete<{additionalContext: string}>(
+			regenerateResponse.text,
+		);
+		expect(regenerated).toMatchObject({
 			id: created.id,
 			status: "syllabus_ready",
 			nextAction: "review_syllabus",
 		});
-		expect(regenerateResponse.body.additionalContext).toContain(
+		expect(regenerated.additionalContext).toContain(
 			"Lean further into practical exercises and project-based outcomes.",
 		);
 	});
@@ -362,12 +380,16 @@ describe("didactic-unit API coverage", () => {
 
 		const syllabusResponse = await request(app)
 			.post(
-				`/api/didactic-unit/${createdResponse.body.id}/syllabus/generate`,
+				`/api/didactic-unit/${createdResponse.body.id}/syllabus/generate/stream`,
 			)
-			.send({tier: "cheap"});
+			.send({quality: "silver"});
 
 		expect(syllabusResponse.status).toBe(200);
-		expect(syllabusResponse.body.syllabus.chapters).toHaveLength(12);
+		expect(
+			parseStreamComplete<{syllabus: {chapters: unknown[]}}>(
+				syllabusResponse.text,
+			).syllabus.chapters,
+		).toHaveLength(12);
 	});
 
 	it("trims extra textbook modules returned by streamed syllabus generation", async () => {
@@ -417,7 +439,7 @@ describe("didactic-unit API coverage", () => {
 			.post(
 				`/api/didactic-unit/${createdResponse.body.id}/syllabus/generate/stream`,
 			)
-			.send({tier: "cheap"});
+			.send({quality: "silver"});
 
 		expect(streamResponse.status).toBe(200);
 

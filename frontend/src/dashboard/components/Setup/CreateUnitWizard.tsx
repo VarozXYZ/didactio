@@ -3,14 +3,19 @@ import {toastError} from "@/hooks/use-toast";
 import {Check, X} from "lucide-react";
 import {
 	type BackendFolder,
-	type BackendAiModelTier,
+	type BackendGenerationQuality,
 	dashboardApi,
 } from "../../api/dashboardApi";
+import {useAuth} from "../../../auth/AuthProvider";
 import {adaptDidacticUnitPlanning} from "../../adapters";
 import type {PlanningDetailViewModel, PlanningSyllabus} from "../../types";
 import {TopicStep} from "./steps/TopicStep";
 import {QuestionnaireStep} from "./steps/QuestionnaireStep";
 import {SyllabusStep} from "./steps/SyllabusStep";
+import {
+	getSyllabusGenerationCost,
+	getUnitGenerationCost,
+} from "../../utils/coinPricing";
 
 export type WizardStep = 0 | 1 | 2;
 
@@ -242,13 +247,14 @@ export function CreateUnitWizard({
 		useState<PartialPlanningSyllabus | null>(null);
 	const [isStreamingSyllabus, setIsStreamingSyllabus] = useState(false);
 	const [activeGenerationTier, setActiveGenerationTier] =
-		useState<BackendAiModelTier | null>(null);
+		useState<BackendGenerationQuality | null>(null);
 	const [reviewDecision, setReviewDecision] = useState<"accept" | "reject">(
 		"accept",
 	);
 	const [regenerationContext, setRegenerationContext] = useState("");
 	const [selectedGenerationTier, setSelectedGenerationTier] =
-		useState<BackendAiModelTier>("premium");
+		useState<BackendGenerationQuality>("gold");
+	const {user, refreshUser} = useAuth();
 
 	const [isLoading, setIsLoading] = useState(Boolean(didacticUnitId));
 	const [isSubmitting, setIsSubmitting] = useState(false);
@@ -325,7 +331,7 @@ export function CreateUnitWizard({
 			if (detail.nextAction === "generate_questionnaire") {
 				detail = await dashboardApi.generateDidacticUnitQuestionnaire(
 					created.id,
-					"cheap",
+					"silver",
 				);
 			}
 
@@ -397,7 +403,7 @@ export function CreateUnitWizard({
 	}, [planning, onDataChanged]);
 
 	const handleGenerateSyllabus = useCallback(
-		async (tier: BackendAiModelTier) => {
+		async (tier: BackendGenerationQuality) => {
 			if (!planning) return;
 			setIsSubmitting(true);
 			setIsStreamingSyllabus(true);
@@ -431,8 +437,10 @@ export function CreateUnitWizard({
 				setRegenerationContext("");
 				if (pd.syllabus) setReviewDecision("accept");
 				onDataChanged();
+				await refreshUser();
 			} catch (e) {
 				toastError(e instanceof Error ? e.message : "Action failed.");
+				await refreshUser();
 			} finally {
 				setIsSubmitting(false);
 				setIsStreamingSyllabus(false);
@@ -443,7 +451,7 @@ export function CreateUnitWizard({
 	);
 
 	const handleStartGeneration = useCallback(
-		async (tier: BackendAiModelTier) => {
+		async (tier: BackendGenerationQuality) => {
 			if (!planning?.syllabus) return;
 			setIsSubmitting(true);
 			try {
@@ -455,9 +463,11 @@ export function CreateUnitWizard({
 					);
 				}
 				onDataChanged();
+				await refreshUser();
 				onOpenEditor(detail.id);
 			} catch (e) {
 				toastError(e instanceof Error ? e.message : "Action failed.");
+				await refreshUser();
 			} finally {
 				setIsSubmitting(false);
 			}
@@ -493,9 +503,19 @@ export function CreateUnitWizard({
 
 	useEffect(() => {
 		if (needsInitialSyllabusGeneration && currentStep === 2) {
-			void handleGenerateSyllabus("cheap");
+			void handleGenerateSyllabus("silver");
 		}
 	}, [needsInitialSyllabusGeneration, currentStep, handleGenerateSyllabus]);
+
+	const syllabusCost = getSyllabusGenerationCost();
+	const selectedUnitCost = getUnitGenerationCost({
+		quality: selectedGenerationTier,
+		length: draftLength,
+	});
+	const canPaySyllabus =
+		(user?.credits[syllabusCost.coinType] ?? 0) >= syllabusCost.amount;
+	const canPaySelectedUnit =
+		(user?.credits[selectedUnitCost.coinType] ?? 0) >= selectedUnitCost.amount;
 
 	if (isLoading) {
 		return (
@@ -683,6 +703,9 @@ export function CreateUnitWizard({
 								}
 								onGenerateSyllabus={handleGenerateSyllabus}
 								onStartGeneration={handleStartGeneration}
+								credits={user?.credits ?? {bronze: 0, silver: 0, gold: 0}}
+								canPaySyllabus={canPaySyllabus}
+								canPaySelectedUnit={canPaySelectedUnit}
 							/>
 						)}
 					</div>

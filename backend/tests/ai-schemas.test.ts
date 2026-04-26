@@ -100,6 +100,7 @@ describe("questionnaire schema", () => {
 					id: "learning_goal",
 					prompt: "What do you want to achieve?",
 					type: "long_text",
+					options: null,
 				},
 			],
 		});
@@ -109,55 +110,16 @@ describe("questionnaire schema", () => {
 		expect(parsed.questions[2]?.id).toBe("learning_goal");
 	});
 
-	it("normalizes keyed questionnaire objects from the gateway", () => {
-		const parsed = questionnaireSchema.parse({
-			topic_knowledge_level: {
-				question: "How much do you already know about graphic design?",
-				type: "single_select",
-				options: [
-					"I am a complete beginner.",
-					"I have a little experience.",
-					"I know some basics already.",
-				],
-			},
-			related_knowledge_level: {
-				question: "Do you have experience with related areas?",
-				type: "single_select",
-				options: [
-					"None of these.",
-					"Some art experience.",
-					"Some digital tool experience.",
-				],
-			},
-			learning_goal: {
-				question:
-					"What do you hope to achieve by the end of the course?",
-				type: "long_text",
-			},
-		});
-
-		expect(parsed.questions.map((question) => question.id)).toEqual([
-			"topic_knowledge_level",
-			"related_knowledge_level",
-			"learning_goal",
-		]);
-		expect(parsed.questions[0]?.prompt).toBe(
-			"How much do you already know about graphic design?",
-		);
-		expect(parsed.questions[0]?.options).toEqual([
-			{
-				value: "I am a complete beginner.",
-				label: "I am a complete beginner.",
-			},
-			{
-				value: "I have a little experience.",
-				label: "I have a little experience.",
-			},
-			{
-				value: "I know some basics already.",
-				label: "I know some basics already.",
-			},
-		]);
+	it("rejects legacy keyed questionnaire objects", () => {
+		expect(() =>
+			questionnaireSchema.parse({
+				topic_knowledge_level: {
+					question: "How much do you already know?",
+					type: "single_select",
+					options: ["Beginner", "Intermediate"],
+				},
+			}),
+		).toThrow();
 	});
 });
 

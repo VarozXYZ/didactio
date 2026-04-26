@@ -147,4 +147,57 @@ export class MongoUserStore implements UserStore {
 
 		return stripMongoId(result);
 	}
+
+	async grantLaunchCredits(
+		id: string,
+		credits: CreditBalances,
+		grantedAt: Date,
+	): Promise<AuthUser | null> {
+		const result = await this.collection.findOneAndUpdate(
+			{id, launchGiftGrantedAt: {$exists: false}},
+			{
+				$inc: {
+					"credits.bronze": credits.bronze,
+					"credits.silver": credits.silver,
+					"credits.gold": credits.gold,
+				},
+				$set: {
+					launchGiftGrantedAt: grantedAt,
+					updatedAt: grantedAt,
+				},
+			},
+			{returnDocument: "after"},
+		);
+
+		return stripMongoId(result) ?? this.findById(id);
+	}
+
+	async applyCreditDelta(input: {
+		id: string;
+		coinType: keyof CreditBalances;
+		delta: number;
+		requireSufficientBalance: boolean;
+	}): Promise<AuthUser | null> {
+		const creditPath = `credits.${input.coinType}`;
+		const filter: Record<string, unknown> = {id: input.id};
+
+		if (input.requireSufficientBalance && input.delta < 0) {
+			filter[creditPath] = {$gte: Math.abs(input.delta)};
+		}
+
+		const result = await this.collection.findOneAndUpdate(
+			filter,
+			{
+				$inc: {
+					[creditPath]: input.delta,
+				},
+				$set: {
+					updatedAt: new Date(),
+				},
+			},
+			{returnDocument: "after"},
+		);
+
+		return stripMongoId(result);
+	}
 }

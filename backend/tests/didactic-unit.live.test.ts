@@ -13,16 +13,31 @@ const env = getAppEnv();
 
 const configuredTiers = [
 	{
-		tier: "cheap" as const,
+		quality: "silver" as const,
 		provider: env.aiCheapProvider,
 		model: env.aiCheapModel,
 	},
 	{
-		tier: "premium" as const,
+		quality: "gold" as const,
 		provider: env.aiPremiumProvider,
 		model: env.aiPremiumModel,
 	},
 ];
+
+function parseStreamComplete<T>(body: string): T {
+	const completeLine = body
+		.split("\n")
+		.map((line) => line.trim())
+		.filter(Boolean)
+		.map((line) => JSON.parse(line) as {type: string; data?: unknown})
+		.find((event) => event.type === "complete");
+
+	if (!completeLine) {
+		throw new Error("Stream did not include a complete event.");
+	}
+
+	return completeLine.data as T;
+}
 
 describe("live AI didactic-unit generation", () => {
 	if (!env.aiGatewayApiKey) {
@@ -36,9 +51,9 @@ describe("live AI didactic-unit generation", () => {
 	}
 
 	for (const configuredTier of configuredTiers) {
-		it(`generates a real syllabus and chapter with the ${configuredTier.tier} model`, async () => {
+		it(`generates a real syllabus and chapter with the ${configuredTier.quality} model`, async () => {
 			const app = createTestApp();
-			const topic = `live ${configuredTier.tier} didactic unit ${Date.now()}`;
+			const topic = `live ${configuredTier.quality} didactic unit ${Date.now()}`;
 
 			const created = await createDidacticUnit(app, {
 				topic,
@@ -60,26 +75,33 @@ describe("live AI didactic-unit generation", () => {
 			});
 
 			const syllabusResponse = await request(app)
-				.post(`/api/didactic-unit/${created.id}/syllabus/generate`)
-				.send({tier: configuredTier.tier});
+				.post(`/api/didactic-unit/${created.id}/syllabus/generate/stream`)
+				.send({quality: configuredTier.quality});
 
 			expect(syllabusResponse.status).toBe(200);
-			expect(syllabusResponse.body).toMatchObject({
+			const syllabusBody = parseStreamComplete<{
+				id: string;
+				provider: string;
+				status: string;
+				nextAction: string;
+				syllabus: {chapters: unknown[]; learningGoals: unknown[]};
+			}>(syllabusResponse.text);
+			expect(syllabusBody).toMatchObject({
 				id: created.id,
 				provider: configuredTier.provider,
 				status: "syllabus_ready",
 				nextAction: "review_syllabus",
 			});
 			expect(
-				syllabusResponse.body.syllabus.chapters.length,
+				syllabusBody.syllabus.chapters.length,
 			).toBeGreaterThan(0);
 			expect(
-				syllabusResponse.body.syllabus.learningGoals.length,
+				syllabusBody.syllabus.learningGoals.length,
 			).toBeGreaterThan(0);
 
 			const approveResponse = await request(app)
 				.post(`/api/didactic-unit/${created.id}/approve-syllabus`)
-				.send({});
+				.send({quality: configuredTier.quality});
 
 			expect(approveResponse.status).toBe(200);
 			expect(approveResponse.body).toMatchObject({
@@ -90,7 +112,7 @@ describe("live AI didactic-unit generation", () => {
 
 			const chapterResponse = await request(app)
 				.post(`/api/didactic-unit/${created.id}/chapters/0/generate`)
-				.send({tier: configuredTier.tier});
+				.send({});
 
 			expect(chapterResponse.status).toBe(200);
 			expect(chapterResponse.body).toMatchObject({

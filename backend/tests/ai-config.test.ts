@@ -9,15 +9,15 @@ describe("AI config API", () => {
 		const initialResponse = await request(app).get("/api/ai-config");
 		expect(initialResponse.status).toBe(200);
 		expect(initialResponse.body).toMatchObject({
-			cheap: expect.any(Object),
-			premium: expect.any(Object),
+			silver: expect.any(Object),
+			gold: expect.any(Object),
 			authoring: expect.any(Object),
 		});
 
 		const updateResponse = await request(app)
 			.patch("/api/ai-config")
 			.send({
-				premium: {
+				gold: {
 					provider: "anthropic",
 					model: "claude-sonnet-4",
 				},
@@ -28,7 +28,7 @@ describe("AI config API", () => {
 			});
 
 		expect(updateResponse.status).toBe(200);
-		expect(updateResponse.body.premium).toEqual({
+		expect(updateResponse.body.gold).toEqual({
 			provider: "anthropic",
 			model: "claude-sonnet-4",
 		});
@@ -39,7 +39,7 @@ describe("AI config API", () => {
 
 		const refreshedResponse = await request(app).get("/api/ai-config");
 		expect(refreshedResponse.status).toBe(200);
-		expect(refreshedResponse.body.premium).toEqual({
+		expect(refreshedResponse.body.gold).toEqual({
 			provider: "anthropic",
 			model: "claude-sonnet-4",
 		});

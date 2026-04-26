@@ -211,6 +211,30 @@ export function createAuthRouter(
 		}
 	});
 
+	router.get(
+		"/credits/transactions",
+		requireAuth,
+		async (request, response, next) => {
+			try {
+				if (!request.auth) {
+					throw new AuthError("unauthenticated", 401, "Authentication required.");
+				}
+
+				const transactions = await authService.listUserCreditTransactions(
+					request.auth.sub,
+				);
+				response.status(200).json({
+					transactions: transactions.map((transaction) => ({
+						...transaction,
+						createdAt: transaction.createdAt.toISOString(),
+					})),
+				});
+			} catch (error) {
+				next(error);
+			}
+		},
+	);
+
 	router.use(authErrorHandler);
 	return router;
 }

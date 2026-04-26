@@ -5,7 +5,7 @@ export type NdjsonEvent =
 	| {type: "partial_markdown"; delta: string; markdown?: string}
 	| {type: "partial_structured"; data: unknown}
 	| {type: "complete"; data: unknown}
-	| {type: "error"; message: string};
+	| {type: "error"; message: string; data?: unknown};
 
 export function openNdjsonStream(response: express.Response): void {
 	response.status(200);

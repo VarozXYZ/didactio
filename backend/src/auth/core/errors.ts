@@ -3,6 +3,7 @@ export class AuthError extends Error {
 		public readonly code: string,
 		public readonly statusCode: number,
 		message: string,
+		public readonly details?: Record<string, unknown>,
 	) {
 		super(message);
 		this.name = "AuthError";

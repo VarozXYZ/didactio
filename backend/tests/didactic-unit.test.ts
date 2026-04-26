@@ -11,6 +11,21 @@ async function createDidacticUnit(app: ReturnType<typeof createTestApp>) {
 	return response.body as {id: string};
 }
 
+function parseStreamComplete<T>(body: string): T {
+	const completeLine = body
+		.split("\n")
+		.map((line) => line.trim())
+		.filter(Boolean)
+		.map((line) => JSON.parse(line) as {type: string; data?: unknown})
+		.find((event) => event.type === "complete");
+
+	if (!completeLine) {
+		throw new Error("Stream did not include a complete event.");
+	}
+
+	return completeLine.data as T;
+}
+
 async function advanceToQuestionnaireAnswered(
 	app: ReturnType<typeof createTestApp>,
 	didacticUnitId: string,
@@ -49,14 +64,14 @@ async function createApprovedDidacticUnit(
 	await advanceToQuestionnaireAnswered(app, created.id);
 
 	const syllabusResponse = await request(app)
-		.post(`/api/didactic-unit/${created.id}/syllabus/generate`)
-		.send({tier: "cheap"});
+		.post(`/api/didactic-unit/${created.id}/syllabus/generate/stream`)
+		.send({quality: "silver"});
 
 	expect(syllabusResponse.status).toBe(200);
 
 	const approvedResponse = await request(app)
 		.post(`/api/didactic-unit/${created.id}/approve-syllabus`)
-		.send({});
+		.send({quality: "silver"});
 
 	expect(approvedResponse.status).toBe(200);
 
@@ -120,15 +135,20 @@ describe("didactic-unit lifecycle", () => {
 		await advanceToQuestionnaireAnswered(app, created.id);
 
 		const syllabusResponse = await request(app)
-			.post(`/api/didactic-unit/${created.id}/syllabus/generate`)
-			.send({tier: "cheap"});
+			.post(`/api/didactic-unit/${created.id}/syllabus/generate/stream`)
+			.send({quality: "silver"});
 
 		expect(syllabusResponse.status).toBe(200);
-		expect(syllabusResponse.body).toMatchObject({
+		const syllabusBody = parseStreamComplete<{
+			status: string;
+			nextAction: string;
+			syllabus: {chapters: unknown[]};
+		}>(syllabusResponse.text);
+		expect(syllabusBody).toMatchObject({
 			status: "syllabus_ready",
 			nextAction: "review_syllabus",
 		});
-		expect(syllabusResponse.body.syllabus.chapters.length).toBeGreaterThan(
+		expect(syllabusBody.syllabus.chapters.length).toBeGreaterThan(
 			0,
 		);
 
@@ -144,7 +164,7 @@ describe("didactic-unit lifecycle", () => {
 
 		const approvedResponse = await request(app)
 			.post(`/api/didactic-unit/${created.id}/approve-syllabus`)
-			.send({});
+			.send({quality: "silver"});
 
 		expect(approvedResponse.status).toBe(200);
 		expect(approvedResponse.body).toMatchObject({
@@ -207,11 +227,11 @@ describe("didactic-unit lifecycle", () => {
 		});
 
 		const syllabusResponse = await request(app)
-			.post(`/api/didactic-unit/${created.id}/syllabus/generate`)
-			.send({tier: "cheap"});
+			.post(`/api/didactic-unit/${created.id}/syllabus/generate/stream`)
+			.send({quality: "silver"});
 
 		expect(syllabusResponse.status).toBe(200);
-		expect(syllabusResponse.body).toMatchObject({
+		expect(parseStreamComplete(syllabusResponse.text)).toMatchObject({
 			status: "syllabus_ready",
 			nextAction: "review_syllabus",
 		});
@@ -223,7 +243,7 @@ describe("didactic-unit lifecycle", () => {
 
 		const generateResponse = await request(app)
 			.post(`/api/didactic-unit/${approved.id}/chapters/0/generate`)
-			.send({tier: "cheap"});
+			.send({});
 
 		expect(generateResponse.status).toBe(200);
 		expect(generateResponse.body).toMatchObject({

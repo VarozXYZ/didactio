@@ -16,7 +16,20 @@ export type AuthUser = {
 		silver: number;
 		gold: number;
 	};
+	launchGiftGrantedAt?: string;
 	lastLoginAt?: string;
+};
+
+export type CreditTransaction = {
+	id: string;
+	userId: string;
+	coinType: "bronze" | "silver" | "gold";
+	direction: "credit" | "debit";
+	amount: number;
+	reason: string;
+	actorUserId: string;
+	metadata?: unknown;
+	createdAt: string;
 };
 
 type AuthSnapshot = {
@@ -125,6 +138,31 @@ export const authClient = {
 		}
 
 		return refreshPromise;
+	},
+
+	async refreshUser() {
+		const response = await this.authorizedFetch("/auth/me");
+		if (!response.ok) {
+			return snapshot.user;
+		}
+
+		const payload = (await response.json()) as {user: AuthUser};
+		setSnapshot({
+			status: "authenticated",
+			user: payload.user,
+			error: null,
+		});
+		return payload.user;
+	},
+
+	async listCreditTransactions() {
+		const response = await this.authorizedFetch("/auth/credits/transactions");
+		if (!response.ok) {
+			const {message} = await parseErrorBody(response);
+			throw new Error(message);
+		}
+
+		return (await response.json()) as {transactions: CreditTransaction[]};
 	},
 
 	async authorizedFetch(

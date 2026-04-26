@@ -86,121 +86,29 @@ export const moderationSchema = z
 		};
 	});
 
-const questionnaireQuestionSchema = z
-	.object({
-		id: z.string().min(1).optional(),
-		prompt: z.string().min(1).optional(),
-		question: z.string().min(1).optional(),
-		type: z.string().min(1),
-		options: z
-			.array(
-				z.union([
-					z.string().min(1),
-					z.object({
-						value: z.string().min(1),
-						label: z.string().min(1),
-					}),
-				]),
-			)
-			.nullish(),
-	})
-	.transform((value, ctx) => {
-		const prompt = value.prompt?.trim() || value.question?.trim();
+const questionnaireQuestionIdSchema = z.enum([
+	"topic_knowledge_level",
+	"related_knowledge_level",
+	"learning_goal",
+]);
 
-		if (!prompt) {
-			ctx.addIssue({
-				code: "custom",
-				message:
-					"Questionnaire question must include prompt or question.",
-				path: ["prompt"],
-			});
-			return z.NEVER;
-		}
+const questionnaireQuestionSchema = z.object({
+	id: questionnaireQuestionIdSchema,
+	prompt: z.string().min(1),
+	type: z.enum(["single_select", "long_text"]),
+	options: z
+		.array(
+			z.object({
+				value: z.string().min(1),
+				label: z.string().min(1),
+			}),
+		)
+		.nullable(),
+});
 
-		return {
-			id: value.id?.trim(),
-			prompt,
-			type: value.type.trim(),
-			options: value.options?.map((option) =>
-				typeof option === "string" ?
-					{
-						value: option.trim(),
-						label: option.trim(),
-					}
-				:	{
-						value: option.value.trim(),
-						label: option.label.trim(),
-					},
-			),
-		};
-	});
-
-export const questionnaireSchema = z
-	.object({
-		questions: z.array(questionnaireQuestionSchema).min(1).optional(),
-		topic_knowledge_level: questionnaireQuestionSchema.optional(),
-		related_knowledge_level: questionnaireQuestionSchema.optional(),
-		learning_goal: questionnaireQuestionSchema.optional(),
-	})
-	.transform((value, ctx) => {
-		if (value.questions?.length) {
-			const normalizedQuestions = value.questions.map((question) => {
-				if (!question.id) {
-					ctx.addIssue({
-						code: "custom",
-						message:
-							"Each questionnaire question in the questions array must include an id.",
-						path: ["questions"],
-					});
-					return z.NEVER;
-				}
-
-				return {
-					id: question.id,
-					prompt: question.prompt,
-					type: question.type,
-					options: question.options ?? null,
-				};
-			});
-
-			if (normalizedQuestions.some((question) => question === z.NEVER)) {
-				return z.NEVER;
-			}
-
-			return {questions: normalizedQuestions};
-		}
-
-		const orderedEntries = [
-			["topic_knowledge_level", value.topic_knowledge_level],
-			["related_knowledge_level", value.related_knowledge_level],
-			["learning_goal", value.learning_goal],
-		] as const;
-
-		const questions = orderedEntries.flatMap(([id, question]) =>
-			question ?
-				[
-					{
-						id,
-						prompt: question.prompt,
-						type: question.type,
-						options: question.options ?? null,
-					},
-				]
-			:	[],
-		);
-
-		if (questions.length === 0) {
-			ctx.addIssue({
-				code: "custom",
-				message:
-					"Questionnaire result must include a questions array or canonical keyed questions.",
-				path: ["questions"],
-			});
-			return z.NEVER;
-		}
-
-		return {questions};
-	});
+export const questionnaireSchema = z.object({
+	questions: z.array(questionnaireQuestionSchema).length(3),
+});
 
 export const folderClassificationSchema = z
 	.object({

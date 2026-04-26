@@ -8,15 +8,15 @@ import {
 	dashboardApi,
 } from "../../../api/dashboardApi";
 
-type ModelTier = "cheap" | "premium";
+type ModelTier = "silver" | "gold";
 
 const tierLabels: Record<ModelTier, {title: string; description: string}> = {
-	cheap: {
-		title: "Cheap Model",
-		description: "Faster, lower-cost default for routine generation.",
+	silver: {
+		title: "Silver Model",
+		description: "Faster default quality for routine generation.",
 	},
-	premium: {
-		title: "Premium Model",
+	gold: {
+		title: "Gold Model",
 		description:
 			"Higher-quality option for the moments when you want the best output.",
 	},
@@ -237,7 +237,7 @@ export function PreferencesView() {
 						Preferences
 					</h1>
 					<p className="mt-0.5 text-[13px] text-[#86868B]">
-						Configure the cheap/premium AI profiles and the shared
+						Configure the silver/gold AI profiles and the shared
 						generation context
 					</p>
 				</div>
@@ -301,7 +301,7 @@ export function PreferencesView() {
 									)
 								}
 							/>
-							{(["cheap", "premium"] as ModelTier[]).map(
+							{(["silver", "gold"] as ModelTier[]).map(
 								(tier) => (
 									<ModelConfigCard
 										key={tier}

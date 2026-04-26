@@ -13,6 +13,7 @@ type AuthContextValue = {
 	error: string | null;
 	beginGoogleLogin: () => void;
 	logout: () => Promise<void>;
+	refreshUser: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -34,6 +35,9 @@ export function AuthProvider({children}: PropsWithChildren) {
 				error: snapshot.error,
 				beginGoogleLogin: () => authClient.beginGoogleLogin(),
 				logout: () => authClient.logout(),
+				refreshUser: async () => {
+					await authClient.refreshUser();
+				},
 			}}
 		>
 			{children}

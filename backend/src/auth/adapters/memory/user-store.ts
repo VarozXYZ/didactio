@@ -20,6 +20,16 @@ export class InMemoryUserStore implements UserStore {
 	private readonly usersById = new Map<string, AuthUser>();
 	private readonly userIdsByProviderAccount = new Map<string, string>();
 
+	constructor(seedUsers: AuthUser[] = []) {
+		for (const user of seedUsers) {
+			this.usersById.set(user.id, user);
+			this.userIdsByProviderAccount.set(
+				this.providerKey(user.provider, user.providerUserId),
+				user.id,
+			);
+		}
+	}
+
 	async findByProviderAccount(
 		provider: AuthProvider,
 		providerUserId: string,
@@ -130,6 +140,62 @@ export class InMemoryUserStore implements UserStore {
 			updatedAt: new Date(),
 		};
 		this.usersById.set(id, updated);
+		return updated;
+	}
+
+	async grantLaunchCredits(
+		id: string,
+		credits: CreditBalances,
+		grantedAt: Date,
+	): Promise<AuthUser | null> {
+		const user = this.usersById.get(id);
+		if (!user) {
+			return null;
+		}
+
+		if (user.launchGiftGrantedAt) {
+			return user;
+		}
+
+		const currentCredits = user.credits ?? createEmptyCredits();
+		const updated: AuthUser = {
+			...user,
+			credits: {
+				bronze: currentCredits.bronze + credits.bronze,
+				silver: currentCredits.silver + credits.silver,
+				gold: currentCredits.gold + credits.gold,
+			},
+			launchGiftGrantedAt: grantedAt,
+			updatedAt: grantedAt,
+		};
+		this.usersById.set(id, updated);
+		return updated;
+	}
+
+	async applyCreditDelta(input: {
+		id: string;
+		coinType: keyof CreditBalances;
+		delta: number;
+		requireSufficientBalance: boolean;
+	}): Promise<AuthUser | null> {
+		const user = this.usersById.get(input.id);
+		if (!user) {
+			return null;
+		}
+
+		const credits = {...(user.credits ?? createEmptyCredits())};
+		const nextValue = credits[input.coinType] + input.delta;
+		if (input.requireSufficientBalance && nextValue < 0) {
+			return null;
+		}
+
+		credits[input.coinType] = nextValue;
+		const updated: AuthUser = {
+			...user,
+			credits,
+			updatedAt: new Date(),
+		};
+		this.usersById.set(input.id, updated);
 		return updated;
 	}
 

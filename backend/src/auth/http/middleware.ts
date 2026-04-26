@@ -60,6 +60,7 @@ export function authErrorHandler(
 		response.status(error.statusCode).json({
 			error: error.code,
 			message: error.message,
+			...(error.details ?? {}),
 		});
 		return;
 	}
