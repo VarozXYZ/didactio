@@ -1,5 +1,6 @@
 import {authClient} from "../../auth/authClient";
 import type {PlanningQuestion, PlanningSyllabus} from "../types";
+import type {PresentationTheme} from "../../types/presentationTheme";
 
 export class DashboardApiError extends Error {
 	status: number;
@@ -25,16 +26,21 @@ export interface BackendFolder {
 	unitCount: number;
 }
 
-export type BackendChapterPresentationSettings = {
-	// New shape
-	sizeProfile?: "small" | "regular" | "large";
-	bodyFontFamily?: string;
-	headingFontFamily?: string;
-	paragraphAlign?: "left" | "center" | "right" | "justify";
-	// Legacy fields (older persisted data)
-	paragraphFontFamily?: "sans" | "serif" | "mono";
-	paragraphFontSize?: "14px" | "16px" | "18px" | "20px";
-};
+export interface BackendHtmlContentBlock {
+	id: string;
+	type:
+		| "heading"
+		| "paragraph"
+		| "blockquote"
+		| "list"
+		| "table"
+		| "code"
+		| "divider";
+	html: string;
+	textLength: number;
+	textStartOffset: number;
+	textEndOffset: number;
+}
 
 export type BackendAiModelConfig = {
 	provider: string;
@@ -66,8 +72,8 @@ export interface BackendDidacticUnitSummary {
 	overview: string;
 	moduleCount: number;
 	generatedChapterCount: number;
-	readCharacterCount: number;
-	totalCharacterCount: number;
+	readBlockCount: number;
+	totalBlockCount: number;
 	progressPercent: number;
 	studyProgressPercent: number;
 	createdAt: string;
@@ -91,6 +97,7 @@ export interface BackendDidacticUnitDetail {
 	folderId: string;
 	folderAssignmentMode: "manual" | "auto";
 	folder: Omit<BackendFolder, "unitCount">;
+	presentationTheme: PresentationTheme | null;
 	provider: BackendProvider;
 	status: string;
 	nextAction: string;
@@ -121,8 +128,8 @@ export interface BackendDidacticUnitDetail {
 	}>;
 	studyProgress: {
 		moduleCount: number;
-		readCharacterCount: number;
-		totalCharacterCount: number;
+		readBlockCount: number;
+		totalBlockCount: number;
 		studyProgressPercent: number;
 	};
 }
@@ -132,8 +139,10 @@ export interface BackendDidacticUnitChapterSummary {
 	title: string;
 	overview: string;
 	hasGeneratedContent: boolean;
-	readCharacterCount: number;
-	totalCharacterCount: number;
+	readBlockIndex: number;
+	readBlockOffset?: number;
+	readBlocksVersion: number;
+	totalBlocks: number;
 	lastVisitedPageIndex?: number;
 	isCompleted: boolean;
 	state: "pending" | "ready" | "failed";
@@ -146,11 +155,15 @@ export interface BackendDidacticUnitChapterDetail {
 	chapterIndex: number;
 	title: string;
 	planningOverview: string;
-	content: string | null;
-	presentationSettings: BackendChapterPresentationSettings;
+	html: string | null;
+	htmlHash?: string;
+	htmlBlocks: BackendHtmlContentBlock[];
+	htmlBlocksVersion: number;
 	state: "pending" | "ready" | "failed";
-	readCharacterCount: number;
-	totalCharacterCount: number;
+	readBlockIndex: number;
+	readBlockOffset?: number;
+	readBlocksVersion: number;
+	totalBlocks: number;
 	lastVisitedPageIndex?: number;
 	isCompleted: boolean;
 	generatedAt?: string;
@@ -162,8 +175,8 @@ export interface BackendDidacticUnitReadingProgressResponse {
 	module: BackendDidacticUnitChapterDetail | null;
 	studyProgress: {
 		moduleCount: number;
-		readCharacterCount: number;
-		totalCharacterCount: number;
+		readBlockCount: number;
+		totalBlockCount: number;
 		studyProgressPercent: number;
 	};
 }
@@ -175,21 +188,42 @@ export interface BackendDidacticUnitChapterRevision {
 	createdAt: string;
 	chapter: {
 		title: string;
-		content: string;
-		presentationSettings?: BackendChapterPresentationSettings;
+		html: string;
+		htmlHash: string;
+		htmlBlocks: BackendHtmlContentBlock[];
+		htmlBlocksVersion: number;
 	};
 }
 
 export interface BackendGenerationRun {
 	id: string;
 	stage: "syllabus" | "chapter";
-	status: "completed" | "failed";
+	status:
+		| "payment_pending"
+		| "queued"
+		| "running"
+		| "retrying"
+		| "completed"
+		| "failed"
+		| "payment_failed";
+	didacticUnitId?: string;
+	unitId?: string;
+	ownerId?: string;
+	userId?: string;
 	provider: BackendProvider;
 	model: string;
 	prompt: string;
 	createdAt: string;
+	updatedAt?: string;
 	error?: string;
+	errorMessage?: string;
 	chapterIndex?: number;
+	attempts?: number;
+	emittedBlocks?: BackendHtmlContentBlock[];
+	finalHtml?: string;
+	finalHash?: string;
+	htmlBlocksVersion?: number;
+	completedAt?: string;
 	rawOutput?: string;
 	telemetry?: {
 		durationMs?: number;
@@ -259,7 +293,7 @@ export interface BackendGenerationRun {
 
 type NdjsonEvent =
 	| {type: "start"; stage: string; provider: string; model: string}
-	| {type: "partial_markdown"; delta: string; markdown?: string}
+	| {type: "partial_html_block"; block: BackendHtmlContentBlock}
 	| {type: "partial_structured"; data: unknown}
 	| {type: "complete"; data: unknown}
 	| {type: "error"; message: string; data?: unknown};
@@ -267,8 +301,8 @@ type NdjsonEvent =
 type StreamHandlers = {
 	signal?: AbortSignal;
 	onStart?: (event: Extract<NdjsonEvent, {type: "start"}>) => void;
-	onPartialMarkdown?: (
-		event: Extract<NdjsonEvent, {type: "partial_markdown"}>,
+	onPartialHtmlBlock?: (
+		event: Extract<NdjsonEvent, {type: "partial_html_block"}>,
 	) => void;
 	onPartialStructured?: (
 		event: Extract<NdjsonEvent, {type: "partial_structured"}>,
@@ -410,8 +444,8 @@ async function streamNdjson<T>(
 				continue;
 			}
 
-			if (event.type === "partial_markdown") {
-				handlers.onPartialMarkdown?.(event);
+			if (event.type === "partial_html_block") {
+				handlers.onPartialHtmlBlock?.(event);
 				continue;
 			}
 
@@ -513,6 +547,18 @@ export const dashboardApi = {
 			},
 		);
 	},
+	updateDidacticUnitTheme(
+		id: string,
+		presentationTheme: PresentationTheme | null,
+	) {
+		return requestJson<BackendDidacticUnitDetail>(
+			`/api/didactic-unit/${id}/theme`,
+			{
+				method: "PATCH",
+				body: JSON.stringify({presentationTheme}),
+			},
+		);
+	},
 	moderateDidacticUnit(id: string) {
 		return requestJson<BackendDidacticUnitDetail>(
 			`/api/didactic-unit/${id}/moderate`,
@@ -602,8 +648,8 @@ export const dashboardApi = {
 		chapterIndex: number,
 		chapter: {
 			title: string;
-			content: string;
-			presentationSettings?: BackendChapterPresentationSettings;
+			html?: string;
+			htmlHash?: string;
 		},
 	) {
 		return requestJson<BackendDidacticUnitChapterDetail>(
@@ -614,59 +660,27 @@ export const dashboardApi = {
 			},
 		);
 	},
-	generateDidacticUnitChapter(
-		id: string,
-		chapterIndex: number,
-	) {
-		return requestJson<BackendDidacticUnitDetail>(
-			`/api/didactic-unit/${id}/modules/${chapterIndex}/generate`,
+	createGenerationRun(id: string, chapterIndex: number) {
+		return requestJson<{runId: string; run: BackendGenerationRun}>(
+			`/api/didactic-unit/${id}/modules/${chapterIndex}/generate-run`,
 			{
 				method: "POST",
 				body: JSON.stringify({}),
 			},
 		);
 	},
-	streamGenerateDidacticUnitChapter(
-		id: string,
-		chapterIndex: number,
-		handlers: StreamHandlers,
-	) {
-		return streamNdjson<BackendDidacticUnitDetail>(
-			`/api/didactic-unit/${id}/modules/${chapterIndex}/generate/stream`,
-			handlers,
-			{
-				body: JSON.stringify({}),
-			},
+	getGenerationRun(runId: string) {
+		return requestJson<{run: BackendGenerationRun}>(
+			`/api/generation-runs/${runId}`,
 		);
 	},
-	regenerateDidacticUnitChapter(
-		id: string,
-		chapterIndex: number,
-		input?: {instruction?: string},
-	) {
-		return requestJson<BackendDidacticUnitDetail>(
-			`/api/didactic-unit/${id}/modules/${chapterIndex}/regenerate`,
-			{
-				method: "POST",
-				body: JSON.stringify({
-					...(input ?? {}),
-				}),
-			},
-		);
-	},
-	streamRegenerateDidacticUnitChapter(
-		id: string,
-		chapterIndex: number,
-		handlers: StreamHandlers,
-		input?: {instruction?: string},
-	) {
-		return streamNdjson<BackendDidacticUnitDetail>(
-			`/api/didactic-unit/${id}/modules/${chapterIndex}/regenerate/stream`,
+	streamGenerationRun(runId: string, handlers: StreamHandlers) {
+		return streamNdjson<{run: BackendGenerationRun}>(
+			`/api/generation-runs/${runId}/stream`,
 			handlers,
 			{
-				body: JSON.stringify({
-					...(input ?? {}),
-				}),
+				method: "GET",
+			body: undefined,
 			},
 		);
 	},
@@ -682,7 +696,10 @@ export const dashboardApi = {
 	updateDidacticUnitReadingProgress(
 		id: string,
 		chapterIndex: number,
-		readCharacterCount: number,
+		progress: {
+			readBlockIndex: number;
+			readBlockOffset?: number;
+		},
 		lastVisitedPageIndex?: number,
 	) {
 		return requestJson<BackendDidacticUnitReadingProgressResponse>(
@@ -690,7 +707,7 @@ export const dashboardApi = {
 			{
 				method: "PUT",
 				body: JSON.stringify({
-					readCharacterCount,
+					...progress,
 					...(lastVisitedPageIndex !== undefined ?
 						{lastVisitedPageIndex}
 					: 	{}),

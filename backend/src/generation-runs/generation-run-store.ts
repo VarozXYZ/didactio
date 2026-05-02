@@ -1,10 +1,20 @@
 import {randomUUID} from "node:crypto";
-import type {DidacticUnitGeneratedChapter} from "../didactic-unit/didactic-unit-chapter.js";
+import type {
+	DidacticUnitGeneratedChapter,
+	HtmlContentBlock,
+} from "../didactic-unit/didactic-unit-chapter.js";
 import type {DidacticUnitSyllabus} from "../didactic-unit/planning.js";
 import type {AiCallTelemetry} from "../ai/telemetry.js";
 
 export type GenerationRunStage = "syllabus" | "chapter";
-export type GenerationRunStatus = "completed" | "failed";
+export type GenerationRunStatus =
+	| "payment_pending"
+	| "queued"
+	| "running"
+	| "retrying"
+	| "completed"
+	| "failed"
+	| "payment_failed";
 
 interface GenerationRunBase {
 	id: string;
@@ -15,8 +25,10 @@ interface GenerationRunBase {
 	prompt: string;
 	status: GenerationRunStatus;
 	createdAt: string;
+	updatedAt?: string;
 	rawOutput?: string;
 	error?: string;
+	errorMessage?: string;
 	telemetry?: AiCallTelemetry;
 }
 
@@ -28,6 +40,16 @@ export interface SyllabusGenerationRunRecord extends GenerationRunBase {
 export interface ChapterGenerationRunRecord extends GenerationRunBase {
 	stage: "chapter";
 	chapterIndex: number;
+	unitId?: string;
+	userId?: string;
+	attempts?: number;
+	coinTxId?: string;
+	refundTxId?: string;
+	emittedBlocks?: HtmlContentBlock[];
+	finalHtml?: string;
+	finalHash?: string;
+	htmlBlocksVersion?: number;
+	completedAt?: string;
 	chapter?: DidacticUnitGeneratedChapter;
 }
 
@@ -37,6 +59,12 @@ export type GenerationRun =
 
 export interface GenerationRunStore {
 	save(run: GenerationRun): Promise<void>;
+	getById(ownerId: string, id: string): Promise<GenerationRun | null>;
+	findActiveChapterRun(
+		ownerId: string,
+		didacticUnitId: string,
+		chapterIndex: number,
+	): Promise<ChapterGenerationRunRecord | null>;
 	listByDidacticUnit(
 		ownerId: string,
 		didacticUnitId: string,
@@ -44,21 +72,52 @@ export interface GenerationRunStore {
 }
 
 export class InMemoryGenerationRunStore implements GenerationRunStore {
-	private readonly runs = new Map<string, GenerationRun[]>();
+	private readonly runsById = new Map<string, GenerationRun>();
 
 	async save(run: GenerationRun): Promise<void> {
-		const didacticUnitRuns = this.runs.get(run.didacticUnitId) ?? [];
-		didacticUnitRuns.unshift(run);
-		this.runs.set(run.didacticUnitId, didacticUnitRuns);
+		this.runsById.set(run.id, run);
+	}
+
+	async getById(ownerId: string, id: string): Promise<GenerationRun | null> {
+		const run = this.runsById.get(id);
+		return run?.ownerId === ownerId ? run : null;
+	}
+
+	async findActiveChapterRun(
+		ownerId: string,
+		didacticUnitId: string,
+		chapterIndex: number,
+	): Promise<ChapterGenerationRunRecord | null> {
+		const activeStatuses = new Set<GenerationRunStatus>([
+			"payment_pending",
+			"queued",
+			"running",
+			"retrying",
+		]);
+		const runs = [...this.runsById.values()]
+			.filter(
+				(run): run is ChapterGenerationRunRecord =>
+					run.ownerId === ownerId &&
+					run.didacticUnitId === didacticUnitId &&
+					run.stage === "chapter" &&
+					run.chapterIndex === chapterIndex &&
+					activeStatuses.has(run.status),
+			)
+			.sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+		return runs[0] ?? null;
 	}
 
 	async listByDidacticUnit(
 		ownerId: string,
 		didacticUnitId: string,
 	): Promise<GenerationRun[]> {
-		return (this.runs.get(didacticUnitId) ?? []).filter(
-			(run) => run.ownerId === ownerId,
-		);
+		return [...this.runsById.values()]
+			.filter(
+				(run) =>
+					run.ownerId === ownerId &&
+					run.didacticUnitId === didacticUnitId,
+			)
+			.sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 	}
 }
 
@@ -125,6 +184,7 @@ export function createCompletedSyllabusGenerationRunRecord(
 		syllabus: input.syllabus,
 		status: "completed",
 		createdAt: input.createdAt,
+		updatedAt: input.createdAt,
 		telemetry: input.telemetry,
 	};
 }
@@ -142,8 +202,10 @@ export function createFailedSyllabusGenerationRunRecord(
 		prompt: input.prompt,
 		rawOutput: input.rawOutput,
 		error: input.error,
+		errorMessage: input.error,
 		status: "failed",
 		createdAt: input.createdAt,
+		updatedAt: input.createdAt,
 		telemetry: input.telemetry,
 	};
 }
@@ -157,13 +219,21 @@ export function createCompletedChapterGenerationRunRecord(
 		didacticUnitId: input.didacticUnitId,
 		ownerId: input.ownerId,
 		chapterIndex: input.chapterIndex,
+		unitId: input.didacticUnitId,
+		userId: input.ownerId,
 		provider: input.provider,
 		model: input.model,
 		prompt: input.prompt,
 		chapter: input.chapter,
+		emittedBlocks: input.chapter.htmlBlocks,
+		finalHtml: input.chapter.html,
+		finalHash: input.chapter.htmlHash,
+		htmlBlocksVersion: input.chapter.htmlBlocksVersion,
 		rawOutput: input.rawOutput,
 		status: "completed",
 		createdAt: input.createdAt,
+		updatedAt: input.createdAt,
+		completedAt: input.createdAt,
 		telemetry: input.telemetry,
 	};
 }
@@ -177,13 +247,47 @@ export function createFailedChapterGenerationRunRecord(
 		didacticUnitId: input.didacticUnitId,
 		ownerId: input.ownerId,
 		chapterIndex: input.chapterIndex,
+		unitId: input.didacticUnitId,
+		userId: input.ownerId,
 		provider: input.provider,
 		model: input.model,
 		prompt: input.prompt,
 		rawOutput: input.rawOutput,
 		error: input.error,
+		errorMessage: input.error,
 		status: "failed",
 		createdAt: input.createdAt,
+		updatedAt: input.createdAt,
 		telemetry: input.telemetry,
+	};
+}
+
+export function createQueuedChapterGenerationRunRecord(input: {
+	didacticUnitId: string;
+	ownerId: string;
+	chapterIndex: number;
+	provider: string;
+	model: string;
+	prompt?: string;
+	coinTxId?: string;
+}): ChapterGenerationRunRecord {
+	const now = new Date().toISOString();
+	return {
+		id: randomUUID(),
+		stage: "chapter",
+		didacticUnitId: input.didacticUnitId,
+		unitId: input.didacticUnitId,
+		ownerId: input.ownerId,
+		userId: input.ownerId,
+		chapterIndex: input.chapterIndex,
+		provider: input.provider,
+		model: input.model,
+		prompt: input.prompt ?? "",
+		status: "queued",
+		attempts: 0,
+		coinTxId: input.coinTxId,
+		emittedBlocks: [],
+		createdAt: now,
+		updatedAt: now,
 	};
 }

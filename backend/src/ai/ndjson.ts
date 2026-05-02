@@ -1,8 +1,9 @@
 import type express from "express";
+import type {HtmlContentBlock} from "../didactic-unit/didactic-unit-chapter.js";
 
 export type NdjsonEvent =
 	| {type: "start"; stage: string; provider: string; model: string}
-	| {type: "partial_markdown"; delta: string; markdown?: string}
+	| {type: "partial_html_block"; block: HtmlContentBlock}
 	| {type: "partial_structured"; data: unknown}
 	| {type: "complete"; data: unknown}
 	| {type: "error"; message: string; data?: unknown};

@@ -87,11 +87,7 @@ describe("coin system", () => {
 		expect((await authService.getUserById("mock-user"))?.credits.gold).toBe(0);
 
 		await generateDidacticUnitChapter(app, syllabusReady.id, 0);
-		const regenerateResponse = await request(app)
-			.post(`/api/didactic-unit/${syllabusReady.id}/chapters/0/regenerate`)
-			.send({});
-
-		expect(regenerateResponse.status).toBe(200);
+		await generateDidacticUnitChapter(app, syllabusReady.id, 0);
 		expect((await authService.getUserById("mock-user"))?.credits.silver).toBe(13);
 	});
 
@@ -108,22 +104,24 @@ describe("coin system", () => {
 		const authService = app.locals.authService as AuthService;
 		const before = await authService.getUserById("mock-user");
 
-		const failed = await request(app)
-			.post(`/api/didactic-unit/${approved.id}/chapters/0/generate`)
+		const failedRun = await request(app)
+			.post(`/api/didactic-unit/${approved.id}/modules/0/generate-run`)
 			.send({});
 
-		expect(failed.status).toBe(409);
+		expect(failedRun.status).toBe(202);
+		const failedStream = await request(app)
+			.get(`/api/generation-runs/${failedRun.body.runId}/stream`)
+			.send({});
+		expect(failedStream.status).toBe(200);
+		expect(failedStream.text).toContain("\"type\":\"error\"");
 		expect((await authService.getUserById("mock-user"))?.credits).toEqual(
 			before?.credits,
 		);
 
-		const repeat = await request(app)
-			.post(`/api/didactic-unit/${approved.id}/chapters/0/generate`)
+		const repeatRun = await request(app)
+			.post(`/api/didactic-unit/${approved.id}/modules/0/generate-run`)
 			.send({});
 
-		expect(repeat.status).toBe(409);
-		expect(repeat.body.error).toBe(
-			"Initial module generation has already been attempted.",
-		);
+		expect(repeatRun.status).toBe(202);
 	});
 });

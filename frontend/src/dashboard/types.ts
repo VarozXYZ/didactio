@@ -1,3 +1,5 @@
+import type {PresentationTheme} from "../types/presentationTheme";
+
 export type DashboardSection =
 	| "all-units"
 	| "subscription"
@@ -111,7 +113,7 @@ export interface PlanningDetailViewModel {
 
 export type EditorChapterStatus = "pending" | "ready" | "failed";
 
-export interface ChapterPresentationSettings {
+export interface EditorTextStyle {
 	sizeProfile: "small" | "regular" | "large";
 	bodyFontFamily: string; // FontId from typography.ts
 	headingFontFamily: string; // FontId from typography.ts
@@ -124,17 +126,38 @@ export interface DidacticUnitEditorChapter {
 	status: EditorChapterStatus;
 	summary: string;
 	readingTime: string;
-	content: string | null;
+	html: string | null;
+	htmlHash?: string;
+	htmlBlocks: HtmlContentBlock[];
+	htmlBlocksVersion: number;
+	readBlockIndex: number;
+	readBlockOffset?: number;
+	readBlocksVersion: number;
+	totalBlocks: number;
 	learningGoals: string[];
 	keyPoints: string[];
 	level: string;
 	effort: string;
 	isCompleted: boolean;
 	completedAt?: string;
-	readCharacterCount: number;
-	totalCharacterCount: number;
 	lastVisitedPageIndex?: number;
-	presentationSettings: ChapterPresentationSettings;
+	textStyle: EditorTextStyle;
+}
+
+export interface HtmlContentBlock {
+	id: string;
+	type:
+		| "heading"
+		| "paragraph"
+		| "blockquote"
+		| "list"
+		| "table"
+		| "code"
+		| "divider";
+	html: string;
+	textLength: number;
+	textStartOffset: number;
+	textEndOffset: number;
 }
 
 export interface DidacticUnitEditorViewModel {
@@ -148,6 +171,7 @@ export interface DidacticUnitEditorViewModel {
 	overview: string;
 	provider: string;
 	generationQuality?: "silver" | "gold";
+	presentationTheme: PresentationTheme | null;
 	chapters: DidacticUnitEditorChapter[];
 }
 
@@ -159,7 +183,7 @@ export interface DidacticUnitRevisionViewModel {
 	title: string;
 	chapter: {
 		title: string;
-		content: string;
-		presentationSettings: ChapterPresentationSettings;
+		html: string;
+		htmlHash: string;
 	};
 }

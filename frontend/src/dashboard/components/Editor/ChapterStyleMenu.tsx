@@ -7,7 +7,7 @@ import {
 	Settings2,
 } from "lucide-react";
 import {useEffect, useRef, useState} from "react";
-import type {ChapterPresentationSettings} from "../../types";
+import type {EditorTextStyle} from "../../types";
 import {
 	FONT_CATALOG,
 	type FontId,
@@ -16,8 +16,8 @@ import {
 import {loadFonts} from "../../utils/fontLoader";
 
 type ChapterStyleMenuProps = {
-	value: ChapterPresentationSettings;
-	onChange: (value: ChapterPresentationSettings) => void;
+	value: EditorTextStyle;
+	onChange: (value: EditorTextStyle) => void;
 	compact?: boolean;
 };
 
@@ -32,7 +32,7 @@ const SIZE_PROFILES: Array<{
 ];
 
 const ALIGN_OPTIONS: Array<{
-	value: ChapterPresentationSettings["paragraphAlign"];
+	value: EditorTextStyle["paragraphAlign"];
 	label: string;
 	icon: typeof AlignLeft;
 }> = [

@@ -78,6 +78,25 @@ async function createApprovedDidacticUnit(
 	return approvedResponse.body as {id: string};
 }
 
+async function generateChapter(
+	app: ReturnType<typeof createTestApp>,
+	didacticUnitId: string,
+	chapterIndex = 0,
+) {
+	const createRunResponse = await request(app)
+		.post(
+			`/api/didactic-unit/${didacticUnitId}/modules/${chapterIndex}/generate-run`,
+		)
+		.send({});
+	expect(createRunResponse.status).toBe(202);
+
+	const streamResponse = await request(app)
+		.get(`/api/generation-runs/${createRunResponse.body.runId}/stream`)
+		.send({});
+	expect(streamResponse.status).toBe(200);
+	parseStreamComplete(streamResponse.text);
+}
+
 describe("didactic-unit lifecycle", () => {
 	it("creates a didactic unit from topic and provider", async () => {
 		const app = createTestApp();
@@ -100,8 +119,8 @@ describe("didactic-unit lifecycle", () => {
 		expect(typeof response.body.id).toBe("string");
 		expect(response.body.studyProgress).toEqual({
 			moduleCount: 0,
-			readCharacterCount: 0,
-			totalCharacterCount: 0,
+			readBlockCount: 0,
+			totalBlockCount: 0,
 			studyProgressPercent: 0,
 		});
 	});
@@ -241,15 +260,7 @@ describe("didactic-unit lifecycle", () => {
 		const app = createTestApp();
 		const approved = await createApprovedDidacticUnit(app);
 
-		const generateResponse = await request(app)
-			.post(`/api/didactic-unit/${approved.id}/chapters/0/generate`)
-			.send({});
-
-		expect(generateResponse.status).toBe(200);
-		expect(generateResponse.body).toMatchObject({
-			id: approved.id,
-			status: "content_generation_in_progress",
-		});
+		await generateChapter(app, approved.id, 0);
 
 		const chapterResponse = await request(app).get(
 			`/api/didactic-unit/${approved.id}/chapters/0`,
@@ -261,34 +272,22 @@ describe("didactic-unit lifecycle", () => {
 			planningOverview: expect.any(String),
 			state: "ready",
 			isCompleted: false,
-			presentationSettings: {
-				paragraphFontFamily: "sans",
-				paragraphFontSize: "16px",
-				paragraphAlign: "left",
-			},
 		});
-		expect(typeof chapterResponse.body.content).toBe("string");
+		expect(typeof chapterResponse.body.html).toBe("string");
+		expect(chapterResponse.body.htmlBlocks.length).toBeGreaterThan(0);
 
 		const updateResponse = await request(app)
 			.patch(`/api/didactic-unit/${approved.id}/chapters/0`)
 			.send({
 				chapter: {
 					title: chapterResponse.body.title,
-					content: chapterResponse.body.content,
-					presentationSettings: {
-						paragraphFontFamily: "serif",
-						paragraphFontSize: "18px",
-						paragraphAlign: "justify",
-					},
+					html: `${chapterResponse.body.html}<p>Additional practice note.</p>`,
+					htmlHash: chapterResponse.body.htmlHash,
 				},
 			});
 
 		expect(updateResponse.status).toBe(200);
-		expect(updateResponse.body.presentationSettings).toEqual({
-			paragraphFontFamily: "serif",
-			paragraphFontSize: "18px",
-			paragraphAlign: "justify",
-		});
+		expect(updateResponse.body.html).toContain("Additional practice note");
 
 		const completionResponse = await request(app)
 			.post(`/api/didactic-unit/${approved.id}/chapters/0/complete`)
@@ -297,15 +296,15 @@ describe("didactic-unit lifecycle", () => {
 		expect(completionResponse.status).toBe(200);
 		expect(completionResponse.body.studyProgress).toMatchObject({
 			moduleCount: expect.any(Number),
-			readCharacterCount: expect.any(Number),
-			totalCharacterCount: expect.any(Number),
+			readBlockCount: expect.any(Number),
+			totalBlockCount: expect.any(Number),
 			studyProgressPercent: expect.any(Number),
 		});
 		expect(
-			completionResponse.body.studyProgress.readCharacterCount,
+			completionResponse.body.studyProgress.readBlockCount,
 		).toBeGreaterThan(0);
 		expect(
-			completionResponse.body.studyProgress.totalCharacterCount,
+			completionResponse.body.studyProgress.totalBlockCount,
 		).toBeGreaterThan(0);
 
 		const revisionsResponse = await request(app).get(

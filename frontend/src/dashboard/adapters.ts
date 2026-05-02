@@ -1,5 +1,4 @@
 import type {
-	BackendChapterPresentationSettings,
 	BackendDidacticUnitChapterDetail,
 	BackendDidacticUnitChapterRevision,
 	BackendDidacticUnitChapterSummary,
@@ -8,7 +7,7 @@ import type {
 	BackendFolder,
 } from "./api/dashboardApi";
 import type {
-	ChapterPresentationSettings,
+	EditorTextStyle,
 	DashboardFolder,
 	DashboardListItem,
 	DidacticUnitEditorChapter,
@@ -21,7 +20,8 @@ import {
 	estimateReadingTimeFromText,
 	formatRelativeTimestamp,
 } from "./utils/topicMetadata";
-import {markdownToPlainText, normalizeStoredMarkdown} from "./utils/markdown";
+import {htmlToPlainText, normalizeStoredMarkdown} from "./utils/markdown";
+import type {PresentationTheme} from "../types/presentationTheme";
 
 function resolveDisplayStatus(status: string): string {
 	switch (status) {
@@ -75,38 +75,29 @@ function resolveActivityDate(
 	return value?.trim() ? value : fallback;
 }
 
-export function resolvePresentationSettings(
-	settings?: BackendChapterPresentationSettings,
-): ChapterPresentationSettings {
-	// Map legacy paragraphFontFamily → bodyFontFamily
-	const legacyFontMap: Record<string, string> = {
-		sans: "inter",
-		serif: "merriweather",
-		mono: "inter",
+export function resolveTextStyle(): EditorTextStyle {
+	return {
+		sizeProfile: "regular",
+		bodyFontFamily: "inter",
+		headingFontFamily: "inter",
+		paragraphAlign: "left",
 	};
-	// Map legacy paragraphFontSize → sizeProfile
-	const legacySizeMap: Record<string, "small" | "regular" | "large"> = {
-		"14px": "small",
-		"16px": "regular",
-		"18px": "large",
-		"20px": "large",
-	};
+}
 
-	const bodyFontFamily =
-		settings?.bodyFontFamily ??
-		legacyFontMap[settings?.paragraphFontFamily ?? ""] ??
-		"inter";
-
-	const sizeProfile =
-		settings?.sizeProfile ??
-		legacySizeMap[settings?.paragraphFontSize ?? ""] ??
-		"regular";
+function resolveTextStyleFromTheme(
+	theme?: PresentationTheme | null,
+): EditorTextStyle {
+	if (!theme) {
+		return resolveTextStyle();
+	}
 
 	return {
-		sizeProfile,
-		bodyFontFamily,
-		headingFontFamily: settings?.headingFontFamily ?? "inter",
-		paragraphAlign: settings?.paragraphAlign ?? "left",
+		sizeProfile: theme.bodyFontSize,
+		bodyFontFamily:
+			theme.bodyFont === "merriweather" ? "merriweather" : "inter",
+		headingFontFamily:
+			theme.headingFont === "merriweather" ? "merriweather" : "inter",
+		paragraphAlign: theme.paragraphAlign,
 	};
 }
 
@@ -239,9 +230,9 @@ function buildEditorChapter(
 	summary: BackendDidacticUnitChapterSummary,
 	detail: BackendDidacticUnitChapterDetail | undefined,
 ): DidacticUnitEditorChapter {
-	const content = normalizeStoredMarkdown(detail?.content ?? "");
+	const html = normalizeStoredMarkdown(detail?.html ?? "");
 	const readingTime = estimateReadingTimeFromText(
-		markdownToPlainText(content),
+		htmlToPlainText(html),
 	);
 
 	return {
@@ -250,21 +241,24 @@ function buildEditorChapter(
 		status: summary.state,
 		summary: detail?.planningOverview ?? summary.overview,
 		readingTime,
-		content,
+		html,
+		htmlHash: detail?.htmlHash,
+		htmlBlocks: detail?.htmlBlocks ?? [],
+		htmlBlocksVersion: detail?.htmlBlocksVersion ?? 0,
+		readBlockIndex: detail?.readBlockIndex ?? 0,
+		readBlockOffset: detail?.readBlockOffset,
+		readBlocksVersion: detail?.readBlocksVersion ?? 0,
+		totalBlocks: detail?.totalBlocks ?? detail?.htmlBlocks.length ?? 0,
 		learningGoals: [...unit.learningGoals],
 		keyPoints: [...unit.chapters[summary.chapterIndex].keyPoints],
 		level: unit.level,
 		effort: deriveEffortFromReadingTime(readingTime),
 		isCompleted: detail?.isCompleted ?? summary.isCompleted,
 		completedAt: detail?.completedAt ?? summary.completedAt,
-		readCharacterCount:
-			detail?.readCharacterCount ?? summary.readCharacterCount,
-		totalCharacterCount:
-			detail?.totalCharacterCount ?? summary.totalCharacterCount,
 		lastVisitedPageIndex:
 			detail?.lastVisitedPageIndex ?? summary.lastVisitedPageIndex,
-		presentationSettings: resolvePresentationSettings(
-			detail?.presentationSettings,
+		textStyle: resolveTextStyleFromTheme(
+			unit.presentationTheme,
 		),
 	};
 }
@@ -285,6 +279,7 @@ export function adaptDidacticUnitEditor(input: {
 		overview: input.unit.overview,
 		provider: input.unit.provider,
 		generationQuality: input.unit.generationQuality,
+		presentationTheme: input.unit.presentationTheme ?? null,
 		chapters: input.chapterSummaries.map((summary) =>
 			buildEditorChapter(
 				input.unit,
@@ -306,10 +301,8 @@ export function adaptDidacticUnitRevisions(
 		title: revision.chapter.title,
 		chapter: {
 			title: revision.chapter.title,
-			content: normalizeStoredMarkdown(revision.chapter.content),
-			presentationSettings: resolvePresentationSettings(
-				revision.chapter.presentationSettings,
-			),
+			html: normalizeStoredMarkdown(revision.chapter.html),
+			htmlHash: revision.chapter.htmlHash,
 		},
 	}));
 }

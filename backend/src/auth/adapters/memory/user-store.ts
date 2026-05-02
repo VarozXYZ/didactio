@@ -7,6 +7,10 @@ import type {
 	UserRole,
 	UserStore,
 } from "../../core/types.js";
+import {
+	SYSTEM_DEFAULT_THEME,
+	type PresentationTheme,
+} from "../../../presentation-theme/types.js";
 
 function createEmptyCredits(): CreditBalances {
 	return {
@@ -75,6 +79,8 @@ export class InMemoryUserStore implements UserStore {
 				pictureUrl: profile.pictureUrl,
 				locale: profile.locale,
 				role,
+				defaultPresentationTheme:
+					existing.defaultPresentationTheme ?? SYSTEM_DEFAULT_THEME,
 				updatedAt: now,
 				lastLoginAt: now,
 			};
@@ -96,6 +102,7 @@ export class InMemoryUserStore implements UserStore {
 			role,
 			status: "active",
 			credits: createEmptyCredits(),
+			defaultPresentationTheme: SYSTEM_DEFAULT_THEME,
 			createdAt: now,
 			updatedAt: now,
 			lastLoginAt: now,
@@ -167,6 +174,24 @@ export class InMemoryUserStore implements UserStore {
 			},
 			launchGiftGrantedAt: grantedAt,
 			updatedAt: grantedAt,
+		};
+		this.usersById.set(id, updated);
+		return updated;
+	}
+
+	async updateDefaultPresentationTheme(
+		id: string,
+		theme: PresentationTheme,
+	): Promise<AuthUser | null> {
+		const user = this.usersById.get(id);
+		if (!user) {
+			return null;
+		}
+
+		const updated: AuthUser = {
+			...user,
+			defaultPresentationTheme: theme,
+			updatedAt: new Date(),
 		};
 		this.usersById.set(id, updated);
 		return updated;

@@ -18,7 +18,6 @@ import {
 	AiGatewayConfigurationError,
 	GatewayAiService,
 	type AiService,
-	type ChapterResult,
 	type FolderClassificationResult,
 	type SyllabusResult,
 } from "./ai/service.js";
@@ -29,18 +28,16 @@ import {
 } from "./didactic-unit/create-didactic-unit.js";
 import {
 	parseUpdateDidacticUnitChapterInput,
-	resolveDidacticUnitChapterPresentationSettings,
+	type HtmlContentBlock,
+	createCanonicalDidacticUnitChapter,
 } from "./didactic-unit/didactic-unit-chapter.js";
 import {
 	applyGeneratedDidacticUnitChapter,
-	createChapterGenerationSourceFromDidacticUnit,
 	hasGeneratedDidacticUnitChapter,
 } from "./didactic-unit/generate-didactic-unit-chapter.js";
 import {listDidacticUnitChapters} from "./didactic-unit/list-didactic-unit-chapters.js";
 import {
-	getModuleReadCharacterCount,
 	getModuleReadProgressRecord,
-	getModuleTotalCharacterCount,
 	updateDidacticUnitModuleReadProgress,
 } from "./didactic-unit/module-reading-progress.js";
 import {
@@ -78,11 +75,11 @@ import {
 } from "./folders/folder-defaults.js";
 import type {Folder, FolderStore} from "./folders/folder-store.js";
 import {
-	createCompletedChapterGenerationRunRecord,
 	createCompletedSyllabusGenerationRunRecord,
-	createFailedChapterGenerationRunRecord,
 	createFailedSyllabusGenerationRunRecord,
+	createQueuedChapterGenerationRunRecord,
 	type ChapterGenerationRunRecord,
+	type GenerationRun,
 	type GenerationRunStore,
 	type SyllabusGenerationRunRecord,
 } from "./generation-runs/generation-run-store.js";
@@ -112,7 +109,6 @@ import {
 	type MongoHealthStatus,
 } from "./mongo/mongo-connection.js";
 import {createLogger, type Logger} from "./logging/logger.js";
-import {buildChapterGenerationPrompt} from "./providers/chapter-generator.js";
 import {AuthError} from "./auth/core/errors.js";
 import {
 	isGenerationQuality,
@@ -123,6 +119,7 @@ import {
 	type GenerationCoinCost,
 	type GenerationQuality,
 } from "./credits/generation-pricing.js";
+import {parsePresentationTheme} from "./presentation-theme/validate.js";
 
 export interface CreateAppOptions {
 	didacticUnitStore: DidacticUnitStore;
@@ -169,7 +166,8 @@ function parseChapterIndex(value: string): number {
 }
 
 function parseModuleReadProgressInput(body: unknown): {
-	readCharacterCount: number;
+	readBlockIndex: number;
+	readBlockOffset?: number;
 	lastVisitedPageIndex?: number;
 } {
 	if (!body || typeof body !== "object") {
@@ -177,21 +175,34 @@ function parseModuleReadProgressInput(body: unknown): {
 	}
 
 	const payload = body as {
-		readCharacterCount?: unknown;
+		readBlockIndex?: unknown;
+		readBlockOffset?: unknown;
 		lastVisitedPageIndex?: unknown;
 	};
+	const readBlockIndex =
+		typeof payload.readBlockIndex === "number" ? payload.readBlockIndex : 0;
 
 	if (
-		typeof payload.readCharacterCount !== "number" ||
-		!Number.isFinite(payload.readCharacterCount)
+		payload.readBlockIndex !== undefined &&
+		(typeof readBlockIndex !== "number" || !Number.isFinite(readBlockIndex))
 	) {
-		throw new Error("readCharacterCount must be a finite number.");
+		throw new Error("readBlockIndex must be a finite number.");
 	}
 
-	if (payload.readCharacterCount < 0) {
+	if (readBlockIndex < 0) {
 		throw new Error(
-			"readCharacterCount must be greater than or equal to 0.",
+			"readBlockIndex must be greater than or equal to 0.",
 		);
+	}
+	if (
+		payload.readBlockOffset !== undefined &&
+		(
+			typeof payload.readBlockOffset !== "number" ||
+			!Number.isFinite(payload.readBlockOffset) ||
+			payload.readBlockOffset < 0
+		)
+	) {
+		throw new Error("readBlockOffset must be a non-negative number.");
 	}
 
 	if (
@@ -209,8 +220,15 @@ function parseModuleReadProgressInput(body: unknown): {
 	}
 
 	return {
-		readCharacterCount: payload.readCharacterCount,
-		lastVisitedPageIndex: payload.lastVisitedPageIndex,
+		readBlockIndex,
+		readBlockOffset:
+			typeof payload.readBlockOffset === "number" ?
+				payload.readBlockOffset
+			:	undefined,
+		lastVisitedPageIndex:
+			typeof payload.lastVisitedPageIndex === "number" ?
+				payload.lastVisitedPageIndex
+			:	undefined,
 	};
 }
 
@@ -294,6 +312,14 @@ function compareRunsByCreatedAtDesc(
 	return right.createdAt.localeCompare(left.createdAt);
 }
 
+function isTerminalGenerationRun(run: GenerationRun): boolean {
+	return (
+		run.status === "completed" ||
+		run.status === "failed" ||
+		run.status === "payment_failed"
+	);
+}
+
 function buildFolderResponse(folder: Folder) {
 	return {
 		id: folder.id,
@@ -348,6 +374,7 @@ function buildDidacticUnitResponseFromFolders(
 		folderId: folder.id,
 		folderAssignmentMode: didacticUnit.folderAssignmentMode,
 		folder: buildFolderResponse(folder),
+		presentationTheme: didacticUnit.presentationTheme ?? null,
 		provider: didacticUnit.provider,
 		status: didacticUnit.status,
 		nextAction: didacticUnit.nextAction,
@@ -662,6 +689,135 @@ async function refundGenerationCredits(input: {
 	});
 }
 
+const TOP_LEVEL_HTML_BLOCK_TAGS = new Set([
+	"h2",
+	"h3",
+	"h4",
+	"p",
+	"ul",
+	"ol",
+	"blockquote",
+	"pre",
+	"table",
+]);
+
+const VOID_HTML_BLOCK_TAGS = new Set(["hr"]);
+
+function createHtmlBlockAccumulator(input: {
+	chapterId: string;
+	onBlock: (block: HtmlContentBlock) => Promise<void>;
+}) {
+	let buffer = "";
+	let cursor = 0;
+	let blockStart = -1;
+	let activeTag: string | null = null;
+	let depth = 0;
+	let emittedCount = 0;
+
+	const emitBlock = async (rawBlockHtml: string) => {
+		const chapter = createCanonicalDidacticUnitChapter({
+			chapterIndex: 0,
+			title: "Streaming block",
+			rawHtml: rawBlockHtml,
+			chapterId: `${input.chapterId}:stream:${emittedCount}`,
+		});
+		const block = chapter.htmlBlocks[0];
+		if (!block) {
+			return;
+		}
+		emittedCount += 1;
+		await input.onBlock(block);
+	};
+
+	const readTag = (tagStart: number) => {
+		const tagEnd = buffer.indexOf(">", tagStart);
+		if (tagEnd === -1) {
+			return null;
+		}
+
+		const rawTag = buffer.slice(tagStart + 1, tagEnd).trim();
+		if (
+			!rawTag ||
+			rawTag.startsWith("!") ||
+			rawTag.startsWith("?")
+		) {
+			return {tagEnd, tagName: "", isClosing: false, isSelfClosing: true};
+		}
+
+		const isClosing = rawTag.startsWith("/");
+		const tagBody = (isClosing ? rawTag.slice(1) : rawTag).trim();
+		const tagName = tagBody.split(/\s+/)[0]?.toLowerCase() ?? "";
+		const isSelfClosing =
+			rawTag.endsWith("/") || VOID_HTML_BLOCK_TAGS.has(tagName);
+
+		return {tagEnd, tagName, isClosing, isSelfClosing};
+	};
+
+	return {
+		async ingest(delta: string) {
+			buffer += delta;
+
+			while (cursor < buffer.length) {
+				const tagStart = buffer.indexOf("<", cursor);
+				if (tagStart === -1) {
+					cursor = buffer.length;
+					break;
+				}
+
+				const tag = readTag(tagStart);
+				if (!tag) {
+					break;
+				}
+
+				if (!tag.tagName) {
+					cursor = tag.tagEnd + 1;
+					continue;
+				}
+
+				if (activeTag === null) {
+					if (
+						!tag.isClosing &&
+						(TOP_LEVEL_HTML_BLOCK_TAGS.has(tag.tagName) ||
+							VOID_HTML_BLOCK_TAGS.has(tag.tagName))
+					) {
+						blockStart = tagStart;
+						activeTag = tag.tagName;
+						depth = tag.isSelfClosing ? 0 : 1;
+
+						if (tag.isSelfClosing) {
+							await emitBlock(buffer.slice(blockStart, tag.tagEnd + 1));
+							buffer = buffer.slice(tag.tagEnd + 1);
+							cursor = 0;
+							blockStart = -1;
+							activeTag = null;
+							continue;
+						}
+					}
+
+					cursor = tag.tagEnd + 1;
+					continue;
+				}
+
+				if (!tag.isClosing && !tag.isSelfClosing) {
+					depth += 1;
+				} else if (tag.isClosing) {
+					depth = Math.max(0, depth - 1);
+				}
+
+				cursor = tag.tagEnd + 1;
+
+				if (depth === 0 && blockStart !== -1) {
+					await emitBlock(buffer.slice(blockStart, tag.tagEnd + 1));
+					buffer = buffer.slice(tag.tagEnd + 1);
+					cursor = 0;
+					blockStart = -1;
+					activeTag = null;
+				}
+			}
+		},
+	};
+}
+
 async function recordCompletedSyllabusRun(
 	generationRunStore: GenerationRunStore,
 	didacticUnit: DidacticUnit,
@@ -695,30 +851,21 @@ function buildDidacticUnitModuleDetailResponse(input: {
 	const generatedChapter = input.didacticUnit.generatedChapters?.find(
 		(chapter) => chapter.chapterIndex === input.moduleIndex,
 	);
-	const totalCharacterCount = getModuleTotalCharacterCount(
-		input.didacticUnit,
-		input.moduleIndex,
-	);
-	const readCharacterCount = getModuleReadCharacterCount(
-		input.didacticUnit,
-		input.moduleIndex,
-	);
 	const readProgress = getModuleReadProgressRecord(
 		input.didacticUnit,
 		input.moduleIndex,
 	);
-	const isCompleted =
-		totalCharacterCount > 0 && readCharacterCount >= totalCharacterCount;
+	const isCompleted = readProgress?.chapterCompleted ?? false;
 	const completedAt = isCompleted ? readProgress?.lastReadAt : undefined;
 
 	return {
 		chapterIndex: input.moduleIndex,
 		title: generatedChapter?.title ?? plannedChapter.title,
 		planningOverview: plannedChapter.overview,
-		content: generatedChapter?.markdown ?? null,
-		presentationSettings: resolveDidacticUnitChapterPresentationSettings(
-			generatedChapter?.presentationSettings,
-		),
+		html: generatedChapter?.html ?? null,
+		htmlHash: generatedChapter?.htmlHash,
+		htmlBlocks: generatedChapter?.htmlBlocks ?? [],
+		htmlBlocksVersion: generatedChapter?.htmlBlocksVersion ?? 0,
 		generatedAt: generatedChapter?.generatedAt,
 		updatedAt: generatedChapter?.updatedAt,
 		state: resolveDidacticUnitChapterState({
@@ -726,8 +873,10 @@ function buildDidacticUnitModuleDetailResponse(input: {
 			chapterIndex: input.moduleIndex,
 			chapterRuns: input.chapterRuns,
 		}),
-		readCharacterCount,
-		totalCharacterCount,
+		readBlockIndex: readProgress?.furthestReadBlockIndex ?? 0,
+		readBlockOffset: readProgress?.furthestReadBlockOffset,
+		readBlocksVersion: readProgress?.furthestReadBlocksVersion ?? 0,
+		totalBlocks: generatedChapter?.htmlBlocks.length ?? 0,
 		isCompleted,
 		completedAt,
 		lastVisitedPageIndex: readProgress?.lastVisitedPageIndex,
@@ -756,67 +905,6 @@ async function recordFailedSyllabusRun(
 				error instanceof Error ?
 					error.message
 				:	"Didactic unit syllabus generation failed.",
-			createdAt: new Date().toISOString(),
-		}),
-	);
-}
-
-async function recordCompletedChapterRun(
-	generationRunStore: GenerationRunStore,
-	didacticUnit: DidacticUnit,
-	chapterIndex: number,
-	result: ChapterResult,
-): Promise<void> {
-	const generatedChapter = didacticUnit.generatedChapters?.find(
-		(chapter) => chapter.chapterIndex === chapterIndex,
-	);
-
-	if (!generatedChapter) {
-		return;
-	}
-
-	await generationRunStore.save(
-		createCompletedChapterGenerationRunRecord({
-			didacticUnitId: didacticUnit.id,
-			ownerId: didacticUnit.ownerId,
-			chapterIndex,
-			provider: result.provider,
-			model: result.model,
-			prompt: result.prompt,
-			chapter: generatedChapter,
-			createdAt: generatedChapter.generatedAt,
-			rawOutput: result.markdown,
-			telemetry: result.telemetry,
-		}),
-	);
-}
-
-async function recordFailedChapterRun(
-	generationRunStore: GenerationRunStore,
-	didacticUnit: DidacticUnit,
-	chapterIndex: number,
-	modelConfig: AiModelConfig,
-	error: unknown,
-): Promise<void> {
-	const promptSource =
-		createChapterGenerationSourceFromDidacticUnit(didacticUnit);
-
-	if (!promptSource.syllabus?.modules?.[chapterIndex]) {
-		return;
-	}
-
-	await generationRunStore.save(
-		createFailedChapterGenerationRunRecord({
-			didacticUnitId: didacticUnit.id,
-			ownerId: didacticUnit.ownerId,
-			chapterIndex,
-			provider: modelConfig.provider,
-			model: modelConfig.model,
-			prompt: buildChapterGenerationPrompt(promptSource, chapterIndex),
-			error:
-				error instanceof Error ?
-					error.message
-				:	"Didactic unit module generation failed.",
 			createdAt: new Date().toISOString(),
 		}),
 	);
@@ -1319,6 +1407,46 @@ export function createApp(options: CreateAppOptions) {
 					error instanceof Error ?
 						error.message
 					:	"Invalid didactic unit folder update request.",
+			});
+		}
+	});
+
+	app.patch("/api/didactic-unit/:id/theme", async (request, response) => {
+		const requestWithMockOwner = asRequestWithMockOwner(request);
+		const didacticUnit = await didacticUnitStore.getById(
+			requestWithMockOwner.mockOwner.id,
+			String(request.params.id),
+		);
+
+		if (!didacticUnit) {
+			response.status(404).json({error: "Didactic unit not found."});
+			return;
+		}
+
+		try {
+			const body = request.body as {presentationTheme?: unknown};
+			const presentationTheme =
+				body.presentationTheme === null ?
+					null
+				:	parsePresentationTheme(body.presentationTheme);
+			const updatedDidacticUnit: DidacticUnit = {
+				...didacticUnit,
+				presentationTheme,
+				updatedAt: new Date().toISOString(),
+			};
+			await didacticUnitStore.save(updatedDidacticUnit);
+			response.json(
+				await buildDidacticUnitResponse(
+					updatedDidacticUnit,
+					folderStore,
+				),
+			);
+		} catch (error) {
+			response.status(422).json({
+				error:
+					error instanceof Error ?
+						error.message
+					:	"Invalid didactic unit theme update request.",
 			});
 		}
 	});
@@ -2360,8 +2488,9 @@ export function createApp(options: CreateAppOptions) {
 					updateDidacticUnitModuleReadProgress(
 						didacticUnit,
 						chapterIndex,
-						parsedInput.readCharacterCount,
+						parsedInput.readBlockIndex,
 						parsedInput.lastVisitedPageIndex,
+						parsedInput.readBlockOffset,
 					);
 				await didacticUnitStore.save(updatedDidacticUnit);
 
@@ -2471,338 +2600,354 @@ export function createApp(options: CreateAppOptions) {
 		},
 	);
 
-	const runChapterGeneration = async (
-		request: express.Request,
-		response: express.Response,
-		revisionSource: "ai_generation" | "ai_regeneration",
-		isStreaming: boolean,
-	) => {
-		const requestWithMockOwner = asRequestWithMockOwner(request);
-		const didacticUnitId = String(request.params.id);
-		const chapterIndexParam = String(request.params.chapterIndex);
-		const didacticUnit = await didacticUnitStore.getById(
-			requestWithMockOwner.mockOwner.id,
-			didacticUnitId,
-		);
-
-		if (!didacticUnit) {
-			response.status(404).json({error: "Didactic unit not found."});
-			return;
-		}
-
-		let chapterIndex;
-		try {
-			chapterIndex = parseChapterIndex(chapterIndexParam);
-		} catch (error) {
-			response.status(400).json({
-				error:
-					error instanceof Error ?
-						error.message
-					:	`Invalid didactic unit module ${revisionSource} request.`,
-			});
-			return;
-		}
-
-		const plannedChapter = didacticUnit.chapters[chapterIndex];
-		if (!plannedChapter) {
-			response.status(400).json({
-				error: "Module index is out of range for the approved syllabus.",
-			});
-			return;
-		}
-
-		const chapterRuns = (
-			await generationRunStore.listByDidacticUnit(
-				requestWithMockOwner.mockOwner.id,
-				didacticUnit.id,
-			)
-		).filter(
-			(run): run is ChapterGenerationRunRecord =>
-				run.stage === "chapter" && run.chapterIndex === chapterIndex,
-		);
-		const latestChapterRun = chapterRuns.sort(compareRunsByCreatedAtDesc)[0];
-		const hasGeneratedChapter = hasGeneratedDidacticUnitChapter(
-			didacticUnit,
-			chapterIndex,
-		);
-		const quality =
-			didacticUnit.generationQuality ??
-			legacyTierToGenerationQuality(didacticUnit.generationTier);
-
-		if (!quality || !didacticUnit.unitGenerationPaidAt) {
-			response.status(409).json({
-				error: "Unit generation must be paid for before modules can be generated.",
-			});
-			return;
-		}
-
-		if (
-			revisionSource === "ai_generation" &&
-			(hasGeneratedChapter || latestChapterRun)
-		) {
-			response.status(409).json({
-				error: "Initial module generation has already been attempted.",
-			});
-			return;
-		}
-
-		if (
-			revisionSource === "ai_regeneration" &&
-			!hasGeneratedChapter &&
-			latestChapterRun?.status !== "failed"
-		) {
-			response
-				.status(404)
-				.json({error: "Generated didactic unit module not found."});
-			return;
-		}
-
-		const config = await aiConfigStore.get(
-			requestWithMockOwner.mockOwner.id,
-		);
-		const tier: AiModelTier = quality;
-		let instruction: string | undefined;
-		let reservation: CreditReservation | null = null;
-
-		try {
-			instruction = parseChapterGenerationInstruction(request.body);
-		} catch (error) {
-			response.status(400).json({
-				error:
-					error instanceof Error ?
-						error.message
-					:	`Invalid didactic unit module ${revisionSource} request.`,
-			});
-			return;
-		}
-
-		if (revisionSource === "ai_regeneration") {
-			try {
-				const cost = resolveModuleRegenerationCost({quality});
-				reservation = await reserveGenerationCredits({
-					authService,
-					ownerId: requestWithMockOwner.mockOwner.id,
-					cost,
-					reason: "module_regeneration",
-					metadata: {
-						operation: "module_regeneration",
-						didacticUnitId: didacticUnit.id,
-						chapterIndex,
-						quality,
-						length: didacticUnit.length,
-					},
-				});
-			} catch (error) {
-				if (error instanceof AuthError) {
-					sendAuthErrorResponse(response, error);
-					return;
-				}
-				throw error;
-			}
-		}
-
-		if (isStreaming) {
-			openNdjsonStream(response);
-		}
-
-		try {
-			const result =
-				isStreaming ?
-					await aiService.streamChapter(
-						{
-							topic: didacticUnit.topic,
-							level: didacticUnit.level,
-							syllabus:
-								didacticUnit.referenceSyllabus ??
-								adaptDidacticUnitSyllabusToReferenceSyllabus({
-									topic: didacticUnit.topic,
-									syllabus: didacticUnit.syllabus ?? {
-										title: didacticUnit.title,
-										overview: didacticUnit.overview,
-										learningGoals:
-											didacticUnit.learningGoals,
-										keywords: didacticUnit.keywords,
-										chapters: didacticUnit.chapters,
-									},
-								}),
-							chapterIndex,
-							questionnaireAnswers:
-								didacticUnit.questionnaireAnswers,
-							continuitySummaries:
-								didacticUnit.continuitySummaries,
-							depth: didacticUnit.depth,
-							length: didacticUnit.length,
-							additionalContext: didacticUnit.additionalContext,
-							instruction,
-							config,
-							tier,
-							abortSignal: createAbortSignal(request),
-						},
-						{
-							onStart: async (selection) => {
-								writeNdjsonEvent(response, {
-									type: "start",
-									stage: "module",
-									provider: selection.provider,
-									model: selection.model,
-								});
-							},
-							onMarkdown: async (delta) => {
-								writeNdjsonEvent(response, {
-									type: "partial_markdown",
-									delta,
-								});
-							},
-						},
-					)
-				:	await aiService.generateChapter({
-						topic: didacticUnit.topic,
-						level: didacticUnit.level,
-						syllabus:
-							didacticUnit.referenceSyllabus ??
-							adaptDidacticUnitSyllabusToReferenceSyllabus({
-								topic: didacticUnit.topic,
-								syllabus: didacticUnit.syllabus ?? {
-									title: didacticUnit.title,
-									overview: didacticUnit.overview,
-									learningGoals: didacticUnit.learningGoals,
-									keywords: didacticUnit.keywords,
-									chapters: didacticUnit.chapters,
-								},
-							}),
-						chapterIndex,
-						questionnaireAnswers: didacticUnit.questionnaireAnswers,
-						continuitySummaries: didacticUnit.continuitySummaries,
-						depth: didacticUnit.depth,
-						length: didacticUnit.length,
-						additionalContext: didacticUnit.additionalContext,
-						instruction,
-						config,
-						tier,
-						abortSignal: createAbortSignal(request),
-					});
-
-			const updatedDidacticUnit = applyGeneratedDidacticUnitChapter(
-				didacticUnit,
-				chapterIndex,
-				result.chapter,
-				revisionSource,
-				result.continuitySummary,
-			);
-			updatedDidacticUnit.provider = result.provider;
-			await didacticUnitStore.save(updatedDidacticUnit);
-			await recordCompletedChapterRun(
-				generationRunStore,
-				updatedDidacticUnit,
-				chapterIndex,
-				result,
+	app.post(
+		"/api/didactic-unit/:id/modules/:chapterIndex/generate-run",
+		async (request, response) => {
+			const requestWithMockOwner = asRequestWithMockOwner(request);
+			const ownerId = requestWithMockOwner.mockOwner.id;
+			const didacticUnit = await didacticUnitStore.getById(
+				ownerId,
+				String(request.params.id),
 			);
 
-			if (isStreaming) {
-				writeNdjsonEvent(response, {
-					type: "complete",
-					data: await buildDidacticUnitResponse(
-						updatedDidacticUnit,
-						folderStore,
-					),
-				});
-				response.end();
+			if (!didacticUnit) {
+				response.status(404).json({error: "Didactic unit not found."});
 				return;
 			}
 
-			response.json(
-				await buildDidacticUnitResponse(
-					updatedDidacticUnit,
-					folderStore,
-				),
-			);
-		} catch (error) {
-			if (reservation) {
-				await refundGenerationCredits({
-					authService,
-					reservation,
-					reason: "module_regeneration_refund",
-					metadata: {
-						operation: "module_regeneration",
-						didacticUnitId: didacticUnit.id,
-						chapterIndex,
-						quality,
-						error:
-							error instanceof Error ?
-								error.message
-							:	"Didactic unit module generation failed.",
-					},
+			let chapterIndex;
+			try {
+				chapterIndex = parseChapterIndex(String(request.params.chapterIndex));
+			} catch (error) {
+				response.status(400).json({
+					error:
+						error instanceof Error ?
+							error.message
+						:	"Invalid didactic unit module generation request.",
 				});
+				return;
 			}
-			await recordFailedChapterRun(
-				generationRunStore,
+
+			const plannedChapter = didacticUnit.chapters[chapterIndex];
+			if (!plannedChapter) {
+				response.status(400).json({
+					error: "Module index is out of range for the approved syllabus.",
+				});
+				return;
+			}
+
+			const activeRun = await generationRunStore.findActiveChapterRun(
+				ownerId,
+				didacticUnit.id,
+				chapterIndex,
+			);
+			if (activeRun) {
+				response.status(202).json({runId: activeRun.id, run: activeRun});
+				return;
+			}
+
+			const quality =
+				didacticUnit.generationQuality ??
+				legacyTierToGenerationQuality(didacticUnit.generationTier);
+			if (!quality || !didacticUnit.unitGenerationPaidAt) {
+				response.status(409).json({
+					error: "Unit generation must be paid for before modules can be generated.",
+				});
+				return;
+			}
+
+			let reservation: CreditReservation | null = null;
+			const isRegeneration = hasGeneratedDidacticUnitChapter(
 				didacticUnit,
 				chapterIndex,
-				config[tier],
-				error,
 			);
-			const resolved = resolveStageConfigError(
-				error,
-				"Didactic unit module generation failed.",
-			);
+			if (isRegeneration) {
+				try {
+					reservation = await reserveGenerationCredits({
+						authService,
+						ownerId,
+						cost: resolveModuleRegenerationCost({quality}),
+						reason: "module_regeneration",
+						metadata: {
+							operation: "module_regeneration",
+							didacticUnitId: didacticUnit.id,
+							chapterIndex,
+							quality,
+							length: didacticUnit.length,
+						},
+					});
+				} catch (error) {
+					if (error instanceof AuthError) {
+						sendAuthErrorResponse(response, error);
+						return;
+					}
+					throw error;
+				}
+			}
 
-			if (isStreaming) {
+			const config = await aiConfigStore.get(ownerId);
+			const run = createQueuedChapterGenerationRunRecord({
+				didacticUnitId: didacticUnit.id,
+				ownerId,
+				chapterIndex,
+				provider: config[quality].provider,
+				model: config[quality].model,
+				coinTxId: reservation?.transaction.id,
+			});
+			await generationRunStore.save(run);
+			response.status(202).json({runId: run.id, run});
+
+			void (async () => {
+				let currentRun: ChapterGenerationRunRecord = {
+					...run,
+					status: "running",
+					attempts: 1,
+					updatedAt: new Date().toISOString(),
+				};
+				await generationRunStore.save(currentRun);
+
+				try {
+					for (let attempt = 1; attempt <= 2; attempt += 1) {
+						currentRun = {
+							...currentRun,
+							status: attempt === 1 ? "running" : "retrying",
+							attempts: attempt,
+							emittedBlocks: [],
+							updatedAt: new Date().toISOString(),
+						};
+						await generationRunStore.save(currentRun);
+
+						try {
+							const latestUnit = await didacticUnitStore.getById(
+								ownerId,
+								didacticUnit.id,
+							);
+							if (!latestUnit) {
+								throw new Error("Didactic unit not found.");
+							}
+
+							const referenceSyllabus =
+								latestUnit.referenceSyllabus ??
+								adaptDidacticUnitSyllabusToReferenceSyllabus({
+									topic: latestUnit.topic,
+									syllabus: latestUnit.syllabus ?? {
+										title: latestUnit.title,
+										overview: latestUnit.overview,
+										learningGoals: latestUnit.learningGoals,
+										keywords: latestUnit.keywords,
+										chapters: latestUnit.chapters,
+									},
+								});
+							const blockAccumulator = createHtmlBlockAccumulator({
+								chapterId: `${latestUnit.topic}:${chapterIndex}`,
+								onBlock: async (block) => {
+									currentRun = {
+										...currentRun,
+										emittedBlocks: [
+											...(currentRun.emittedBlocks ?? []),
+											block,
+										],
+										updatedAt: new Date().toISOString(),
+									};
+									await generationRunStore.save(currentRun);
+								},
+							});
+
+							const result = await aiService.streamChapter(
+								{
+									topic: latestUnit.topic,
+									level: latestUnit.level,
+									syllabus: referenceSyllabus,
+									chapterIndex,
+									questionnaireAnswers:
+										latestUnit.questionnaireAnswers,
+									continuitySummaries:
+										latestUnit.continuitySummaries,
+									depth: latestUnit.depth,
+									length: latestUnit.length,
+									additionalContext:
+										latestUnit.additionalContext,
+									instruction: parseChapterGenerationInstruction(
+										request.body,
+									),
+									config,
+									tier: quality,
+								},
+								{
+									onHtml: async (delta) => {
+										await blockAccumulator.ingest(delta);
+									},
+								},
+							);
+
+							const updatedDidacticUnit =
+								applyGeneratedDidacticUnitChapter(
+									latestUnit,
+									chapterIndex,
+									result.chapter,
+									hasGeneratedDidacticUnitChapter(
+										latestUnit,
+										chapterIndex,
+									) ?
+										"ai_regeneration"
+									:	"ai_generation",
+									result.continuitySummary,
+								);
+							updatedDidacticUnit.provider = result.provider;
+							await didacticUnitStore.save(updatedDidacticUnit);
+
+							currentRun = {
+								...currentRun,
+								status: "completed",
+								provider: result.provider,
+								model: result.model,
+								prompt: result.prompt,
+								chapter: result.chapter,
+								rawOutput: result.html,
+								emittedBlocks: result.chapter.htmlBlocks,
+								finalHtml: result.chapter.html,
+								finalHash: result.chapter.htmlHash,
+								htmlBlocksVersion:
+									result.chapter.htmlBlocksVersion,
+								telemetry: result.telemetry,
+								updatedAt: new Date().toISOString(),
+								completedAt: new Date().toISOString(),
+							};
+							await generationRunStore.save(currentRun);
+							return;
+						} catch (error) {
+							if (attempt < 2) {
+								continue;
+							}
+							throw error;
+						}
+					}
+				} catch (error) {
+					const message =
+						error instanceof Error ?
+							error.message
+						:	"Didactic unit module generation failed.";
+					if (reservation) {
+						await refundGenerationCredits({
+							authService,
+							reservation,
+							reason: "module_regeneration_refund",
+							metadata: {
+								operation: "module_regeneration",
+								didacticUnitId: didacticUnit.id,
+								chapterIndex,
+								quality,
+								error: message,
+							},
+						});
+					}
+					await generationRunStore.save({
+						...currentRun,
+						status: "failed",
+						error: message,
+						errorMessage: message,
+						refundTxId:
+							reservation ? `refund:${reservation.transaction.id}` : undefined,
+						updatedAt: new Date().toISOString(),
+						completedAt: new Date().toISOString(),
+					});
+				}
+			})();
+		},
+	);
+
+	app.get("/api/generation-runs/:runId", async (request, response) => {
+		const requestWithMockOwner = asRequestWithMockOwner(request);
+		const run = await generationRunStore.getById(
+			requestWithMockOwner.mockOwner.id,
+			String(request.params.runId),
+		);
+		if (!run) {
+			response.status(404).json({error: "Generation run not found."});
+			return;
+		}
+
+		response.json({run});
+	});
+
+	app.get("/api/generation-runs/:runId/stream", async (request, response) => {
+		const requestWithMockOwner = asRequestWithMockOwner(request);
+		const ownerId = requestWithMockOwner.mockOwner.id;
+		const runId = String(request.params.runId);
+		let run = await generationRunStore.getById(ownerId, runId);
+		if (!run) {
+			response.status(404).json({error: "Generation run not found."});
+			return;
+		}
+
+		openNdjsonStream(response);
+		writeNdjsonEvent(response, {
+			type: "start",
+			stage: run.stage === "chapter" ? "module" : run.stage,
+			provider: run.provider,
+			model: run.model,
+		});
+
+		let emittedCount = 0;
+		const replay = (current: GenerationRun) => {
+			if (current.stage !== "chapter") {
+				return;
+			}
+			const blocks = current.emittedBlocks ?? [];
+			for (const block of blocks.slice(emittedCount)) {
+				writeNdjsonEvent(response, {type: "partial_html_block", block});
+			}
+			emittedCount = blocks.length;
+		};
+
+		replay(run);
+		if (isTerminalGenerationRun(run)) {
+			if (run.status === "completed") {
+				writeNdjsonEvent(response, {type: "complete", data: {run}});
+			} else {
 				writeNdjsonEvent(response, {
 					type: "error",
-					message: resolved.message,
+					message: run.errorMessage ?? run.error ?? "Generation failed.",
+					data: {run},
+				});
+			}
+			response.end();
+			return;
+		}
+
+		const interval = setInterval(async () => {
+			run = await generationRunStore.getById(ownerId, runId);
+			if (!run) {
+				clearInterval(interval);
+				writeNdjsonEvent(response, {
+					type: "error",
+					message: "Generation run was removed.",
 				});
 				response.end();
 				return;
 			}
+			replay(run);
+			if (!isTerminalGenerationRun(run)) {
+				return;
+			}
 
-			response
-				.status(
-					(
-						resolved.message ===
-							"Module index is out of range for the approved syllabus."
-					) ?
-						400
-					:	resolved.status,
-				)
-				.json({error: resolved.message});
-		}
-	};
+			clearInterval(interval);
+			if (run.status === "completed") {
+				writeNdjsonEvent(response, {type: "complete", data: {run}});
+			} else {
+				writeNdjsonEvent(response, {
+					type: "error",
+					message: run.errorMessage ?? run.error ?? "Generation failed.",
+					data: {run},
+				});
+			}
+			response.end();
+		}, 500);
 
-	app.post(
-		[
-			"/api/didactic-unit/:id/chapters/:chapterIndex/generate",
-			"/api/didactic-unit/:id/modules/:chapterIndex/generate",
-		],
-		async (request, response) =>
-			runChapterGeneration(request, response, "ai_generation", false),
-	);
-
-	app.post(
-		[
-			"/api/didactic-unit/:id/chapters/:chapterIndex/generate/stream",
-			"/api/didactic-unit/:id/modules/:chapterIndex/generate/stream",
-		],
-		async (request, response) =>
-			runChapterGeneration(request, response, "ai_generation", true),
-	);
-
-	app.post(
-		[
-			"/api/didactic-unit/:id/chapters/:chapterIndex/regenerate",
-			"/api/didactic-unit/:id/modules/:chapterIndex/regenerate",
-		],
-		async (request, response) =>
-			runChapterGeneration(request, response, "ai_regeneration", false),
-	);
-
-	app.post(
-		[
-			"/api/didactic-unit/:id/chapters/:chapterIndex/regenerate/stream",
-			"/api/didactic-unit/:id/modules/:chapterIndex/regenerate/stream",
-		],
-		async (request, response) =>
-			runChapterGeneration(request, response, "ai_regeneration", true),
-	);
+		request.on("close", () => {
+			clearInterval(interval);
+		});
+	});
 
 	app.use(authErrorHandler);
 

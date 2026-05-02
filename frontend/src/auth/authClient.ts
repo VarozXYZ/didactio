@@ -1,3 +1,5 @@
+import type {PresentationTheme} from "../types/presentationTheme";
+
 export type AuthStatus = "loading" | "authenticated" | "unauthenticated";
 export type AuthUser = {
 	id: string;
@@ -16,6 +18,7 @@ export type AuthUser = {
 		silver: number;
 		gold: number;
 	};
+	defaultPresentationTheme: PresentationTheme;
 	launchGiftGrantedAt?: string;
 	lastLoginAt?: string;
 };
@@ -163,6 +166,25 @@ export const authClient = {
 		}
 
 		return (await response.json()) as {transactions: CreditTransaction[]};
+	},
+
+	async updateDefaultPresentationTheme(defaultPresentationTheme: PresentationTheme) {
+		const response = await this.authorizedFetch("/auth/me/default-theme", {
+			method: "PATCH",
+			body: JSON.stringify({defaultPresentationTheme}),
+		});
+		if (!response.ok) {
+			const {message} = await parseErrorBody(response);
+			throw new Error(message);
+		}
+
+		const payload = (await response.json()) as {user: AuthUser};
+		setSnapshot({
+			status: "authenticated",
+			user: payload.user,
+			error: null,
+		});
+		return payload.user;
 	},
 
 	async authorizedFetch(

@@ -472,7 +472,7 @@ export function SyllabusStep({
 				<div className="flex flex-col items-center justify-center py-12">
 					<Loader2 size={28} className="mb-4 animate-spin text-[#4ADE80]" />
 					<p className="mb-4 text-[14px] font-medium text-[#1D1D1F]">
-						Generating syllabus…
+						Preparing your syllabus…
 					</p>
 					<div className="w-48">
 						<Progress
@@ -482,8 +482,8 @@ export function SyllabusStep({
 					</div>
 					<p className="mt-3 text-[12px] text-[#86868B]">
 						{isStreamingSyllabus ?
-							"Streaming syllabus draft…"
-						:	"Preparing syllabus generation…"}
+							"Drafting your syllabus…"
+						:	"Almost there…"}
 					</p>
 				</div>
 			)}

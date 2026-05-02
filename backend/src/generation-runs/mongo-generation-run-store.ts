@@ -1,5 +1,6 @@
 import type {Db, Document} from "mongodb";
 import type {
+	ChapterGenerationRunRecord,
 	GenerationRun,
 	GenerationRunStore,
 } from "./generation-run-store.js";
@@ -33,6 +34,32 @@ export class MongoGenerationRunStore implements GenerationRunStore {
 			},
 			{upsert: true},
 		);
+	}
+
+	async getById(ownerId: string, id: string): Promise<GenerationRun | null> {
+		return stripMongoId(await this.collection.findOne({id, ownerId}));
+	}
+
+	async findActiveChapterRun(
+		ownerId: string,
+		didacticUnitId: string,
+		chapterIndex: number,
+	): Promise<ChapterGenerationRunRecord | null> {
+		const document = await this.collection
+			.find({
+				ownerId,
+				didacticUnitId,
+				stage: "chapter",
+				chapterIndex,
+				status: {
+					$in: ["payment_pending", "queued", "running", "retrying"],
+				},
+			})
+			.sort({createdAt: -1})
+			.limit(1)
+			.next();
+		const run = stripMongoId(document);
+		return run?.stage === "chapter" ? run : null;
 	}
 
 	async listByDidacticUnit(

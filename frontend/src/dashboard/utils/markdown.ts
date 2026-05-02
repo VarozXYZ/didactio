@@ -540,7 +540,7 @@ function serializeBlockElement(element: HTMLElement): string {
 	}
 }
 
-function htmlToMarkdown(value: string): string {
+export function htmlToMarkdown(value: string): string {
 	const parser = new DOMParser();
 	const document = parser.parseFromString(value, "text/html");
 	const blocks = Array.from(document.body.children);
@@ -647,7 +647,7 @@ export function normalizeStoredMarkdown(
 		return repairAiMarkdown(trimmedValue);
 	}
 
-	return repairAiMarkdown(htmlToMarkdown(trimmedValue));
+	return trimmedValue;
 }
 
 export function formatModuleMarkdownForRender(markdown: string): string {
@@ -657,7 +657,9 @@ export function formatModuleMarkdownForRender(markdown: string): string {
 		return "";
 	}
 
-	return renumberMarkdownHeadings(normalizedMarkdown);
+	return looksLikeHtml(normalizedMarkdown) ?
+			normalizedMarkdown
+		:	renumberMarkdownHeadings(normalizedMarkdown);
 }
 
 export function markdownToHtml(markdown: string): string {
@@ -665,6 +667,10 @@ export function markdownToHtml(markdown: string): string {
 
 	if (!normalizedMarkdown) {
 		return "";
+	}
+
+	if (looksLikeHtml(normalizedMarkdown)) {
+		return normalizedMarkdown;
 	}
 
 	return String(htmlProcessor.processSync(normalizedMarkdown));
@@ -685,11 +691,44 @@ export function markdownToPlainText(
 	return document.body.textContent?.replace(/\s+/g, " ").trim() ?? "";
 }
 
+export function htmlToPlainText(html: string | null | undefined): string {
+	const parser = new DOMParser();
+	const document = parser.parseFromString(html ?? "", "text/html");
+	return document.body.textContent?.replace(/\s+/g, " ").trim() ?? "";
+}
+
+function htmlElementToPageBlock(element: HTMLElement): MarkdownPageBlock {
+	const html = element.outerHTML;
+	const text = element.textContent?.replace(/\s+/g, " ").trim() ?? "";
+	const headingLevel =
+		element.tagName === "H2" ? 1
+		: element.tagName === "H3" ? 2
+		: element.tagName === "H4" ? 3
+		: undefined;
+
+	return {
+		type: element.tagName === "P" ? "paragraph" : "markdown",
+		continued: false,
+		markdown: html,
+		text,
+		...(headingLevel ? {headingLevel: headingLevel as 1 | 2 | 3} : {}),
+	} as MarkdownPageBlock;
+}
+
 export function extractMarkdownBlocks(markdown: string): MarkdownPageBlock[] {
 	const normalizedMarkdown = normalizeStoredMarkdown(markdown);
 
 	if (!normalizedMarkdown) {
 		return [];
+	}
+
+	if (looksLikeHtml(normalizedMarkdown)) {
+		const parser = new DOMParser();
+		const document = parser.parseFromString(normalizedMarkdown, "text/html");
+		return Array.from(document.body.children)
+			.filter((element): element is HTMLElement => element instanceof HTMLElement)
+			.map((element) => htmlElementToPageBlock(element))
+			.filter((block) => block.text || block.markdown.trim());
 	}
 
 	const tree = markdownParser.parse(normalizedMarkdown);
@@ -793,11 +832,19 @@ export function normalizeMarkdownForStorage(markdown: string): string {
 	return markdown.replace(/\u00a0/g, " ").trim();
 }
 
+export function normalizeStoredHtml(value: string | null | undefined): string {
+	return normalizeStoredMarkdown(value);
+}
+
+export function normalizeHtmlForStorage(html: string): string {
+	return normalizeMarkdownForStorage(html);
+}
+
 export function markdownToDom(markdown: string): Document {
 	const parser = new DOMParser();
 	return parser.parseFromString(markdownToHtml(markdown), "text/html");
 }
 
 export function htmlToStoredMarkdown(html: string): string {
-	return repairAiMarkdown(htmlToMarkdown(html));
+	return html.replace(/\u00a0/g, " ").trim();
 }

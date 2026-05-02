@@ -62,7 +62,7 @@ export function buildChapterGenerationPrompt(
 	const learningGoal = findAnswerValue(source, "learning_goal");
 
 	return [
-		"Write one didactic chapter in markdown.",
+		"Write one didactic chapter in sanitized HTML.",
 		`Topic: ${source.topic}`,
 		`Unit title: ${source.syllabus?.title ?? source.topic}`,
 		`Learner level: ${source.level}`,
@@ -72,7 +72,9 @@ export function buildChapterGenerationPrompt(
 		`Current topic knowledge: ${topicKnowledgeLevel}`,
 		`Related knowledge: ${relatedKnowledgeLevel}`,
 		`Learner goal: ${learningGoal}`,
-		"Return only markdown instructional content.",
+		"Return only HTML instructional content.",
+		"Use h2, h3, h4, p, ul, ol, li, blockquote, pre, code, table, thead, tbody, tr, th, td, hr, br, strong, em, u, a, sub, sup, and mark only.",
+		"Do not include JSON, markdown fences, script, style, iframe, img, div, section, or inline style attributes.",
 		"Do not include the module title as a top-level heading.",
 		"Do not include a standalone overview section at the beginning.",
 		"Start directly with the instructional body and use natural topic-specific headings.",

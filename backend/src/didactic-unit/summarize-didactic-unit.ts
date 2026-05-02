@@ -1,7 +1,7 @@
 import type {DidacticUnit} from "./create-didactic-unit.js";
 import {
-	getModuleReadCharacterCount,
-	getModuleTotalCharacterCount,
+	getModuleReadBlockCount,
+	getModuleTotalBlockCount,
 } from "./module-reading-progress.js";
 
 export interface DidacticUnitSummary {
@@ -15,8 +15,8 @@ export interface DidacticUnitSummary {
 	overview: string;
 	moduleCount: number;
 	generatedChapterCount: number;
-	readCharacterCount: number;
-	totalCharacterCount: number;
+	readBlockCount: number;
+	totalBlockCount: number;
 	progressPercent: number;
 	studyProgressPercent: number;
 	createdAt: string;
@@ -25,8 +25,8 @@ export interface DidacticUnitSummary {
 
 export interface DidacticUnitStudyProgress {
 	moduleCount: number;
-	readCharacterCount: number;
-	totalCharacterCount: number;
+	readBlockCount: number;
+	totalBlockCount: number;
 	studyProgressPercent: number;
 }
 
@@ -42,14 +42,14 @@ function calculateProgressPercent(
 }
 
 function calculateStudyProgressPercent(
-	readCharacterCount: number,
-	totalCharacterCount: number,
+	readBlockCount: number,
+	totalBlockCount: number,
 ): number {
-	if (totalCharacterCount === 0) {
+	if (totalBlockCount === 0) {
 		return 0;
 	}
 
-	return Math.round((readCharacterCount / totalCharacterCount) * 100);
+	return Math.round((readBlockCount / totalBlockCount) * 100);
 }
 
 const planningProgressPercentByStatus: Partial<
@@ -79,21 +79,21 @@ function resolveLastActivityAt(didacticUnit: DidacticUnit): string {
 }
 
 function summarizeReadableProgress(didacticUnit: DidacticUnit): {
-	readCharacterCount: number;
-	totalCharacterCount: number;
+	readBlockCount: number;
+	totalBlockCount: number;
 } {
 	return didacticUnit.chapters.reduce(
 		(totals, _chapter, moduleIndex) => ({
-			readCharacterCount:
-				totals.readCharacterCount +
-				getModuleReadCharacterCount(didacticUnit, moduleIndex),
-			totalCharacterCount:
-				totals.totalCharacterCount +
-				getModuleTotalCharacterCount(didacticUnit, moduleIndex),
+			readBlockCount:
+				totals.readBlockCount +
+				getModuleReadBlockCount(didacticUnit, moduleIndex),
+			totalBlockCount:
+				totals.totalBlockCount +
+				getModuleTotalBlockCount(didacticUnit, moduleIndex),
 		}),
 		{
-			readCharacterCount: 0,
-			totalCharacterCount: 0,
+			readBlockCount: 0,
+			totalBlockCount: 0,
 		},
 	);
 }
@@ -104,7 +104,7 @@ export function summarizeDidacticUnit(
 	const moduleCount = didacticUnit.chapters.length;
 	const generatedChapterCount = didacticUnit.generatedChapters?.length ?? 0;
 	const lastActivityAt = resolveLastActivityAt(didacticUnit);
-	const {readCharacterCount, totalCharacterCount} =
+	const {readBlockCount, totalBlockCount} =
 		summarizeReadableProgress(didacticUnit);
 	const progressPercent =
 		planningProgressPercentByStatus[didacticUnit.status] ??
@@ -121,12 +121,12 @@ export function summarizeDidacticUnit(
 		overview: didacticUnit.overview,
 		moduleCount,
 		generatedChapterCount,
-		readCharacterCount,
-		totalCharacterCount,
+		readBlockCount,
+		totalBlockCount,
 		progressPercent,
 		studyProgressPercent: calculateStudyProgressPercent(
-			readCharacterCount,
-			totalCharacterCount,
+			readBlockCount,
+			totalBlockCount,
 		),
 		createdAt: didacticUnit.createdAt,
 		lastActivityAt,
@@ -137,16 +137,16 @@ export function summarizeDidacticUnitStudyProgress(
 	didacticUnit: DidacticUnit,
 ): DidacticUnitStudyProgress {
 	const moduleCount = didacticUnit.chapters.length;
-	const {readCharacterCount, totalCharacterCount} =
+	const {readBlockCount, totalBlockCount} =
 		summarizeReadableProgress(didacticUnit);
 
 	return {
 		moduleCount,
-		readCharacterCount,
-		totalCharacterCount,
+		readBlockCount,
+		totalBlockCount,
 		studyProgressPercent: calculateStudyProgressPercent(
-			readCharacterCount,
-			totalCharacterCount,
+			readBlockCount,
+			totalBlockCount,
 		),
 	};
 }

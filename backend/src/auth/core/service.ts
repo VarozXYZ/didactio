@@ -24,6 +24,8 @@ import type {
 	UserRole,
 	UserStore,
 } from "./types.js";
+import {SYSTEM_DEFAULT_THEME, type PresentationTheme} from "../../presentation-theme/types.js";
+import {normalizePresentationTheme} from "../../presentation-theme/validate.js";
 
 function emptyCredits(): CreditBalances {
 	return {
@@ -383,6 +385,21 @@ export class AuthService {
 		return this.creditTransactionStore.listByUserId(userId);
 	}
 
+	async updateDefaultPresentationTheme(
+		userId: string,
+		theme: PresentationTheme,
+	): Promise<AuthUser> {
+		const updatedUser = await this.userStore.updateDefaultPresentationTheme(
+			userId,
+			normalizePresentationTheme(theme),
+		);
+		if (!updatedUser) {
+			throw new AuthError("user_not_found", 404, "User not found.");
+		}
+
+		return updatedUser;
+	}
+
 	toPublicUser(user: AuthUser): PublicAuthUser {
 		return {
 			id: user.id,
@@ -397,6 +414,8 @@ export class AuthService {
 			role: user.role,
 			status: user.status,
 			credits: user.credits ?? emptyCredits(),
+			defaultPresentationTheme:
+				user.defaultPresentationTheme ?? SYSTEM_DEFAULT_THEME,
 			launchGiftGrantedAt: user.launchGiftGrantedAt?.toISOString(),
 			lastLoginAt: user.lastLoginAt?.toISOString(),
 		};

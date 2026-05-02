@@ -115,7 +115,8 @@ body {
 }
 
 .prose h2,
-.typography-scope h2 {
+.typography-scope h2,
+.unit-page-scope h2 {
 	margin-top: 1.2em;
 	margin-bottom: 0.5em;
 	color: #1d1d1f;
@@ -126,7 +127,8 @@ body {
 }
 
 .prose h3,
-.typography-scope h3 {
+.typography-scope h3,
+.unit-page-scope h3 {
 	margin-top: 1em;
 	margin-bottom: 0.4em;
 	color: #1d1d1f;
@@ -137,7 +139,8 @@ body {
 }
 
 .prose p,
-.typography-scope p {
+.typography-scope p,
+.unit-page-scope p {
 	margin-bottom: 0.8em;
 	color: #1d1d1f;
 	font-family: var(--typo-body-family, Inter);
@@ -159,12 +162,14 @@ body {
 	margin-bottom: 0.8em;
 }
 
-.prose strong {
+.prose strong,
+.unit-page-scope strong {
 	color: #1d1d1f;
 	font-weight: 700;
 }
 
-.prose em {
+.prose em,
+.unit-page-scope em {
 	color: #86868b;
 	font-style: italic;
 }
@@ -172,7 +177,9 @@ body {
 .prose ul,
 .prose ol,
 .typography-scope ul,
-.typography-scope ol {
+.typography-scope ol,
+.unit-page-scope ul,
+.unit-page-scope ol {
 	margin-top: 0.5em;
 	margin-bottom: 0.8em;
 	padding-left: 1.2em;
@@ -182,12 +189,14 @@ body {
 }
 
 .prose li,
-.typography-scope li {
+.typography-scope li,
+.unit-page-scope li {
 	margin-bottom: 0.3em;
 	line-height: 1.9;
 }
 
-.prose table {
+.prose table,
+.unit-page-scope table {
 	display: block;
 	width: 100%;
 	margin: 1.1em 0 1.2em;
@@ -200,12 +209,15 @@ body {
 	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
-.prose thead {
+.prose thead,
+.unit-page-scope thead {
 	background: #f3f4f6;
 }
 
 .prose th,
-.prose td {
+.prose td,
+.unit-page-scope th,
+.unit-page-scope td {
 	min-width: 96px;
 	padding: 0.75rem 0.9rem;
 	border-bottom: 1px solid #e5e5e7;
@@ -214,7 +226,8 @@ body {
 	white-space: nowrap;
 }
 
-.prose th {
+.prose th,
+.unit-page-scope th {
 	color: #1d1d1f;
 	font-size: 12px;
 	font-weight: 700;
@@ -222,17 +235,20 @@ body {
 	text-transform: uppercase;
 }
 
-.prose td {
+.prose td,
+.unit-page-scope td {
 	color: #374151;
 	font-size: 14px;
 	line-height: 1.6;
 }
 
-.prose tbody tr:last-child td {
+.prose tbody tr:last-child td,
+.unit-page-scope tbody tr:last-child td {
 	border-bottom: 0;
 }
 
-.prose code {
+.prose code,
+.unit-page-scope code {
 	font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
 	font-size: 0.85em;
 	font-weight: 500;
@@ -243,7 +259,8 @@ body {
 	border: 1px solid #e2e5ea;
 }
 
-.prose pre {
+.prose pre,
+.unit-page-scope pre {
 	font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
 	font-size: 0.85em;
 	background: #0d1117;
@@ -257,7 +274,8 @@ body {
 	border: 1px solid #21262d;
 }
 
-.prose pre code {
+.prose pre code,
+.unit-page-scope pre code {
 	background: none;
 	color: inherit;
 	border: none;
@@ -266,86 +284,109 @@ body {
 	font-weight: normal;
 }
 
-.lexical-inline-code {
-	font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
-	font-size: 0.85em;
-	font-weight: 500;
-	background: #f0f2f5;
-	color: #b45309;
-	padding: 0.15em 0.45em;
-	border-radius: 5px;
-	border: 1px solid #e2e5ea;
+.prose hr,
+.unit-page-scope hr {
+	margin: 1.4rem 0;
+	border: 0;
+	border-top: 1px solid #e5e5e7;
 }
 
-.lexical-code-block {
-	display: block;
-	font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
-	font-size: 0.85em;
-	background: #0d1117;
-	color: #e6edf3;
-	padding: 1rem 1.25rem;
-	border-radius: 10px;
-	margin: 1rem 0;
+.tiptap-editor:focus {
+	outline: none;
+}
+
+.unit-page-scope {
+	background: var(--unit-page-bg, #fff);
+	color: var(--unit-body-color, #1d1d1f);
+	font-family: var(--unit-body-font, Inter, system-ui, sans-serif);
+	font-size: var(--unit-body-size, 16px);
+	line-height: var(--unit-line-height, 1.6);
+}
+
+.unit-page-scope p {
+	margin: var(--unit-paragraph-margin, 0.65em 0);
+	text-align: var(--unit-paragraph-align, left);
+}
+
+.unit-page-scope h2,
+.unit-page-scope h3,
+.unit-page-scope h4 {
+	color: var(--unit-heading-color, #111827);
+	font-family: var(--unit-heading-font, Inter, system-ui, sans-serif);
+}
+
+.unit-page-scope h2 {
+	font-size: calc(1.5em * var(--unit-heading-scale, 1));
+}
+
+.unit-page-scope h3 {
+	font-size: calc(1.25em * var(--unit-heading-scale, 1));
+}
+
+.unit-page-scope h4 {
+	font-size: calc(1.1em * var(--unit-heading-scale, 1));
+}
+
+.unit-page-scope a {
+	color: var(--unit-accent-color, #2563eb);
+}
+
+.unit-page-scope mark {
+	background: var(--unit-accent-color, #2563eb);
+	border-radius: 2px;
+	color: #fff;
+	padding: 0 0.1em;
+}
+
+.unit-page-scope blockquote {
+	border-left: 4px solid var(--unit-blockquote-accent, #cbd5e1);
+	font-style: italic;
+	padding-left: 1em;
+}
+
+.unit-page-scope code {
+	background: var(--unit-code-bg, #f4f4f5);
+	border-radius: 3px;
+	font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+	padding: 0.1em 0.3em;
+}
+
+.unit-page-scope pre {
+	background: var(--unit-code-bg, #f4f4f5);
+	border-radius: 6px;
 	overflow-x: auto;
-	line-height: 1.7;
-	white-space: pre;
-	border: 1px solid #21262d;
+	padding: 1em;
 }
 
-.prose hr {
-	margin: 1.4rem 0;
-	border: 0;
-	border-top: 1px solid #e5e5e7;
+.unit-page-scope ul,
+.unit-page-scope ol {
+	margin: 0.5em 0;
+	padding-left: 1.5em;
 }
 
-.lexical-horizontal-rule {
-	margin: 1.4rem 0;
-	border: 0;
-	border-top: 1px solid #e5e5e7;
-}
-
-.lexical-table {
-	box-sizing: border-box;
-	max-width: 100%;
+.unit-page-scope table {
+	border-collapse: collapse;
 	width: 100%;
-	margin: 1rem 0 1.2rem;
-	border-collapse: separate;
-	border-spacing: 0;
-	border-radius: 14px;
-	overflow: hidden;
-	background: #fbfbfc;
-	box-shadow: inset 0 0 0 1px #e5e5e7;
-	table-layout: fixed;
 }
 
-.lexical-table-row {
-	background: transparent;
+.unit-page-scope th,
+.unit-page-scope td {
+	border: 1px solid var(--unit-blockquote-accent, #cbd5e1);
+	padding: 0.4em 0.6em;
 }
 
-.lexical-table-cell {
-	min-width: 96px;
-	padding: 0.75rem 0.9rem;
-	border-right: 1px solid #e5e5e7;
-	border-bottom: 1px solid #e5e5e7;
-	vertical-align: top;
-	color: #374151;
+.unit-page-scope hr {
+	border: 0;
+	border-top: 1px solid var(--unit-blockquote-accent, #cbd5e1);
+	margin: 1.5em 0;
 }
 
-.lexical-table-cell:last-child {
-	border-right: 0;
-}
-
-.lexical-table tr:last-child .lexical-table-cell {
-	border-bottom: 0;
-}
-
-.lexical-table-cell-header {
-	background: #f3f4f6;
-	color: #111827;
-	font-size: 12px;
-	font-weight: 700;
-	letter-spacing: 0.03em;
-	text-transform: uppercase;
+.tiptap-editor p.is-editor-empty:first-child::before {
+	color: #9ca3af;
+	content: attr(data-placeholder);
+	float: left;
+	height: 0;
+	pointer-events: none;
 }
 
 ::-webkit-scrollbar {

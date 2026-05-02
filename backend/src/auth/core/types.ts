@@ -1,3 +1,5 @@
+import type {PresentationTheme} from "../../presentation-theme/types.js";
+
 export type AuthProvider = "google";
 export type UserRole = "admin" | "user";
 export type AuthUserStatus = "active" | "disabled";
@@ -24,6 +26,7 @@ export interface AuthUser {
 	role: UserRole;
 	status: AuthUserStatus;
 	credits: CreditBalances;
+	defaultPresentationTheme?: PresentationTheme;
 	launchGiftGrantedAt?: Date;
 	createdAt: Date;
 	updatedAt: Date;
@@ -137,6 +140,7 @@ export interface PublicAuthUser {
 	role: UserRole;
 	status: AuthUserStatus;
 	credits: CreditBalances;
+	defaultPresentationTheme: PresentationTheme;
 	launchGiftGrantedAt?: string;
 	lastLoginAt?: string;
 }
@@ -161,6 +165,10 @@ export interface UserStore {
 		id: string,
 		credits: CreditBalances,
 		grantedAt: Date,
+	): Promise<AuthUser | null>;
+	updateDefaultPresentationTheme(
+		id: string,
+		theme: PresentationTheme,
 	): Promise<AuthUser | null>;
 	applyCreditDelta(input: {
 		id: string;

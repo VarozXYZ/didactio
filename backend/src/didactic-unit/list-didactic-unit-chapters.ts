@@ -1,8 +1,7 @@
 import type {DidacticUnit} from "./create-didactic-unit.js";
 import {
-	getModuleReadCharacterCount,
 	getModuleReadProgressRecord,
-	getModuleTotalCharacterCount,
+	getModuleTotalBlockCount,
 } from "./module-reading-progress.js";
 
 export interface DidacticUnitChapterSummary {
@@ -10,8 +9,10 @@ export interface DidacticUnitChapterSummary {
 	title: string;
 	overview: string;
 	hasGeneratedContent: boolean;
-	readCharacterCount: number;
-	totalCharacterCount: number;
+	readBlockIndex: number;
+	readBlockOffset?: number;
+	readBlocksVersion: number;
+	totalBlocks: number;
 	isCompleted: boolean;
 	generatedAt?: string;
 	updatedAt?: string;
@@ -26,21 +27,11 @@ export function listDidacticUnitChapters(
 		const generatedChapter = didacticUnit.generatedChapters?.find(
 			(candidate) => candidate.chapterIndex === chapterIndex,
 		);
-		const totalCharacterCount = getModuleTotalCharacterCount(
-			didacticUnit,
-			chapterIndex,
-		);
-		const readCharacterCount = getModuleReadCharacterCount(
-			didacticUnit,
-			chapterIndex,
-		);
-		const isCompleted =
-			totalCharacterCount > 0 &&
-			readCharacterCount >= totalCharacterCount;
 		const readProgress = getModuleReadProgressRecord(
 			didacticUnit,
 			chapterIndex,
 		);
+		const isCompleted = readProgress?.chapterCompleted ?? false;
 		const completedAt = isCompleted ? readProgress?.lastReadAt : undefined;
 
 		return {
@@ -48,8 +39,10 @@ export function listDidacticUnitChapters(
 			title: chapter.title,
 			overview: chapter.overview,
 			hasGeneratedContent: generatedChapter !== undefined,
-			readCharacterCount,
-			totalCharacterCount,
+			readBlockIndex: readProgress?.furthestReadBlockIndex ?? 0,
+			readBlockOffset: readProgress?.furthestReadBlockOffset,
+			readBlocksVersion: readProgress?.furthestReadBlocksVersion ?? 0,
+			totalBlocks: getModuleTotalBlockCount(didacticUnit, chapterIndex),
 			isCompleted,
 			generatedAt: generatedChapter?.generatedAt,
 			updatedAt: generatedChapter?.updatedAt,

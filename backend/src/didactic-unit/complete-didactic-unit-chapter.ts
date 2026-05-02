@@ -1,25 +1,21 @@
 import type {DidacticUnit} from "./create-didactic-unit.js";
 import {
-	getModuleTotalCharacterCount,
-	updateDidacticUnitModuleReadProgress,
+	completeDidacticUnitModuleReadProgress,
+	getModuleTotalBlockCount,
 } from "./module-reading-progress.js";
 
 export function completeDidacticUnitChapter(
 	didacticUnit: DidacticUnit,
 	chapterIndex: number,
 ): DidacticUnit {
-	const totalCharacterCount = getModuleTotalCharacterCount(
+	const totalBlockCount = getModuleTotalBlockCount(
 		didacticUnit,
 		chapterIndex,
 	);
 
-	if (totalCharacterCount === 0) {
+	if (totalBlockCount === 0) {
 		throw new Error("Generated didactic unit module not found.");
 	}
 
-	return updateDidacticUnitModuleReadProgress(
-		didacticUnit,
-		chapterIndex,
-		totalCharacterCount,
-	);
+	return completeDidacticUnitModuleReadProgress(didacticUnit, chapterIndex);
 }

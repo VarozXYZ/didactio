@@ -1,5 +1,5 @@
 import type {
-	ChapterPresentationSettings,
+	EditorTextStyle,
 	DidacticUnitEditorChapter as UnitChapter,
 } from "./types";
 import {
@@ -190,7 +190,7 @@ function renderBlock(
 	});
 }
 
-function isMeasuredPageWithMarkdown(
+function isMeasuredContentPage(
 	page: MeasuredModulePage,
 ): page is ContentMeasuredModulePage | ContentWithActionsMeasuredModulePage {
 	return page.kind === "content" || page.kind === "content_with_actions";
@@ -199,7 +199,7 @@ function isMeasuredPageWithMarkdown(
 function isMeasuredPageWithReadableContent(
 	page: MeasuredModulePage,
 ): page is ContentMeasuredModulePage | ContentWithActionsMeasuredModulePage {
-	return isMeasuredPageWithMarkdown(page);
+	return isMeasuredContentPage(page);
 }
 
 function annotateBlocks(
@@ -828,7 +828,7 @@ function canMergeTerminalActionPage({
 	return proseHeight + POST_MODULE_ACTION_GAP + actionHeight <= pageLimit + 1;
 }
 
-export function getReadCharacterCountForSpread(
+export function getReadTextOffsetForSpread(
 	pages: MeasuredModulePage[],
 	spreadIndex: number,
 ): number {
@@ -844,7 +844,7 @@ export function getReadCharacterCountForSpread(
 
 export function findResumeSpreadIndex(
 	pages: MeasuredModulePage[],
-	readCharacterCount: number,
+	readTextOffset: number,
 ): number {
 	if (pages.length === 0) {
 		return 0;
@@ -853,7 +853,7 @@ export function findResumeSpreadIndex(
 	const firstUnreadPageIndex = pages.findIndex(
 		(page) =>
 			isMeasuredPageWithReadableContent(page) &&
-			page.endCharacterOffset > readCharacterCount,
+			page.endCharacterOffset > readTextOffset,
 	);
 
 	if (firstUnreadPageIndex === -1) {
@@ -911,7 +911,7 @@ export function measurePages({
 	pageHeight,
 	chapterIndex,
 	hasNextModule,
-	presentationSettings,
+	textStyle,
 }: {
 	activeChapter: MeasurePageChapter;
 	content: string;
@@ -919,7 +919,7 @@ export function measurePages({
 	pageHeight: number;
 	chapterIndex: number;
 	hasNextModule: boolean;
-	presentationSettings?: ChapterPresentationSettings;
+	textStyle?: EditorTextStyle;
 }): MeasuredModulePage[] {
 	if (!content || !pageWidth || !pageHeight) return [];
 	const renderedContent = formatModuleMarkdownForRender(content);
@@ -943,13 +943,13 @@ export function measurePages({
 	const primaryActionLabel = hasNextModule ? "Next module" : "Finish unit 🎉";
 
 	const typography =
-		presentationSettings ?
+		textStyle ?
 			resolveTypography({
-				sizeProfile: (presentationSettings.sizeProfile ??
+				sizeProfile: (textStyle.sizeProfile ??
 					"regular") as SizeProfile,
-				bodyFontId: (presentationSettings.bodyFontFamily ??
+				bodyFontId: (textStyle.bodyFontFamily ??
 					"inter") as FontId,
-				headingFontId: (presentationSettings.headingFontFamily ??
+				headingFontId: (textStyle.headingFontFamily ??
 					"inter") as FontId,
 				isMobile,
 			})
@@ -1049,7 +1049,7 @@ export function measurePages({
 		proseMeasure,
 	).map((pageBlocks) => buildMeasuredPage(pageBlocks));
 
-	const totalCharacterCount = contentPages.at(-1)?.endCharacterOffset ?? 0;
+	const totalTextLength = contentPages.at(-1)?.endCharacterOffset ?? 0;
 	const lastContentPage = contentPages.at(-1);
 	const canCollapseTerminalPage =
 		lastContentPage !== undefined &&
@@ -1079,8 +1079,8 @@ export function measurePages({
 		...contentPages,
 		{
 			kind: "post_module_actions",
-			startCharacterOffset: totalCharacterCount,
-			endCharacterOffset: totalCharacterCount,
+			startCharacterOffset: totalTextLength,
+			endCharacterOffset: totalTextLength,
 			hasNextModule,
 			primaryActionLabel,
 		},

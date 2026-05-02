@@ -140,16 +140,28 @@ export async function generateDidacticUnitChapter(
 	didacticUnitId: string,
 	chapterIndex = 0,
 ) {
-	const response = await request(app)
+	const createRunResponse = await request(app)
 		.post(
-			`/api/didactic-unit/${didacticUnitId}/chapters/${chapterIndex}/generate`,
+			`/api/didactic-unit/${didacticUnitId}/modules/${chapterIndex}/generate-run`,
 		)
 		.send({});
+
+	expect(createRunResponse.status).toBe(202);
+
+	const streamResponse = await request(app)
+		.get(`/api/generation-runs/${createRunResponse.body.runId}/stream`)
+		.send({});
+
+	expect(streamResponse.status).toBe(200);
+
+	parseStreamComplete(streamResponse.text);
+
+	const response = await request(app).get(`/api/didactic-unit/${didacticUnitId}`);
 
 	expect(response.status).toBe(200);
 
 	return response.body as {
 		id: string;
-		generatedChapters?: Array<{chapterIndex: number; content: string}>;
+		generatedChapters?: Array<{chapterIndex: number; html: string}>;
 	};
 }

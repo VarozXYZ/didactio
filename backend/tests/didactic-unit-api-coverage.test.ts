@@ -44,8 +44,8 @@ describe("didactic-unit API coverage", () => {
 			chapters: expect.any(Array),
 			studyProgress: {
 				moduleCount: expect.any(Number),
-				readCharacterCount: 0,
-				totalCharacterCount: 0,
+				readBlockCount: 0,
+				totalBlockCount: 0,
 				studyProgressPercent: 0,
 			},
 		});
@@ -162,9 +162,41 @@ describe("didactic-unit API coverage", () => {
 		expect(response.body.chapters[0]).toMatchObject({
 			chapterIndex: 0,
 			hasGeneratedContent: true,
-			readCharacterCount: 0,
+			readBlockIndex: 0,
+			totalBlocks: expect.any(Number),
 			state: "ready",
 		});
+	});
+
+	it("streams generation-run HTML blocks before completion", async () => {
+		const app = createTestApp();
+		const approved = await createApprovedDidacticUnit(app);
+
+		const createRunResponse = await request(app)
+			.post(`/api/didactic-unit/${approved.id}/modules/0/generate-run`)
+			.send({});
+
+		expect(createRunResponse.status).toBe(202);
+
+		const streamResponse = await request(app)
+			.get(`/api/generation-runs/${createRunResponse.body.runId}/stream`)
+			.send({});
+
+		expect(streamResponse.status).toBe(200);
+		const events = streamResponse.text
+			.trim()
+			.split("\n")
+			.map((line) => JSON.parse(line) as {type: string});
+		const partialIndex = events.findIndex(
+			(event) => event.type === "partial_html_block",
+		);
+		const completeIndex = events.findIndex(
+			(event) => event.type === "complete",
+		);
+
+		expect(partialIndex).toBeGreaterThan(-1);
+		expect(completeIndex).toBeGreaterThan(-1);
+		expect(partialIndex).toBeLessThan(completeIndex);
 	});
 
 	it("updates module reading progress monotonically and returns weighted study progress", async () => {
@@ -178,36 +210,37 @@ describe("didactic-unit API coverage", () => {
 		);
 
 		expect(chapterResponse.status).toBe(200);
-		expect(chapterResponse.body.totalCharacterCount).toBeGreaterThan(0);
+		expect(chapterResponse.body.totalBlocks).toBeGreaterThan(0);
 
 		const firstProgressResponse = await request(app)
 			.put(
 				`/api/didactic-unit/${approved.id}/chapters/0/reading-progress`,
 			)
-			.send({readCharacterCount: 40, lastVisitedPageIndex: 2});
+			.send({readBlockIndex: 1, readBlockOffset: 4, lastVisitedPageIndex: 2});
 
 		expect(firstProgressResponse.status).toBe(200);
 		expect(firstProgressResponse.body.module).toMatchObject({
 			chapterIndex: 0,
-			readCharacterCount: 40,
-			totalCharacterCount: chapterResponse.body.totalCharacterCount,
+			readBlockIndex: 1,
+			readBlockOffset: 4,
+			totalBlocks: chapterResponse.body.totalBlocks,
 			lastVisitedPageIndex: 2,
 			isCompleted: false,
 		});
 		expect(firstProgressResponse.body.studyProgress).toMatchObject({
 			moduleCount: expect.any(Number),
-			readCharacterCount: 40,
-			totalCharacterCount: chapterResponse.body.totalCharacterCount,
+			readBlockCount: expect.any(Number),
+			totalBlockCount: expect.any(Number),
 		});
 
 		const secondProgressResponse = await request(app)
 			.put(
 				`/api/didactic-unit/${approved.id}/chapters/0/reading-progress`,
 			)
-			.send({readCharacterCount: 10, lastVisitedPageIndex: 1});
+			.send({readBlockIndex: 0, lastVisitedPageIndex: 1});
 
 		expect(secondProgressResponse.status).toBe(200);
-		expect(secondProgressResponse.body.module.readCharacterCount).toBe(40);
+		expect(secondProgressResponse.body.module.readBlockIndex).toBe(1);
 		expect(secondProgressResponse.body.module.lastVisitedPageIndex).toBe(1);
 
 		const listResponse = await request(app)
@@ -238,46 +271,43 @@ describe("didactic-unit API coverage", () => {
 				`/api/didactic-unit/${approved.id}/chapters/0/reading-progress`,
 			)
 			.send({
-				readCharacterCount: chapterResponse.body.totalCharacterCount,
+				readBlockIndex: chapterResponse.body.totalBlocks - 1,
 			});
 
 		expect(progressResponse.status).toBe(200);
-		expect(progressResponse.body.module.isCompleted).toBe(true);
+		expect(progressResponse.body.module.isCompleted).toBe(false);
+
+		const completionResponse = await request(app).post(
+			`/api/didactic-unit/${approved.id}/chapters/0/complete`,
+		);
+		expect(completionResponse.status).toBe(200);
+		expect(completionResponse.body.studyProgress.studyProgressPercent).toBe(100);
 
 		const updateResponse = await request(app)
 			.patch(`/api/didactic-unit/${approved.id}/chapters/0`)
 			.send({
 				chapter: {
 					title: `${chapterResponse.body.title} updated`,
-					content: `${chapterResponse.body.content}\n\nAdditional closing note.`,
-					presentationSettings:
-						chapterResponse.body.presentationSettings,
+					html: `${chapterResponse.body.html}<p>Additional closing note.</p>`,
+					htmlHash: chapterResponse.body.htmlHash,
 				},
 			});
 
 		expect(updateResponse.status).toBe(200);
 		expect(updateResponse.body).toMatchObject({
 			chapterIndex: 0,
-			readCharacterCount: 0,
+			readBlockIndex: 0,
 			isCompleted: false,
 		});
 	});
 
-	it("regenerates an existing chapter and records regeneration history", async () => {
+	it("regenerates an existing chapter through a generation run and records history", async () => {
 		const app = createTestApp();
 		const approved = await createApprovedDidacticUnit(app);
 
 		await generateDidacticUnitChapter(app, approved.id, 0);
 
-		const regenerateResponse = await request(app)
-			.post(`/api/didactic-unit/${approved.id}/chapters/0/regenerate`)
-			.send({});
-
-		expect(regenerateResponse.status).toBe(200);
-		expect(regenerateResponse.body).toMatchObject({
-			id: approved.id,
-			status: "content_generation_in_progress",
-		});
+		await generateDidacticUnitChapter(app, approved.id, 0);
 
 		const revisionsResponse = await request(app).get(
 			`/api/didactic-unit/${approved.id}/chapters/0/revisions`,

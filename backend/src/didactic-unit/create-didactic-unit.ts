@@ -21,6 +21,7 @@ import type {
 	DidacticUnitGeneratedChapter,
 } from "./didactic-unit-chapter.js";
 import type {DidacticUnitModuleReadProgress} from "./module-reading-progress.js";
+import type {PresentationTheme} from "../presentation-theme/types.js";
 
 export type DidacticUnitStatus =
 	| "submitted"
@@ -54,6 +55,7 @@ export interface DidacticUnit {
 	questionnaireEnabled: boolean;
 	folderId: string;
 	folderAssignmentMode: DidacticUnitFolderAssignmentMode;
+	presentationTheme?: PresentationTheme | null;
 	improvedTopicBrief?: string;
 	reasoningNotes?: string;
 	questionnaire?: DidacticUnitQuestionnaire;
@@ -108,6 +110,7 @@ export function createDidacticUnit(
 		questionnaireEnabled: input.questionnaireEnabled,
 		folderId: input.folderSelection.folderId ?? "",
 		folderAssignmentMode: input.folderSelection.mode,
+		presentationTheme: null,
 		createdAt,
 		updatedAt: createdAt,
 	};

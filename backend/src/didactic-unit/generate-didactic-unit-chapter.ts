@@ -7,8 +7,8 @@ import {
 	type DidacticUnit,
 } from "./create-didactic-unit.js";
 import {
+	createCanonicalDidacticUnitChapter,
 	createDidacticUnitChapterRevision,
-	resolveDidacticUnitChapterPresentationSettings,
 	type DidacticUnitChapterRevisionSource,
 } from "./didactic-unit-chapter.js";
 import {resetDidacticUnitModuleReadProgress} from "./module-reading-progress.js";
@@ -73,12 +73,17 @@ export function applyGeneratedDidacticUnitChapter(
 	revisionSource: DidacticUnitChapterRevisionSource = "ai_generation",
 	continuitySummary?: string,
 ): DidacticUnit {
-	const generatedChapter = {
-		...rawGeneratedChapter,
-		presentationSettings: resolveDidacticUnitChapterPresentationSettings(
-			rawGeneratedChapter.presentationSettings,
-		),
-	};
+	const generatedChapter =
+		rawGeneratedChapter.html ?
+			rawGeneratedChapter
+		:	createCanonicalDidacticUnitChapter({
+				chapterIndex,
+				chapterId: `${didacticUnit.id}:${chapterIndex}`,
+				title: rawGeneratedChapter.title,
+				rawHtml: rawGeneratedChapter.html,
+				generatedAt: rawGeneratedChapter.generatedAt,
+				updatedAt: rawGeneratedChapter.updatedAt,
+			});
 	const updatedAt =
 		generatedChapter.updatedAt ?? generatedChapter.generatedAt;
 	const generatedChapters = didacticUnit.generatedChapters ?? [];

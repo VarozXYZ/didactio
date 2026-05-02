@@ -1,6 +1,6 @@
 import {describe, expect, it} from "vitest";
 import {
-	buildChapterMarkdownPrompt,
+	buildChapterHtmlPrompt,
 	buildGatewaySystemPrompt,
 	buildModerationPrompt,
 	resolveTargetChapterCount,
@@ -99,7 +99,7 @@ describe("prompt quality helpers", () => {
 	});
 
 	it("builds a chapter prompt with continuity, module planning, and regeneration guidance", () => {
-		const prompt = buildChapterMarkdownPrompt({
+		const prompt = buildChapterHtmlPrompt({
 			topic: "Python programming",
 			level: "beginner",
 			chapterIndex: 1,
@@ -194,7 +194,7 @@ describe("prompt quality helpers", () => {
 			length: "short",
 		});
 
-		const chapterPrompt = buildChapterMarkdownPrompt({
+		const chapterPrompt = buildChapterHtmlPrompt({
 			topic: "The history of the Silk Road",
 			level: "beginner",
 			chapterIndex: 0,

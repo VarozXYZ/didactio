@@ -4,8 +4,8 @@ import type {
 	UpdateDidacticUnitChapterInput,
 } from "./didactic-unit-chapter.js";
 import {
+	createCanonicalDidacticUnitChapter,
 	createDidacticUnitChapterRevision,
-	resolveDidacticUnitChapterPresentationSettings,
 } from "./didactic-unit-chapter.js";
 import {resetDidacticUnitModuleReadProgress} from "./module-reading-progress.js";
 
@@ -24,19 +24,35 @@ export function updateDidacticUnitChapter(
 	}
 
 	const currentChapter = generatedChapters[existingChapterIndex];
-	const updatedChapter: DidacticUnitGeneratedChapter = {
-		...currentChapter,
-		title: input.chapter.title,
-		markdown: input.chapter.content,
-		presentationSettings: resolveDidacticUnitChapterPresentationSettings(
-			input.chapter.presentationSettings ??
-				currentChapter.presentationSettings,
-		),
-		updatedAt: new Date().toISOString(),
-	};
+	if (
+		input.chapter.htmlHash &&
+		input.chapter.htmlHash !== currentChapter.htmlHash
+	) {
+		throw new Error("Chapter was updated elsewhere. Reload before saving.");
+	}
+
+	const updatedAt = new Date().toISOString();
+	const updatedChapter: DidacticUnitGeneratedChapter =
+		createCanonicalDidacticUnitChapter({
+			chapterIndex,
+			chapterId: `${didacticUnit.id}:${chapterIndex}`,
+			generatedAt: currentChapter.generatedAt,
+			updatedAt,
+			rawHtml: input.chapter.html,
+			title: input.chapter.title,
+		});
+
+	if (
+		updatedChapter.title === currentChapter.title &&
+		updatedChapter.htmlHash === currentChapter.htmlHash
+	) {
+		return didacticUnit;
+	}
+
+	const nextChapter: DidacticUnitGeneratedChapter = updatedChapter;
 
 	const updatedChapters = [...generatedChapters];
-	updatedChapters[existingChapterIndex] = updatedChapter;
+	updatedChapters[existingChapterIndex] = nextChapter;
 
 	return resetDidacticUnitModuleReadProgress(
 		{
@@ -46,11 +62,11 @@ export function updateDidacticUnitChapter(
 				createDidacticUnitChapterRevision({
 					chapterIndex,
 					source: "manual_edit",
-					chapter: updatedChapter,
+					chapter: nextChapter,
 				}),
 			],
 			generatedChapters: updatedChapters,
-			updatedAt: updatedChapter.updatedAt as string,
+			updatedAt,
 		},
 		chapterIndex,
 	);

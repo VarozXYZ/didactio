@@ -17,8 +17,7 @@ import type {AiConfig, AiModelConfig, AiModelTier} from "./config.js";
 import {resolveGatewayModelId} from "./config.js";
 import {
 	buildFolderClassificationPrompt,
-	buildChapterMarkdownPrompt,
-	buildContinuitySummaryPrompt,
+	buildChapterHtmlPrompt,
 	buildGatewaySystemPrompt,
 	buildLearnerSummaryPrompt,
 	buildModerationPrompt,
@@ -38,7 +37,8 @@ import {
 	summarizeAiCallTelemetry,
 	type AiCallTelemetry,
 } from "./telemetry.js";
-import {normalizeGeneratedChapterMarkdown} from "./markdown-parsers.js";
+import {createCanonicalDidacticUnitChapter} from "../didactic-unit/didactic-unit-chapter.js";
+import {extractContinuitySummary} from "../html/extractContinuity.js";
 
 export class AiGatewayConfigurationError extends Error {}
 
@@ -83,7 +83,7 @@ export interface SummaryResult extends BaseStageResult {
 }
 
 export interface ChapterResult extends BaseStageResult {
-	markdown: string;
+	html: string;
 	chapter: DidacticUnitGeneratedChapter;
 	continuitySummary: string;
 }
@@ -103,6 +103,7 @@ interface GatewayAiServiceOptions {
 export interface MarkdownStreamCallbacks<T> {
 	onStart?: (selection: ModelSelection) => Promise<void> | void;
 	onMarkdown?: (delta: string, markdown: string) => Promise<void> | void;
+	onHtml?: (delta: string, html: string) => Promise<void> | void;
 	onComplete?: (result: T) => Promise<void> | void;
 }
 
@@ -1049,20 +1050,12 @@ export class GatewayAiService implements AiService {
 		callbacks: MarkdownStreamCallbacks<SummaryResult>,
 	): Promise<SummaryResult> {
 		const selection = this.selectModel(input.tier, input.config);
-		const prompt =
-			input.kind === "continuity" ?
-				buildContinuitySummaryPrompt({
-					topic: input.topic,
-					chapterTitle: input.chapterTitle,
-					chapterMarkdown: input.chapterMarkdown,
-					authoring: input.config.authoring,
-				})
-			:	buildLearnerSummaryPrompt({
-					topic: input.topic,
-					chapterTitle: input.chapterTitle,
-					chapterMarkdown: input.chapterMarkdown,
-					authoring: input.config.authoring,
-				});
+		const prompt = buildLearnerSummaryPrompt({
+			topic: input.topic,
+			chapterTitle: input.chapterTitle,
+			chapterMarkdown: input.chapterMarkdown,
+			authoring: input.config.authoring,
+		});
 		let markdown = "";
 		const startedAt = Date.now();
 		const maxOutputTokens = resolveStageMaxOutputTokens("summary");
@@ -1169,7 +1162,7 @@ export class GatewayAiService implements AiService {
 		callbacks: MarkdownStreamCallbacks<ChapterResult>,
 	): Promise<ChapterResult> {
 		const selection = this.selectModel(input.tier, input.config);
-		const prompt = buildChapterMarkdownPrompt({
+		const prompt = buildChapterHtmlPrompt({
 			topic: input.topic,
 			level: input.level,
 			syllabus: input.syllabus,
@@ -1182,7 +1175,7 @@ export class GatewayAiService implements AiService {
 			depth: input.depth,
 			length: input.length,
 		});
-		let markdown = "";
+		let html = "";
 		const startedAt = Date.now();
 		const maxOutputTokens = resolveStageMaxOutputTokens(
 			"chapter",
@@ -1214,29 +1207,22 @@ export class GatewayAiService implements AiService {
 						return;
 					}
 
-					markdown += chunk.text;
-					await callbacks.onMarkdown?.(chunk.text, markdown);
+					html += chunk.text;
+					await callbacks.onHtml?.(chunk.text, html);
+					await callbacks.onMarkdown?.(chunk.text, html);
 				},
 			});
 
-			const finalMarkdown = await result.text;
-			const normalizedChapter = normalizeGeneratedChapterMarkdown(
-				finalMarkdown,
-				input.chapterIndex,
-				{
-					fallbackTitle:
-						input.syllabus.modules[input.chapterIndex]?.title,
-				},
-			);
-			const continuitySummary = await this.generateSummary({
-				topic: input.topic,
-				chapterTitle: normalizedChapter.title,
-				chapterMarkdown: finalMarkdown,
-				config: input.config,
-				tier: input.tier,
-				abortSignal: input.abortSignal,
-				kind: "continuity",
+			const finalHtml = await result.text;
+			const chapter = createCanonicalDidacticUnitChapter({
+				chapterIndex: input.chapterIndex,
+				chapterId: `${input.topic}:${input.chapterIndex}`,
+				title:
+					input.syllabus.modules[input.chapterIndex]?.title ??
+					`Module ${input.chapterIndex + 1}`,
+				rawHtml: finalHtml,
 			});
+			const continuitySummary = extractContinuitySummary(chapter.html);
 			const telemetry = await this.enrichAiCallTelemetry(
 				await collectAiCallTelemetry(result, Date.now() - startedAt),
 			);
@@ -1246,22 +1232,17 @@ export class GatewayAiService implements AiService {
 				model: selection.model,
 				prompt,
 				telemetry,
-				markdown: finalMarkdown,
-				continuitySummary: continuitySummary.markdown,
-				chapter: {
-					chapterIndex: input.chapterIndex,
-					title: normalizedChapter.title,
-					markdown: normalizedChapter.markdown,
-					generatedAt: new Date().toISOString(),
-				},
+				html: finalHtml,
+				continuitySummary,
+				chapter,
 			};
 
 			this.logAiCallCompleted("module", selection, telemetry, {
 				tier: input.tier,
 				moduleIndex: input.chapterIndex,
 				moduleTitle: finalResult.chapter.title,
-				markdownLength: finalMarkdown.length,
-				normalizedMarkdownLength: normalizedChapter.markdown.length,
+				htmlLength: finalHtml.length,
+				normalizedHtmlLength: chapter.html.length,
 				streaming: true,
 				maxOutputTokens,
 			});

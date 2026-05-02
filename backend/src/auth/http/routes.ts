@@ -4,6 +4,7 @@ import type {PassportStatic} from "passport";
 import {AuthError} from "../core/errors.js";
 import type {AuthService} from "../core/service.js";
 import type {AuthConfig, NormalizedGoogleProfile} from "../core/types.js";
+import {parsePresentationTheme} from "../../presentation-theme/validate.js";
 import {
 	clearOAuthFlowCookie,
 	clearRefreshCookie,
@@ -210,6 +211,35 @@ export function createAuthRouter(
 			next(error);
 		}
 	});
+
+	router.patch(
+		"/me/default-theme",
+		requireAuth,
+		async (request, response, next) => {
+			try {
+				if (!request.auth) {
+					throw new AuthError("unauthenticated", 401, "Authentication required.");
+				}
+
+				const body = request.body as {defaultPresentationTheme?: unknown};
+				const theme = parsePresentationTheme(body.defaultPresentationTheme);
+				const user = await authService.updateDefaultPresentationTheme(
+					request.auth.sub,
+					theme,
+				);
+
+				response.status(200).json({
+					user: authService.toPublicUser(user),
+				});
+			} catch (error) {
+				if (error instanceof Error && !(error instanceof AuthError)) {
+					response.status(422).json({error: error.message});
+					return;
+				}
+				next(error);
+			}
+		},
+	);
 
 	router.get(
 		"/credits/transactions",

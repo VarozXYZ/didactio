@@ -26,7 +26,7 @@ import {
 	WandSparkles,
 	X,
 } from "lucide-react";
-import type {LexicalEditor} from "lexical";
+import type {Editor} from "@tiptap/react";
 import {AnimatePresence, motion as Motion} from "motion/react";
 import {clsx} from "clsx";
 import {twMerge} from "tailwind-merge";
@@ -61,34 +61,39 @@ import {
 import {
 	adaptDidacticUnitEditor,
 	adaptDidacticUnitRevisions,
-	resolvePresentationSettings,
 } from "../../adapters";
 import {loadFonts} from "../../utils/fontLoader";
 import {
 	calculateSpreadMetrics,
-	getReadCharacterCountForSpread,
+	getReadTextOffsetForSpread,
 	getStatusPillClass,
 	measurePages,
 	type MeasuredModulePage,
 } from "../../pageLayout";
-import {LexicalMarkdownEditor} from "./LexicalMarkdownEditor";
+import {TiptapHtmlEditor} from "./TiptapHtmlEditor";
+import {ChapterRenderer} from "../Content/ChapterRenderer";
 import {ChapterStyleMenu} from "./ChapterStyleMenu";
-import {LexicalToolbar} from "./LexicalToolbar";
+import {EditorToolbar} from "./EditorToolbar";
 import type {
-	ChapterPresentationSettings,
+	EditorTextStyle,
 	DidacticUnitEditorChapter,
 	DidacticUnitEditorViewModel,
 	DidacticUnitRevisionViewModel,
 } from "../../types";
 import {formatRelativeTimestamp} from "../../utils/topicMetadata";
 import {
-	normalizeMarkdownForStorage,
-	normalizeStoredMarkdown,
+	normalizeHtmlForStorage,
+	normalizeStoredHtml,
 } from "../../utils/markdown";
 import {getFolderEmoji} from "../../utils/folderDisplay";
 import {useAuth} from "../../../auth/AuthProvider";
 import {CoinAmount} from "@/components/Coin";
 import {getModuleRegenerationCost} from "../../utils/coinPricing";
+import {
+	resolvePresentationTheme,
+	themeVars,
+} from "../../utils/themeVars";
+import type {PresentationTheme} from "../../../types/presentationTheme";
 
 function ChapterStatusIcon({
 	status,
@@ -232,17 +237,17 @@ type UnitEditorProps = {
 type ChapterDraft = {
 	chapterIndex: number;
 	title: string;
-	contentMarkdown: string;
-	presentationSettings: ChapterPresentationSettings;
+	htmlDraft: string;
+	textStyle: EditorTextStyle;
 };
 
 function cn(...inputs: Array<string | false | null | undefined>) {
 	return twMerge(clsx(inputs));
 }
 
-const STREAMING_MARKDOWN_FLUSH_MS = 350;
+const STREAMING_HTML_FLUSH_MS = 350;
 
-function isMeasuredPageWithMarkdown(
+function isMeasuredContentPage(
 	page: MeasuredModulePage,
 ): page is Extract<
 	MeasuredModulePage,
@@ -255,43 +260,47 @@ function calculateUnitStudyProgressPercent(
 	chapters: DidacticUnitEditorChapter[],
 	input: {
 		chapterIndex: number;
-		readCharacterCount: number;
-		totalCharacterCount: number;
+		readBlockIndex: number;
+		totalBlocks: number;
+		isCompleted?: boolean;
 	},
 ): number {
 	const totals = chapters.reduce(
 		(result, chapter) => {
-			const readCharacterCount =
+			const readBlockCount =
 				chapter.chapterIndex === input.chapterIndex ?
-					Math.max(
-						chapter.readCharacterCount,
-						input.readCharacterCount,
-					)
-				:	chapter.readCharacterCount;
-			const totalCharacterCount =
+					(input.isCompleted ?
+						input.totalBlocks
+					:	input.totalBlocks > 0 ?
+						Math.max(chapter.readBlockIndex, input.readBlockIndex) + 1
+					:	0)
+				:	chapter.isCompleted ?
+					chapter.totalBlocks
+				:	chapter.totalBlocks > 0 ?
+					chapter.readBlockIndex + 1
+				:	0;
+			const totalBlocks =
 				chapter.chapterIndex === input.chapterIndex ?
-					input.totalCharacterCount
-				:	chapter.totalCharacterCount;
+					input.totalBlocks
+				:	chapter.totalBlocks;
 
 			return {
-				readCharacterCount:
-					result.readCharacterCount + readCharacterCount,
-				totalCharacterCount:
-					result.totalCharacterCount + totalCharacterCount,
+				readBlockCount: result.readBlockCount + readBlockCount,
+				totalBlocks: result.totalBlocks + totalBlocks,
 			};
 		},
 		{
-			readCharacterCount: 0,
-			totalCharacterCount: 0,
+			readBlockCount: 0,
+			totalBlocks: 0,
 		},
 	);
 
-	if (totals.totalCharacterCount === 0) {
+	if (totals.totalBlocks === 0) {
 		return 0;
 	}
 
 	return Math.round(
-		(totals.readCharacterCount / totals.totalCharacterCount) * 100,
+		(totals.readBlockCount / totals.totalBlocks) * 100,
 	);
 }
 
@@ -302,12 +311,58 @@ function buildDraft(
 	return {
 		chapterIndex: chapter.chapterIndex,
 		title: detail?.title ?? chapter.title,
-		contentMarkdown: normalizeStoredMarkdown(
-			detail?.content ?? chapter.content,
+		htmlDraft: normalizeStoredHtml(
+			detail?.html ?? chapter.html,
 		),
-		presentationSettings:
-			resolvePresentationSettings(detail?.presentationSettings) ??
-			chapter.presentationSettings,
+		textStyle: chapter.textStyle,
+	};
+}
+
+function themeFromTextStyle(
+	currentTheme: PresentationTheme,
+	settings: EditorTextStyle,
+): PresentationTheme {
+	return {
+		...currentTheme,
+		bodyFont:
+			settings.bodyFontFamily === "merriweather" ?
+				"merriweather"
+			:	"inter",
+		headingFont:
+			settings.headingFontFamily === "merriweather" ?
+				"merriweather"
+			:	"inter",
+		bodyFontSize: settings.sizeProfile,
+		paragraphAlign: settings.paragraphAlign,
+	};
+}
+
+function mapVisibleTextOffsetToBlockProgress(
+	chapter: DidacticUnitEditorChapter,
+	visibleTextOffset: number,
+): {readBlockIndex: number; readBlockOffset?: number} {
+	const blocks = chapter.htmlBlocks;
+	if (blocks.length === 0) {
+		return {readBlockIndex: 0};
+	}
+	const lastBlock = blocks[blocks.length - 1];
+	if (visibleTextOffset >= lastBlock.textEndOffset) {
+		return {
+			readBlockIndex: blocks.length - 1,
+			readBlockOffset: lastBlock.textLength,
+		};
+	}
+	const blockIndex = Math.max(
+		0,
+		blocks.findIndex((block) => visibleTextOffset <= block.textEndOffset),
+	);
+	const block = blocks[blockIndex] ?? blocks[0];
+	return {
+		readBlockIndex: blockIndex,
+		readBlockOffset: Math.max(
+			0,
+			visibleTextOffset - block.textStartOffset,
+		),
 	};
 }
 
@@ -358,14 +413,27 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		number | null
 	>(null);
 	const [contentPageDrafts, setContentPageDrafts] = useState<string[]>([]);
-	const [activeLexicalEditor, setActiveLexicalEditor] =
-		useState<LexicalEditor | null>(null);
+	const [activeHtmlEditor, setActiveHtmlEditor] = useState<Editor | null>(
+		null,
+	);
 	const [isLoading, setIsLoading] = useState(true);
-	const [streamingMarkdown, setStreamingMarkdown] = useState("");
+	const [streamingHtml, setStreamingHtml] = useState("");
 	const [isStreamingGeneration, setIsStreamingGeneration] = useState(false);
 	const [unitGenerationTier, setUnitGenerationTier] =
 		useState<BackendGenerationQuality | null>(null);
 	const {user, refreshUser} = useAuth();
+	const resolvedTheme = useMemo(
+		() =>
+			resolvePresentationTheme(
+				workspace?.presentationTheme,
+				user?.defaultPresentationTheme,
+			),
+		[workspace?.presentationTheme, user?.defaultPresentationTheme],
+	);
+	const resolvedThemeVars = useMemo(
+		() => themeVars(resolvedTheme),
+		[resolvedTheme],
+	);
 	const [activeGeneratingChapterIndex, setActiveGeneratingChapterIndex] =
 		useState<number | null>(null);
 	const [viewport, setViewport] = useState(() => ({
@@ -390,13 +458,13 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	const isReadingProgressSaveInFlightRef = useRef(false);
 	const pendingReadingProgressSaveRef = useRef<{
 		chapter: DidacticUnitEditorChapter;
-		readCharacterCount: number;
+		visibleTextOffset: number;
 		lastVisitedPageIndex?: number;
 		resolve: (didPersist: boolean) => void;
 	} | null>(null);
 	const lastReadingProgressPayloadRef = useRef<string | null>(null);
-	const streamingMarkdownBufferRef = useRef("");
-	const streamingMarkdownFlushTimeoutRef = useRef<number | null>(null);
+	const streamingHtmlBufferRef = useRef("");
+	const streamingHtmlFlushTimeoutRef = useRef<number | null>(null);
 
 	const activeChapter = useMemo(
 		() =>
@@ -441,9 +509,9 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		draft.chapterIndex === activeChapter.chapterIndex;
 	const activeDraftContent =
 		isDraftForActiveChapter ?
-			draft.contentMarkdown
-		: 	normalizeStoredMarkdown(
-				activeChapterDetail?.content ?? activeChapter?.content ?? "",
+			draft.htmlDraft
+		: 	normalizeStoredHtml(
+				activeChapterDetail?.html ?? activeChapter?.html ?? "",
 			);
 	const hasNextActiveModule = useMemo(
 		() =>
@@ -607,7 +675,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 
 	useEffect(() => {
 		lastReadingProgressPayloadRef.current = null;
-	}, [activeChapter?.chapterIndex, activeChapter?.totalCharacterCount]);
+	}, [activeChapter?.chapterIndex, activeChapter?.totalBlocks]);
 
 	useEffect(() => {
 		if (!activeChapter) {
@@ -622,16 +690,15 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		}
 
 		setIsEditMode(false);
-		setActiveLexicalEditor(null);
+		setActiveHtmlEditor(null);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [
 		activeChapter?.chapterIndex,
 		activeChapter?.title,
-		activeChapter?.content,
-		activeChapter?.presentationSettings,
+		activeChapter?.html,
+		activeChapter?.textStyle,
 		activeChapterDetail?.title,
-		activeChapterDetail?.content,
-		activeChapterDetail?.presentationSettings,
+		activeChapterDetail?.html,
 	]);
 
 	useEffect(() => {
@@ -647,7 +714,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			currentDraft ?
 				{
 					...currentDraft,
-					contentMarkdown: streamingMarkdown,
+					htmlDraft: streamingHtml,
 				}
 			:	currentDraft,
 		);
@@ -655,7 +722,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		activeChapterIndex,
 		activeGeneratingChapterIndex,
 		isStreamingGeneration,
-		streamingMarkdown,
+		streamingHtml,
 	]);
 
 	useEffect(() => {
@@ -677,8 +744,8 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			if (saveTimeoutRef.current) {
 				window.clearTimeout(saveTimeoutRef.current);
 			}
-			if (streamingMarkdownFlushTimeoutRef.current) {
-				window.clearTimeout(streamingMarkdownFlushTimeoutRef.current);
+			if (streamingHtmlFlushTimeoutRef.current) {
+				window.clearTimeout(streamingHtmlFlushTimeoutRef.current);
 			}
 		},
 		[],
@@ -686,8 +753,8 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 
 	const activeDraftSettings =
 		isDraftForActiveChapter ?
-			draft.presentationSettings
-		: 	activeChapter?.presentationSettings;
+			draft.textStyle
+		: 	activeChapter?.textStyle;
 
 	useEffect(() => {
 		if (fontsReady) return;
@@ -728,7 +795,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 					hasNextModule: hasNextActiveModule,
 					pageHeight: spreadMetrics.pageHeight,
 					pageWidth: spreadMetrics.pageWidth,
-					presentationSettings: activeDraftSettings,
+					textStyle: activeDraftSettings,
 				})
 			:	[],
 		[
@@ -744,7 +811,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	const paginatedContentPages = useMemo(
 		() =>
 			measuredReadPages
-				.filter(isMeasuredPageWithMarkdown)
+				.filter(isMeasuredContentPage)
 				.map((page) => page.markdown),
 		[measuredReadPages],
 	);
@@ -860,20 +927,19 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	const applyReadingProgressLocally = useCallback(
 		(input: {
 			chapterIndex: number;
-			readCharacterCount: number;
-			totalCharacterCount: number;
+			readBlockIndex: number;
+			readBlockOffset?: number;
+			readBlocksVersion: number;
+			totalBlocks: number;
 			lastVisitedPageIndex?: number;
 			studyProgressPercent?: number;
+			isCompleted?: boolean;
 			completedAt?: string;
 		}) => {
 			if (input.lastVisitedPageIndex !== undefined) {
 				lastVisitedPageByChapterRef.current[input.chapterIndex] =
 					input.lastVisitedPageIndex;
 			}
-
-			const isCompleted =
-				input.totalCharacterCount > 0 &&
-				input.readCharacterCount >= input.totalCharacterCount;
 
 			setChapterDetails((currentDetails) => {
 				const currentDetail = currentDetails[input.chapterIndex];
@@ -882,13 +948,21 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 					return currentDetails;
 				}
 
+				const isCompleted =
+					input.isCompleted ?? currentDetail.isCompleted;
+				const readBlockIndex = Math.max(
+					currentDetail.readBlockIndex,
+					input.readBlockIndex,
+				);
 				const nextDetail = {
 					...currentDetail,
-					readCharacterCount: Math.max(
-						currentDetail.readCharacterCount,
-						input.readCharacterCount,
-					),
-					totalCharacterCount: input.totalCharacterCount,
+					readBlockIndex,
+					readBlockOffset:
+						readBlockIndex === input.readBlockIndex ?
+							input.readBlockOffset
+						:	currentDetail.readBlockOffset,
+					readBlocksVersion: input.readBlocksVersion,
+					totalBlocks: input.totalBlocks,
 					lastVisitedPageIndex:
 						input.lastVisitedPageIndex ??
 						currentDetail.lastVisitedPageIndex,
@@ -900,10 +974,13 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				};
 
 				if (
-					currentDetail.readCharacterCount ===
-						nextDetail.readCharacterCount &&
-					currentDetail.totalCharacterCount ===
-						nextDetail.totalCharacterCount &&
+					currentDetail.readBlockIndex ===
+						nextDetail.readBlockIndex &&
+					currentDetail.readBlockOffset ===
+						nextDetail.readBlockOffset &&
+					currentDetail.readBlocksVersion ===
+						nextDetail.readBlocksVersion &&
+					currentDetail.totalBlocks === nextDetail.totalBlocks &&
 					currentDetail.lastVisitedPageIndex ===
 						nextDetail.lastVisitedPageIndex &&
 					currentDetail.isCompleted === nextDetail.isCompleted &&
@@ -929,13 +1006,21 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 						return chapter;
 					}
 
+					const isCompleted =
+						input.isCompleted ?? chapter.isCompleted;
+					const readBlockIndex = Math.max(
+						chapter.readBlockIndex,
+						input.readBlockIndex,
+					);
 					const nextChapter = {
 						...chapter,
-						readCharacterCount: Math.max(
-							chapter.readCharacterCount,
-							input.readCharacterCount,
-						),
-						totalCharacterCount: input.totalCharacterCount,
+						readBlockIndex,
+						readBlockOffset:
+							readBlockIndex === input.readBlockIndex ?
+								input.readBlockOffset
+							:	chapter.readBlockOffset,
+						readBlocksVersion: input.readBlocksVersion,
+						totalBlocks: input.totalBlocks,
 						lastVisitedPageIndex:
 							input.lastVisitedPageIndex ??
 							chapter.lastVisitedPageIndex,
@@ -947,10 +1032,12 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 					};
 
 					didChapterChange =
-						chapter.readCharacterCount !==
-							nextChapter.readCharacterCount ||
-						chapter.totalCharacterCount !==
-							nextChapter.totalCharacterCount ||
+						chapter.readBlockIndex !== nextChapter.readBlockIndex ||
+						chapter.readBlockOffset !==
+							nextChapter.readBlockOffset ||
+						chapter.readBlocksVersion !==
+							nextChapter.readBlocksVersion ||
+						chapter.totalBlocks !== nextChapter.totalBlocks ||
 						chapter.lastVisitedPageIndex !==
 							nextChapter.lastVisitedPageIndex ||
 						chapter.isCompleted !== nextChapter.isCompleted ||
@@ -962,8 +1049,9 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 					input.studyProgressPercent ??
 					calculateUnitStudyProgressPercent(chapters, {
 						chapterIndex: input.chapterIndex,
-						readCharacterCount: input.readCharacterCount,
-						totalCharacterCount: input.totalCharacterCount,
+						readBlockIndex: input.readBlockIndex,
+						totalBlocks: input.totalBlocks,
+						isCompleted: input.isCompleted,
 					});
 
 				if (!didChapterChange && currentWorkspace.progress === progress) {
@@ -988,11 +1076,14 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 
 			applyReadingProgressLocally({
 				chapterIndex: response.module.chapterIndex,
-				readCharacterCount: response.module.readCharacterCount,
-				totalCharacterCount: response.module.totalCharacterCount,
+				readBlockIndex: response.module.readBlockIndex,
+				readBlockOffset: response.module.readBlockOffset,
+				readBlocksVersion: response.module.readBlocksVersion,
+				totalBlocks: response.module.totalBlocks,
 				lastVisitedPageIndex: response.module.lastVisitedPageIndex,
 				studyProgressPercent:
 					response.studyProgress.studyProgressPercent,
+				isCompleted: response.module.isCompleted,
 				completedAt: response.module.completedAt,
 			});
 		},
@@ -1010,39 +1101,43 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		);
 	};
 
-	const clearStreamingMarkdownFlush = useCallback(() => {
-		if (streamingMarkdownFlushTimeoutRef.current) {
-			window.clearTimeout(streamingMarkdownFlushTimeoutRef.current);
-			streamingMarkdownFlushTimeoutRef.current = null;
+	const clearStreamingHtmlFlush = useCallback(() => {
+		if (streamingHtmlFlushTimeoutRef.current) {
+			window.clearTimeout(streamingHtmlFlushTimeoutRef.current);
+			streamingHtmlFlushTimeoutRef.current = null;
 		}
 	}, []);
 
-	const flushStreamingMarkdown = useCallback(() => {
-		clearStreamingMarkdownFlush();
-		setStreamingMarkdown(streamingMarkdownBufferRef.current);
-	}, [clearStreamingMarkdownFlush]);
+	const flushStreamingHtml = useCallback(() => {
+		clearStreamingHtmlFlush();
+		setStreamingHtml(streamingHtmlBufferRef.current);
+	}, [clearStreamingHtmlFlush]);
 
-	const resetStreamingMarkdown = useCallback(() => {
-		clearStreamingMarkdownFlush();
-		streamingMarkdownBufferRef.current = "";
-		setStreamingMarkdown("");
-	}, [clearStreamingMarkdownFlush]);
+	const resetStreamingHtml = useCallback(() => {
+		clearStreamingHtmlFlush();
+		streamingHtmlBufferRef.current = "";
+		setStreamingHtml("");
+	}, [clearStreamingHtmlFlush]);
 
-	const queueStreamingMarkdown = useCallback(
-		(event: {delta: string; markdown?: string}) => {
-			streamingMarkdownBufferRef.current =
-				event.markdown ?? `${streamingMarkdownBufferRef.current}${event.delta}`;
+	const queueStreamingHtmlBlock = useCallback(
+		(block: {html: string}) => {
+			streamingHtmlBufferRef.current = [
+				streamingHtmlBufferRef.current,
+				block.html,
+			]
+				.filter(Boolean)
+				.join("\n");
 
-			if (streamingMarkdownFlushTimeoutRef.current !== null) {
+			if (streamingHtmlFlushTimeoutRef.current !== null) {
 				return;
 			}
 
-			streamingMarkdownFlushTimeoutRef.current = window.setTimeout(
-				flushStreamingMarkdown,
-				STREAMING_MARKDOWN_FLUSH_MS,
+			streamingHtmlFlushTimeoutRef.current = window.setTimeout(
+				flushStreamingHtml,
+				STREAMING_HTML_FLUSH_MS,
 			);
 		},
-		[flushStreamingMarkdown],
+		[flushStreamingHtml],
 	);
 
 	const refreshWorkspaceAfterGeneration = useCallback(async () => {
@@ -1067,36 +1162,24 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			setActiveChapterIndex(chapter.chapterIndex);
 			setCurrentSpread(0);
 			setIsEditMode(false);
-			setActiveLexicalEditor(null);
+			setActiveHtmlEditor(null);
 			setIsSubmitting(true);
 			setIsStreamingGeneration(true);
 			setActiveGeneratingChapterIndex(chapter.chapterIndex);
-			resetStreamingMarkdown();
+			resetStreamingHtml();
 
 			try {
-				if (chapter.status === "ready" || chapter.status === "failed") {
-					await dashboardApi.streamRegenerateDidacticUnitChapter(
-						didacticUnitId,
-						chapter.chapterIndex,
-						{
-							onPartialMarkdown: (event) => {
-								queueStreamingMarkdown(event);
-							},
-						},
-					);
-				} else {
-					await dashboardApi.streamGenerateDidacticUnitChapter(
-						didacticUnitId,
-						chapter.chapterIndex,
-						{
-							onPartialMarkdown: (event) => {
-								queueStreamingMarkdown(event);
-							},
-						},
-					);
-				}
+				const {runId} = await dashboardApi.createGenerationRun(
+					didacticUnitId,
+					chapter.chapterIndex,
+				);
+				await dashboardApi.streamGenerationRun(runId, {
+					onPartialHtmlBlock: ({block}) => {
+						queueStreamingHtmlBlock(block);
+					},
+				});
 
-				flushStreamingMarkdown();
+				flushStreamingHtml();
 				setUnitGenerationTier((previousTier) => previousTier ?? tier);
 				await refreshWorkspaceAfterGeneration();
 				await refreshUser();
@@ -1112,16 +1195,16 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				setIsSubmitting(false);
 				setIsStreamingGeneration(false);
 				setActiveGeneratingChapterIndex(null);
-				resetStreamingMarkdown();
+				resetStreamingHtml();
 			}
 		},
 		[
 			didacticUnitId,
-			flushStreamingMarkdown,
-			queueStreamingMarkdown,
+			flushStreamingHtml,
+			queueStreamingHtmlBlock,
 			refreshWorkspaceAfterGeneration,
 			refreshUser,
-			resetStreamingMarkdown,
+			resetStreamingHtml,
 		],
 	);
 
@@ -1162,20 +1245,20 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		try {
 			for (const chapter of pendingChapters) {
 				setActiveGeneratingChapterIndex(chapter.chapterIndex);
-				resetStreamingMarkdown();
+				resetStreamingHtml();
 
 				try {
-					await dashboardApi.streamGenerateDidacticUnitChapter(
+					const {runId} = await dashboardApi.createGenerationRun(
 						didacticUnitId,
 						chapter.chapterIndex,
-						{
-							onPartialMarkdown: (event) => {
-								queueStreamingMarkdown(event);
-							},
-						},
 					);
+					await dashboardApi.streamGenerationRun(runId, {
+						onPartialHtmlBlock: ({block}) => {
+							queueStreamingHtmlBlock(block);
+						},
+					});
 
-					flushStreamingMarkdown();
+					flushStreamingHtml();
 				} catch (actionError) {
 					toastError(
 						actionError instanceof Error ?
@@ -1199,14 +1282,14 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			setIsSubmitting(false);
 			setIsStreamingGeneration(false);
 			setActiveGeneratingChapterIndex(null);
-			resetStreamingMarkdown();
+			resetStreamingHtml();
 		}
 	}, [
 		didacticUnitId,
-		flushStreamingMarkdown,
-		queueStreamingMarkdown,
+		flushStreamingHtml,
+		queueStreamingHtmlBlock,
 		refreshWorkspaceAfterGeneration,
-		resetStreamingMarkdown,
+		resetStreamingHtml,
 		unitGenerationTier,
 		workspace,
 	]);
@@ -1217,7 +1300,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		}
 
 		const nextTitle = draft.title.trim();
-		const nextContent = normalizeMarkdownForStorage(draft.contentMarkdown);
+		const nextHtml = normalizeHtmlForStorage(draft.htmlDraft);
 
 		await runAction(
 			() =>
@@ -1226,8 +1309,8 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 					activeChapter.chapterIndex,
 					{
 						title: nextTitle,
-						content: nextContent || activeChapter.content || "",
-						presentationSettings: draft.presentationSettings,
+						html: nextHtml || activeChapter.html || "",
+						htmlHash: activeChapter.htmlHash,
 					},
 				),
 			{
@@ -1268,7 +1351,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	]);
 
 	const enterEditMode = () => {
-		setActiveLexicalEditor(null);
+		setActiveHtmlEditor(null);
 		setIsEditMode(true);
 	};
 
@@ -1278,7 +1361,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		}
 
 		setDraft(buildDraft(activeChapter, activeChapterDetail));
-		setActiveLexicalEditor(null);
+		setActiveHtmlEditor(null);
 		setIsEditMode(false);
 	};
 
@@ -1289,10 +1372,8 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 
 		return (
 			activeChapterDetail.title === revision.chapter.title &&
-			normalizeStoredMarkdown(activeChapterDetail.content ?? "") ===
-				normalizeStoredMarkdown(revision.chapter.content) &&
-			JSON.stringify(activeChapterDetail.presentationSettings) ===
-				JSON.stringify(revision.chapter.presentationSettings)
+			normalizeStoredHtml(activeChapterDetail.html ?? "") ===
+				normalizeStoredHtml(revision.chapter.html)
 		);
 	};
 
@@ -1310,9 +1391,8 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 					activeChapter.chapterIndex,
 					{
 						title: revision.chapter.title,
-						content: revision.chapter.content,
-						presentationSettings:
-							revision.chapter.presentationSettings,
+						html: revision.chapter.html,
+						htmlHash: activeChapter.htmlHash,
 					},
 				),
 			{
@@ -1327,29 +1407,33 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	const sendReadingProgress = useCallback(
 		async (
 			chapter: DidacticUnitEditorChapter,
-			readCharacterCount: number,
+			visibleTextOffset: number,
 			lastVisitedPageIndex?: number,
 		): Promise<boolean> => {
 			if (
 				chapter.status !== "ready" ||
-				chapter.totalCharacterCount === 0
+				chapter.totalBlocks === 0
 			) {
 				return false;
 			}
 
-			const clampedReadCharacterCount = Math.max(
-				0,
-				Math.min(
-					chapter.totalCharacterCount,
-					Math.floor(readCharacterCount),
-				),
+			const nextBlockProgress = mapVisibleTextOffsetToBlockProgress(
+				chapter,
+				Math.max(0, Math.floor(visibleTextOffset)),
 			);
-			const nextReadCharacterCount = Math.max(
-				chapter.readCharacterCount,
-				clampedReadCharacterCount,
+			const nextReadBlockIndex = Math.max(
+				chapter.readBlockIndex,
+				nextBlockProgress.readBlockIndex,
 			);
+			const nextReadBlockOffset =
+				nextReadBlockIndex === nextBlockProgress.readBlockIndex ?
+					nextBlockProgress.readBlockOffset
+				:	chapter.readBlockOffset;
 			const didReadAdvance =
-				nextReadCharacterCount > chapter.readCharacterCount;
+				nextReadBlockIndex > chapter.readBlockIndex ||
+				(nextReadBlockIndex === chapter.readBlockIndex &&
+					(nextReadBlockOffset ?? 0) >
+						(chapter.readBlockOffset ?? 0));
 			const didVisitPage =
 				lastVisitedPageIndex !== undefined &&
 				lastVisitedPageIndex !== chapter.lastVisitedPageIndex;
@@ -1360,8 +1444,10 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 
 			const payloadKey = [
 				chapter.chapterIndex,
-				chapter.totalCharacterCount,
-				nextReadCharacterCount,
+				chapter.htmlBlocksVersion,
+				chapter.totalBlocks,
+				nextReadBlockIndex,
+				nextReadBlockOffset ?? "",
 				lastVisitedPageIndex ?? "",
 			].join(":");
 
@@ -1373,8 +1459,10 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 
 			applyReadingProgressLocally({
 				chapterIndex: chapter.chapterIndex,
-				readCharacterCount: nextReadCharacterCount,
-				totalCharacterCount: chapter.totalCharacterCount,
+				readBlockIndex: nextReadBlockIndex,
+				readBlockOffset: nextReadBlockOffset,
+				readBlocksVersion: chapter.htmlBlocksVersion,
+				totalBlocks: chapter.totalBlocks,
 				lastVisitedPageIndex,
 			});
 
@@ -1386,7 +1474,12 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 					await dashboardApi.updateDidacticUnitReadingProgress(
 						didacticUnitId,
 						chapter.chapterIndex,
-						nextReadCharacterCount,
+						{
+							readBlockIndex: nextReadBlockIndex,
+							...(nextReadBlockOffset !== undefined ?
+								{readBlockOffset: nextReadBlockOffset}
+							: 	{}),
+						},
 						lastVisitedPageIndex,
 					);
 
@@ -1439,7 +1532,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		void (async () => {
 			const didPersist = await sendReadingProgress(
 				pendingSave.chapter,
-				pendingSave.readCharacterCount,
+				pendingSave.visibleTextOffset,
 				pendingSave.lastVisitedPageIndex,
 			);
 			pendingSave.resolve(didPersist);
@@ -1451,29 +1544,33 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	const persistReadProgress = useCallback(
 		(
 			chapter: DidacticUnitEditorChapter,
-			readCharacterCount: number,
+			visibleTextOffset: number,
 			lastVisitedPageIndex?: number,
 		): Promise<boolean> => {
 			if (
 				chapter.status !== "ready" ||
-				chapter.totalCharacterCount === 0
+				chapter.totalBlocks === 0
 			) {
 				return Promise.resolve(false);
 			}
 
-			const clampedReadCharacterCount = Math.max(
-				0,
-				Math.min(
-					chapter.totalCharacterCount,
-					Math.floor(readCharacterCount),
-				),
+			const nextBlockProgress = mapVisibleTextOffsetToBlockProgress(
+				chapter,
+				Math.max(0, Math.floor(visibleTextOffset)),
 			);
-			const nextReadCharacterCount = Math.max(
-				chapter.readCharacterCount,
-				clampedReadCharacterCount,
+			const nextReadBlockIndex = Math.max(
+				chapter.readBlockIndex,
+				nextBlockProgress.readBlockIndex,
 			);
+			const nextReadBlockOffset =
+				nextReadBlockIndex === nextBlockProgress.readBlockIndex ?
+					nextBlockProgress.readBlockOffset
+				:	chapter.readBlockOffset;
 			const didReadAdvance =
-				nextReadCharacterCount > chapter.readCharacterCount;
+				nextReadBlockIndex > chapter.readBlockIndex ||
+				(nextReadBlockIndex === chapter.readBlockIndex &&
+					(nextReadBlockOffset ?? 0) >
+						(chapter.readBlockOffset ?? 0));
 			const didVisitPage =
 				lastVisitedPageIndex !== undefined &&
 				lastVisitedPageIndex !== chapter.lastVisitedPageIndex;
@@ -1484,8 +1581,10 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 
 			applyReadingProgressLocally({
 				chapterIndex: chapter.chapterIndex,
-				readCharacterCount: nextReadCharacterCount,
-				totalCharacterCount: chapter.totalCharacterCount,
+				readBlockIndex: nextReadBlockIndex,
+				readBlockOffset: nextReadBlockOffset,
+				readBlocksVersion: chapter.htmlBlocksVersion,
+				totalBlocks: chapter.totalBlocks,
 				lastVisitedPageIndex,
 			});
 
@@ -1496,7 +1595,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 
 				pendingReadingProgressSaveRef.current = {
 					chapter,
-					readCharacterCount: nextReadCharacterCount,
+					visibleTextOffset,
 					lastVisitedPageIndex,
 					resolve,
 				};
@@ -1515,7 +1614,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 
 		const didPersist = await persistReadProgress(
 			activeChapter,
-			activeChapter.totalCharacterCount,
+			activeChapter.htmlBlocks.at(-1)?.textEndOffset ?? 0,
 			Math.max(0, measuredReadPages.length - 1),
 		);
 
@@ -1569,14 +1668,14 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				0,
 				Math.min(nextSpread * 2 + 1, measuredReadPages.length - 1),
 			);
-			const readCharacterCount = getReadCharacterCountForSpread(
+			const visibleTextOffset = getReadTextOffsetForSpread(
 				measuredReadPages,
 				nextSpread,
 			);
 
 			void persistReadProgress(
 				activeChapter,
-				readCharacterCount,
+				visibleTextOffset,
 				lastVisitedPageIndex,
 			);
 		},
@@ -1711,7 +1810,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				currentDraft ?
 					{
 						...currentDraft,
-						contentMarkdown: normalizeMarkdownForStorage(
+						htmlDraft: normalizeHtmlForStorage(
 							nextPages
 								.filter((page) => page.trim().length > 0)
 								.join("\n\n"),
@@ -1813,33 +1912,43 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 								"overflow-hidden"
 							),
 						)}
+						style={resolvedThemeVars}
 					>
-						<LexicalMarkdownEditor
-							key={`content-${didacticUnitId}-${activeChapter.chapterIndex}-${pageIndex}-${editable ? "edit" : "read"}`}
-							contentClassName={cn(
-								"leading-[1.9] text-[#1D1D1F] outline-none",
-								extraContent ?
-									"min-h-0 w-full shrink-0 overflow-visible pb-1"
-								:	"h-full min-h-full overflow-hidden",
-							)}
-							baseTextStyle={draft.presentationSettings}
-							editable={editable}
-							editorId={`content-${didacticUnitId}-${activeChapter.chapterIndex}-${pageIndex}-${editable ? "edit" : "read"}`}
-							initialMarkdown={markdown ?? ""}
-							onFocusEditor={
-								editable ? setActiveLexicalEditor : undefined
-							}
-							onMarkdownChange={
-								editable ?
-									(nextMarkdown) =>
-										updatePaginatedContentPage(
-											pageIndex,
-											nextMarkdown,
-										)
-								:	undefined
-							}
-							placeholder="Write the module content here..."
-						/>
+						{editable ?
+							<TiptapHtmlEditor
+								key={`content-${didacticUnitId}-${activeChapter.chapterIndex}-${pageIndex}-edit`}
+								contentClassName={cn(
+									"leading-[1.9] text-[#1D1D1F] outline-none",
+									extraContent ?
+										"min-h-0 w-full shrink-0 overflow-visible pb-1"
+									:	"h-full min-h-full overflow-hidden",
+								)}
+								baseTextStyle={draft.textStyle}
+								editable
+								editorId={`content-${didacticUnitId}-${activeChapter.chapterIndex}-${pageIndex}-edit`}
+								initialHtml={markdown ?? ""}
+								onFocusEditor={setActiveHtmlEditor}
+								onHtmlChange={(nextMarkdown) =>
+									updatePaginatedContentPage(
+										pageIndex,
+										nextMarkdown,
+									)
+								}
+								placeholder="Write the module content here..."
+							/>
+						:	<ChapterRenderer
+								html={markdown ?? ""}
+								className={cn(
+									"unit-page-scope leading-[1.9] text-[#1D1D1F]",
+									extraContent ?
+										"min-h-0 w-full shrink-0 overflow-visible pb-1"
+									:	"h-full min-h-full overflow-hidden",
+								)}
+								style={resolvedThemeVars}
+								animateBlocks={isActiveChapterStreaming}
+								animationSeed={`${didacticUnitId}-${activeChapter.chapterIndex}-${pageIndex}`}
+							/>
+						}
 						{extraContent ?
 							<div className="mt-5 shrink-0">{extraContent}</div>
 						:	null}
@@ -1927,30 +2036,40 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 						"relative flex min-h-0 flex-1 flex-col",
 						extraContent ? "overflow-y-auto" : "overflow-hidden",
 					)}
+					style={resolvedThemeVars}
 				>
-					<LexicalMarkdownEditor
-						key={`content-${didacticUnitId}-${activeChapter.chapterIndex}-0-${editable ? "edit" : "read"}`}
-						contentClassName={cn(
-							"leading-[1.9] text-[#1D1D1F] outline-none",
-							extraContent ?
-								"min-h-0 w-full shrink-0 overflow-visible pb-1"
-							:	"h-full min-h-full overflow-hidden",
-						)}
-						baseTextStyle={draft.presentationSettings}
-						editable={editable}
-						editorId={`content-${didacticUnitId}-${activeChapter.chapterIndex}-0-${editable ? "edit" : "read"}`}
-						initialMarkdown={markdown ?? ""}
-						onFocusEditor={
-							editable ? setActiveLexicalEditor : undefined
-						}
-						onMarkdownChange={
-							editable ?
-								(nextMarkdown) =>
-									updatePaginatedContentPage(0, nextMarkdown)
-							:	undefined
-						}
-						placeholder="Write the module content here..."
-					/>
+					{editable ?
+						<TiptapHtmlEditor
+							key={`content-${didacticUnitId}-${activeChapter.chapterIndex}-0-edit`}
+							contentClassName={cn(
+								"leading-[1.9] text-[#1D1D1F] outline-none",
+								extraContent ?
+									"min-h-0 w-full shrink-0 overflow-visible pb-1"
+								:	"h-full min-h-full overflow-hidden",
+							)}
+							baseTextStyle={draft.textStyle}
+							editable
+							editorId={`content-${didacticUnitId}-${activeChapter.chapterIndex}-0-edit`}
+							initialHtml={markdown ?? ""}
+							onFocusEditor={setActiveHtmlEditor}
+							onHtmlChange={(nextMarkdown) =>
+								updatePaginatedContentPage(0, nextMarkdown)
+							}
+							placeholder="Write the module content here..."
+						/>
+					:	<ChapterRenderer
+							html={markdown ?? ""}
+							className={cn(
+								"unit-page-scope leading-[1.9] text-[#1D1D1F]",
+								extraContent ?
+									"min-h-0 w-full shrink-0 overflow-visible pb-1"
+								:	"h-full min-h-full overflow-hidden",
+							)}
+							style={resolvedThemeVars}
+							animateBlocks={isActiveChapterStreaming}
+							animationSeed={`${didacticUnitId}-${activeChapter.chapterIndex}-first`}
+						/>
+					}
 					{extraContent ?
 						<div className="mt-5 shrink-0">{extraContent}</div>
 					:	null}
@@ -2022,7 +2141,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 
 	const editorToolbarCompact = spreadMetrics.spreadWidth < 920;
 
-	const renderLexicalSpread = (editable: boolean) => (
+	const renderEditorSpread = (editable: boolean) => (
 		<>
 			<div
 				className="relative flex items-center justify-center"
@@ -2049,7 +2168,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 								})
 							: (
 								leftReadPage &&
-								isMeasuredPageWithMarkdown(leftReadPage)
+								isMeasuredContentPage(leftReadPage)
 							) ?
 								renderFirstPage({
 									editable: false,
@@ -2156,17 +2275,42 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 							>
 								<ChapterStyleMenu
 									compact={editorToolbarCompact}
-									value={draft.presentationSettings}
-									onChange={(presentationSettings) =>
+									value={draft.textStyle}
+									onChange={(textStyle) => {
 										setDraft((previous) =>
 											previous ?
 												{
 													...previous,
-													presentationSettings,
+													textStyle,
 												}
 											:	previous,
-										)
-									}
+										);
+										const presentationTheme =
+											themeFromTextStyle(
+												resolvedTheme,
+												textStyle,
+											);
+										setWorkspace((previous) =>
+											previous ?
+												{
+													...previous,
+													presentationTheme,
+												}
+											:	previous,
+										);
+										void dashboardApi
+											.updateDidacticUnitTheme(
+												didacticUnitId,
+												presentationTheme,
+											)
+											.catch((error) => {
+												toastError(
+														error instanceof Error ?
+															error.message
+														:	"Could not update the unit style.",
+												);
+											});
+									}}
 								/>
 								<div
 									className={cn(
@@ -2176,8 +2320,8 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 										),
 									)}
 								/>
-								<LexicalToolbar
-									activeEditor={activeLexicalEditor}
+								<EditorToolbar
+									activeEditor={activeHtmlEditor}
 									compact={editorToolbarCompact}
 								/>
 							</Motion.div>
@@ -2561,7 +2705,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 						activeChapter.status === "ready" ||
 						isActiveChapterStreaming
 					) ?
-						renderLexicalSpread(isEditMode)
+						renderEditorSpread(isEditMode)
 					:	<>
 							{isPendingChapter ?
 								<div className="flex flex-col items-center justify-center space-y-6 text-center">

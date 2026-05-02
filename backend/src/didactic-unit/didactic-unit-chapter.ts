@@ -1,16 +1,34 @@
 import {randomUUID} from "node:crypto";
+import {computeHtmlHash} from "../html/hash.js";
+import {sanitizeChapterHtml} from "../html/sanitize.js";
+import {
+	HTML_BLOCKS_VERSION,
+	extractHtmlBlocks,
+} from "../html/extractBlocks.js";
 
-export interface DidacticUnitChapterPresentationSettings {
-	paragraphFontFamily: "sans" | "serif" | "mono";
-	paragraphFontSize: "14px" | "16px" | "18px" | "20px";
-	paragraphAlign: "left" | "center" | "right" | "justify";
+export interface HtmlContentBlock {
+	id: string;
+	type:
+		| "heading"
+		| "paragraph"
+		| "blockquote"
+		| "list"
+		| "table"
+		| "code"
+		| "divider";
+	html: string;
+	textLength: number;
+	textStartOffset: number;
+	textEndOffset: number;
 }
 
 export interface DidacticUnitGeneratedChapter {
 	chapterIndex: number;
 	title: string;
-	markdown: string;
-	presentationSettings?: DidacticUnitChapterPresentationSettings;
+	html: string;
+	htmlHash: string;
+	htmlBlocks: HtmlContentBlock[];
+	htmlBlocksVersion: number;
 	generatedAt: string;
 	updatedAt?: string;
 }
@@ -36,30 +54,8 @@ export interface DidacticUnitChapterRevision {
 export interface UpdateDidacticUnitChapterInput {
 	chapter: {
 		title: string;
-		content: string;
-		presentationSettings?: DidacticUnitChapterPresentationSettings;
-	};
-}
-
-export function createDefaultDidacticUnitChapterPresentationSettings(): DidacticUnitChapterPresentationSettings {
-	return {
-		paragraphFontFamily: "sans",
-		paragraphFontSize: "16px",
-		paragraphAlign: "left",
-	};
-}
-
-export function resolveDidacticUnitChapterPresentationSettings(
-	settings?: Partial<DidacticUnitChapterPresentationSettings> | null,
-): DidacticUnitChapterPresentationSettings {
-	const defaults = createDefaultDidacticUnitChapterPresentationSettings();
-
-	return {
-		paragraphFontFamily:
-			settings?.paragraphFontFamily ?? defaults.paragraphFontFamily,
-		paragraphFontSize:
-			settings?.paragraphFontSize ?? defaults.paragraphFontSize,
-		paragraphAlign: settings?.paragraphAlign ?? defaults.paragraphAlign,
+		html: string;
+		htmlHash?: string;
 	};
 }
 
@@ -73,57 +69,32 @@ function parseNonEmptyString(value: unknown, fieldName: string): string {
 	return parsedValue;
 }
 
-function parsePresentationSettings(
-	value: unknown,
-	fieldName: string,
-): DidacticUnitChapterPresentationSettings | undefined {
-	if (value === undefined) {
-		return undefined;
+export function createCanonicalDidacticUnitChapter(input: {
+	chapterIndex: number;
+	title: string;
+	rawHtml: string;
+	generatedAt?: string;
+	updatedAt?: string;
+	chapterId?: string;
+}): DidacticUnitGeneratedChapter {
+	const sanitized = sanitizeChapterHtml(input.rawHtml);
+
+	if (sanitized.isEmpty) {
+		throw new Error("Generated chapter HTML is empty after sanitization.");
 	}
 
-	if (!value || typeof value !== "object") {
-		throw new Error(`${fieldName} must be a JSON object.`);
-	}
-
-	const settings = value as Record<string, unknown>;
-	const paragraphFontFamily = parseNonEmptyString(
-		settings.paragraphFontFamily,
-		`${fieldName}.paragraphFontFamily`,
-	);
-	const paragraphFontSize = parseNonEmptyString(
-		settings.paragraphFontSize,
-		`${fieldName}.paragraphFontSize`,
-	);
-	const paragraphAlign = parseNonEmptyString(
-		settings.paragraphAlign,
-		`${fieldName}.paragraphAlign`,
-	);
-
-	if (!["sans", "serif", "mono"].includes(paragraphFontFamily)) {
-		throw new Error(
-			`${fieldName}.paragraphFontFamily must be one of: sans, serif, mono.`,
-		);
-	}
-
-	if (!["14px", "16px", "18px", "20px"].includes(paragraphFontSize)) {
-		throw new Error(
-			`${fieldName}.paragraphFontSize must be one of: 14px, 16px, 18px, 20px.`,
-		);
-	}
-
-	if (!["left", "center", "right", "justify"].includes(paragraphAlign)) {
-		throw new Error(
-			`${fieldName}.paragraphAlign must be one of: left, center, right, justify.`,
-		);
-	}
+	const chapterId = input.chapterId ?? `${input.chapterIndex}`;
+	const htmlBlocks = extractHtmlBlocks(sanitized.html, chapterId);
 
 	return {
-		paragraphFontFamily:
-			paragraphFontFamily as DidacticUnitChapterPresentationSettings["paragraphFontFamily"],
-		paragraphFontSize:
-			paragraphFontSize as DidacticUnitChapterPresentationSettings["paragraphFontSize"],
-		paragraphAlign:
-			paragraphAlign as DidacticUnitChapterPresentationSettings["paragraphAlign"],
+		chapterIndex: input.chapterIndex,
+		title: input.title.trim(),
+		html: sanitized.html,
+		htmlHash: computeHtmlHash(sanitized.html),
+		htmlBlocks,
+		htmlBlocksVersion: HTML_BLOCKS_VERSION,
+		generatedAt: input.generatedAt ?? new Date().toISOString(),
+		updatedAt: input.updatedAt,
 	};
 }
 
@@ -142,21 +113,18 @@ export function parseUpdateDidacticUnitChapterInput(
 
 	const chapterPayload = payload.chapter as {
 		title?: unknown;
-		content?: unknown;
+		html?: unknown;
+		htmlHash?: unknown;
 	};
 
 	return {
 		chapter: {
 			title: parseNonEmptyString(chapterPayload.title, "chapter.title"),
-			content: parseNonEmptyString(
-				chapterPayload.content,
-				"chapter.content",
-			),
-			presentationSettings: parsePresentationSettings(
-				(chapterPayload as {presentationSettings?: unknown})
-					.presentationSettings,
-				"chapter.presentationSettings",
-			),
+			html: parseNonEmptyString(chapterPayload.html, "chapter.html"),
+			htmlHash:
+				typeof chapterPayload.htmlHash === "string" ?
+					chapterPayload.htmlHash.trim()
+				:	undefined,
 		},
 	};
 }
@@ -170,13 +138,7 @@ export function createDidacticUnitChapterRevision(input: {
 		id: randomUUID(),
 		chapterIndex: input.chapterIndex,
 		source: input.source,
-		chapter: {
-			...input.chapter,
-			presentationSettings:
-				resolveDidacticUnitChapterPresentationSettings(
-					input.chapter.presentationSettings,
-				),
-		},
+		chapter: {...input.chapter},
 		createdAt: input.chapter.updatedAt ?? input.chapter.generatedAt,
 	};
 }

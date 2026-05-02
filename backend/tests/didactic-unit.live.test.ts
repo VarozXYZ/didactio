@@ -110,16 +110,18 @@ describe("live AI didactic-unit generation", () => {
 				status: "syllabus_approved",
 			});
 
-			const chapterResponse = await request(app)
-				.post(`/api/didactic-unit/${created.id}/chapters/0/generate`)
+			const chapterRunResponse = await request(app)
+				.post(`/api/didactic-unit/${created.id}/modules/0/generate-run`)
 				.send({});
 
-			expect(chapterResponse.status).toBe(200);
-			expect(chapterResponse.body).toMatchObject({
-				id: created.id,
-				provider: configuredTier.provider,
-				status: "content_generation_in_progress",
-			});
+			expect(chapterRunResponse.status).toBe(202);
+
+			const chapterStreamResponse = await request(app)
+				.get(`/api/generation-runs/${chapterRunResponse.body.runId}/stream`)
+				.send({});
+
+			expect(chapterStreamResponse.status).toBe(200);
+			parseStreamComplete(chapterStreamResponse.text);
 
 			const generatedChapterResponse = await request(app).get(
 				`/api/didactic-unit/${created.id}/chapters/0`,
@@ -131,11 +133,13 @@ describe("live AI didactic-unit generation", () => {
 				state: "ready",
 				isCompleted: false,
 			});
-			expect(typeof generatedChapterResponse.body.content).toBe("string");
+			expect(typeof generatedChapterResponse.body.html).toBe("string");
 			expect(
-				generatedChapterResponse.body.content.length,
+				generatedChapterResponse.body.html.length,
 			).toBeGreaterThan(100);
-			expect(typeof generatedChapterResponse.body.content).toBe("string");
+			expect(generatedChapterResponse.body.htmlBlocks.length).toBeGreaterThan(
+				0,
+			);
 			expect(
 				generatedChapterResponse.body.planningOverview.length,
 			).toBeGreaterThan(0);

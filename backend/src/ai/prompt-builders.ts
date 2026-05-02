@@ -229,7 +229,7 @@ export function buildGatewaySystemPrompt(
 		case "summary":
 			return "You write concise internal continuity summaries or learner-facing recaps depending on the prompt.";
 		case "chapter":
-			return "You are an expert curriculum designer and instructional design specialist. Return only markdown educational content.";
+			return "You are an expert curriculum designer and instructional design specialist. Return only sanitized-HTML-compatible educational content.";
 	}
 }
 
@@ -423,7 +423,7 @@ export function buildSyllabusMarkdownPrompt(input: {
 	].join("\n\n");
 }
 
-export function buildChapterMarkdownPrompt(input: {
+export function buildChapterHtmlPrompt(input: {
 	topic: string;
 	level: DidacticUnitLevel;
 	syllabus: DidacticUnitReferenceSyllabus;
@@ -439,7 +439,7 @@ export function buildChapterMarkdownPrompt(input: {
 	const module = input.syllabus.modules[input.chapterIndex];
 	const previousBridge =
 		input.chapterIndex > 0 ?
-			`Begin with a short bridge from the previous module, ${input.syllabus.modules[input.chapterIndex - 1]?.title ?? "the previous module"}.`
+			`Use this previous-module continuity context naturally, without adding a fixed bridge heading: ${input.continuitySummaries?.[input.chapterIndex - 1] ?? input.syllabus.modules[input.chapterIndex - 1]?.overview ?? "the previous module"}.`
 		:	"This is the first module, so begin by orienting the learner clearly.";
 
 	return [
@@ -508,48 +508,28 @@ export function buildChapterMarkdownPrompt(input: {
 			"3. A contrastive analysis showing ineffective vs effective approaches",
 			"4. Common mistakes or pitfalls",
 			"5. A short, meaningful activity or reflection task",
-			'6. A final "Why it works" section explaining the underlying principles',
-			"7. One short knowledge check quiz with 3 questions for the module",
-			'8. A short "Meta-connection" section explaining how these skills prepare for the next module',
+			"6. A final paragraph that concisely recaps the chapter and works as context for the next chapter.",
 			'Do not use generic headings like "Concept Explanation" or "Practical Example" repeatedly. Use topic-specific headings.',
 			input.instruction ?
 				`Regeneration instruction from the user: ${input.instruction}`
 			:	"",
 		]),
 		buildSection("Output Contract", [
-			"Return ONLY markdown educational content.",
-			"Do not include the module title as a top-level heading because the UI already presents it separately.",
+			"Return ONLY HTML. Do not include JSON, Markdown, code fences, or commentary outside the HTML.",
+			"Allowed block tags: h2, h3, h4, p, ul, ol, li, blockquote, pre, code, table, thead, tbody, tr, th, td, hr, br.",
+			"Allowed inline tags: strong, em, u, code, a, sub, sup, mark.",
+			"Use only h2, h3, and h4 for headings. Do not output h1, h5, or h6.",
+			"Do not include the module title as a heading because the UI already presents it separately.",
 			"Do not include a standalone overview section at the beginning.",
 			"Start directly with the instructional body.",
-			"Do not include JSON, code fences, or commentary outside markdown.",
-			"Use natural, topic-specific markdown headings throughout the module body.",
-			"Use markdown heading syntax for subsection labels (for example, #### A useful subheading); do not use standalone bold lines as headings.",
-			"Place blank lines between headings, paragraphs, and lists so each block renders separately.",
+			"Every text run must be inside a valid block element such as p, li, blockquote, th, or td.",
+			"Do not use div, section, article, span, img, style, script, iframe, form, details, summary, data attributes, or on* event handlers.",
+			"Do not use inline style attributes. Do not use class attributes except language-* on code.",
+			"Code blocks must use <pre><code class=\"language-X\">...</code></pre>.",
+			"Links may use href and title only. Use http, https, mailto, or #anchor hrefs.",
+			"Use sentence case for headings.",
+			"The final top-level <p> must be a concise recap or conclusion for continuity.",
 		]),
-	].join("\n\n");
-}
-
-export function buildContinuitySummaryPrompt(input: {
-	topic: string;
-	chapterTitle: string;
-	chapterMarkdown: string;
-	authoring: AuthoringConfig;
-}): string {
-	return [
-		buildSection("Role / Contract", [
-			"Analyze the content and extract a concise, schematic list of key concepts, definitions, and techniques covered.",
-			"Return a markdown bullet list with at most 10 items.",
-			"Do not use full paragraphs. Focus on what was explicitly taught.",
-		]),
-		buildSection(
-			"Authoring Profile",
-			buildAuthoringContext(input.authoring),
-		),
-		buildSection("Current Artifact Target", [
-			`Topic: ${input.topic}`,
-			`Module title: ${input.chapterTitle}`,
-		]),
-		buildSection("Source Markdown", [input.chapterMarkdown]),
 	].join("\n\n");
 }
 

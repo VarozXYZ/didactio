@@ -63,26 +63,12 @@ describe("didactic-unit API errors", () => {
 		});
 	});
 
-	it("returns 404 when a module regeneration is requested before any generation exists", async () => {
-		const app = createTestApp();
-		const approved = await createApprovedDidacticUnit(app);
-
-		const response = await request(app)
-			.post(`/api/didactic-unit/${approved.id}/chapters/0/regenerate`)
-			.send({});
-
-		expect(response.status).toBe(404);
-		expect(response.body).toEqual({
-			error: "Generated didactic unit module not found.",
-		});
-	});
-
 	it("returns 400 when the requested module index is outside the approved syllabus", async () => {
 		const app = createTestApp();
 		const approved = await createApprovedDidacticUnit(app);
 
 		const response = await request(app)
-			.post(`/api/didactic-unit/${approved.id}/chapters/99/generate`)
+			.post(`/api/didactic-unit/${approved.id}/modules/99/generate-run`)
 			.send({});
 
 		expect(response.status).toBe(400);

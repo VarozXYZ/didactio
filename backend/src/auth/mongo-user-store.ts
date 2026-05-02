@@ -8,6 +8,10 @@ import type {
 	UserRole,
 	UserStore,
 } from "./core/types.js";
+import {
+	SYSTEM_DEFAULT_THEME,
+	type PresentationTheme,
+} from "../presentation-theme/types.js";
 
 type AuthUserDocument = AuthUser & Document;
 
@@ -84,6 +88,8 @@ export class MongoUserStore implements UserStore {
 				pictureUrl: profile.pictureUrl,
 				locale: profile.locale,
 				role,
+				defaultPresentationTheme:
+					existing.defaultPresentationTheme ?? SYSTEM_DEFAULT_THEME,
 				updatedAt: now,
 				lastLoginAt: now,
 			};
@@ -106,6 +112,7 @@ export class MongoUserStore implements UserStore {
 			role,
 			status: "active",
 			credits: createEmptyCredits(),
+			defaultPresentationTheme: SYSTEM_DEFAULT_THEME,
 			createdAt: now,
 			updatedAt: now,
 			lastLoginAt: now,
@@ -170,6 +177,24 @@ export class MongoUserStore implements UserStore {
 		);
 
 		return stripMongoId(result) ?? this.findById(id);
+	}
+
+	async updateDefaultPresentationTheme(
+		id: string,
+		theme: PresentationTheme,
+	): Promise<AuthUser | null> {
+		const result = await this.collection.findOneAndUpdate(
+			{id},
+			{
+				$set: {
+					defaultPresentationTheme: theme,
+					updatedAt: new Date(),
+				},
+			},
+			{returnDocument: "after"},
+		);
+
+		return stripMongoId(result);
 	}
 
 	async applyCreditDelta(input: {

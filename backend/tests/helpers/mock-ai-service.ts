@@ -14,6 +14,7 @@ import {
 	buildQuestionnaireForDidacticUnit,
 	type DidacticUnitQuestionAnswer,
 } from "../../src/didactic-unit/planning.js";
+import {createCanonicalDidacticUnitChapter} from "../../src/didactic-unit/didactic-unit-chapter.js";
 import {resolveTargetChapterCount} from "../../src/ai/prompt-builders.js";
 
 function findAnswerValue(
@@ -72,7 +73,7 @@ function referenceSyllabusForLength(
 	};
 }
 
-function chapterMarkdown(input: {
+function chapterHtml(input: {
 	topic: string;
 	chapterTitle: string;
 	chapterOverview: string;
@@ -81,14 +82,14 @@ function chapterMarkdown(input: {
 	const learningGoal = findAnswerValue(input.answers, "learning_goal");
 
 	return [
-		"## Core Ideas",
-		`This module explores ${input.chapterTitle} in the context of ${input.topic}.`,
-		`It keeps the learner goal in view: ${learningGoal}.`,
-		"Use the concepts, examples, and checkpoints to build confidence progressively.",
-		"## Practice in context",
-		`Work through a realistic example related to ${input.chapterOverview.toLowerCase()}.`,
-		"## Why it works",
-		"Connect each step back to the underlying principles so the learner can transfer the skill.",
+		"<h2>Core ideas</h2>",
+		`<p>This module explores ${input.chapterTitle} in the context of ${input.topic}.</p>`,
+		`<p>It keeps the learner goal in view: ${learningGoal}.</p>`,
+		"<p>Use the concepts, examples, and checkpoints to build confidence progressively.</p>",
+		"<h2>Practice in context</h2>",
+		`<p>Work through a realistic example related to ${input.chapterOverview.toLowerCase()}.</p>`,
+		"<h2>Why it works</h2>",
+		"<p>Connect each step back to the underlying principles so the learner can transfer the skill.</p>",
 	].join("\n");
 }
 
@@ -311,7 +312,7 @@ export function createMockAiService(): AiService {
 			return result;
 		},
 		async generateChapter(input): Promise<ChapterResult> {
-			const markdown = chapterMarkdown({
+			const html = chapterHtml({
 				topic: input.topic,
 				chapterTitle: input.syllabus.modules[input.chapterIndex].title,
 				chapterOverview:
@@ -319,21 +320,22 @@ export function createMockAiService(): AiService {
 				answers: input.questionnaireAnswers,
 			});
 			const chapter = input.syllabus.modules[input.chapterIndex];
+			const generatedChapter = createCanonicalDidacticUnitChapter({
+				chapterIndex: input.chapterIndex,
+				chapterId: `${input.topic}:${input.chapterIndex}`,
+				title: chapter.title,
+				rawHtml: html,
+			});
 
 			return {
 				provider,
 				model,
 				prompt: `Chapter ${chapter.title}`,
 				telemetry,
-				markdown,
+				html: generatedChapter.html,
 				continuitySummary:
 					"- Concepts introduced\n- Workflow explained\n- Safe to assume the learner knows the basics",
-				chapter: {
-					chapterIndex: input.chapterIndex,
-					title: chapter.title,
-					markdown,
-					generatedAt: new Date().toISOString(),
-				},
+				chapter: generatedChapter,
 			};
 		},
 		async streamChapter(
@@ -346,7 +348,7 @@ export function createMockAiService(): AiService {
 				modelId: `${provider}/${model}`,
 			});
 			const result = await this.generateChapter(input);
-			await callbacks.onMarkdown?.(result.markdown, result.markdown);
+			await callbacks.onHtml?.(result.html, result.html);
 			await callbacks.onComplete?.(result);
 			return result;
 		},
