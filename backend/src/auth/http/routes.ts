@@ -265,6 +265,48 @@ export function createAuthRouter(
 		},
 	);
 
+	router.patch(
+		"/me/profile",
+		requireAuth,
+		async (request, response, next) => {
+			try {
+				if (!request.auth) {
+					throw new AuthError("unauthenticated", 401, "Authentication required.");
+				}
+
+				const body = request.body as {displayName?: unknown};
+				if (typeof body.displayName !== "string" || !body.displayName.trim()) {
+					return response.status(400).json({error: "displayName must be a non-empty string."});
+				}
+
+				const user = await authService.updateDisplayName(
+					request.auth.sub,
+					body.displayName,
+				);
+				response.status(200).json({user: authService.toPublicUser(user)});
+			} catch (error) {
+				next(error);
+			}
+		},
+	);
+
+	router.patch(
+		"/me/onboarding-complete",
+		requireAuth,
+		async (request, response, next) => {
+			try {
+				if (!request.auth) {
+					throw new AuthError("unauthenticated", 401, "Authentication required.");
+				}
+
+				const user = await authService.completeOnboarding(request.auth.sub);
+				response.status(200).json({user: authService.toPublicUser(user)});
+			} catch (error) {
+				next(error);
+			}
+		},
+	);
+
 	router.use(authErrorHandler);
 	return router;
 }

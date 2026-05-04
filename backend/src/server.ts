@@ -4,6 +4,7 @@ import {MongoCreditTransactionStore} from "./auth/mongo-credit-transaction-store
 import {MongoSessionStore} from "./auth/mongo-session-store.js";
 import {MongoUserStore} from "./auth/mongo-user-store.js";
 import {createApp} from "./app.js";
+import {MongoAiConfigStore} from "./ai/config.js";
 import {MongoDidacticUnitStore} from "./didactic-unit/mongo-didactic-unit-store.js";
 import {MongoFolderStore} from "./folders/mongo-folder-store.js";
 import {MongoGenerationRunStore} from "./generation-runs/mongo-generation-run-store.js";
@@ -31,10 +32,12 @@ const sessionStore = new MongoSessionStore(mongoConnection.database);
 const creditTransactionStore = new MongoCreditTransactionStore(
 	mongoConnection.database,
 );
+const aiConfigStore = new MongoAiConfigStore(mongoConnection.database);
 const app = createApp({
 	didacticUnitStore,
 	generationRunStore,
 	folderStore,
+	aiConfigStore,
 	authConfig,
 	userStore,
 	sessionStore,

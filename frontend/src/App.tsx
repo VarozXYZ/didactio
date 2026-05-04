@@ -9,6 +9,7 @@ import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import DashboardPage from "./pages/DashboardPage";
 import AuthCallbackPage from "./pages/AuthCallbackPage";
+import OnboardingPage from "./pages/OnboardingPage";
 
 function App() {
 	const location = useLocation();
@@ -18,7 +19,8 @@ function App() {
 		location.pathname === "/auth/callback" ||
 		location.pathname === "/oauth/callback";
 	const isDashboardRoute = location.pathname.startsWith("/dashboard");
-	const hideMainChrome = isAuthRoute || isDashboardRoute;
+	const isOnboardingRoute = location.pathname.startsWith("/onboarding");
+	const hideMainChrome = isAuthRoute || isDashboardRoute || isOnboardingRoute;
 
 	return (
 		<div
@@ -40,6 +42,14 @@ function App() {
 					<Route path="/register" element={<RegisterPage />} />
 					<Route path="/auth/callback" element={<AuthCallbackPage />} />
 					<Route path="/oauth/callback" element={<AuthCallbackPage />} />
+					<Route
+						path="/onboarding"
+						element={
+							<RequireAuth skipOnboardingCheck>
+								<OnboardingPage />
+							</RequireAuth>
+						}
+					/>
 					<Route
 						path="/dashboard/*"
 						element={

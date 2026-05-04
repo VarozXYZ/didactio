@@ -28,6 +28,7 @@ export interface AuthUser {
 	credits: CreditBalances;
 	defaultPresentationTheme?: PresentationTheme;
 	launchGiftGrantedAt?: Date;
+	onboardingCompletedAt?: Date;
 	createdAt: Date;
 	updatedAt: Date;
 	lastLoginAt?: Date;
@@ -142,6 +143,7 @@ export interface PublicAuthUser {
 	credits: CreditBalances;
 	defaultPresentationTheme: PresentationTheme;
 	launchGiftGrantedAt?: string;
+	onboardingCompletedAt?: string;
 	lastLoginAt?: string;
 }
 
@@ -176,6 +178,8 @@ export interface UserStore {
 		delta: number;
 		requireSufficientBalance: boolean;
 	}): Promise<AuthUser | null>;
+	updateDisplayName(id: string, displayName: string): Promise<AuthUser | null>;
+	completeOnboarding(id: string, at: Date): Promise<AuthUser | null>;
 }
 
 export interface SessionStore {

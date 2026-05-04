@@ -197,6 +197,24 @@ export class MongoUserStore implements UserStore {
 		return stripMongoId(result);
 	}
 
+	async updateDisplayName(id: string, displayName: string): Promise<AuthUser | null> {
+		const result = await this.collection.findOneAndUpdate(
+			{id},
+			{$set: {displayName, updatedAt: new Date()}},
+			{returnDocument: "after"},
+		);
+		return stripMongoId(result);
+	}
+
+	async completeOnboarding(id: string, at: Date): Promise<AuthUser | null> {
+		const result = await this.collection.findOneAndUpdate(
+			{id},
+			{$set: {onboardingCompletedAt: at, updatedAt: at}},
+			{returnDocument: "after"},
+		);
+		return stripMongoId(result);
+	}
+
 	async applyCreditDelta(input: {
 		id: string;
 		coinType: keyof CreditBalances;

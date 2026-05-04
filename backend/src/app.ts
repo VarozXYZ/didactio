@@ -13,6 +13,7 @@ import {
 	InMemoryAiConfigStore,
 	parseAiConfigPatch,
 } from "./ai/config.js";
+import {MODEL_CATALOG} from "./ai/model-catalog.js";
 import {openNdjsonStream, writeNdjsonEvent} from "./ai/ndjson.js";
 import {
 	AiGatewayConfigurationError,
@@ -1040,6 +1041,10 @@ export function createApp(options: CreateAppOptions) {
 		response.json(
 			await aiConfigStore.get(requestWithMockOwner.mockOwner.id),
 		);
+	});
+
+	app.get("/api/ai-config/catalog", (_request, response) => {
+		response.json(MODEL_CATALOG);
 	});
 
 	app.patch("/api/ai-config", async (request, response) => {

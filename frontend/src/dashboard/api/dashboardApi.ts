@@ -47,6 +47,18 @@ export type BackendAiModelConfig = {
 	model: string;
 };
 
+export type BackendModelEntry = {
+	id: string;
+	label: string;
+	description: string;
+	recommended?: boolean;
+};
+
+export type BackendModelCatalog = {
+	silver: BackendModelEntry[];
+	gold: BackendModelEntry[];
+};
+
 export type BackendAuthoringConfig = {
 	language: string;
 	tone: "friendly" | "neutral" | "professional";
@@ -520,6 +532,9 @@ export const dashboardApi = {
 	},
 	getAiConfig() {
 		return requestJson<BackendAiConfig>("/api/ai-config");
+	},
+	getAiConfigCatalog() {
+		return requestJson<BackendModelCatalog>("/api/ai-config/catalog");
 	},
 	updateAiConfig(input: Partial<BackendAiConfig>) {
 		return requestJson<BackendAiConfig>("/api/ai-config", {

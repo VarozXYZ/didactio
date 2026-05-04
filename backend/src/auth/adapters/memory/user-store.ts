@@ -224,6 +224,36 @@ export class InMemoryUserStore implements UserStore {
 		return updated;
 	}
 
+	async updateDisplayName(id: string, displayName: string): Promise<AuthUser | null> {
+		const user = this.usersById.get(id);
+		if (!user) {
+			return null;
+		}
+
+		const updated: AuthUser = {
+			...user,
+			displayName,
+			updatedAt: new Date(),
+		};
+		this.usersById.set(id, updated);
+		return updated;
+	}
+
+	async completeOnboarding(id: string, at: Date): Promise<AuthUser | null> {
+		const user = this.usersById.get(id);
+		if (!user) {
+			return null;
+		}
+
+		const updated: AuthUser = {
+			...user,
+			onboardingCompletedAt: at,
+			updatedAt: at,
+		};
+		this.usersById.set(id, updated);
+		return updated;
+	}
+
 	private providerKey(provider: AuthProvider, providerUserId: string): string {
 		return `${provider}:${providerUserId}`;
 	}

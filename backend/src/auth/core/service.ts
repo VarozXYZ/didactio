@@ -400,6 +400,29 @@ export class AuthService {
 		return updatedUser;
 	}
 
+	async updateDisplayName(userId: string, displayName: string): Promise<AuthUser> {
+		const trimmed = displayName.trim();
+		if (!trimmed) {
+			throw new AuthError("invalid_display_name", 400, "Display name must not be empty.");
+		}
+
+		const updatedUser = await this.userStore.updateDisplayName(userId, trimmed);
+		if (!updatedUser) {
+			throw new AuthError("user_not_found", 404, "User not found.");
+		}
+
+		return updatedUser;
+	}
+
+	async completeOnboarding(userId: string): Promise<AuthUser> {
+		const updatedUser = await this.userStore.completeOnboarding(userId, new Date());
+		if (!updatedUser) {
+			throw new AuthError("user_not_found", 404, "User not found.");
+		}
+
+		return updatedUser;
+	}
+
 	toPublicUser(user: AuthUser): PublicAuthUser {
 		return {
 			id: user.id,
@@ -417,6 +440,7 @@ export class AuthService {
 			defaultPresentationTheme:
 				user.defaultPresentationTheme ?? SYSTEM_DEFAULT_THEME,
 			launchGiftGrantedAt: user.launchGiftGrantedAt?.toISOString(),
+			onboardingCompletedAt: user.onboardingCompletedAt?.toISOString(),
 			lastLoginAt: user.lastLoginAt?.toISOString(),
 		};
 	}

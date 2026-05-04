@@ -20,6 +20,7 @@ export type AuthUser = {
 	};
 	defaultPresentationTheme: PresentationTheme;
 	launchGiftGrantedAt?: string;
+	onboardingCompletedAt?: string;
 	lastLoginAt?: string;
 };
 
@@ -166,6 +167,35 @@ export const authClient = {
 		}
 
 		return (await response.json()) as {transactions: CreditTransaction[]};
+	},
+
+	async updateDisplayName(displayName: string) {
+		const response = await this.authorizedFetch("/auth/me/profile", {
+			method: "PATCH",
+			body: JSON.stringify({displayName}),
+		});
+		if (!response.ok) {
+			const {message} = await parseErrorBody(response);
+			throw new Error(message);
+		}
+
+		const payload = (await response.json()) as {user: AuthUser};
+		setSnapshot({status: "authenticated", user: payload.user, error: null});
+		return payload.user;
+	},
+
+	async completeOnboarding() {
+		const response = await this.authorizedFetch("/auth/me/onboarding-complete", {
+			method: "PATCH",
+		});
+		if (!response.ok) {
+			const {message} = await parseErrorBody(response);
+			throw new Error(message);
+		}
+
+		const payload = (await response.json()) as {user: AuthUser};
+		setSnapshot({status: "authenticated", user: payload.user, error: null});
+		return payload.user;
 	},
 
 	async updateDefaultPresentationTheme(defaultPresentationTheme: PresentationTheme) {

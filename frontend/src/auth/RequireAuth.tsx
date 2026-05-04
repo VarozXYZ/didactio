@@ -2,8 +2,8 @@ import {Navigate, useLocation} from "react-router-dom";
 import {useAuth} from "./AuthProvider";
 import type {PropsWithChildren} from "react";
 
-export function RequireAuth({children}: PropsWithChildren) {
-	const {status} = useAuth();
+export function RequireAuth({children, skipOnboardingCheck}: PropsWithChildren<{skipOnboardingCheck?: boolean}>) {
+	const {status, user} = useAuth();
 	const location = useLocation();
 
 	if (status === "loading") {
@@ -23,6 +23,10 @@ export function RequireAuth({children}: PropsWithChildren) {
 
 	if (status !== "authenticated") {
 		return <Navigate to="/login" replace state={{from: location}} />;
+	}
+
+	if (!skipOnboardingCheck && !user?.onboardingCompletedAt) {
+		return <Navigate to="/onboarding" replace />;
 	}
 
 	return children;

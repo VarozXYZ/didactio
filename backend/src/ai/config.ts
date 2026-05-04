@@ -1,3 +1,4 @@
+import type {Db} from "mongodb";
 import {getAppEnv} from "../config/env.js";
 
 export type AiModelTier = "silver" | "gold";
@@ -201,6 +202,57 @@ export class InMemoryAiConfigStore implements AiConfigStore {
 		};
 
 		this.configs.set(ownerId, next);
+		return next;
+	}
+}
+
+export class MongoAiConfigStore implements AiConfigStore {
+	private readonly users;
+
+	constructor(
+		database: Db,
+		private readonly defaults: AiConfig = getDefaultAiConfig(),
+	) {
+		this.users = database.collection<{id: string; aiConfig?: AiConfig}>("users");
+	}
+
+	async get(ownerId: string): Promise<AiConfig> {
+		const doc = await this.users.findOne(
+			{id: ownerId},
+			{projection: {aiConfig: 1}},
+		);
+		if (!doc?.aiConfig) {
+			return structuredClone(this.defaults);
+		}
+
+		return {
+			silver: doc.aiConfig.silver ?? this.defaults.silver,
+			gold: doc.aiConfig.gold ?? this.defaults.gold,
+			authoring: {...this.defaults.authoring, ...doc.aiConfig.authoring},
+		};
+	}
+
+	async update(ownerId: string, patch: PartialAiConfig): Promise<AiConfig> {
+		const current = await this.get(ownerId);
+		const next: AiConfig = {
+			silver: normalizeModelConfig(
+				"silver",
+				patch.silver ?? patch.cheap,
+				current.silver,
+			),
+			gold: normalizeModelConfig(
+				"gold",
+				patch.gold ?? patch.premium,
+				current.gold,
+			),
+			authoring: normalizeAuthoringConfig(patch.authoring, current.authoring),
+		};
+
+		await this.users.updateOne(
+			{id: ownerId},
+			{$set: {aiConfig: next, updatedAt: new Date()}},
+		);
+
 		return next;
 	}
 }
