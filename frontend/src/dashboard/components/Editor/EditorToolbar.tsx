@@ -57,6 +57,7 @@ function ToolbarButton({
 			type="button"
 			disabled={disabled}
 			aria-label={compact ? label : undefined}
+			onMouseDown={(e) => e.preventDefault()}
 			onClick={onClick}
 			className={cn(
 				"flex shrink-0 items-center justify-center rounded-full border border-transparent text-[12px] font-medium text-[#1D1D1F] transition-all hover:border-[#E3E1DA] hover:bg-[#F7F4EC] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-transparent disabled:hover:bg-transparent",
@@ -175,6 +176,7 @@ export function EditorToolbar({
 				<button
 					type="button"
 					disabled={!activeEditor}
+					onMouseDown={(e) => e.preventDefault()}
 					onClick={() => setOpen((current) => !current)}
 					className={cn(
 						"flex shrink-0 items-center rounded-full border text-[12px] font-medium transition-all disabled:opacity-40",
@@ -204,6 +206,7 @@ export function EditorToolbar({
 							<button
 								key={option.value}
 								type="button"
+								onMouseDown={(e) => e.preventDefault()}
 								onClick={() => applyBlockType(option.value)}
 								className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left text-[12px] transition-colors ${
 									option.value === blockType ?

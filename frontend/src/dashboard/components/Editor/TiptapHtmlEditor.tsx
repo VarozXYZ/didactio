@@ -14,9 +14,9 @@ import {EditorContent, type Editor, useEditor} from "@tiptap/react";
 import {common, createLowlight} from "lowlight";
 import type {EditorTextStyle} from "../../types";
 import {
-	FONT_CATALOG,
 	makeTypographyVars,
 	resolveTypography,
+	STYLE_PRESETS,
 	type FontId,
 } from "../../utils/typography";
 import {cn} from "@/lib/utils";
@@ -107,32 +107,18 @@ export function TiptapHtmlEditor({
 		return null;
 	}
 
-	const bodyFont =
-		baseTextStyle?.bodyFontFamily &&
-		baseTextStyle.bodyFontFamily in FONT_CATALOG ?
-			(baseTextStyle.bodyFontFamily as FontId)
-		:	"inter";
-	const headingFont =
-		baseTextStyle?.headingFontFamily &&
-		baseTextStyle.headingFontFamily in FONT_CATALOG ?
-			(baseTextStyle.headingFontFamily as FontId)
-		:	bodyFont;
+	const preset = STYLE_PRESETS[baseTextStyle?.stylePreset ?? "classic"];
 	const typographyVars = makeTypographyVars(
 		resolveTypography({
-			bodyFontId: bodyFont,
-			headingFontId: headingFont,
+			bodyFontId: preset.body as FontId,
+			headingFontId: preset.heading as FontId,
 			isMobile: false,
 			sizeProfile: baseTextStyle?.sizeProfile ?? "regular",
 		}),
 	);
 
 	return (
-		<div
-			style={{
-				...typographyVars,
-				textAlign: baseTextStyle?.paragraphAlign ?? "left",
-			}}
-		>
+		<div style={typographyVars}>
 			<EditorContent editor={editor} />
 		</div>
 	);

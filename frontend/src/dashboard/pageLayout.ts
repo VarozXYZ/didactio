@@ -22,6 +22,7 @@ import {
 	resolveTypography,
 	defaultTypography,
 	applyTypographyVars,
+	STYLE_PRESETS,
 	type ResolvedTypography,
 	type FontId,
 	type SizeProfile,
@@ -37,8 +38,10 @@ const PAGE_WIDTH_RATIO_DESKTOP = 0.76;
 const PAGE_WIDTH_RATIO_MOBILE = 0.72;
 const POST_MODULE_ACTION_GAP = 24;
 const FIRST_PAGE_HEADER_BOTTOM_GAP = 16;
-const CONTENT_PAGE_LABEL_BOTTOM_GAP = 12;
 const DOM_BLOCK_HEIGHT_CACHE_LIMIT = 2000;
+// Extra height per code block to account for the .code-block-header bar added
+// by CodeBlock.tsx (padding 6+6px + ~16px line + 1px border = ~29px; use 32 for margin).
+const CODE_BLOCK_HEADER_HEIGHT_PX = 32;
 
 const domBlockHeightCache = new Map<string, number>();
 
@@ -725,10 +728,13 @@ function validatePagesWithDom(
 		const pageHeight =
 			domBlockHeightCache.get(cacheKey) ??
 			(() => {
-				proseMeasure.innerHTML = markdownToHtml(pageMarkdown);
+				const html = markdownToHtml(pageMarkdown);
+				proseMeasure.innerHTML = html;
+				const codeBlockCount = (html.match(/<pre/gi) ?? []).length;
 				return setCachedDomBlockHeight(
 					cacheKey,
-					proseMeasure.scrollHeight,
+					proseMeasure.scrollHeight +
+						codeBlockCount * CODE_BLOCK_HEADER_HEIGHT_PX,
 				);
 			})();
 
@@ -821,8 +827,12 @@ function canMergeTerminalActionPage({
 	proseMeasure: HTMLDivElement;
 	actionMeasure: HTMLDivElement;
 }): boolean {
-	proseMeasure.innerHTML = markdownToHtml(lastPage.markdown);
-	const proseHeight = proseMeasure.scrollHeight;
+	const html = markdownToHtml(lastPage.markdown);
+	proseMeasure.innerHTML = html;
+	const codeBlockCount = (html.match(/<pre/gi) ?? []).length;
+	const proseHeight =
+		proseMeasure.scrollHeight +
+		codeBlockCount * CODE_BLOCK_HEADER_HEIGHT_PX;
 	const actionHeight = actionMeasure.scrollHeight;
 
 	return proseHeight + POST_MODULE_ACTION_GAP + actionHeight <= pageLimit + 1;
@@ -928,11 +938,11 @@ export function measurePages({
 	const isMobile = pageWidth < 420;
 
 	// Padding constants must exactly match the page card wrapper CSS:
-	//   mobile:   p-6 pb-12  → 24px top/sides, 48px bottom
-	//   desktop:  md:p-8 md:pb-14 → 32px top/sides, 56px bottom
-	const pagePaddingSide = isMobile ? 24 : 32;
-	const pagePaddingTop = isMobile ? 24 : 32;
-	const pagePaddingBottom = isMobile ? 48 : 56;
+	//   mobile:   px-5 py-4 → sides 20px, top/bottom 16px
+	//   desktop:  md:px-6 md:py-5 → sides 24px, top/bottom 20px
+	const pagePaddingSide = isMobile ? 20 : 24;
+	const pagePaddingTop = isMobile ? 16 : 20;
+	const pagePaddingBottom = isMobile ? 16 : 20;
 	const measurementBuffer = isMobile ? 8 : 6;
 
 	const contentWidth = Math.max(240, pageWidth - pagePaddingSide * 2);
@@ -942,17 +952,20 @@ export function measurePages({
 	);
 	const primaryActionLabel = hasNextModule ? "Next module" : "Finish unit 🎉";
 
+	const stylePresetId = textStyle?.stylePreset ?? "classic";
 	const typography =
 		textStyle ?
-			resolveTypography({
-				sizeProfile: (textStyle.sizeProfile ??
-					"regular") as SizeProfile,
-				bodyFontId: (textStyle.bodyFontFamily ??
-					"inter") as FontId,
-				headingFontId: (textStyle.headingFontFamily ??
-					"inter") as FontId,
-				isMobile,
-			})
+			(() => {
+				const preset = STYLE_PRESETS[stylePresetId];
+				return resolveTypography({
+					sizeProfile: (textStyle.sizeProfile ??
+						"regular") as SizeProfile,
+					bodyFontId: preset.body as FontId,
+					headingFontId: preset.heading as FontId,
+					isMobile,
+					stylePreset: stylePresetId,
+				});
+			})()
 		:	defaultTypography(isMobile);
 
 	const sandbox = document.createElement("div");
@@ -965,23 +978,26 @@ export function measurePages({
 	sandbox.style.zIndex = "-1";
 
 	const proseMeasure = document.createElement("div");
-	proseMeasure.className =
-		"prose prose-neutral max-w-none leading-[1.9] text-[#1D1D1F]";
+	// Use unit-page-scope so measurement uses exactly the same CSS rules as
+	// the rendered ChapterRenderer, ensuring heading/paragraph sizes match.
+	proseMeasure.className = "unit-page-scope";
 	proseMeasure.style.width = `${contentWidth}px`;
 	proseMeasure.style.overflow = "hidden";
-	applyTypographyVars(proseMeasure, typography);
+	proseMeasure.style.setProperty("--unit-body-font", typography.body.family);
+	proseMeasure.style.setProperty("--unit-heading-font", typography.h2.family);
+	proseMeasure.style.setProperty("--unit-body-size", `${typography.body.sizePx}px`);
+	proseMeasure.style.setProperty("--unit-line-height", String(typography.body.lineHeight));
+	proseMeasure.style.setProperty("--unit-heading-scale", "1");
+	proseMeasure.style.setProperty("--unit-paragraph-align", "justify");
+	proseMeasure.style.setProperty("--unit-paragraph-margin", "0.65em 0");
 
 	const headerMeasure = document.createElement("div");
 	headerMeasure.style.width = `${contentWidth}px`;
 	headerMeasure.style.overflow = "hidden";
 	headerMeasure.innerHTML = createHeaderMarkup(activeChapter, chapterIndex);
 
-	// Measure the "Module Content" label that sits above the content area on
-	// every non-first page (matches the label in renderContentPage).
 	const labelMeasure = document.createElement("div");
 	labelMeasure.style.width = `${contentWidth}px`;
-	labelMeasure.innerHTML =
-		'<div class="mb-3 text-[11px] font-semibold uppercase tracking-wide">Module Content</div>';
 
 	const actionMeasure = document.createElement("div");
 	actionMeasure.style.width = `${contentWidth}px`;
@@ -1005,10 +1021,7 @@ export function measurePages({
 	);
 	const regularPageLimit = Math.max(
 		140,
-		contentLimit -
-			labelMeasure.scrollHeight -
-			CONTENT_PAGE_LABEL_BOTTOM_GAP -
-			measurementBuffer,
+		contentLimit - measurementBuffer,
 	);
 	const blocks = annotateBlocks(
 		extractMarkdownBlocks(renderedContent),
@@ -1029,8 +1042,14 @@ export function measurePages({
 			return cachedHeight;
 		}
 
-		proseMeasure.innerHTML = markdownToHtml(renderedBlock);
-		return setCachedDomBlockHeight(cacheKey, proseMeasure.scrollHeight);
+		const html = markdownToHtml(renderedBlock);
+		proseMeasure.innerHTML = html;
+		const codeBlockCount = (html.match(/<pre/gi) ?? []).length;
+		return setCachedDomBlockHeight(
+			cacheKey,
+			proseMeasure.scrollHeight +
+				codeBlockCount * CODE_BLOCK_HEADER_HEIGHT_PX,
+		);
 	};
 
 	const rawPages = paginateBlocks({
@@ -1146,8 +1165,14 @@ export function paginateMarkdownContent({
 			return cachedHeight;
 		}
 
-		proseMeasure.innerHTML = markdownToHtml(renderedBlock);
-		return setCachedDomBlockHeight(cacheKey, proseMeasure.scrollHeight);
+		const html = markdownToHtml(renderedBlock);
+		proseMeasure.innerHTML = html;
+		const codeBlockCount = (html.match(/<pre/gi) ?? []).length;
+		return setCachedDomBlockHeight(
+			cacheKey,
+			proseMeasure.scrollHeight +
+				codeBlockCount * CODE_BLOCK_HEADER_HEIGHT_PX,
+		);
 	};
 
 	const rawPages = paginateBlocks({

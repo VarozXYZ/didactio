@@ -77,12 +77,18 @@ function resolveActivityDate(
 
 export function resolveTextStyle(): EditorTextStyle {
 	return {
+		stylePreset: "classic",
 		sizeProfile: "regular",
-		bodyFontFamily: "inter",
-		headingFontFamily: "inter",
-		paragraphAlign: "left",
 	};
 }
+
+// Map old preset IDs to the new 5-preset system for backward compat.
+const LEGACY_PRESET_MAP: Record<string, import("./utils/typography").StylePresetId> = {
+	tech: "modern",
+	educational: "modern",
+	editorial: "classic",
+	serious: "classic",
+};
 
 function resolveTextStyleFromTheme(
 	theme?: PresentationTheme | null,
@@ -91,13 +97,17 @@ function resolveTextStyleFromTheme(
 		return resolveTextStyle();
 	}
 
+	const raw = theme.stylePreset as string | undefined;
+	const stylePreset =
+		raw && raw in LEGACY_PRESET_MAP ?
+			LEGACY_PRESET_MAP[raw]
+		: raw && ["modern", "modern", "classic", "classic", "plain"].includes(raw) ?
+			(raw as import("./utils/typography").StylePresetId)
+		:	"classic";
+
 	return {
+		stylePreset,
 		sizeProfile: theme.bodyFontSize,
-		bodyFontFamily:
-			theme.bodyFont === "merriweather" ? "merriweather" : "inter",
-		headingFontFamily:
-			theme.headingFont === "merriweather" ? "merriweather" : "inter",
-		paragraphAlign: theme.paragraphAlign,
 	};
 }
 

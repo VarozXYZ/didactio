@@ -6,15 +6,33 @@ import {
 	type PresentationParagraphSpacing,
 	type PresentationSizeProfile,
 	type PresentationTheme,
+	type StylePresetId,
 } from "./types.js";
 
 const FONTS: PresentationFont[] = [
 	"inter",
+	"lexend",
+	"eb-garamond",
+	"crimson-pro",
+	"dm-sans",
+	// Legacy values kept for backward compatibility
 	"merriweather",
 	"source-serif",
 	"system-sans",
 	"system-serif",
 	"system-mono",
+	"space-grotesk",
+	"atkinson",
+	"fraunces",
+	"cormorant",
+	"literata",
+	"epilogue",
+];
+
+const STYLE_PRESETS: StylePresetId[] = [
+	"modern",
+	"classic",
+	"plain",
 ];
 const SIZE_PROFILES: PresentationSizeProfile[] = ["small", "regular", "large"];
 const HEADING_SCALES: PresentationHeadingScale[] = [
@@ -104,7 +122,13 @@ export function parsePresentationTheme(value: unknown): PresentationTheme {
 	}
 
 	const payload = value as Record<string, unknown>;
+	const stylePreset =
+		payload.stylePreset !== undefined &&
+		payload.stylePreset !== null ?
+			parseEnum(payload.stylePreset, "stylePreset", STYLE_PRESETS)
+		:	undefined;
 	return {
+		...(stylePreset !== undefined ? {stylePreset} : {}),
 		bodyFont: parseEnum(payload.bodyFont, "bodyFont", FONTS),
 		headingFont: parseEnum(payload.headingFont, "headingFont", FONTS),
 		bodyFontSize: parseEnum(
@@ -137,6 +161,33 @@ export function parsePresentationTheme(value: unknown): PresentationTheme {
 			"paragraphSpacing",
 			PARAGRAPH_SPACINGS,
 		),
+		...(payload.numberColor ?
+			{numberColor: parseColor(payload.numberColor, "numberColor")}
+		:	{}),
+		...(payload.codeAccentColor ?
+			{
+				codeAccentColor: parseColor(
+					payload.codeAccentColor,
+					"codeAccentColor",
+				),
+			}
+		:	{}),
+		...(payload.codeBorderColor ?
+			{
+				codeBorderColor: parseColor(
+					payload.codeBorderColor,
+					"codeBorderColor",
+				),
+			}
+		:	{}),
+		...(payload.codeHeaderBackground ?
+			{
+				codeHeaderBackground: parseColor(
+					payload.codeHeaderBackground,
+					"codeHeaderBackground",
+				),
+			}
+		:	{}),
 	};
 }
 

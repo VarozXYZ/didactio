@@ -44,14 +44,14 @@ describe("coin system", () => {
 
 		const authService = app.locals.authService as AuthService;
 		const user = await authService.getUserById("mock-user");
-		expect(user?.credits.silver).toBe(14);
+		expect(user?.credits.bronze).toBe(29);
 
 		await authService.adjustUserCredits({
 			userId: "mock-user",
 			actorUserId: "mock-user",
-			coinType: "silver",
+			coinType: "bronze",
 			direction: "debit",
-			amount: 14,
+			amount: 29,
 			reason: "test_exhaustion",
 		});
 
@@ -64,8 +64,8 @@ describe("coin system", () => {
 		expect(rejected.status).toBe(402);
 		expect(rejected.body).toMatchObject({
 			error: "insufficient_credits",
-			requiredCost: {coinType: "silver", amount: 1},
-			credits: {silver: 0},
+			requiredCost: {coinType: "bronze", amount: 1},
+			credits: {bronze: 0},
 		});
 	});
 
@@ -88,7 +88,7 @@ describe("coin system", () => {
 
 		await generateDidacticUnitChapter(app, syllabusReady.id, 0);
 		await generateDidacticUnitChapter(app, syllabusReady.id, 0);
-		expect((await authService.getUserById("mock-user"))?.credits.silver).toBe(13);
+		expect((await authService.getUserById("mock-user"))?.credits.silver).toBe(14);
 	});
 
 	it("records a failed initial module attempt once without charging extra coins", async () => {

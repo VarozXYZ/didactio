@@ -36,6 +36,12 @@ function resolveApprovedValue(value: {
 	return undefined;
 }
 
+const STYLE_PRESET_IDS = [
+	"modern",
+	"classic",
+	"plain",
+] as const;
+
 export const moderationSchema = z
 	.object({
 		approved: z.boolean().optional(),
@@ -48,6 +54,8 @@ export const moderationSchema = z
 		reasoningNotes: z.string().min(1),
 		folderName: z.string().min(1).optional(),
 		folderReasoning: z.string().min(1).optional(),
+		stylePreset: z.enum(STYLE_PRESET_IDS).optional(),
+		style: z.enum(STYLE_PRESET_IDS).optional(),
 	})
 	.transform((value, ctx) => {
 		const approved = resolveApprovedValue(value);
@@ -83,6 +91,7 @@ export const moderationSchema = z
 			reasoningNotes: value.reasoningNotes.trim(),
 			folderName: value.folderName?.trim(),
 			folderReasoning: value.folderReasoning?.trim(),
+			stylePreset: value.stylePreset ?? value.style,
 		};
 	});
 
@@ -120,6 +129,8 @@ export const folderClassificationSchema = z
 		reason: z.string().min(1).optional(),
 		folderReasoning: z.string().min(1).optional(),
 		reasoningNotes: z.string().min(1).optional(),
+		stylePreset: z.enum(STYLE_PRESET_IDS).optional(),
+		style: z.enum(STYLE_PRESET_IDS).optional(),
 	})
 	.transform((value, ctx) => {
 		const folderName =
@@ -156,6 +167,7 @@ export const folderClassificationSchema = z
 		return {
 			folderName,
 			reasoning,
+			stylePreset: value.stylePreset ?? value.style,
 		};
 	});
 

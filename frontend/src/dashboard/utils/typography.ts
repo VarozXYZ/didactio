@@ -11,65 +11,109 @@ export const FONT_CATALOG = {
 		category: "sans-serif",
 		googleId: null,
 	},
-	roboto: {
-		label: "Roboto",
-		family: "Roboto",
+	lexend: {
+		label: "Lexend",
+		family: "Lexend",
 		category: "sans-serif",
-		googleId: "Roboto:wght@400;500;700",
-	},
-	montserrat: {
-		label: "Montserrat",
-		family: "Montserrat",
-		category: "sans-serif",
-		googleId: "Montserrat:wght@400;600;700",
-	},
-	nunito: {
-		label: "Nunito",
-		family: "Nunito",
-		category: "sans-serif",
-		googleId: "Nunito:wght@400;600;700",
-	},
-	openSans: {
-		label: "Open Sans",
-		family: "Open Sans",
-		category: "sans-serif",
-		googleId: "Open+Sans:wght@400;600;700",
-	},
-	merriweather: {
-		label: "Merriweather",
-		family: "Merriweather",
-		category: "serif",
-		googleId: "Merriweather:wght@400;700",
+		googleId: "Lexend:wght@400;500;600;700",
 	},
 	ebGaramond: {
-		label: "Garamond",
+		label: "EB Garamond",
 		family: "EB Garamond",
 		category: "serif",
-		googleId: "EB+Garamond:wght@400;600;700",
+		googleId: "EB+Garamond:ital,wght@0,400;0,600;0,700;1,400",
 	},
-	playfair: {
-		label: "Playfair",
-		family: "Playfair Display",
+	crimsonPro: {
+		label: "Crimson Pro",
+		family: "Crimson Pro",
 		category: "serif",
-		googleId: "Playfair+Display:wght@400;700",
+		googleId: "Crimson+Pro:ital,wght@0,400;0,600;1,400;1,600",
 	},
-	lora: {
-		label: "Lora",
-		family: "Lora",
-		category: "serif",
-		googleId: "Lora:wght@400;600;700",
-	},
-	playwrite: {
-		label: "Playwrite IE",
-		family: "Playwrite IE",
-		category: "handwriting",
-		googleId: "Playwrite+IE:wght@400",
+	dmSans: {
+		label: "DM Sans",
+		family: "DM Sans",
+		category: "sans-serif",
+		googleId: "DM+Sans:wght@400;500;600;700",
 	},
 } as const;
 
 export type FontId = keyof typeof FONT_CATALOG;
 
+export interface StylePreset {
+	label: string;
+	variant: string;
+	heading: FontId;
+	body: FontId;
+	pageBackground: string;
+	accentColor: string;
+	headingColor: string;
+	numberColor: string;
+	codeBackground: string;
+	codeBorderColor: string;
+	codeHeaderBackground: string;
+	codeAccentColor: string;
+	blockquoteAccent: string;
+}
+
+export const STYLE_PRESETS: Record<string, StylePreset> = {
+	modern: {
+		label: "Modern",
+		variant: "",
+		heading: "lexend",
+		body: "inter",
+		pageBackground: "#F6FAFB",
+		accentColor: "#4ADE80",
+		headingColor: "#1A3832",
+		numberColor: "#BBF7D0",
+		codeBackground: "#E9F5F3",
+		codeBorderColor: "#86EFAC",
+		codeHeaderBackground: "#DCFCE7",
+		codeAccentColor: "#22C55E",
+		blockquoteAccent: "#6EE7B7",
+	},
+	classic: {
+		label: "Classic",
+		variant: "",
+		heading: "ebGaramond",
+		body: "crimsonPro",
+		pageBackground: "#FDFAF7",
+		accentColor: "#996633",
+		headingColor: "#2A1A0A",
+		numberColor: "#D4B896",
+		codeBackground: "#F7EEE4",
+		codeBorderColor: "#E4D0BC",
+		codeHeaderBackground: "#EEE1D0",
+		codeAccentColor: "#7A4E28",
+		blockquoteAccent: "#C4A070",
+	},
+	plain: {
+		label: "Plain",
+		variant: "",
+		heading: "dmSans",
+		body: "dmSans",
+		pageBackground: "#FFFFFF",
+		accentColor: "#2563EB",
+		headingColor: "#111827",
+		numberColor: "#C8C8C8",
+		codeBackground: "#F6F8FA",
+		codeBorderColor: "#D0D7DE",
+		codeHeaderBackground: "#EAEEF2",
+		codeAccentColor: "#1D1D1F",
+		blockquoteAccent: "#CBD5E1",
+	},
+} as const;
+
+export type StylePresetId = "modern" | "classic" | "plain";
+
 export type SizeProfile = "small" | "regular" | "large";
+
+// Classic serif fonts render optically smaller; these offsets are applied to
+// body font size everywhere (measurement + CSS vars) so both stay in sync.
+export const CLASSIC_BODY_SIZES: Record<SizeProfile, {mobile: number; desktop: number}> = {
+	small:   {mobile: 14, desktop: 15},
+	regular: {mobile: 15, desktop: 17},
+	large:   {mobile: 17, desktop: 19},
+};
 
 const SIZE_PROFILES: Record<
 	SizeProfile,
@@ -113,8 +157,8 @@ const LIST_PADDING_LEFT_EM = 1.2;
 const LIST_ITEM_MARGIN_EM = 0.3;
 const CODE_FONT_SIZE_EM = 0.92;
 const CODE_PADDING_H_EM = 0.35;
-const BLOCKQUOTE_INDENT_EM = 1.0; 
-const BLOCKQUOTE_BORDER_PX = 4; 
+const BLOCKQUOTE_INDENT_EM = 1.0;
+const BLOCKQUOTE_BORDER_PX = 4;
 
 function cssFont(
 	weight: number,
@@ -178,10 +222,17 @@ export function resolveTypography(settings: {
 	bodyFontId: FontId;
 	headingFontId: FontId;
 	isMobile: boolean;
+	stylePreset?: StylePresetId;
 }): ResolvedTypography {
-	const {sizeProfile, bodyFontId, headingFontId, isMobile} = settings;
+	const {sizeProfile, bodyFontId, headingFontId, isMobile, stylePreset} = settings;
 	const profile = SIZE_PROFILES[sizeProfile];
-	const bodySz = isMobile ? profile.body.mobile : profile.body.desktop;
+	const rawBodySz = isMobile ? profile.body.mobile : profile.body.desktop;
+	const bodySz =
+		stylePreset === "classic" ?
+			(isMobile ?
+				CLASSIC_BODY_SIZES[sizeProfile].mobile
+			:	CLASSIC_BODY_SIZES[sizeProfile].desktop)
+		:	rawBodySz;
 	const h1Sz = isMobile ? profile.h1.mobile : profile.h1.desktop;
 	const h2Sz = isMobile ? profile.h2.mobile : profile.h2.desktop;
 	const h3Sz = isMobile ? profile.h3.mobile : profile.h3.desktop;
@@ -249,13 +300,14 @@ export function resolveTypography(settings: {
 	};
 }
 
-// Default resolved typography for read mode (regular profile, Inter, desktop).
+// Default resolved typography for read mode (regular profile, classic preset, desktop).
 export function defaultTypography(isMobile = false): ResolvedTypography {
 	return resolveTypography({
 		sizeProfile: "regular",
-		bodyFontId: "inter",
-		headingFontId: "inter",
+		bodyFontId: STYLE_PRESETS.classic.body,
+		headingFontId: STYLE_PRESETS.classic.heading,
 		isMobile,
+		stylePreset: "classic",
 	});
 }
 

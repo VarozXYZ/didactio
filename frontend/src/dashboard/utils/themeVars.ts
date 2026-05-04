@@ -3,7 +3,7 @@ import {
 	SYSTEM_DEFAULT_THEME,
 	type PresentationTheme,
 } from "../../types/presentationTheme";
-import {FONT_CATALOG, type FontId} from "./typography";
+import {FONT_CATALOG, CLASSIC_BODY_SIZES, type FontId} from "./typography";
 
 function fontFamily(font: string): string {
 	if (font in FONT_CATALOG) {
@@ -11,27 +11,45 @@ function fontFamily(font: string): string {
 	}
 
 	switch (font) {
+		case "eb-garamond":
+			return "EB Garamond, Georgia, serif";
+		case "crimson-pro":
+			return "Crimson Pro, Georgia, serif";
+		case "dm-sans":
+			return "DM Sans, sans-serif";
 		case "system-serif":
 			return "Georgia, Cambria, serif";
 		case "system-mono":
 			return "ui-monospace, SFMono-Regular, Menlo, monospace";
 		case "source-serif":
-			return FONT_CATALOG.merriweather.family;
+		case "merriweather":
+			return "Merriweather, Georgia, serif";
+		case "space-grotesk":
+			return "Space Grotesk, sans-serif";
+		case "fraunces":
+			return "Source Serif 4, serif";
+		case "cormorant":
+			return "Cormorant Garamond, serif";
+		case "literata":
+			return "Literata, serif";
+		case "epilogue":
+			return "Epilogue, sans-serif";
+		case "atkinson":
+			return "Atkinson Hyperlegible, sans-serif";
 		case "system-sans":
 		default:
 			return FONT_CATALOG.inter.family;
 	}
 }
 
-function bodySize(size: PresentationTheme["bodyFontSize"]): string {
+function bodySize(size: PresentationTheme["bodyFontSize"], stylePreset?: string): string {
+	if (stylePreset === "classic") {
+		return `${CLASSIC_BODY_SIZES[size as keyof typeof CLASSIC_BODY_SIZES]?.desktop ?? 17}px`;
+	}
 	switch (size) {
-		case "small":
-			return "14px";
-		case "large":
-			return "18px";
-		case "regular":
-		default:
-			return "16px";
+		case "small":  return "14px";
+		case "large":  return "18px";
+		default:       return "16px";
 	}
 }
 
@@ -72,7 +90,7 @@ export function themeVars(theme: PresentationTheme): CSSProperties {
 	return {
 		"--unit-body-font": fontFamily(theme.bodyFont),
 		"--unit-heading-font": fontFamily(theme.headingFont),
-		"--unit-body-size": bodySize(theme.bodyFontSize),
+		"--unit-body-size": bodySize(theme.bodyFontSize, theme.stylePreset),
 		"--unit-line-height": String(theme.lineHeight),
 		"--unit-body-color": theme.bodyColor,
 		"--unit-heading-color": theme.headingColor,
@@ -83,5 +101,9 @@ export function themeVars(theme: PresentationTheme): CSSProperties {
 		"--unit-paragraph-align": theme.paragraphAlign,
 		"--unit-heading-scale": headingScale(theme.headingScale),
 		"--unit-paragraph-margin": paragraphMargin(theme.paragraphSpacing),
+		"--unit-number-color": theme.numberColor ?? "#D4B896",
+		"--unit-code-accent": theme.codeAccentColor ?? "#7A4E28",
+		"--unit-code-border": theme.codeBorderColor ?? "#E4D0BC",
+		"--unit-code-header-bg": theme.codeHeaderBackground ?? "#EEE1D0",
 	} as CSSProperties;
 }

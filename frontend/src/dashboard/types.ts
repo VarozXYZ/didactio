@@ -1,4 +1,5 @@
 import type {PresentationTheme} from "../types/presentationTheme";
+import type {StylePresetId} from "./utils/typography";
 
 export type DashboardSection =
 	| "all-units"
@@ -114,10 +115,8 @@ export interface PlanningDetailViewModel {
 export type EditorChapterStatus = "pending" | "ready" | "failed";
 
 export interface EditorTextStyle {
+	stylePreset: StylePresetId;
 	sizeProfile: "small" | "regular" | "large";
-	bodyFontFamily: string; // FontId from typography.ts
-	headingFontFamily: string; // FontId from typography.ts
-	paragraphAlign: "left" | "center" | "right" | "justify";
 }
 
 export interface DidacticUnitEditorChapter {

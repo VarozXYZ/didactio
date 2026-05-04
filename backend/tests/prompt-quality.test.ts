@@ -48,6 +48,52 @@ describe("prompt quality helpers", () => {
 		expect(prompt).toContain("folderName exactly as written");
 	});
 
+	it("uses a generic allow-by-default moderation policy", () => {
+		const prompt = buildModerationPrompt({
+			topic: "Python programming",
+			level: "beginner",
+			authoring,
+		});
+
+		expect(prompt).toContain(
+			"Approve by default when the request can be turned into a harmless, lawful, rights-respecting learning unit",
+		);
+		expect(prompt).toContain("Approve ordinary educational topics across domains");
+		expect(prompt).toContain("academic subjects");
+		expect(prompt).toContain("professional skills");
+		expect(prompt).toContain("hobbies");
+		expect(prompt).toContain("Set approved to true for ordinary benign educational requests");
+		expect(prompt).toContain("Reject requests that meaningfully enable real-world harm");
+	});
+
+	it("treats benign video game strategy as one allowed case", () => {
+		const prompt = buildModerationPrompt({
+			topic: "Como conseguir muchisimos diamantes en Infinity Nikki",
+			level: "beginner",
+			authoring,
+		});
+
+		expect(prompt).toContain("games");
+		expect(prompt).toContain("Infinity Nikki");
+		expect(prompt).toContain("in-game progression");
+		expect(prompt).toContain("cheating");
+		expect(prompt).toContain("payment bypass");
+	});
+
+	it("keeps moderation style preset instructions schema-compatible", () => {
+		const prompt = buildModerationPrompt({
+			topic: "World history",
+			level: "beginner",
+			authoring,
+		});
+
+		expect(prompt).toContain(
+			'Return stylePreset as one of: "modern", "classic", "plain"',
+		);
+		expect(prompt).not.toContain("modern-light");
+		expect(prompt).not.toContain("classic-light");
+	});
+
 	it("uses a dedicated folder classification system prompt", () => {
 		const prompt = buildGatewaySystemPrompt("folder_classification");
 
@@ -178,6 +224,22 @@ describe("prompt quality helpers", () => {
 		expect(prompt).toContain("1. Conditionals");
 		expect(prompt).toContain(
 			'Do not use generic headings like "Concept Explanation"',
+		);
+		expect(prompt).toContain(
+			"recap only what this chapter has already taught",
+		);
+		expect(prompt).toContain("Exactly one closing paragraph");
+		expect(prompt).toContain(
+			"placed only at the very end of the HTML",
+		);
+		expect(prompt).toContain(
+			"Do not add closing, recap, transition, or 'what comes next' headings",
+		);
+		expect(prompt).toContain(
+			"What you have learned and what comes next",
+		);
+		expect(prompt).toContain(
+			"The final top-level element must be a single <p>",
 		);
 	});
 

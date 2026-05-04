@@ -1,4 +1,5 @@
 import sanitizeHtml from "sanitize-html";
+import * as parse5 from "parse5";
 
 export interface SanitizeResult {
 	html: string;
@@ -212,7 +213,21 @@ export function sanitizeChapterHtml(rawHtml: string): SanitizeResult {
 		},
 	});
 
-	const normalizedHtml = html.replace(/\s+\n/g, "\n").trim();
+	// Wrap any top-level orphan text nodes in <p> tags. These can appear when
+	// block-level wrappers like <div> or <section> are stripped by the sanitizer,
+	// leaving their text content exposed at the root level.
+	const fragment = parse5.parseFragment(html);
+	let mutated = false;
+	for (const node of fragment.childNodes) {
+		const textNode = node as {nodeName: string; value?: string};
+		if (textNode.nodeName === "#text" && textNode.value?.trim()) {
+			const p = parse5.parseFragment(`<p>${textNode.value}</p>`);
+			Object.assign(node, p.childNodes[0]);
+			mutated = true;
+		}
+	}
+	const processedHtml = mutated ? parse5.serialize(fragment) : html;
+	const normalizedHtml = processedHtml.replace(/\s+\n/g, "\n").trim();
 
 	return {
 		html: normalizedHtml,

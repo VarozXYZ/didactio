@@ -63,11 +63,13 @@ export interface ModerationResult extends BaseStageResult {
 	reasoningNotes: string;
 	folderName?: string;
 	folderReasoning?: string;
+	stylePreset?: "modern" | "modern" | "classic" | "classic" | "plain";
 }
 
 export interface FolderClassificationResult extends BaseStageResult {
 	folderName: string;
 	reasoning: string;
+	stylePreset?: "modern" | "modern" | "classic" | "classic" | "plain";
 }
 
 export interface QuestionnaireResult extends BaseStageResult {
@@ -581,6 +583,7 @@ export class GatewayAiService implements AiService {
 				telemetry,
 				folderName: result.object.folderName,
 				reasoning: result.object.reasoning,
+				stylePreset: result.object.stylePreset,
 			};
 
 			this.logAiCallCompleted(
@@ -657,6 +660,7 @@ export class GatewayAiService implements AiService {
 				reasoningNotes: result.object.reasoningNotes,
 				folderName: result.object.folderName,
 				folderReasoning: result.object.folderReasoning,
+				stylePreset: result.object.stylePreset,
 			};
 
 			this.logAiCallCompleted("moderation", selection, telemetry, {

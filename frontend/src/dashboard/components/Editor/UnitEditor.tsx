@@ -12,7 +12,6 @@ import {
 	CheckCircle2,
 	ChevronLeft,
 	ChevronRight,
-	Clock,
 	Edit3,
 	History,
 	Loader2,
@@ -22,7 +21,6 @@ import {
 	Settings,
 	Share2,
 	Sparkles,
-	Target,
 	WandSparkles,
 	X,
 } from "lucide-react";
@@ -94,6 +92,7 @@ import {
 	themeVars,
 } from "../../utils/themeVars";
 import type {PresentationTheme} from "../../../types/presentationTheme";
+import {FONT_CATALOG, STYLE_PRESETS, type FontId} from "../../utils/typography";
 
 function ChapterStatusIcon({
 	status,
@@ -318,22 +317,47 @@ function buildDraft(
 	};
 }
 
+// FontId (camelCase) → PresentationFont (kebab-case) for keys that differ.
+const FONT_ID_TO_PRESENTATION: Partial<
+	Record<FontId, PresentationTheme["bodyFont"]>
+> = {
+	ebGaramond: "eb-garamond",
+	crimsonPro: "crimson-pro",
+	dmSans: "dm-sans",
+};
+
+function fontIdToPresFont(id: FontId): PresentationTheme["bodyFont"] {
+	return (
+		FONT_ID_TO_PRESENTATION[id] ??
+		(id as unknown as PresentationTheme["bodyFont"])
+	);
+}
+
 function themeFromTextStyle(
-	currentTheme: PresentationTheme,
+	_currentTheme: PresentationTheme,
 	settings: EditorTextStyle,
 ): PresentationTheme {
+	const presetId = settings.stylePreset ?? "classic";
+	const preset = STYLE_PRESETS[presetId];
 	return {
-		...currentTheme,
-		bodyFont:
-			settings.bodyFontFamily === "merriweather" ?
-				"merriweather"
-			:	"inter",
-		headingFont:
-			settings.headingFontFamily === "merriweather" ?
-				"merriweather"
-			:	"inter",
+		stylePreset: presetId,
+		bodyFont: fontIdToPresFont(preset.body),
+		headingFont: fontIdToPresFont(preset.heading),
 		bodyFontSize: settings.sizeProfile,
-		paragraphAlign: settings.paragraphAlign,
+		lineHeight: 1.6,
+		bodyColor: "#1D1D1F",
+		headingColor: preset.headingColor,
+		accentColor: preset.accentColor,
+		blockquoteAccent: preset.blockquoteAccent,
+		codeBackground: preset.codeBackground,
+		pageBackground: preset.pageBackground,
+		paragraphAlign: "justify",
+		headingScale: "balanced",
+		paragraphSpacing: "normal",
+		numberColor: preset.numberColor,
+		codeAccentColor: preset.codeAccentColor,
+		codeBorderColor: preset.codeBorderColor,
+		codeHeaderBackground: preset.codeHeaderBackground,
 	};
 }
 
@@ -430,9 +454,18 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			),
 		[workspace?.presentationTheme, user?.defaultPresentationTheme],
 	);
+	// Merge preset fonts from draft.textStyle into the resolved theme so CSS vars
+	// always reflect the current style preset rather than the raw stored fonts.
+	const effectiveTheme = useMemo(
+		() =>
+			draft ?
+				themeFromTextStyle(resolvedTheme, draft.textStyle)
+			:	resolvedTheme,
+		[resolvedTheme, draft],
+	);
 	const resolvedThemeVars = useMemo(
-		() => themeVars(resolvedTheme),
-		[resolvedTheme],
+		() => themeVars(effectiveTheme),
+		[effectiveTheme],
 	);
 	const [activeGeneratingChapterIndex, setActiveGeneratingChapterIndex] =
 		useState<number | null>(null);
@@ -761,21 +794,15 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		void document.fonts.ready.then(() => setFontsReady(true));
 	}, [fontsReady]);
 
-	// When presentation fonts change, wait for them to finish loading before paginating.
+	// When presentation preset changes, load the two preset fonts before paginating.
 	useEffect(() => {
-		const bodyFont = activeDraftSettings?.bodyFontFamily;
-		const headingFont = activeDraftSettings?.headingFontFamily;
-		if (!bodyFont && !headingFont) return;
+		const presetId = activeDraftSettings?.stylePreset ?? "classic";
+		const preset = STYLE_PRESETS[presetId];
 		setFontsReady(false);
-		void loadFonts(
-			[bodyFont, headingFont].filter(Boolean) as Parameters<
-				typeof loadFonts
-			>[0],
-		).then(() => setFontsReady(true));
-	}, [
-		activeDraftSettings?.bodyFontFamily,
-		activeDraftSettings?.headingFontFamily,
-	]);
+		void loadFonts([preset.body, preset.heading] as FontId[]).then(() =>
+			setFontsReady(true),
+		);
+	}, [activeDraftSettings?.stylePreset]);
 
 	const spreadMetrics = useMemo(
 		() =>
@@ -1895,16 +1922,14 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	}) => {
 		return (
 			<div
-				className="relative overflow-hidden rounded-[16px] border border-[#E5E5E7] bg-white shadow-[0_8px_60px_rgba(0,0,0,0.08)] md:rounded-[24px]"
+				className="relative overflow-hidden rounded-[16px] border border-[#E5E5E7] shadow-[0_8px_60px_rgba(0,0,0,0.08)] md:rounded-[24px]"
 				style={{
 					height: `${spreadMetrics.pageHeight}px`,
 					width: `${spreadMetrics.pageWidth}px`,
+					backgroundColor: resolvedThemeVars["--unit-page-bg"] as string ?? "#ffffff",
 				}}
 			>
-				<div className="flex h-full flex-col overflow-hidden p-6 pb-12 md:p-8 md:pb-14">
-					<div className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-[#86868B]">
-						Module Content
-					</div>
+				<div className="flex h-full flex-col overflow-hidden px-5 py-4 md:px-6 md:py-5">
 					<div
 						className={cn(
 							"relative flex min-h-0 flex-1 flex-col",
@@ -1921,7 +1946,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 									"leading-[1.9] text-[#1D1D1F] outline-none",
 									extraContent ?
 										"min-h-0 w-full shrink-0 overflow-visible pb-1"
-									:	"h-full min-h-full overflow-hidden",
+									:	"h-full min-h-full overflow-auto",
 								)}
 								baseTextStyle={draft.textStyle}
 								editable
@@ -1942,11 +1967,12 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 									"unit-page-scope leading-[1.9] text-[#1D1D1F]",
 									extraContent ?
 										"min-h-0 w-full shrink-0 overflow-visible pb-1"
-									:	"h-full min-h-full overflow-hidden",
+									:	"h-full min-h-full overflow-auto",
 								)}
 								style={resolvedThemeVars}
 								animateBlocks={isActiveChapterStreaming}
 								animationSeed={`${didacticUnitId}-${activeChapter.chapterIndex}-${pageIndex}`}
+								stylePreset={draft.textStyle.stylePreset ?? "classic"}
 							/>
 						}
 						{extraContent ?
@@ -1972,63 +1998,75 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		markdown: string | undefined;
 		extraContent?: ReactNode;
 		pageNumber: number;
-	}) => (
+	}) => {
+		const titlePreset =
+			STYLE_PRESETS[draft.textStyle.stylePreset ?? "classic"];
+		const titleHeadingFamily = FONT_CATALOG[titlePreset.heading].family;
+		const titleBodyFamily = FONT_CATALOG[titlePreset.body].family;
+
+		return (
 		<div
-			className="relative overflow-hidden rounded-[16px] border border-[#E5E5E7] bg-white shadow-[0_8px_60px_rgba(0,0,0,0.08)] md:rounded-[24px]"
+			className="relative overflow-hidden rounded-[16px] border border-[#E5E5E7] shadow-[0_8px_60px_rgba(0,0,0,0.08)] md:rounded-[24px]"
 			style={{
 				height: `${spreadMetrics.pageHeight}px`,
 				width: `${spreadMetrics.pageWidth}px`,
+				backgroundColor: resolvedThemeVars["--unit-page-bg"] as string ?? "#ffffff",
 			}}
 		>
-			<div className="flex h-full flex-col overflow-hidden p-6 pb-12 md:p-8 md:pb-14">
-				<div className="mb-4 flex-shrink-0 space-y-2">
-					<div className="flex items-center gap-2">
-						<span className="rounded-full bg-[#F5F5F7] px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-[#86868B]">
-							Module {activeChapter.chapterIndex + 1}
-						</span>
-						<span
-							className={cn(
-								"rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest",
-								getStatusPillClass(activeChapter.status),
-							)}
+			<div className="flex h-full flex-col overflow-hidden px-5 py-4 md:px-6 md:py-5" style={resolvedThemeVars}>
+				<div className="flex-shrink-0">
+					<div className="flex items-center justify-between gap-4">
+						<h2
+							className="flex-1 font-bold leading-tight tracking-tight text-[#1D1D1F] outline-none"
+							style={{
+								fontFamily: titleHeadingFamily,
+								fontSize: "clamp(1.5rem, 3.5vw, 2.25rem)",
+							}}
+							contentEditable={editable}
+							onInput={(event) =>
+								setDraft((previous) =>
+									previous ?
+										{
+											...previous,
+											title:
+												event.currentTarget
+													.textContent ?? "",
+										}
+									:	previous,
+								)
+							}
+							spellCheck={editable}
+							suppressContentEditableWarning
 						>
-							{activeChapter.status}
+							{draft.title}
+						</h2>
+						<span
+							className="flex-shrink-0 select-none font-bold leading-none tracking-tight"
+							style={{
+								fontSize: "clamp(3rem, 6vw, 4.5rem)",
+								fontFamily: titleHeadingFamily,
+								color: STYLE_PRESETS[draft.textStyle.stylePreset ?? "classic"].numberColor,
+							}}
+							aria-hidden="true"
+						>
+							{String(activeChapter.chapterIndex + 1).padStart(2, "0")}
 						</span>
 					</div>
-					<h2
-						className="min-h-[2.5rem] text-xl font-bold leading-tight tracking-tight text-[#1D1D1F] outline-none md:text-2xl"
-						contentEditable={editable}
-						onInput={(event) =>
-							setDraft((previous) =>
-								previous ?
-									{
-										...previous,
-										title:
-											event.currentTarget.textContent ??
-											"",
-									}
-								:	previous,
-							)
-						}
-						spellCheck={editable}
-						suppressContentEditableWarning
+					<p
+						className="unit-summary-quote mt-4 font-medium italic leading-relaxed text-[#86868B]"
+						style={{
+							fontFamily: titleBodyFamily,
+							textAlign: "justify",
+						}}
 					>
-						{draft.title}
-					</h2>
-					<p className="min-h-[88px] font-medium italic leading-relaxed text-[#86868B]">
 						{activeChapter.summary}
 					</p>
-					<div className="flex items-center gap-3 pt-1 text-[10px] text-[#86868B]">
-						<div className="flex items-center gap-1">
-							<Clock size={12} strokeWidth={1.5} />
-							<span>{activeChapter.readingTime}</span>
-						</div>
-						<div className="flex items-center gap-1">
-							<Target size={12} strokeWidth={1.5} />
-							<span>{activeChapter.level}</span>
-						</div>
-					</div>
-					<div className="my-3 h-[1px] w-full bg-[#E5E5E7]" />
+					<div
+						className="mt-5 h-[1.5px] w-full bg-gradient-to-r from-transparent to-transparent"
+						style={{
+							backgroundImage: `linear-gradient(to right, transparent, ${STYLE_PRESETS[draft.textStyle.stylePreset ?? "classic"].numberColor}, transparent)`,
+						}}
+					/>
 				</div>
 
 				<div
@@ -2036,7 +2074,6 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 						"relative flex min-h-0 flex-1 flex-col",
 						extraContent ? "overflow-y-auto" : "overflow-hidden",
 					)}
-					style={resolvedThemeVars}
 				>
 					{editable ?
 						<TiptapHtmlEditor
@@ -2045,7 +2082,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 								"leading-[1.9] text-[#1D1D1F] outline-none",
 								extraContent ?
 									"min-h-0 w-full shrink-0 overflow-visible pb-1"
-								:	"h-full min-h-full overflow-hidden",
+								:	"h-full min-h-full overflow-auto",
 							)}
 							baseTextStyle={draft.textStyle}
 							editable
@@ -2063,11 +2100,12 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 								"unit-page-scope leading-[1.9] text-[#1D1D1F]",
 								extraContent ?
 									"min-h-0 w-full shrink-0 overflow-visible pb-1"
-								:	"h-full min-h-full overflow-hidden",
+								:	"h-full min-h-full overflow-auto",
 							)}
 							style={resolvedThemeVars}
 							animateBlocks={isActiveChapterStreaming}
 							animationSeed={`${didacticUnitId}-${activeChapter.chapterIndex}-first`}
+							stylePreset={draft.textStyle.stylePreset ?? "classic"}
 						/>
 					}
 					{extraContent ?
@@ -2081,6 +2119,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			</div>
 		</div>
 	);
+	};
 
 	const renderReadPage = ({
 		page,
@@ -2103,7 +2142,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 						width: `${spreadMetrics.pageWidth}px`,
 					}}
 				>
-					<div className="flex h-full flex-col overflow-hidden p-6 pb-12 md:p-8 md:pb-14">
+					<div className="flex h-full flex-col overflow-hidden px-5 py-4 md:px-6 md:py-5">
 						<div className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-[#86868B]">
 							Next Steps
 						</div>
@@ -2113,7 +2152,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 								primaryActionLabel: page.primaryActionLabel,
 							})}
 						</div>
-						<div className="absolute bottom-4 right-6 text-[10px] font-medium text-[#86868B] md:bottom-6 md:right-10">
+						<div className="pointer-events-none absolute bottom-4 right-6 text-[10px] font-medium text-[#86868B] md:bottom-6 md:right-10">
 							{pageNumber}
 						</div>
 					</div>
@@ -2273,53 +2312,6 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 									ease: [0.22, 1, 0.36, 1],
 								}}
 							>
-								<ChapterStyleMenu
-									compact={editorToolbarCompact}
-									value={draft.textStyle}
-									onChange={(textStyle) => {
-										setDraft((previous) =>
-											previous ?
-												{
-													...previous,
-													textStyle,
-												}
-											:	previous,
-										);
-										const presentationTheme =
-											themeFromTextStyle(
-												resolvedTheme,
-												textStyle,
-											);
-										setWorkspace((previous) =>
-											previous ?
-												{
-													...previous,
-													presentationTheme,
-												}
-											:	previous,
-										);
-										void dashboardApi
-											.updateDidacticUnitTheme(
-												didacticUnitId,
-												presentationTheme,
-											)
-											.catch((error) => {
-												toastError(
-														error instanceof Error ?
-															error.message
-														:	"Could not update the unit style.",
-												);
-											});
-									}}
-								/>
-								<div
-									className={cn(
-										"h-6 w-px shrink-0 bg-[#E5DED0]",
-										editorToolbarCompact ? "block" : (
-											"hidden md:block"
-										),
-									)}
-								/>
 								<EditorToolbar
 									activeEditor={activeHtmlEditor}
 									compact={editorToolbarCompact}
@@ -2631,7 +2623,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 
 						<div className="flex items-center gap-1.5">
 							<button
-								className="flex items-center gap-2 rounded-full px-3 py-1.5 text-[13px] font-medium transition-all hover:bg-[#F5F5F7]"
+								className="flex items-center gap-2 rounded-full border border-[#D4D7DD] bg-white px-3 py-1.5 text-[13px] font-medium text-[#1D1D1F] transition-all hover:bg-[#F5F5F7]"
 								onClick={() =>
 									setIsHistoryOpen((value) => !value)
 								}
@@ -2661,6 +2653,47 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 										</span>
 									</button>
 								)}
+							{draft !== null && (
+								<ChapterStyleMenu
+									compact={false}
+									value={draft.textStyle}
+									onChange={(textStyle) => {
+										setDraft((previous) =>
+											previous ?
+												{
+													...previous,
+													textStyle,
+												}
+											:	previous,
+										);
+										const presentationTheme =
+											themeFromTextStyle(
+												resolvedTheme,
+												textStyle,
+											);
+										setWorkspace((previous) =>
+											previous ?
+												{
+													...previous,
+													presentationTheme,
+												}
+											:	previous,
+										);
+										void dashboardApi
+											.updateDidacticUnitTheme(
+												didacticUnitId,
+												presentationTheme,
+											)
+											.catch((error) => {
+												toastError(
+													error instanceof Error ?
+														error.message
+													:	"Could not update the unit style.",
+												);
+											});
+									}}
+								/>
+							)}
 							{isEditMode ?
 								<div
 									className="flex h-8 w-[117px] overflow-hidden rounded-full border border-[#D4D7DD] bg-white shadow-sm"
@@ -2980,27 +3013,33 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 							:	"Retry generating this module?"}
 						</AlertDialogTitle>
 						<AlertDialogDescription>
-							{activeChapter.status === "ready" ?
-								<>
-									The module will be generated again and the
-									text you see now will be replaced. Earlier
-									snapshots stay available: open{" "}
-									<strong className="font-medium text-[#1D1D1F]">
-										Version History
-									</strong>{" "}
-									in the header to review or restore a
-									previous version.
-								</>
-							:	<>
-									We will run generation again for this
-									module. If a snapshot was already saved, you
-									can open it from{" "}
-									<strong className="font-medium text-[#1D1D1F]">
-										Version History
-									</strong>{" "}
-									in the header.
-								</>
-							}
+							<div className="space-y-3">
+								{activeChapter.status === "ready" ?
+									<>
+										The module will be generated again and the
+										text you see now will be replaced. Earlier
+										snapshots stay available: open{" "}
+										<strong className="font-medium text-[#1D1D1F]">
+											Version History
+										</strong>{" "}
+										in the header to review or restore a
+										previous version.
+									</>
+								:	<>
+										We will run generation again for this
+										module. If a snapshot was already saved, you
+										can open it from{" "}
+										<strong className="font-medium text-[#1D1D1F]">
+											Version History
+										</strong>{" "}
+										in the header.
+									</>
+								}
+								<div className="flex items-center gap-2">
+									<span>This action will cost</span>
+									<CoinAmount type="bronze" amount={1} />
+								</div>
+							</div>
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>

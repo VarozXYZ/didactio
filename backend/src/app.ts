@@ -120,6 +120,7 @@ import {
 	type GenerationQuality,
 } from "./credits/generation-pricing.js";
 import {parsePresentationTheme} from "./presentation-theme/validate.js";
+import {SYSTEM_DEFAULT_THEME} from "./presentation-theme/types.js";
 
 export interface CreateAppOptions {
 	didacticUnitStore: DidacticUnitStore;
@@ -1502,6 +1503,13 @@ export function createApp(options: CreateAppOptions) {
 			});
 
 			if (!moderation.approved) {
+				appLogger.warn("Didactic unit moderation rejected", {
+					didacticUnitId: didacticUnit.id,
+					ownerId: requestWithMockOwner.mockOwner.id,
+					topic: didacticUnit.topic,
+					notes: moderation.notes,
+					reasoningNotes: moderation.reasoningNotes,
+				});
 				response.status(409).json({error: moderation.notes});
 				return;
 			}
@@ -1525,7 +1533,20 @@ export function createApp(options: CreateAppOptions) {
 						}),
 					})
 				:	moderatedDidacticUnit;
-			await didacticUnitStore.save(folderResolvedDidacticUnit);
+			// Apply AI-suggested style preset if no theme is set yet
+			const styledUnit =
+				moderation.stylePreset &&
+				!folderResolvedDidacticUnit.presentationTheme?.stylePreset ?
+					{
+						...folderResolvedDidacticUnit,
+						presentationTheme: {
+							...(folderResolvedDidacticUnit.presentationTheme ??
+								SYSTEM_DEFAULT_THEME),
+							stylePreset: moderation.stylePreset,
+						},
+					}
+				:	folderResolvedDidacticUnit;
+			await didacticUnitStore.save(styledUnit);
 			response.json(
 				await buildDidacticUnitResponse(
 					folderResolvedDidacticUnit,
@@ -1620,6 +1641,14 @@ export function createApp(options: CreateAppOptions) {
 				);
 
 				if (!moderation.approved) {
+					appLogger.warn("Didactic unit moderation rejected", {
+						didacticUnitId: didacticUnit.id,
+						ownerId: requestWithMockOwner.mockOwner.id,
+						topic: didacticUnit.topic,
+						notes: moderation.notes,
+						reasoningNotes: moderation.reasoningNotes,
+						streaming: true,
+					});
 					writeNdjsonEvent(response, {
 						type: "error",
 						message: moderation.notes,

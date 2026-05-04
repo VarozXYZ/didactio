@@ -1,10 +1,28 @@
+export type StylePresetId =
+	| "modern"
+	| "modern"
+	| "classic"
+	| "classic"
+	| "plain";
+
 export type PresentationFont =
 	| "inter"
+	| "lexend"
+	| "eb-garamond"
+	| "crimson-pro"
+	| "dm-sans"
+	// Legacy values kept for backward compatibility
 	| "merriweather"
 	| "source-serif"
 	| "system-sans"
 	| "system-serif"
-	| "system-mono";
+	| "system-mono"
+	| "space-grotesk"
+	| "atkinson"
+	| "fraunces"
+	| "cormorant"
+	| "literata"
+	| "epilogue";
 
 export type PresentationSizeProfile = "small" | "regular" | "large";
 export type PresentationHeadingScale = "compact" | "balanced" | "display";
@@ -16,6 +34,7 @@ export type PresentationParagraphAlign =
 	| "justify";
 
 export interface PresentationTheme {
+	stylePreset?: StylePresetId;
 	bodyFont: PresentationFont;
 	headingFont: PresentationFont;
 	bodyFontSize: PresentationSizeProfile;
@@ -29,20 +48,29 @@ export interface PresentationTheme {
 	paragraphAlign: PresentationParagraphAlign;
 	headingScale: PresentationHeadingScale;
 	paragraphSpacing: PresentationParagraphSpacing;
+	numberColor?: string;
+	codeAccentColor?: string;
+	codeBorderColor?: string;
+	codeHeaderBackground?: string;
 }
 
 export const SYSTEM_DEFAULT_THEME: PresentationTheme = {
-	bodyFont: "inter",
-	headingFont: "inter",
+	stylePreset: "classic",
+	bodyFont: "crimson-pro",
+	headingFont: "eb-garamond",
 	bodyFontSize: "regular",
 	lineHeight: 1.6,
 	bodyColor: "#1D1D1F",
-	headingColor: "#111827",
-	accentColor: "#2563EB",
-	blockquoteAccent: "#CBD5E1",
-	codeBackground: "#F4F4F5",
-	pageBackground: "#FFFFFF",
-	paragraphAlign: "left",
+	headingColor: "#2A1A0A",
+	accentColor: "#996633",
+	blockquoteAccent: "#C4A070",
+	codeBackground: "#F7EEE4",
+	pageBackground: "#FDFAF7",
+	paragraphAlign: "justify",
 	headingScale: "balanced",
 	paragraphSpacing: "normal",
+	numberColor: "#D4B896",
+	codeAccentColor: "#7A4E28",
+	codeBorderColor: "#E4D0BC",
+	codeHeaderBackground: "#EEE1D0",
 };

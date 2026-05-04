@@ -248,11 +248,20 @@ export function buildModerationPrompt(input: {
 	return [
 		buildSection("Role / Contract", [
 			"Validate that the topic is appropriate for educational content.",
-			"Reject only harmful, illegal, clearly non-educational, or unusable requests.",
+			"Approve by default when the request can be turned into a harmless, lawful, rights-respecting learning unit.",
+			"Reject only when the unsafe or unusable part is central to the request and cannot be removed while preserving a coherent educational topic.",
 			"Improve vague prompts into clear, structured learning objectives.",
 			shouldClassifyFolder ?
 				"Also classify the unit into exactly one of the provided folders."
 			:	"",
+		]),
+		buildSection("Moderation Policy", [
+			"Approve ordinary educational topics across domains: academic subjects, professional skills, software and technology, arts, languages, health and wellbeing at a general educational level, finance literacy, hobbies, entertainment, sports, games, productivity, and personal development.",
+			"Do not reject merely because the topic is informal, practical, commercial, strategic, entertainment-related, competitive, or not traditionally academic.",
+			"Reject requests that meaningfully enable real-world harm, illegal conduct, rights violations, privacy invasion, cheating/fraud, account abuse, payment bypass, malware/bots, weapons misuse, self-harm, abuse or exploitation, hateful/harassing content, sexual explicitness, or instructions to evade safeguards.",
+			"Reject requests to plagiarize, impersonate, steal copyrighted material, violate terms of service, or bypass access controls. Educational discussion about ethics, prevention, history, policy, or high-level awareness of these areas is allowed.",
+			"When a request has both safe and unsafe interpretations, approve the safe educational version, remove or neutralize unsafe instructions, and mention the boundary in notes.",
+			'Example allowed case: "Como conseguir muchisimos diamantes en Infinity Nikki" should be approved as a legitimate guide to in-game progression, events, daily tasks, rewards, and resource management, while excluding cheating, bots, account abuse, exploits, or payment bypass.',
 		]),
 		buildSection(
 			"Authoring Profile",
@@ -275,9 +284,17 @@ export function buildModerationPrompt(input: {
 					.join("\n"),
 			])
 		:	"",
+		buildSection("Visual Style Presets", [
+			'Also choose the most appropriate visual style for this unit from exactly one of: "modern", "classic", "plain".',
+			'- "modern": programming, engineering, technology, and data science topics (clean, contemporary aesthetic)',
+			'- "classic": humanities, history, literature, and general learning (editorial, traditional aesthetic)',
+			'- "plain": neutral content with minimal styling (default if unsure)',
+			"Return the chosen preset ID in the stylePreset field.",
+		]),
 		buildSection("Output Contract", [
 			"Return whether the prompt is approved, a normalized topic title, an improved topic brief targeting the requested level, and concise reasoning notes.",
 			"Use these exact JSON keys: approved, notes, normalizedTopic, improvedTopicBrief, reasoningNotes.",
+			"Set approved to true for ordinary benign educational requests, including practical or hobby topics, unless the request clearly falls into a rejection category above.",
 			"Preserve the authoring context in the improved brief so downstream generations inherit it.",
 			shouldClassifyFolder ?
 				"Return folderName exactly as written in the available folder list. If uncertain, use General."
@@ -285,6 +302,7 @@ export function buildModerationPrompt(input: {
 			shouldClassifyFolder ?
 				"Return folderReasoning with a short explanation for the folder choice."
 			:	"",
+			'Return stylePreset as one of: "modern", "classic", "plain". Default to "classic" if unsure.',
 		]),
 	].join("\n\n");
 }
@@ -360,9 +378,17 @@ export function buildFolderClassificationPrompt(input: {
 				)
 				.join("\n"),
 		]),
+		buildSection("Visual Style Presets", [
+			'Also choose the most appropriate visual style for this unit from exactly one of: "modern", "classic", "plain".',
+			'- "modern": programming, engineering, technology, and data science topics (clean, contemporary aesthetic)',
+			'- "classic": humanities, history, literature, and general learning (editorial, traditional aesthetic)',
+			'- "plain": neutral content with minimal styling (default if unsure)',
+			"Return the chosen preset ID in the stylePreset field.",
+		]),
 		buildSection("Output Contract", [
 			"Return the chosen folderName exactly as written in the available folder list.",
 			"Include a concise reasoning string explaining the match.",
+			'Return the stylePreset as one of: "modern", "classic", "plain". Default to "classic" if unsure.',
 		]),
 	].join("\n\n");
 }
@@ -508,7 +534,10 @@ export function buildChapterHtmlPrompt(input: {
 			"3. A contrastive analysis showing ineffective vs effective approaches",
 			"4. Common mistakes or pitfalls",
 			"5. A short, meaningful activity or reflection task",
-			"6. A final paragraph that concisely recaps the chapter and works as context for the next chapter.",
+			"6. Exactly one closing paragraph for the whole generated module, placed only at the very end of the HTML.",
+			"The closing paragraph must concisely recap only what this chapter has already taught.",
+			"Do not add closing, recap, transition, or 'what comes next' headings inside individual lessons or in the middle of the module.",
+			"Do not preview future modules, upcoming lessons, or what the learner will do next in the closing paragraph.",
 			'Do not use generic headings like "Concept Explanation" or "Practical Example" repeatedly. Use topic-specific headings.',
 			input.instruction ?
 				`Regeneration instruction from the user: ${input.instruction}`
@@ -528,7 +557,10 @@ export function buildChapterHtmlPrompt(input: {
 			"Code blocks must use <pre><code class=\"language-X\">...</code></pre>.",
 			"Links may use href and title only. Use http, https, mailto, or #anchor hrefs.",
 			"Use sentence case for headings.",
-			"The final top-level <p> must be a concise recap or conclusion for continuity.",
+			"The final top-level element must be a single <p>, not a heading or list.",
+			"The final top-level <p> must be the only closing recap in the module and must summarize concepts already covered in this chapter.",
+			'Do not use headings such as "What you have learned", "What comes next", "What you have learned and what comes next", "Summary", "Conclusion", "Next steps", "Lo que has aprendido", or "Que viene despues".',
+			'The final top-level <p> must not mention future learning, upcoming modules, next chapters, previews, or phrases like "next", "will learn", "will explore", "in the next module", "a continuacion", or "en el siguiente modulo".',
 		]),
 	].join("\n\n");
 }

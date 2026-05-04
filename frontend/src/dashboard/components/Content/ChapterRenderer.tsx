@@ -6,6 +6,7 @@ import parse, {
 } from "html-react-parser";
 import {Children, type CSSProperties, type ReactNode} from "react";
 import {motion as Motion, useReducedMotion} from "motion/react";
+import type {StylePresetId} from "../../utils/typography";
 import {CodeBlock} from "./CodeBlock";
 
 type ChapterRendererProps = {
@@ -14,6 +15,7 @@ type ChapterRendererProps = {
 	style?: CSSProperties;
 	animateBlocks?: boolean;
 	animationSeed?: string;
+	stylePreset?: StylePresetId;
 };
 
 function getText(node: DOMNode): string {
@@ -51,6 +53,7 @@ export function ChapterRenderer({
 	style,
 	animateBlocks = false,
 	animationSeed = "chapter",
+	stylePreset = "classic",
 }: ChapterRendererProps) {
 	const prefersReducedMotion = useReducedMotion();
 	const options: HTMLReactParserOptions = {
@@ -65,7 +68,7 @@ export function ChapterRenderer({
 						child instanceof Element && child.name === "code",
 				);
 				const language = getLanguage(codeChild?.attribs.class);
-				return <CodeBlock code={getText(codeChild ?? node)} language={language} />;
+				return <CodeBlock code={getText(codeChild ?? node)} language={language} stylePreset={stylePreset} />;
 			}
 
 			if (node.name === "a") {

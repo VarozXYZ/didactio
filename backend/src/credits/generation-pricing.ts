@@ -31,7 +31,7 @@ export function resolveUnitGenerationCost(input: {
 
 export function resolveSyllabusGenerationCost(): GenerationCoinCost {
 	return {
-		coinType: "silver",
+		coinType: "bronze",
 		amount: 1,
 	};
 }

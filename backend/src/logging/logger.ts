@@ -1,5 +1,6 @@
 import {appendFileSync, mkdirSync} from "node:fs";
 import path from "node:path";
+import {inspect} from "node:util";
 import {compactRecord, toSerializableValue} from "../utils/serialize.js";
 
 export type LogLevel = "debug" | "info" | "warn" | "error";
@@ -31,6 +32,38 @@ function resolveDefaultLogLevel(): LogLevel {
 	}
 
 	return process.env.NODE_ENV === "test" ? "error" : "info";
+}
+
+function formatLogTimestamp(date: Date): string {
+	const pad = (value: number) => String(value).padStart(2, "0");
+
+	return [
+		`${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`,
+		`${pad(date.getHours())}:${pad(date.getMinutes())}`,
+	].join(" ");
+}
+
+function formatLogDetails(details: Record<string, unknown>): string {
+	if (Object.keys(details).length === 0) {
+		return "";
+	}
+
+	return `\n${inspect(details, {
+		breakLength: 100,
+		colors: false,
+		compact: false,
+		depth: null,
+		sorted: false,
+	})}`;
+}
+
+function formatConsoleLog(
+	level: LogLevel,
+	message: string,
+	details: Record<string, unknown>,
+): string {
+	const levelLabel = level === "info" ? "" : `${level.toUpperCase()} `;
+	return `[${formatLogTimestamp(new Date())}] ${levelLabel}${message}${formatLogDetails(details)}`;
 }
 
 export class Logger {
@@ -83,16 +116,12 @@ export class Logger {
 			return;
 		}
 
-		const entry = compactRecord({
-			timestamp: new Date().toISOString(),
-			level,
-			logger: this.name,
-			message,
+		const logDetails = compactRecord({
 			...(toSerializableValue(this.context) as Record<string, unknown>),
 			...(toSerializableValue(details ?? {}) as Record<string, unknown>),
 		});
 
-		const serialized = JSON.stringify(entry);
+		const serialized = formatConsoleLog(level, message, logDetails);
 
 		if (level === "error") {
 			console.error(serialized);
