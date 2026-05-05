@@ -1197,13 +1197,11 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			setActiveGeneratingChapterIndex(chapter.chapterIndex);
 			resetStreamingHtml();
 
-			let streamRunId: string | null = null;
 			try {
 				const {runId} = await dashboardApi.createGenerationRun(
 					didacticUnitId,
 					chapter.chapterIndex,
 				);
-				streamRunId = runId;
 				setActiveRunId(runId);
 				await dashboardApi.streamGenerationRun(runId, {
 					onPartialHtmlBlock: ({block}) => {
@@ -1216,7 +1214,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				await refreshWorkspaceAfterGeneration();
 				await refreshUser();
 			} catch (actionError) {
-				if (cancelledGenerationRunIdRef.current !== streamRunId) {
+				if (!isCancellingGenerationRef.current) {
 					toastError(
 						actionError instanceof Error ?
 							actionError.message
@@ -1226,14 +1224,12 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				setIsSaving(false);
 				await refreshUser();
 			} finally {
+				isCancellingGenerationRef.current = false;
 				setIsSubmitting(false);
 				setIsStreamingGeneration(false);
 				setActiveGeneratingChapterIndex(null);
 				setActiveRunId(null);
 				resetStreamingHtml();
-				if (cancelledGenerationRunIdRef.current === streamRunId) {
-					cancelledGenerationRunIdRef.current = null;
-				}
 			}
 		},
 		[
@@ -1267,7 +1263,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		generationQueueBlockedRef.current = true;
 
 		try {
-			cancelledGenerationRunIdRef.current = activeRunId;
+			isCancellingGenerationRef.current = true;
 			await dashboardApi.cancelGenerationRun(activeRunId);
 			await refreshWorkspaceAfterGeneration();
 		} catch (actionError) {
@@ -1312,13 +1308,11 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				setActiveGeneratingChapterIndex(chapter.chapterIndex);
 				resetStreamingHtml();
 
-				let streamRunId: string | null = null;
 				try {
 					const {runId} = await dashboardApi.createGenerationRun(
 						didacticUnitId,
 						chapter.chapterIndex,
 					);
-					streamRunId = runId;
 					setActiveRunId(runId);
 					await dashboardApi.streamGenerationRun(runId, {
 						onPartialHtmlBlock: ({block}) => {
@@ -1328,7 +1322,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 
 					flushStreamingHtml();
 				} catch (actionError) {
-					if (cancelledGenerationRunIdRef.current !== streamRunId) {
+					if (!isCancellingGenerationRef.current) {
 						toastError(
 							actionError instanceof Error ?
 								actionError.message
@@ -1336,10 +1330,8 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 						);
 					}
 				} finally {
+					isCancellingGenerationRef.current = false;
 					await refreshWorkspaceAfterGeneration();
-					if (cancelledGenerationRunIdRef.current === streamRunId) {
-						cancelledGenerationRunIdRef.current = null;
-					}
 				}
 
 				if (generationQueueBlockedRef.current) {
@@ -1348,11 +1340,14 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			}
 		} catch (actionError) {
 			generationQueueBlockedRef.current = true;
-			toastError(
-				actionError instanceof Error ?
-					actionError.message
-				:	"Didactic unit generation failed.",
-			);
+			if (!isCancellingGenerationRef.current) {
+				toastError(
+					actionError instanceof Error ?
+						actionError.message
+					:	"Didactic unit generation failed.",
+				);
+			}
+			isCancellingGenerationRef.current = false;
 			setIsSaving(false);
 		} finally {
 			isGenerationQueueRunningRef.current = false;
