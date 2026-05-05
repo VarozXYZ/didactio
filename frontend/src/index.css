@@ -229,7 +229,7 @@ body {
 .unit-page-scope ol {
 	margin-top: 0.5em;
 	margin-bottom: 0.8em;
-	padding-left: 1.2em;
+	padding-left: 1.6em;
 	text-align: justify;
 }
 
@@ -237,12 +237,14 @@ body {
 .typography-scope ul,
 .unit-page-scope ul {
 	list-style-type: disc;
+	list-style-position: inside;
 }
 
 .prose ol,
 .typography-scope ol,
 .unit-page-scope ol {
 	list-style-type: decimal;
+	list-style-position: inside;
 }
 
 .prose li,
@@ -250,6 +252,13 @@ body {
 .unit-page-scope li {
 	margin-bottom: 0.3em;
 	line-height: 1.9;
+	padding-left: 1.1em;
+	text-indent: -1.1em;
+}
+
+.unit-page-scope li::marker {
+	color: var(--unit-body-color, #1d1d1f);
+	font-size: 0.9em;
 }
 
 .prose table,
@@ -414,7 +423,7 @@ body {
 .unit-page-scope ul,
 .unit-page-scope ol {
 	margin: 0.5em 0;
-	padding-left: 1.5em;
+	padding-left: 1.6em;
 }
 
 
@@ -461,6 +470,7 @@ body {
 	border: 1px solid var(--unit-code-border, #d0d7de);
 	border-radius: 16px;
 	overflow: hidden;
+	position: relative;
 	margin: 1rem 0;
 }
 
@@ -468,7 +478,7 @@ body {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	padding: 6px 12px;
+	padding: 4px 12px;
 	background: var(--unit-code-header-bg, #eaeef2);
 	border-bottom: 1px solid var(--unit-code-border, #d0d7de);
 }
@@ -478,6 +488,49 @@ body {
 	font-size: 11px;
 	color: #57606a;
 	font-weight: 500;
+}
+
+.code-block-continuation {
+	border-radius: 999px;
+	color: var(--unit-code-accent, #57606a);
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+	font-size: 10px;
+	font-weight: 600;
+	padding: 1px 6px;
+	text-transform: uppercase;
+}
+
+.code-block-continuation::before {
+	content: "\21A9";
+	font-size: 11px;
+	line-height: 1;
+}
+
+.code-block-continues-next {
+	position: absolute;
+	right: 10px;
+	bottom: 8px;
+	border-radius: 999px;
+	background: var(--unit-code-bg, #f6f8fa);
+	color: var(--unit-code-accent, #57606a);
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+	font-size: 10px;
+	font-weight: 600;
+	line-height: 1;
+	padding: 4px 7px;
+	text-transform: uppercase;
+}
+
+.code-block-continues-next::before {
+	content: "\21AA";
+	font-size: 11px;
+	line-height: 1;
 }
 
 .code-block-copy {
@@ -506,7 +559,7 @@ body {
 	border: none;
 	border-radius: 0;
 	background: transparent;
-	padding: 1rem 1.25rem;
+	padding: 0.3rem 1.25rem;
 	font-size: 0.85em;
 	line-height: 1.7;
 	overflow-x: auto;

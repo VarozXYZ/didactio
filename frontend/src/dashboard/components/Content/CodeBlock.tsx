@@ -11,6 +11,7 @@ const THEME_MAP: Record<StylePresetId, string> = {
 type CodeBlockProps = {
 	code: string;
 	language?: string;
+	continuation?: "continued" | "continues-next";
 	stylePreset?: StylePresetId;
 };
 
@@ -21,7 +22,12 @@ function escapeHtml(value: string): string {
 		.replace(/>/g, "&gt;");
 }
 
-export function CodeBlock({code, language, stylePreset = "classic"}: CodeBlockProps) {
+export function CodeBlock({
+	code,
+	language,
+	continuation,
+	stylePreset = "classic",
+}: CodeBlockProps) {
 	const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null);
 	const [copied, setCopied] = useState(false);
 	const lineCount = useMemo(() => Math.max(1, code.split("\n").length), [code]);
@@ -68,7 +74,14 @@ export function CodeBlock({code, language, stylePreset = "classic"}: CodeBlockPr
 	return (
 		<div className="code-block-wrapper">
 			<div className="code-block-header">
-				<span className="code-block-lang">{langLabel}</span>
+				<div className="flex items-center gap-2">
+					<span className="code-block-lang">{langLabel}</span>
+					{continuation === "continued" ?
+						<span className="code-block-continuation">
+							continued
+						</span>
+					:	null}
+				</div>
 				<button
 					className="code-block-copy"
 					onClick={handleCopy}
@@ -94,6 +107,9 @@ export function CodeBlock({code, language, stylePreset = "classic"}: CodeBlockPr
 					<code>{code}</code>
 				</pre>
 			}
+			{continuation === "continues-next" ?
+				<div className="code-block-continues-next">next page</div>
+			:	null}
 		</div>
 	);
 }

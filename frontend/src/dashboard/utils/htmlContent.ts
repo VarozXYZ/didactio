@@ -12,6 +12,16 @@ export type HtmlPageBlock =
 			headingLevel?: 1 | 2 | 3;
 	  }
 	| {
+			type: "code";
+			html: string;
+			text: string;
+			code: string;
+			language?: string;
+			splitId?: string;
+			continued: boolean;
+			continuesNext: boolean;
+	  }
+	| {
 			type: "splittable_list";
 			ordered: boolean;
 			spread: boolean;
@@ -52,8 +62,64 @@ function headingLevelForElement(element: HTMLElement): 1 | 2 | 3 | undefined {
 	return undefined;
 }
 
+function getCodeLanguage(codeElement: Element | null): string | undefined {
+	const className = codeElement?.getAttribute("class") ?? "";
+	return className.match(/\blanguage-([a-z0-9+#-]+)/i)?.[1];
+}
+
+function escapeCodeHtml(value: string): string {
+	return value
+		.replaceAll("&", "&amp;")
+		.replaceAll("<", "&lt;")
+		.replaceAll(">", "&gt;");
+}
+
+export function buildCodeHtml({
+	code,
+	language,
+	splitId,
+	continued = false,
+	continuesNext = false,
+}: {
+	code: string;
+	language?: string;
+	splitId?: string;
+	continued?: boolean;
+	continuesNext?: boolean;
+}): string {
+	const languageClass = language ? ` class="language-${language}"` : "";
+	const continuationAttributes = [
+		splitId ? ` data-code-split-id="${splitId}"` : "",
+		continued ? ' data-code-continuation="continued"' : "",
+		continuesNext ? ' data-code-continues-next="true"' : "",
+	].join("");
+	return `<pre${continuationAttributes}><code${languageClass}>${escapeCodeHtml(code)}</code></pre>`;
+}
+
 function htmlElementToPageBlock(element: HTMLElement): HtmlPageBlock {
 	const text = normalizeText(element.textContent);
+
+	if (element.tagName === "PRE") {
+		const codeElement = element.querySelector("code");
+		const code = codeElement?.textContent ?? element.textContent ?? "";
+		const language = getCodeLanguage(codeElement);
+		return {
+			type: "code",
+			html: buildCodeHtml({
+				code,
+				language,
+				splitId: element.dataset.codeSplitId,
+				continued: element.dataset.codeContinuation === "continued",
+				continuesNext: element.dataset.codeContinuesNext === "true",
+			}),
+			text: normalizeText(code),
+			code,
+			language,
+			splitId: element.dataset.codeSplitId,
+			continued: element.dataset.codeContinuation === "continued",
+			continuesNext: element.dataset.codeContinuesNext === "true",
+		};
+	}
 
 	if (
 		(element.tagName === "UL" || element.tagName === "OL") &&

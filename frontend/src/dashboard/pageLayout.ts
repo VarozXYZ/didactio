@@ -3,6 +3,7 @@ import type {
 	DidacticUnitEditorChapter as UnitChapter,
 } from "./types";
 import {
+	buildCodeHtml,
 	buildListHtml,
 	extractHtmlBlocks,
 	normalizeStoredHtml,
@@ -16,7 +17,6 @@ import {
 	prepareH2Block,
 	prepareH3Block,
 	prepareListItemBlock,
-	measureBlockHeight,
 	getBlockLines,
 	type BlockMeasurement,
 } from "./utils/pretextMeasure";
@@ -40,9 +40,6 @@ const PAGE_WIDTH_RATIO_MOBILE = 0.72;
 const POST_MODULE_ACTION_GAP = 24;
 const FIRST_PAGE_HEADER_BOTTOM_GAP = 16;
 const DOM_BLOCK_HEIGHT_CACHE_LIMIT = 2000;
-// Extra height per code block to account for the .code-block-header bar added
-// by CodeBlock.tsx (padding 6+6px + ~16px line + 1px border = ~29px; use 32 for margin).
-const CODE_BLOCK_HEADER_HEIGHT_PX = 32;
 
 const domBlockHeightCache = new Map<string, number>();
 
@@ -157,6 +154,10 @@ function escapeHtml(value: string): string {
 }
 
 function renderHtmlBlock(block: HtmlPageBlock): string {
+	if (block.type === "code") {
+		return buildCodeHtml(block);
+	}
+
 	if (block.type === "splittable_list") {
 		return buildListHtml(block);
 	}
@@ -166,6 +167,46 @@ function renderHtmlBlock(block: HtmlPageBlock): string {
 	}
 
 	return block.html;
+}
+
+function getLanguageFromCodeElement(codeElement: Element | null): string {
+	const className = codeElement?.getAttribute("class") ?? "";
+	return className.match(/\blanguage-([a-z0-9+#-]+)/i)?.[1] ?? "plaintext";
+}
+
+function createCodeBlockMeasurementHtml(html: string): string {
+	const parser = new DOMParser();
+	const document = parser.parseFromString(html, "text/html");
+
+	document.body.querySelectorAll("pre").forEach((pre) => {
+		const codeElement = pre.querySelector("code");
+		const language = getLanguageFromCodeElement(codeElement);
+		const wrapper = document.createElement("div");
+		wrapper.className = "code-block-wrapper";
+		wrapper.innerHTML = `
+			<div class="code-block-header">
+				<div class="flex items-center gap-2">
+					<span class="code-block-lang">${escapeHtml(language)}</span>
+				</div>
+				<button type="button" class="code-block-copy">Copy</button>
+			</div>
+			<div class="code-block-highlight"></div>
+		`;
+		wrapper
+			.querySelector(".code-block-highlight")
+			?.appendChild(pre.cloneNode(true));
+		pre.replaceWith(wrapper);
+	});
+
+	return document.body.innerHTML;
+}
+
+function measureRenderedHtmlHeight(
+	html: string,
+	proseMeasure: HTMLDivElement,
+): number {
+	proseMeasure.innerHTML = createCodeBlockMeasurementHtml(html);
+	return proseMeasure.scrollHeight;
 }
 
 function isMeasuredContentPage(
@@ -261,6 +302,10 @@ function annotateBlocks(
 			};
 		}
 
+		if (block.type === "code") {
+			return {...block, startCharacterOffset, endCharacterOffset};
+		}
+
 		// All union members handled above; this is unreachable.
 		return {
 			...(block as object),
@@ -281,18 +326,89 @@ function joinBlocksHtml(blocks: HtmlPageBlock[]): string {
 	return out;
 }
 
-function splitParagraphToFit({
+function makeParagraphFragment({
 	block,
-	currentBlocksHeight,
-	currentLimit,
-	contentWidth,
+	fittingText,
+	remainderText,
 	typography,
 }: {
 	block: Extract<AnnotatedHtmlPageBlock, {type: "paragraph"}>;
-	currentBlocksHeight: number;
+	fittingText: string;
+	remainderText: string;
+	typography: ResolvedTypography;
+}): {
+	fittingBlock: Extract<AnnotatedHtmlPageBlock, {type: "paragraph"}>;
+	remainder: Extract<AnnotatedHtmlPageBlock, {type: "paragraph"}> | null;
+} {
+	const fittingEndText =
+		remainderText ?
+			block.text.slice(0, fittingText.length).trimEnd()
+		:	block.text;
+	const remainderStartText =
+		remainderText ? block.text.slice(fittingEndText.length).trimStart() : "";
+	const fittingEndCharacterOffset = Math.min(
+		block.endCharacterOffset,
+		block.startCharacterOffset + fittingEndText.length,
+	);
+	const remainderStartCharacterOffset =
+		remainderStartText ?
+			Math.min(
+				block.endCharacterOffset,
+				fittingEndCharacterOffset +
+					(block.text.length -
+						fittingEndText.length -
+						remainderStartText.length),
+			)
+		:	fittingEndCharacterOffset;
+	const splitHtml = splitParagraphHtmlAtTextOffset(
+		block.html,
+		fittingEndText.length,
+	);
+
+	return {
+		fittingBlock: {
+			...block,
+			html: splitHtml.fittingHtml,
+			text: fittingEndText,
+			endCharacterOffset: fittingEndCharacterOffset,
+			blockMeasurement: prepareParagraphBlock(
+				undefined,
+				fittingEndText,
+				typography,
+			),
+		},
+		remainder:
+			remainderStartText ?
+				{
+					...block,
+					html: splitHtml.remainderHtml,
+					text: remainderStartText,
+					continued: true,
+					startCharacterOffset: remainderStartCharacterOffset,
+					blockMeasurement: prepareParagraphBlock(
+						undefined,
+						remainderStartText,
+						typography,
+					),
+				}
+			:	null,
+	};
+}
+
+function splitParagraphToFit({
+	block,
+	currentLimit,
+	contentWidth,
+	typography,
+	currentBlocks,
+	domMeasurePage,
+}: {
+	block: Extract<AnnotatedHtmlPageBlock, {type: "paragraph"}>;
 	currentLimit: number;
 	contentWidth: number;
 	typography: ResolvedTypography;
+	currentBlocks: AnnotatedHtmlPageBlock[];
+	domMeasurePage: (blocks: HtmlPageBlock[], pageLimit: number) => number;
 }): {
 	fittingBlock: Extract<
 		AnnotatedHtmlPageBlock,
@@ -308,68 +424,39 @@ function splitParagraphToFit({
 		return {fittingBlock: null, remainder: {...block}};
 	}
 
-	const availableHeight = currentLimit - currentBlocksHeight;
-	if (availableHeight <= 0) {
-		return {fittingBlock: null, remainder: {...block}};
+	let lo = 1;
+	let hi = lines.length;
+	let best:
+		| {
+				fittingBlock: Extract<AnnotatedHtmlPageBlock, {type: "paragraph"}>;
+				remainder: Extract<AnnotatedHtmlPageBlock, {type: "paragraph"}> | null;
+		  }
+		| null = null;
+
+	while (lo <= hi) {
+		const mid = Math.floor((lo + hi) / 2);
+		const fittingText = lines.slice(0, mid).join(" ");
+		const remainderText = lines.slice(mid).join(" ");
+		const candidate = makeParagraphFragment({
+			block,
+			fittingText,
+			remainderText,
+			typography,
+		});
+		const candidateHeight = domMeasurePage(
+			[...currentBlocks, candidate.fittingBlock],
+			currentLimit,
+		);
+
+		if (candidateHeight <= currentLimit + 1) {
+			best = candidate;
+			lo = mid + 1;
+		} else {
+			hi = mid - 1;
+		}
 	}
 
-	// Count lines that fit including this block's vertical margins (must match measureBlockHeight).
-	const verticalMargins =
-		measurement.marginTopPx + measurement.marginBottomPx;
-	const fittingLineCount = Math.floor(
-		(availableHeight - verticalMargins) / measurement.lineHeightPx,
-	);
-	if (fittingLineCount <= 0) {
-		return {fittingBlock: null, remainder: {...block}};
-	}
-
-	if (fittingLineCount >= lines.length) {
-		return {fittingBlock: block, remainder: null};
-	}
-
-	const fittingText = lines.slice(0, fittingLineCount).join(" ");
-	const remainderText = lines.slice(fittingLineCount).join(" ");
-	const fittingEndCharacterOffset = Math.min(
-		block.endCharacterOffset,
-		block.startCharacterOffset + fittingText.length,
-	);
-	const remainderStartCharacterOffset =
-		remainderText ?
-			Math.min(block.endCharacterOffset, fittingEndCharacterOffset + 1)
-		:	fittingEndCharacterOffset;
-	const splitHtml = splitParagraphHtmlAtTextOffset(
-		block.html,
-		fittingText.length,
-	);
-
-	return {
-		fittingBlock: {
-			...block,
-			html: splitHtml.fittingHtml,
-			text: fittingText,
-			endCharacterOffset: fittingEndCharacterOffset,
-			blockMeasurement: prepareParagraphBlock(
-				undefined,
-				fittingText,
-				typography,
-			),
-		},
-		remainder:
-			remainderText ?
-				{
-					...block,
-					html: splitHtml.remainderHtml,
-					text: remainderText,
-					continued: true,
-					startCharacterOffset: remainderStartCharacterOffset,
-					blockMeasurement: prepareParagraphBlock(
-						undefined,
-						remainderText,
-						typography,
-					),
-				}
-			:	null,
-	};
+	return best ?? {fittingBlock: null, remainder: {...block}};
 }
 
 type SplittableListAnnotated = Extract<
@@ -377,31 +464,166 @@ type SplittableListAnnotated = Extract<
 	{type: "splittable_list"}
 >;
 
-function measureListHeight(
-	_block: SplittableListAnnotated,
-	itemMeasurements: BlockMeasurement[],
-	itemContentWidth: number,
-	typography: ResolvedTypography,
-): number {
-	let total = typography.list.marginTopPx + typography.list.marginBottomPx;
-	for (const m of itemMeasurements) {
-		total += measureBlockHeight(m, itemContentWidth);
+type CodeAnnotated = Extract<AnnotatedHtmlPageBlock, {type: "code"}>;
+
+let codeSplitIdCounter = 0;
+
+function getCodeLines(code: string): string[] {
+	return code.split("\n");
+}
+
+function makeCodeSubBlock({
+	block,
+	code,
+	text,
+	continued,
+	continuesNext,
+	splitId,
+	startCharacterOffset,
+	endCharacterOffset,
+}: {
+	block: CodeAnnotated;
+	code: string;
+	text: string;
+	continued: boolean;
+	continuesNext: boolean;
+	splitId?: string;
+	startCharacterOffset: number;
+	endCharacterOffset: number;
+}): CodeAnnotated {
+	return {
+		...block,
+		code,
+		text,
+		html: buildCodeHtml({
+			code,
+			language: block.language,
+			splitId,
+			continued,
+			continuesNext,
+		}),
+		continued,
+		continuesNext,
+		splitId,
+		startCharacterOffset,
+		endCharacterOffset,
+	};
+}
+
+function splitCodeToFit({
+	block,
+	currentLimit,
+	currentBlocks,
+	domMeasurePage,
+}: {
+	block: CodeAnnotated;
+	currentLimit: number;
+	currentBlocks: AnnotatedHtmlPageBlock[];
+	domMeasurePage: (blocks: HtmlPageBlock[], pageLimit: number) => number;
+}): {
+	fittingBlock: CodeAnnotated | null;
+	remainder: CodeAnnotated | null;
+} {
+	const lines = getCodeLines(block.code);
+	if (lines.length <= 1) {
+		return {fittingBlock: null, remainder: block};
 	}
-	return total;
+	const splitId = block.splitId ?? `code-split-${codeSplitIdCounter++}`;
+
+	const makeCandidate = (lineCount: number): CodeAnnotated => {
+		const code = lines.slice(0, lineCount).join("\n");
+		const text = code.replace(/\s+/g, " ").trim();
+		return makeCodeSubBlock({
+			block,
+			code,
+			text,
+			continued: block.continued,
+			continuesNext: lineCount < lines.length,
+			splitId,
+			startCharacterOffset: block.startCharacterOffset,
+			endCharacterOffset: Math.min(
+				block.endCharacterOffset,
+				block.startCharacterOffset + text.length,
+			),
+		});
+	};
+
+	let lo = 1;
+	let hi = lines.length;
+	let bestLineCount = 0;
+
+	while (lo <= hi) {
+		const mid = Math.floor((lo + hi) / 2);
+		const candidate = makeCandidate(mid);
+		const candidateHeight = domMeasurePage(
+			[...currentBlocks, candidate],
+			currentLimit,
+		);
+
+		if (candidateHeight <= currentLimit + 1) {
+			bestLineCount = mid;
+			lo = mid + 1;
+		} else {
+			hi = mid - 1;
+		}
+	}
+
+	if (bestLineCount <= 0) {
+		return {fittingBlock: null, remainder: block};
+	}
+
+	if (bestLineCount >= lines.length) {
+		return {fittingBlock: block, remainder: null};
+	}
+
+	const fittingCode = lines.slice(0, bestLineCount).join("\n");
+	const remainderCode = lines.slice(bestLineCount).join("\n");
+	const fittingText = fittingCode.replace(/\s+/g, " ").trim();
+	const remainderText = remainderCode.replace(/\s+/g, " ").trim();
+	const fittingEndOffset = Math.min(
+		block.endCharacterOffset,
+		block.startCharacterOffset + fittingText.length,
+	);
+
+	return {
+		fittingBlock: makeCodeSubBlock({
+			block,
+			code: fittingCode,
+			text: fittingText,
+			continued: block.continued,
+			continuesNext: Boolean(remainderCode),
+			splitId,
+			startCharacterOffset: block.startCharacterOffset,
+			endCharacterOffset: fittingEndOffset,
+		}),
+		remainder:
+			remainderCode ?
+				makeCodeSubBlock({
+					block,
+					code: remainderCode,
+					text: remainderText,
+					continued: true,
+					continuesNext: false,
+					splitId,
+					startCharacterOffset: fittingEndOffset,
+					endCharacterOffset: block.endCharacterOffset,
+				})
+			:	null,
+	};
 }
 
 function splitListToFit({
 	block,
-	currentBlocksHeight,
 	currentLimit,
-	contentWidth,
 	typography,
+	currentBlocks,
+	domMeasurePage,
 }: {
 	block: SplittableListAnnotated;
-	currentBlocksHeight: number;
 	currentLimit: number;
-	contentWidth: number;
 	typography: ResolvedTypography;
+	currentBlocks: AnnotatedHtmlPageBlock[];
+	domMeasurePage: (blocks: HtmlPageBlock[], pageLimit: number) => number;
 }): {
 	fittingBlock: SplittableListAnnotated | null;
 	remainder: SplittableListAnnotated | null;
@@ -416,10 +638,6 @@ function splitListToFit({
 		return {fittingBlock: null, remainder: block};
 	}
 
-	const itemContentWidth = Math.max(
-		1,
-		contentWidth - typography.list.paddingLeftPx,
-	);
 	const makeSubBlock = (
 		slicedItems: typeof items,
 		slicedMeasurements: BlockMeasurement[],
@@ -431,22 +649,26 @@ function splitListToFit({
 		itemMeasurements: slicedMeasurements,
 	});
 
-	// Greedy forward scan — O(n) instead of binary search, allowing accurate Pretext heights.
 	let bestK = 0;
-	let runningHeight =
-		currentBlocksHeight +
-		typography.list.marginTopPx +
-		typography.list.marginBottomPx;
+	let lo = 1;
+	let hi = items.length;
 
-	for (let k = 0; k < items.length - 1; k++) {
-		runningHeight += measureBlockHeight(
-			itemMeasurements[k],
-			itemContentWidth,
+	while (lo <= hi) {
+		const mid = Math.floor((lo + hi) / 2);
+		const candidate = makeSubBlock(
+			items.slice(0, mid),
+			itemMeasurements.slice(0, mid),
 		);
-		if (runningHeight <= currentLimit + 1) {
-			bestK = k + 1;
+		const candidateHeight = domMeasurePage(
+			[...currentBlocks, candidate],
+			currentLimit,
+		);
+
+		if (candidateHeight <= currentLimit + 1) {
+			bestK = mid;
+			lo = mid + 1;
 		} else {
-			break;
+			hi = mid - 1;
 		}
 	}
 
@@ -483,214 +705,138 @@ function splitListToFit({
 	};
 }
 
-function estimateBlockHeight(
-	block: AnnotatedHtmlPageBlock,
-	contentWidth: number,
-	typography: ResolvedTypography,
-	domMeasure: (block: HtmlPageBlock) => number,
-): number {
-	if (block.blockMeasurement) {
-		return measureBlockHeight(block.blockMeasurement, contentWidth);
-	}
-
-	if (block.type === "splittable_list" && block.itemMeasurements) {
-		const itemContentWidth = Math.max(
-			1,
-			contentWidth - typography.list.paddingLeftPx,
-		);
-		return measureListHeight(
-			block as unknown as SplittableListAnnotated,
-			block.itemMeasurements,
-			itemContentWidth,
-			typography,
-		);
-	}
-
-	return domMeasure(block);
-}
-
 function paginateBlocks({
 	blocks,
 	firstPageLimit,
 	regularPageLimit,
 	contentWidth,
 	typography,
-	domMeasureBlock,
+	domMeasurePage,
 }: {
 	blocks: AnnotatedHtmlPageBlock[];
 	firstPageLimit: number;
 	regularPageLimit: number;
 	contentWidth: number;
 	typography: ResolvedTypography;
-	domMeasureBlock: (block: HtmlPageBlock) => number;
+	domMeasurePage: (blocks: HtmlPageBlock[], pageLimit: number) => number;
 }): AnnotatedHtmlPageBlock[][] {
 	const mutableBlocks = [...blocks];
 	const pages: AnnotatedHtmlPageBlock[][] = [];
 	let currentBlocks: AnnotatedHtmlPageBlock[] = [];
-	let currentHeight = 0;
 	let blockIndex = 0;
+
+	const currentLimit = () =>
+		pages.length === 0 ? firstPageLimit : regularPageLimit;
+	const fits = (
+		candidateBlocks: AnnotatedHtmlPageBlock[],
+		pageLimit: number,
+	): boolean => domMeasurePage(candidateBlocks, pageLimit) <= pageLimit + 1;
+	const closeCurrentPage = (): boolean => {
+		if (currentBlocks.length === 0) return false;
+
+		const orphanBlocks = pullTrailingOrphanBlocksForward(currentBlocks);
+		if (orphanBlocks.length > 0) {
+			mutableBlocks.splice(blockIndex, 0, ...orphanBlocks);
+		}
+
+		if (currentBlocks.length > 0) {
+			pages.push(currentBlocks);
+		}
+
+		currentBlocks = [];
+		return true;
+	};
+	const splitBlock = (
+		block: AnnotatedHtmlPageBlock,
+		pageLimit: number,
+	) => {
+		if (block.type === "paragraph") {
+			return splitParagraphToFit({
+				block,
+				currentLimit: pageLimit,
+				contentWidth,
+				typography,
+				currentBlocks,
+				domMeasurePage,
+			});
+		}
+
+		if (block.type === "splittable_list") {
+			return splitListToFit({
+				block,
+				currentLimit: pageLimit,
+				typography,
+				currentBlocks,
+				domMeasurePage,
+			});
+		}
+
+		if (block.type === "code") {
+			return splitCodeToFit({
+				block,
+				currentLimit: pageLimit,
+				currentBlocks,
+				domMeasurePage,
+			});
+		}
+
+		return {fittingBlock: null, remainder: block};
+	};
+	const useSplitResult = (
+		splitResult: {
+			fittingBlock: AnnotatedHtmlPageBlock | null;
+			remainder: AnnotatedHtmlPageBlock | null;
+		},
+	): boolean => {
+		if (!splitResult.fittingBlock) return false;
+
+		pages.push([...currentBlocks, splitResult.fittingBlock]);
+		currentBlocks = [];
+
+		if (splitResult.remainder) {
+			mutableBlocks.splice(blockIndex, 1, splitResult.remainder);
+		} else {
+			blockIndex += 1;
+		}
+
+		return true;
+	};
 
 	while (blockIndex < mutableBlocks.length) {
 		const block = mutableBlocks[blockIndex];
-		const currentLimit =
-			pages.length === 0 ? firstPageLimit : regularPageLimit;
-		const blockHeight = estimateBlockHeight(
-			block,
-			contentWidth,
-			typography,
-			domMeasureBlock,
-		);
+		const pageLimit = currentLimit();
 
-		if (currentHeight + blockHeight <= currentLimit + 1) {
+		if (
+			block.type === "code" &&
+			block.continued &&
+			block.splitId &&
+			currentBlocks.some(
+				(currentBlock) =>
+					currentBlock.type === "code" &&
+					currentBlock.splitId === block.splitId,
+			)
+		) {
+			if (closeCurrentPage()) continue;
+		}
+
+		if (fits([...currentBlocks, block], pageLimit)) {
 			currentBlocks.push(block);
-			currentHeight += blockHeight;
 			blockIndex += 1;
 			continue;
 		}
 
-		if (block.type === "paragraph") {
-			const {fittingBlock, remainder} = splitParagraphToFit({
-				block,
-				currentBlocksHeight: currentHeight,
-				currentLimit,
-				contentWidth,
-				typography,
-			});
-
-			if (fittingBlock) {
-				pages.push([...currentBlocks, fittingBlock]);
-				currentBlocks = [];
-				currentHeight = 0;
-
-				if (remainder?.text && remainder.text !== block.text) {
-					mutableBlocks.splice(blockIndex, 1, remainder);
-				} else {
-					blockIndex += 1;
-				}
-
-				continue;
-			}
-		}
-
-		if (block.type === "splittable_list") {
-			const {fittingBlock, remainder} = splitListToFit({
-				block,
-				currentBlocksHeight: currentHeight,
-				currentLimit,
-				contentWidth,
-				typography,
-			});
-
-			if (fittingBlock) {
-				pages.push([...currentBlocks, fittingBlock]);
-				currentBlocks = [];
-				currentHeight = 0;
-
-				if (remainder) {
-					mutableBlocks.splice(blockIndex, 1, remainder);
-				} else {
-					blockIndex += 1;
-				}
-
-				continue;
-			}
-		}
-
-		if (
-			block.type === "paragraph" &&
-			currentBlocks.length > 0 &&
-			isHeadingBlock(currentBlocks.at(-1)!)
-		) {
-			const {fittingBlock, remainder} = splitParagraphToFit({
-				block,
-				currentBlocksHeight: currentHeight,
-				currentLimit,
-				contentWidth,
-				typography,
-			});
-
-			if (fittingBlock) {
-				pages.push([...currentBlocks, fittingBlock]);
-				currentBlocks = [];
-				currentHeight = 0;
-
-				if (remainder?.text && remainder.text !== block.text) {
-					mutableBlocks.splice(blockIndex, 1, remainder);
-				} else {
-					blockIndex += 1;
-				}
-
-				continue;
-			}
-		}
+		const splitResult = splitBlock(block, pageLimit);
+		if (useSplitResult(splitResult)) continue;
 
 		if (currentBlocks.length > 0) {
-			// Prevent orphaned headings / short intros at the bottom of a page.
-			// When a heading (or heading + short intro paragraph) ends up as the
-			// last content on a page with no following content, move it forward so
-			// it stays with what comes next.
-			const orphanBlocks = pullTrailingOrphanBlocksForward(currentBlocks);
-			if (orphanBlocks.length > 0) {
-				mutableBlocks.splice(blockIndex, 0, ...orphanBlocks);
-			}
-
-			if (currentBlocks.length === 0) {
-				continue;
-			}
-
-			pages.push(currentBlocks);
-			currentBlocks = [];
-			currentHeight = 0;
+			closeCurrentPage();
 			continue;
 		}
 
-		if (block.type === "paragraph") {
-			const {fittingBlock, remainder} = splitParagraphToFit({
-				block,
-				currentBlocksHeight: 0,
-				currentLimit,
-				contentWidth,
-				typography,
-			});
-
-			pages.push(fittingBlock ? [fittingBlock] : [block]);
-			currentBlocks = [];
-			currentHeight = 0;
-
-			if (remainder?.text && remainder.text !== block.text) {
-				mutableBlocks.splice(blockIndex, 1, remainder);
-			} else {
-				blockIndex += 1;
-			}
-
-			continue;
-		}
-
-		if (block.type === "splittable_list") {
-			const {fittingBlock, remainder} = splitListToFit({
-				block,
-				currentBlocksHeight: 0,
-				currentLimit,
-				contentWidth,
-				typography,
-			});
-
-			pages.push(fittingBlock ? [fittingBlock] : [block]);
-			currentBlocks = [];
-			currentHeight = 0;
-
-			if (remainder) {
-				mutableBlocks.splice(blockIndex, 1, remainder);
-			} else {
-				blockIndex += 1;
-			}
-
-			continue;
-		}
+		const freshSplitResult = splitBlock(block, currentLimit());
+		if (useSplitResult(freshSplitResult)) continue;
 
 		pages.push([block]);
-		currentBlocks = [];
-		currentHeight = 0;
 		blockIndex += 1;
 	}
 
@@ -722,12 +868,9 @@ function validatePagesWithDom(
 		const pageHeight =
 			domBlockHeightCache.get(cacheKey) ??
 			(() => {
-				proseMeasure.innerHTML = pageHtml;
-				const codeBlockCount = (pageHtml.match(/<pre/gi) ?? []).length;
 				return setCachedDomBlockHeight(
 					cacheKey,
-					proseMeasure.scrollHeight +
-						codeBlockCount * CODE_BLOCK_HEADER_HEIGHT_PX,
+					measureRenderedHtmlHeight(pageHtml, proseMeasure),
 				);
 			})();
 
@@ -820,11 +963,7 @@ function canMergeTerminalActionPage({
 	proseMeasure: HTMLDivElement;
 	actionMeasure: HTMLDivElement;
 }): boolean {
-	proseMeasure.innerHTML = lastPage.html;
-	const codeBlockCount = (lastPage.html.match(/<pre/gi) ?? []).length;
-	const proseHeight =
-		proseMeasure.scrollHeight +
-		codeBlockCount * CODE_BLOCK_HEADER_HEIGHT_PX;
+	const proseHeight = measureRenderedHtmlHeight(lastPage.html, proseMeasure);
 	const actionHeight = actionMeasure.scrollHeight;
 
 	return proseHeight + POST_MODULE_ACTION_GAP + actionHeight <= pageLimit + 1;
@@ -1021,25 +1160,26 @@ export function measurePages({
 	);
 	const typographyCacheKey = makeTypographyCacheKey(typography);
 
-	const domMeasureBlock = (block: HtmlPageBlock): number => {
-		const renderedBlock = renderHtmlBlock(block);
+	const domMeasurePage = (
+		pageBlocks: HtmlPageBlock[],
+		pageLimit: number,
+	): number => {
+		const pageHtml = joinBlocksHtml(pageBlocks);
 		const cacheKey = [
-			"block",
+			"candidate-page",
 			contentWidth,
+			pageLimit,
 			typographyCacheKey,
-			renderedBlock,
+			pageHtml,
 		].join("\u0000");
 		const cachedHeight = domBlockHeightCache.get(cacheKey);
 		if (cachedHeight !== undefined) {
 			return cachedHeight;
 		}
 
-		proseMeasure.innerHTML = renderedBlock;
-		const codeBlockCount = (renderedBlock.match(/<pre/gi) ?? []).length;
 		return setCachedDomBlockHeight(
 			cacheKey,
-			proseMeasure.scrollHeight +
-				codeBlockCount * CODE_BLOCK_HEADER_HEIGHT_PX,
+			measureRenderedHtmlHeight(pageHtml, proseMeasure),
 		);
 	};
 
@@ -1049,7 +1189,7 @@ export function measurePages({
 		regularPageLimit,
 		contentWidth,
 		typography,
-		domMeasureBlock,
+		domMeasurePage,
 	});
 
 	const contentPages = validatePagesWithDom(
@@ -1145,25 +1285,26 @@ export function paginateHtmlContent({
 	);
 	const typographyCacheKey = makeTypographyCacheKey(typography);
 
-	const domMeasureBlock = (block: HtmlPageBlock): number => {
-		const renderedBlock = renderHtmlBlock(block);
+	const domMeasurePage = (
+		pageBlocks: HtmlPageBlock[],
+		pageLimit: number,
+	): number => {
+		const pageHtml = joinBlocksHtml(pageBlocks);
 		const cacheKey = [
-			"block",
+			"candidate-page",
 			contentWidth,
+			pageLimit,
 			typographyCacheKey,
-			renderedBlock,
+			pageHtml,
 		].join("\u0000");
 		const cachedHeight = domBlockHeightCache.get(cacheKey);
 		if (cachedHeight !== undefined) {
 			return cachedHeight;
 		}
 
-		proseMeasure.innerHTML = renderedBlock;
-		const codeBlockCount = (renderedBlock.match(/<pre/gi) ?? []).length;
 		return setCachedDomBlockHeight(
 			cacheKey,
-			proseMeasure.scrollHeight +
-				codeBlockCount * CODE_BLOCK_HEADER_HEIGHT_PX,
+			measureRenderedHtmlHeight(pageHtml, proseMeasure),
 		);
 	};
 
@@ -1173,7 +1314,7 @@ export function paginateHtmlContent({
 		regularPageLimit,
 		contentWidth,
 		typography,
-		domMeasureBlock,
+		domMeasurePage,
 	});
 
 	const pages = validatePagesWithDom(

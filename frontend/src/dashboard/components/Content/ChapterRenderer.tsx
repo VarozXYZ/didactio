@@ -68,7 +68,20 @@ export function ChapterRenderer({
 						child instanceof Element && child.name === "code",
 				);
 				const language = getLanguage(codeChild?.attribs.class);
-				return <CodeBlock code={getText(codeChild ?? node)} language={language} stylePreset={stylePreset} />;
+				const continuation =
+					node.attribs["data-code-continuation"] === "continued" ?
+						"continued"
+					: node.attribs["data-code-continues-next"] === "true" ?
+						"continues-next"
+					:	undefined;
+				return (
+					<CodeBlock
+						code={getText(codeChild ?? node)}
+						language={language}
+						continuation={continuation}
+						stylePreset={stylePreset}
+					/>
+				);
 			}
 
 			if (node.name === "a") {
