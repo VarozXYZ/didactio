@@ -1792,6 +1792,10 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 
 	useEffect(() => {
 		const handleKeyDown = (event: KeyboardEvent) => {
+			if (isEditModeRef.current) {
+				return;
+			}
+
 			if (event.key === "ArrowRight") {
 				goToNextSpread();
 			}

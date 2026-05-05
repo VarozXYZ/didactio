@@ -313,11 +313,7 @@ body {
 	font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
 	font-size: 0.85em;
 	font-weight: 500;
-	background: var(--unit-code-bg, #f0f2f5);
 	color: var(--unit-code-accent, #7A4E28);
-	padding: 0.15em 0.45em;
-	border-radius: 5px;
-	border: 1px solid var(--unit-code-border, #e2e5ea);
 }
 
 .prose pre,
@@ -407,10 +403,7 @@ body {
 }
 
 .unit-page-scope code {
-	background: var(--unit-code-bg, #f4f4f5);
-	border-radius: 3px;
 	font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-	padding: 0.1em 0.3em;
 }
 
 .unit-page-scope pre {

@@ -98,7 +98,7 @@ export const STYLE_PRESETS: Record<string, StylePreset> = {
 		codeBackground: "#F6F8FA",
 		codeBorderColor: "#D0D7DE",
 		codeHeaderBackground: "#EAEEF2",
-		codeAccentColor: "#1D1D1F",
+		codeAccentColor: "#2563EB",
 		blockquoteAccent: "#CBD5E1",
 	},
 } as const;

@@ -154,15 +154,17 @@ function formatContinuityContext(
 		)
 		.join("\n");
 
-	const summaryContext =
-		previousSummaries.length > 0 ?
-			previousSummaries
-				.map(
-					(summary, index) =>
-						`### Module ${index + 1} Concepts:\n${summary}`,
-				)
-				.join("\n\n")
-		:	"Students have completed the earlier modules and already know their foundational concepts.";
+	const summaryContext = previousModules
+		.map((module, index) => {
+			const summary = previousSummaries[index];
+			const content =
+				summary ??
+				[module.overview, module.lessons.map((l) => l.title).join(", ")]
+					.filter(Boolean)
+					.join(" — ");
+			return `### Module ${index + 1} Concepts:\n${content}`;
+		})
+		.join("\n\n");
 
 	return [
 		"**Prerequisites (from previous modules):**",
