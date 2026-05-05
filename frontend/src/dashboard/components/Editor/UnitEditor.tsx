@@ -64,7 +64,6 @@ import {loadFonts} from "../../utils/fontLoader";
 import {
 	calculateSpreadMetrics,
 	getReadTextOffsetForSpread,
-	getStatusPillClass,
 	measurePages,
 	type MeasuredModulePage,
 } from "../../pageLayout";
@@ -82,7 +81,7 @@ import {formatRelativeTimestamp} from "../../utils/topicMetadata";
 import {
 	normalizeHtmlForStorage,
 	normalizeStoredHtml,
-} from "../../utils/markdown";
+} from "../../utils/htmlContent";
 import {getFolderEmoji} from "../../utils/folderDisplay";
 import {useAuth} from "../../../auth/AuthProvider";
 import {CoinAmount} from "@/components/Coin";
@@ -469,7 +468,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	);
 	const [activeGeneratingChapterIndex, setActiveGeneratingChapterIndex] =
 		useState<number | null>(null);
-	const [activeRunId, setActiveRunId] = useState<string | null>(null);
+	const [, setActiveRunId] = useState<string | null>(null);
 	const [viewport, setViewport] = useState(() => ({
 		height: typeof window !== "undefined" ? window.innerHeight : 900,
 		width: typeof window !== "undefined" ? window.innerWidth : 1440,
@@ -840,7 +839,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		() =>
 			measuredReadPages
 				.filter(isMeasuredContentPage)
-				.map((page) => page.markdown),
+				.map((page) => page.html),
 		[measuredReadPages],
 	);
 	const visibleEditablePages =
@@ -1824,7 +1823,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 
 	const updatePaginatedContentPage = (
 		pageIndex: number,
-		markdown: string,
+		html: string,
 	) => {
 		setContentPageDrafts((previous) => {
 			const nextPages =
@@ -1834,7 +1833,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				nextPages.push("");
 			}
 
-			nextPages[pageIndex] = markdown;
+			nextPages[pageIndex] = html;
 
 			setDraft((currentDraft) =>
 				currentDraft ?
@@ -1909,16 +1908,20 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			</div>
 		</div>
 	);
+	const unitPageBackground =
+		(resolvedThemeVars as Record<string, string | undefined>)[
+			"--unit-page-bg"
+		] ?? "#ffffff";
 
 	const renderContentPage = ({
 		editable,
-		markdown,
+		html,
 		extraContent,
 		pageIndex,
 		pageNumber,
 	}: {
 		editable: boolean;
-		markdown: string | undefined;
+		html: string | undefined;
 		extraContent?: ReactNode;
 		pageIndex: number;
 		pageNumber: number;
@@ -1929,7 +1932,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				style={{
 					height: `${spreadMetrics.pageHeight}px`,
 					width: `${spreadMetrics.pageWidth}px`,
-					backgroundColor: resolvedThemeVars["--unit-page-bg"] as string ?? "#ffffff",
+					backgroundColor: unitPageBackground,
 				}}
 			>
 				<div className="flex h-full flex-col overflow-hidden px-5 py-4 md:px-6 md:py-5">
@@ -1954,18 +1957,18 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 								baseTextStyle={draft.textStyle}
 								editable
 								editorId={`content-${didacticUnitId}-${activeChapter.chapterIndex}-${pageIndex}-edit`}
-								initialHtml={markdown ?? ""}
+								initialHtml={html ?? ""}
 								onFocusEditor={setActiveHtmlEditor}
-								onHtmlChange={(nextMarkdown) =>
+								onHtmlChange={(nextHtml) =>
 									updatePaginatedContentPage(
 										pageIndex,
-										nextMarkdown,
+										nextHtml,
 									)
 								}
 								placeholder="Write the module content here..."
 							/>
 						:	<ChapterRenderer
-								html={markdown ?? ""}
+								html={html ?? ""}
 								className={cn(
 									"unit-page-scope leading-[1.9] text-[#1D1D1F]",
 									extraContent ?
@@ -1993,12 +1996,12 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 
 	const renderFirstPage = ({
 		editable,
-		markdown,
+		html,
 		extraContent,
 		pageNumber,
 	}: {
 		editable: boolean;
-		markdown: string | undefined;
+		html: string | undefined;
 		extraContent?: ReactNode;
 		pageNumber: number;
 	}) => {
@@ -2013,7 +2016,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			style={{
 				height: `${spreadMetrics.pageHeight}px`,
 				width: `${spreadMetrics.pageWidth}px`,
-				backgroundColor: resolvedThemeVars["--unit-page-bg"] as string ?? "#ffffff",
+				backgroundColor: unitPageBackground,
 			}}
 		>
 			<div className="flex h-full flex-col overflow-hidden px-5 py-4 md:px-6 md:py-5" style={resolvedThemeVars}>
@@ -2090,15 +2093,15 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 							baseTextStyle={draft.textStyle}
 							editable
 							editorId={`content-${didacticUnitId}-${activeChapter.chapterIndex}-0-edit`}
-							initialHtml={markdown ?? ""}
+							initialHtml={html ?? ""}
 							onFocusEditor={setActiveHtmlEditor}
-							onHtmlChange={(nextMarkdown) =>
-								updatePaginatedContentPage(0, nextMarkdown)
+							onHtmlChange={(nextHtml) =>
+								updatePaginatedContentPage(0, nextHtml)
 							}
 							placeholder="Write the module content here..."
 						/>
 					:	<ChapterRenderer
-							html={markdown ?? ""}
+							html={html ?? ""}
 							className={cn(
 								"unit-page-scope leading-[1.9] text-[#1D1D1F]",
 								extraContent ?
@@ -2165,7 +2168,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 
 		return renderContentPage({
 			editable: false,
-			markdown: page.markdown,
+			html: page.html,
 			extraContent:
 				(
 					page.kind === "content_with_actions" &&
@@ -2205,7 +2208,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 							editable ?
 								renderFirstPage({
 									editable: true,
-									markdown: leftEditablePage,
+									html: leftEditablePage,
 									pageNumber: 1,
 								})
 							: (
@@ -2214,7 +2217,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 							) ?
 								renderFirstPage({
 									editable: false,
-									markdown: leftReadPage.markdown,
+									html: leftReadPage.html,
 									extraContent:
 										(
 											leftReadPage.kind ===
@@ -2238,7 +2241,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 						: editable ?
 							renderContentPage({
 								editable: true,
-								markdown: leftEditablePage,
+								html: leftEditablePage,
 								pageIndex: contentPageOffset,
 								pageNumber: contentPageOffset + 1,
 							})
@@ -2252,7 +2255,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 							rightEditablePage !== undefined ?
 								renderContentPage({
 									editable: true,
-									markdown: rightEditablePage,
+									html: rightEditablePage,
 									pageIndex: contentPageOffset + 1,
 									pageNumber: contentPageOffset + 2,
 								})

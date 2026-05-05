@@ -20,7 +20,7 @@ import {
 	estimateReadingTimeFromText,
 	formatRelativeTimestamp,
 } from "./utils/topicMetadata";
-import {htmlToPlainText, normalizeStoredMarkdown} from "./utils/markdown";
+import {htmlToPlainText, normalizeStoredHtml} from "./utils/htmlContent";
 import type {PresentationTheme} from "../types/presentationTheme";
 
 function resolveDisplayStatus(status: string): string {
@@ -240,7 +240,7 @@ function buildEditorChapter(
 	summary: BackendDidacticUnitChapterSummary,
 	detail: BackendDidacticUnitChapterDetail | undefined,
 ): DidacticUnitEditorChapter {
-	const html = normalizeStoredMarkdown(detail?.html ?? "");
+	const html = normalizeStoredHtml(detail?.html ?? "");
 	const readingTime = estimateReadingTimeFromText(
 		htmlToPlainText(html),
 	);
@@ -311,7 +311,7 @@ export function adaptDidacticUnitRevisions(
 		title: revision.chapter.title,
 		chapter: {
 			title: revision.chapter.title,
-			html: normalizeStoredMarkdown(revision.chapter.html),
+			html: normalizeStoredHtml(revision.chapter.html),
 			htmlHash: revision.chapter.htmlHash,
 		},
 	}));

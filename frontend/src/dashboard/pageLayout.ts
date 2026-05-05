@@ -3,11 +3,13 @@ import type {
 	DidacticUnitEditorChapter as UnitChapter,
 } from "./types";
 import {
-	extractMarkdownBlocks,
-	formatModuleMarkdownForRender,
-	markdownToHtml,
-	type MarkdownPageBlock,
-} from "./utils/markdown";
+	buildListHtml,
+	extractHtmlBlocks,
+	normalizeStoredHtml,
+	splitParagraphHtmlAtTextOffset,
+	wrapParagraphHtml,
+	type HtmlPageBlock,
+} from "./utils/htmlContent";
 import {
 	prepareParagraphBlock,
 	prepareH1Block,
@@ -21,7 +23,6 @@ import {
 import {
 	resolveTypography,
 	defaultTypography,
-	applyTypographyVars,
 	STYLE_PRESETS,
 	type ResolvedTypography,
 	type FontId,
@@ -72,14 +73,14 @@ function makeTypographyCacheKey(typography: ResolvedTypography): string {
 
 type ContentMeasuredModulePage = {
 	kind: "content";
-	markdown: string;
+	html: string;
 	startCharacterOffset: number;
 	endCharacterOffset: number;
 };
 
 type ContentWithActionsMeasuredModulePage = {
 	kind: "content_with_actions";
-	markdown: string;
+	html: string;
 	startCharacterOffset: number;
 	endCharacterOffset: number;
 	hasNextModule: boolean;
@@ -104,7 +105,7 @@ type MeasurePageChapter = Pick<
 	"title" | "summary" | "status" | "readingTime" | "level"
 >;
 
-type AnnotatedMarkdownPageBlock = MarkdownPageBlock & {
+type AnnotatedHtmlPageBlock = HtmlPageBlock & {
 	startCharacterOffset: number;
 	endCharacterOffset: number;
 	// Present for paragraphs and h1-h3 headings.
@@ -113,18 +114,18 @@ type AnnotatedMarkdownPageBlock = MarkdownPageBlock & {
 	itemMeasurements?: BlockMeasurement[];
 };
 
-function isHeadingBlock(block: AnnotatedMarkdownPageBlock): boolean {
-	return block.type === "markdown" && /^#{1,6}\s/.test(block.markdown);
+function isHeadingBlock(block: AnnotatedHtmlPageBlock): boolean {
+	return block.type === "html" && block.headingLevel !== undefined;
 }
 
-function isShortIntroBlock(block: AnnotatedMarkdownPageBlock): boolean {
+function isShortIntroBlock(block: AnnotatedHtmlPageBlock): boolean {
 	return block.type === "paragraph" && block.text.length < 80;
 }
 
 function pullTrailingOrphanBlocksForward(
-	blocks: AnnotatedMarkdownPageBlock[],
-): AnnotatedMarkdownPageBlock[] {
-	const movedBlocks: AnnotatedMarkdownPageBlock[] = [];
+	blocks: AnnotatedHtmlPageBlock[],
+): AnnotatedHtmlPageBlock[] {
+	const movedBlocks: AnnotatedHtmlPageBlock[] = [];
 
 	const lastBlock = blocks.at(-1);
 	const secondLastBlock = blocks.at(-2);
@@ -155,42 +156,16 @@ function escapeHtml(value: string): string {
 		.replaceAll("'", "&#39;");
 }
 
-function renderParagraphMarkdown(
-	text: string,
-	{
-		continued = false,
-		continuesNext = false,
-	}: {continued?: boolean; continuesNext?: boolean} = {},
-): string {
-	const normalizedText = text.trim();
-
-	if (!normalizedText) {
-		return "";
+function renderHtmlBlock(block: HtmlPageBlock): string {
+	if (block.type === "splittable_list") {
+		return buildListHtml(block);
 	}
 
-	if (continued || continuesNext) {
-		return normalizedText;
+	if (block.type === "paragraph") {
+		return block.html || wrapParagraphHtml(escapeHtml(block.text));
 	}
 
-	return normalizedText;
-}
-
-function renderBlock(
-	block: MarkdownPageBlock,
-	options: {continued?: boolean; continuesNext?: boolean} = {},
-): string {
-	if (block.type === "markdown" || block.type === "splittable_list") {
-		return block.markdown;
-	}
-
-	if (!block.continued && !options.continued && !options.continuesNext) {
-		return block.markdown;
-	}
-
-	return renderParagraphMarkdown(block.text, {
-		continued: block.continued,
-		...options,
-	});
+	return block.html;
 }
 
 function isMeasuredContentPage(
@@ -206,9 +181,9 @@ function isMeasuredPageWithReadableContent(
 }
 
 function annotateBlocks(
-	blocks: MarkdownPageBlock[],
+	blocks: HtmlPageBlock[],
 	typography: ResolvedTypography,
-): AnnotatedMarkdownPageBlock[] {
+): AnnotatedHtmlPageBlock[] {
 	let characterOffset = 0;
 
 	return blocks.map((block) => {
@@ -222,14 +197,14 @@ function annotateBlocks(
 				startCharacterOffset,
 				endCharacterOffset,
 				blockMeasurement: prepareParagraphBlock(
-					block.inlineChildren,
+					undefined,
 					block.text,
 					typography,
 				),
 			};
 		}
 
-		if (block.type === "markdown") {
+		if (block.type === "html") {
 			const hl = block.headingLevel;
 			if (hl === 1) {
 				return {
@@ -237,7 +212,7 @@ function annotateBlocks(
 					startCharacterOffset,
 					endCharacterOffset,
 					blockMeasurement: prepareH1Block(
-						block.inlineChildren,
+						undefined,
 						block.text,
 						typography,
 					),
@@ -249,7 +224,7 @@ function annotateBlocks(
 					startCharacterOffset,
 					endCharacterOffset,
 					blockMeasurement: prepareH2Block(
-						block.inlineChildren,
+						undefined,
 						block.text,
 						typography,
 					),
@@ -261,7 +236,7 @@ function annotateBlocks(
 					startCharacterOffset,
 					endCharacterOffset,
 					blockMeasurement: prepareH3Block(
-						block.inlineChildren,
+						undefined,
 						block.text,
 						typography,
 					),
@@ -273,7 +248,7 @@ function annotateBlocks(
 		if (block.type === "splittable_list") {
 			const itemMeasurements = block.items.map((item) =>
 				prepareListItemBlock(
-					item.inlineChildren,
+					undefined,
 					item.text,
 					typography,
 				),
@@ -291,23 +266,17 @@ function annotateBlocks(
 			...(block as object),
 			startCharacterOffset,
 			endCharacterOffset,
-		} as AnnotatedMarkdownPageBlock;
+		} as AnnotatedHtmlPageBlock;
 	});
 }
 
-/** Join blocks for storage / HTML render. Continued paragraph fragments use MD hard breaks so they stay one `<p>`. */
-function joinBlocksMarkdown(blocks: MarkdownPageBlock[]): string {
+function joinBlocksHtml(blocks: HtmlPageBlock[]): string {
 	if (blocks.length === 0) return "";
-	let out = renderBlock(blocks[0]);
+	let out = renderHtmlBlock(blocks[0]);
 	for (let i = 1; i < blocks.length; i++) {
-		const prev = blocks[i - 1];
 		const curr = blocks[i];
-		const continuedPara =
-			curr.type === "paragraph" &&
-			curr.continued &&
-			prev.type === "paragraph";
-		out += continuedPara ? "  \n" : "\n\n";
-		out += renderBlock(curr);
+		out += "\n\n";
+		out += renderHtmlBlock(curr);
 	}
 	return out;
 }
@@ -319,21 +288,21 @@ function splitParagraphToFit({
 	contentWidth,
 	typography,
 }: {
-	block: Extract<AnnotatedMarkdownPageBlock, {type: "paragraph"}>;
+	block: Extract<AnnotatedHtmlPageBlock, {type: "paragraph"}>;
 	currentBlocksHeight: number;
 	currentLimit: number;
 	contentWidth: number;
 	typography: ResolvedTypography;
 }): {
 	fittingBlock: Extract<
-		AnnotatedMarkdownPageBlock,
+		AnnotatedHtmlPageBlock,
 		{type: "paragraph"}
 	> | null;
-	remainder: Extract<AnnotatedMarkdownPageBlock, {type: "paragraph"}> | null;
+	remainder: Extract<AnnotatedHtmlPageBlock, {type: "paragraph"}> | null;
 } {
 	const measurement =
 		block.blockMeasurement ??
-		prepareParagraphBlock(block.inlineChildren, block.text, typography);
+		prepareParagraphBlock(undefined, block.text, typography);
 	const lines = getBlockLines(measurement, contentWidth);
 	if (lines.length === 0) {
 		return {fittingBlock: null, remainder: {...block}};
@@ -368,14 +337,15 @@ function splitParagraphToFit({
 		remainderText ?
 			Math.min(block.endCharacterOffset, fittingEndCharacterOffset + 1)
 		:	fittingEndCharacterOffset;
+	const splitHtml = splitParagraphHtmlAtTextOffset(
+		block.html,
+		fittingText.length,
+	);
 
 	return {
 		fittingBlock: {
 			...block,
-			markdown: renderParagraphMarkdown(fittingText, {
-				continued: block.continued,
-				continuesNext: Boolean(remainderText),
-			}),
+			html: splitHtml.fittingHtml,
 			text: fittingText,
 			endCharacterOffset: fittingEndCharacterOffset,
 			blockMeasurement: prepareParagraphBlock(
@@ -388,7 +358,7 @@ function splitParagraphToFit({
 			remainderText ?
 				{
 					...block,
-					markdown: remainderText,
+					html: splitHtml.remainderHtml,
 					text: remainderText,
 					continued: true,
 					startCharacterOffset: remainderStartCharacterOffset,
@@ -403,7 +373,7 @@ function splitParagraphToFit({
 }
 
 type SplittableListAnnotated = Extract<
-	AnnotatedMarkdownPageBlock,
+	AnnotatedHtmlPageBlock,
 	{type: "splittable_list"}
 >;
 
@@ -436,11 +406,11 @@ function splitListToFit({
 	fittingBlock: SplittableListAnnotated | null;
 	remainder: SplittableListAnnotated | null;
 } {
-	const {items, spread} = block;
+	const {items} = block;
 	const itemMeasurements =
 		block.itemMeasurements ??
 		items.map((item) =>
-			prepareListItemBlock(item.inlineChildren, item.text, typography),
+			prepareListItemBlock(undefined, item.text, typography),
 		);
 	if (items.length <= 1) {
 		return {fittingBlock: null, remainder: block};
@@ -450,17 +420,13 @@ function splitListToFit({
 		1,
 		contentWidth - typography.list.paddingLeftPx,
 	);
-	const separator = spread ? "\n\n" : "\n";
-
 	const makeSubBlock = (
 		slicedItems: typeof items,
 		slicedMeasurements: BlockMeasurement[],
 	): SplittableListAnnotated => ({
 		...block,
 		items: slicedItems,
-		markdown: slicedItems
-			.map((item) => item.markdown.trim())
-			.join(separator),
+		html: buildListHtml({...block, items: slicedItems}),
 		text: slicedItems.map((item) => item.text).join(" "),
 		itemMeasurements: slicedMeasurements,
 	});
@@ -518,10 +484,10 @@ function splitListToFit({
 }
 
 function estimateBlockHeight(
-	block: AnnotatedMarkdownPageBlock,
+	block: AnnotatedHtmlPageBlock,
 	contentWidth: number,
 	typography: ResolvedTypography,
-	domMeasure: (block: MarkdownPageBlock) => number,
+	domMeasure: (block: HtmlPageBlock) => number,
 ): number {
 	if (block.blockMeasurement) {
 		return measureBlockHeight(block.blockMeasurement, contentWidth);
@@ -551,16 +517,16 @@ function paginateBlocks({
 	typography,
 	domMeasureBlock,
 }: {
-	blocks: AnnotatedMarkdownPageBlock[];
+	blocks: AnnotatedHtmlPageBlock[];
 	firstPageLimit: number;
 	regularPageLimit: number;
 	contentWidth: number;
 	typography: ResolvedTypography;
-	domMeasureBlock: (block: MarkdownPageBlock) => number;
-}): AnnotatedMarkdownPageBlock[][] {
+	domMeasureBlock: (block: HtmlPageBlock) => number;
+}): AnnotatedHtmlPageBlock[][] {
 	const mutableBlocks = [...blocks];
-	const pages: AnnotatedMarkdownPageBlock[][] = [];
-	let currentBlocks: AnnotatedMarkdownPageBlock[] = [];
+	const pages: AnnotatedHtmlPageBlock[][] = [];
+	let currentBlocks: AnnotatedHtmlPageBlock[] = [];
 	let currentHeight = 0;
 	let blockIndex = 0;
 
@@ -621,6 +587,34 @@ function paginateBlocks({
 				currentHeight = 0;
 
 				if (remainder) {
+					mutableBlocks.splice(blockIndex, 1, remainder);
+				} else {
+					blockIndex += 1;
+				}
+
+				continue;
+			}
+		}
+
+		if (
+			block.type === "paragraph" &&
+			currentBlocks.length > 0 &&
+			isHeadingBlock(currentBlocks.at(-1)!)
+		) {
+			const {fittingBlock, remainder} = splitParagraphToFit({
+				block,
+				currentBlocksHeight: currentHeight,
+				currentLimit,
+				contentWidth,
+				typography,
+			});
+
+			if (fittingBlock) {
+				pages.push([...currentBlocks, fittingBlock]);
+				currentBlocks = [];
+				currentHeight = 0;
+
+				if (remainder?.text && remainder.text !== block.text) {
 					mutableBlocks.splice(blockIndex, 1, remainder);
 				} else {
 					blockIndex += 1;
@@ -708,29 +702,28 @@ function paginateBlocks({
 }
 
 function validatePagesWithDom(
-	pages: AnnotatedMarkdownPageBlock[][],
+	pages: AnnotatedHtmlPageBlock[][],
 	firstPageLimit: number,
 	regularPageLimit: number,
 	proseMeasure: HTMLDivElement,
-): AnnotatedMarkdownPageBlock[][] {
-	const validated: AnnotatedMarkdownPageBlock[][] = [];
+): AnnotatedHtmlPageBlock[][] {
+	const validated: AnnotatedHtmlPageBlock[][] = [];
 
 	for (let i = 0; i < pages.length; i++) {
 		const page = pages[i];
 		const limit =
 			(validated.length === 0 ? firstPageLimit : regularPageLimit) + 1;
-		const pageMarkdown = joinBlocksMarkdown(page);
+		const pageHtml = joinBlocksHtml(page);
 		const cacheKey = [
 			"page",
 			proseMeasure.style.cssText,
-			pageMarkdown,
+			pageHtml,
 		].join("\u0000");
 		const pageHeight =
 			domBlockHeightCache.get(cacheKey) ??
 			(() => {
-				const html = markdownToHtml(pageMarkdown);
-				proseMeasure.innerHTML = html;
-				const codeBlockCount = (html.match(/<pre/gi) ?? []).length;
+				proseMeasure.innerHTML = pageHtml;
+				const codeBlockCount = (pageHtml.match(/<pre/gi) ?? []).length;
 				return setCachedDomBlockHeight(
 					cacheKey,
 					proseMeasure.scrollHeight +
@@ -771,11 +764,11 @@ function validatePagesWithDom(
 }
 
 function buildMeasuredPage(
-	blocks: AnnotatedMarkdownPageBlock[],
+	blocks: AnnotatedHtmlPageBlock[],
 ): ContentMeasuredModulePage {
 	return {
 		kind: "content",
-		markdown: joinBlocksMarkdown(blocks),
+		html: joinBlocksHtml(blocks),
 		startCharacterOffset: blocks[0]?.startCharacterOffset ?? 0,
 		endCharacterOffset: blocks.at(-1)?.endCharacterOffset ?? 0,
 	};
@@ -827,9 +820,8 @@ function canMergeTerminalActionPage({
 	proseMeasure: HTMLDivElement;
 	actionMeasure: HTMLDivElement;
 }): boolean {
-	const html = markdownToHtml(lastPage.markdown);
-	proseMeasure.innerHTML = html;
-	const codeBlockCount = (html.match(/<pre/gi) ?? []).length;
+	proseMeasure.innerHTML = lastPage.html;
+	const codeBlockCount = (lastPage.html.match(/<pre/gi) ?? []).length;
 	const proseHeight =
 		proseMeasure.scrollHeight +
 		codeBlockCount * CODE_BLOCK_HEADER_HEIGHT_PX;
@@ -883,7 +875,7 @@ function createHeaderMarkup(
 	activeChapter: MeasurePageChapter,
 	chapterIndex: number,
 ): string {
-	const overviewHtml = markdownToHtml(activeChapter.summary);
+	const overviewHtml = escapeHtml(activeChapter.summary);
 
 	return `
     <div class="mb-4 flex-shrink-0 space-y-2">
@@ -932,7 +924,7 @@ export function measurePages({
 	textStyle?: EditorTextStyle;
 }): MeasuredModulePage[] {
 	if (!content || !pageWidth || !pageHeight) return [];
-	const renderedContent = formatModuleMarkdownForRender(content);
+	const renderedContent = normalizeStoredHtml(content);
 	if (!renderedContent) return [];
 
 	const isMobile = pageWidth < 420;
@@ -1024,13 +1016,13 @@ export function measurePages({
 		contentLimit - measurementBuffer,
 	);
 	const blocks = annotateBlocks(
-		extractMarkdownBlocks(renderedContent),
+		extractHtmlBlocks(renderedContent),
 		typography,
 	);
 	const typographyCacheKey = makeTypographyCacheKey(typography);
 
-	const domMeasureBlock = (block: MarkdownPageBlock): number => {
-		const renderedBlock = renderBlock(block);
+	const domMeasureBlock = (block: HtmlPageBlock): number => {
+		const renderedBlock = renderHtmlBlock(block);
 		const cacheKey = [
 			"block",
 			contentWidth,
@@ -1042,9 +1034,8 @@ export function measurePages({
 			return cachedHeight;
 		}
 
-		const html = markdownToHtml(renderedBlock);
-		proseMeasure.innerHTML = html;
-		const codeBlockCount = (html.match(/<pre/gi) ?? []).length;
+		proseMeasure.innerHTML = renderedBlock;
+		const codeBlockCount = (renderedBlock.match(/<pre/gi) ?? []).length;
 		return setCachedDomBlockHeight(
 			cacheKey,
 			proseMeasure.scrollHeight +
@@ -1106,7 +1097,7 @@ export function measurePages({
 	];
 }
 
-export function paginateMarkdownContent({
+export function paginateHtmlContent({
 	content,
 	pageWidth,
 	pageHeight,
@@ -1141,19 +1132,21 @@ export function paginateMarkdownContent({
 
 	const proseMeasure = document.createElement("div");
 	proseMeasure.className =
-		"prose prose-neutral max-w-none leading-[1.9] text-[#1D1D1F]";
+		"unit-page-scope leading-[1.9] text-[#1D1D1F]";
 	proseMeasure.style.width = `${contentWidth}px`;
 	proseMeasure.style.overflow = "hidden";
-	applyTypographyVars(proseMeasure, typography);
 
 	sandbox.appendChild(proseMeasure);
 	document.body.appendChild(sandbox);
 
-	const blocks = annotateBlocks(extractMarkdownBlocks(content), typography);
+	const blocks = annotateBlocks(
+		extractHtmlBlocks(normalizeStoredHtml(content)),
+		typography,
+	);
 	const typographyCacheKey = makeTypographyCacheKey(typography);
 
-	const domMeasureBlock = (block: MarkdownPageBlock): number => {
-		const renderedBlock = renderBlock(block);
+	const domMeasureBlock = (block: HtmlPageBlock): number => {
+		const renderedBlock = renderHtmlBlock(block);
 		const cacheKey = [
 			"block",
 			contentWidth,
@@ -1165,9 +1158,8 @@ export function paginateMarkdownContent({
 			return cachedHeight;
 		}
 
-		const html = markdownToHtml(renderedBlock);
-		proseMeasure.innerHTML = html;
-		const codeBlockCount = (html.match(/<pre/gi) ?? []).length;
+		proseMeasure.innerHTML = renderedBlock;
+		const codeBlockCount = (renderedBlock.match(/<pre/gi) ?? []).length;
 		return setCachedDomBlockHeight(
 			cacheKey,
 			proseMeasure.scrollHeight +
@@ -1189,7 +1181,7 @@ export function paginateMarkdownContent({
 		regularPageLimit,
 		regularPageLimit,
 		proseMeasure,
-	).map((pageBlocks) => joinBlocksMarkdown(pageBlocks));
+	).map((pageBlocks) => joinBlocksHtml(pageBlocks));
 
 	document.body.removeChild(sandbox);
 
