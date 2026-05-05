@@ -517,6 +517,23 @@ body {
 	background: transparent !important;
 }
 
+.code-block-highlight pre::-webkit-scrollbar {
+	height: 6px;
+}
+
+.code-block-highlight pre::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+.code-block-highlight pre::-webkit-scrollbar-thumb {
+	background: #d0d7de;
+	border-radius: 10px;
+}
+
+.code-block-highlight pre::-webkit-scrollbar-thumb:hover {
+	background: #8c959f;
+}
+
 /* ─── Tiptap edit-mode hljs syntax token colors ───────────────────────────── */
 
 .tiptap-editor .hljs-keyword,

@@ -469,6 +469,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	);
 	const [activeGeneratingChapterIndex, setActiveGeneratingChapterIndex] =
 		useState<number | null>(null);
+	const [activeRunId, setActiveRunId] = useState<string | null>(null);
 	const [viewport, setViewport] = useState(() => ({
 		height: typeof window !== "undefined" ? window.innerHeight : 900,
 		width: typeof window !== "undefined" ? window.innerWidth : 1440,
@@ -1200,6 +1201,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 					didacticUnitId,
 					chapter.chapterIndex,
 				);
+				setActiveRunId(runId);
 				await dashboardApi.streamGenerationRun(runId, {
 					onPartialHtmlBlock: ({block}) => {
 						queueStreamingHtmlBlock(block);
@@ -1222,6 +1224,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				setIsSubmitting(false);
 				setIsStreamingGeneration(false);
 				setActiveGeneratingChapterIndex(null);
+				setActiveRunId(null);
 				resetStreamingHtml();
 			}
 		},
@@ -2444,7 +2447,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 									/>
 								)}
 								<button
-									className="flex min-w-0 flex-1 items-start gap-2.5 text-left"
+									className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
 									onClick={() =>
 										setActiveChapterIndex(
 											chapter.chapterIndex,
@@ -2454,7 +2457,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 								>
 									<span
 										className={cn(
-											"mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-[8px] text-[11px] font-bold tabular-nums transition-colors",
+											"flex h-6 w-6 shrink-0 items-center justify-center rounded-[8px] text-[11px] font-bold tabular-nums transition-colors",
 											isActive ?
 												"bg-white text-[#1D1D1F] shadow-[0_1px_2px_rgba(0,0,0,0.06)] ring-1 ring-black/[0.05]"
 											:	"bg-black/[0.05] text-[#86868B] group-hover:bg-black/[0.07] group-hover:text-[#1D1D1F]",

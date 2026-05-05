@@ -689,6 +689,11 @@ export const dashboardApi = {
 			`/api/generation-runs/${runId}`,
 		);
 	},
+	cancelGenerationRun(runId: string) {
+		return requestJson<{ok: boolean}>(`/api/generation-runs/${runId}/cancel`, {
+			method: "POST",
+		});
+	},
 	streamGenerationRun(runId: string, handlers: StreamHandlers) {
 		return streamNdjson<{run: BackendGenerationRun}>(
 			`/api/generation-runs/${runId}/stream`,

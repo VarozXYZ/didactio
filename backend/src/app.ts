@@ -915,6 +915,7 @@ async function recordFailedSyllabusRun(
 export function createApp(options: CreateAppOptions) {
 	const app = express();
 	app.set("etag", false);
+	const activeGenerationControllers = new Map<string, AbortController>();
 	const didacticUnitStore = options.didacticUnitStore;
 	const generationRunStore = options.generationRunStore;
 	const folderStore = options.folderStore;
@@ -2731,6 +2732,9 @@ export function createApp(options: CreateAppOptions) {
 			await generationRunStore.save(run);
 			response.status(202).json({runId: run.id, run});
 
+			const generationAbortController = new AbortController();
+			activeGenerationControllers.set(run.id, generationAbortController);
+
 			void (async () => {
 				let currentRun: ChapterGenerationRunRecord = {
 					...run,
@@ -2806,6 +2810,7 @@ export function createApp(options: CreateAppOptions) {
 									),
 									config,
 									tier: quality,
+									abortSignal: generationAbortController.signal,
 								},
 								{
 									onHtml: async (delta) => {
@@ -2885,10 +2890,43 @@ export function createApp(options: CreateAppOptions) {
 						updatedAt: new Date().toISOString(),
 						completedAt: new Date().toISOString(),
 					});
+				} finally {
+					activeGenerationControllers.delete(run.id);
 				}
 			})();
 		},
 	);
+
+	app.post("/api/generation-runs/:runId/cancel", async (request, response) => {
+		const requestWithMockOwner = asRequestWithMockOwner(request);
+		const ownerId = requestWithMockOwner.mockOwner.id;
+		const runId = String(request.params.runId);
+		const run = await generationRunStore.getById(ownerId, runId);
+
+		if (!run) {
+			response.status(404).json({error: "Generation run not found."});
+			return;
+		}
+
+		if (isTerminalGenerationRun(run)) {
+			response.status(409).json({error: "Generation run is already complete."});
+			return;
+		}
+
+		activeGenerationControllers.get(runId)?.abort();
+		activeGenerationControllers.delete(runId);
+
+		await generationRunStore.save({
+			...run,
+			status: "failed",
+			error: "Cancelled by user.",
+			errorMessage: "Cancelled by user.",
+			updatedAt: new Date().toISOString(),
+			completedAt: new Date().toISOString(),
+		} as ChapterGenerationRunRecord);
+
+		response.status(200).json({ok: true});
+	});
 
 	app.get("/api/generation-runs/:runId", async (request, response) => {
 		const requestWithMockOwner = asRequestWithMockOwner(request);
