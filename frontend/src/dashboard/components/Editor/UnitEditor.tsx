@@ -468,7 +468,8 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	);
 	const [activeGeneratingChapterIndex, setActiveGeneratingChapterIndex] =
 		useState<number | null>(null);
-	const [, setActiveRunId] = useState<string | null>(null);
+	const [activeRunId, setActiveRunId] = useState<string | null>(null);
+	const [isCancellingGeneration, setIsCancellingGeneration] = useState(false);
 	const [viewport, setViewport] = useState(() => ({
 		height: typeof window !== "undefined" ? window.innerHeight : 900,
 		width: typeof window !== "undefined" ? window.innerWidth : 1440,
@@ -498,6 +499,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	const lastReadingProgressPayloadRef = useRef<string | null>(null);
 	const streamingHtmlBufferRef = useRef("");
 	const streamingHtmlFlushTimeoutRef = useRef<number | null>(null);
+	const isCancellingGenerationRef = useRef(false);
 
 	const activeChapter = useMemo(
 		() =>
@@ -1195,11 +1197,13 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			setActiveGeneratingChapterIndex(chapter.chapterIndex);
 			resetStreamingHtml();
 
+			let streamRunId: string | null = null;
 			try {
 				const {runId} = await dashboardApi.createGenerationRun(
 					didacticUnitId,
 					chapter.chapterIndex,
 				);
+				streamRunId = runId;
 				setActiveRunId(runId);
 				await dashboardApi.streamGenerationRun(runId, {
 					onPartialHtmlBlock: ({block}) => {
@@ -1212,11 +1216,13 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				await refreshWorkspaceAfterGeneration();
 				await refreshUser();
 			} catch (actionError) {
-				toastError(
-					actionError instanceof Error ?
-						actionError.message
-					:	"Didactic unit action failed.",
-				);
+				if (cancelledGenerationRunIdRef.current !== streamRunId) {
+					toastError(
+						actionError instanceof Error ?
+							actionError.message
+						:	"Didactic unit action failed.",
+					);
+				}
 				setIsSaving(false);
 				await refreshUser();
 			} finally {
@@ -1225,6 +1231,9 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				setActiveGeneratingChapterIndex(null);
 				setActiveRunId(null);
 				resetStreamingHtml();
+				if (cancelledGenerationRunIdRef.current === streamRunId) {
+					cancelledGenerationRunIdRef.current = null;
+				}
 			}
 		},
 		[
@@ -1248,6 +1257,33 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 
 		await streamChapterContent(activeChapter, tier);
 	};
+
+	const handleStopActiveGeneration = useCallback(async () => {
+		if (!activeRunId || isCancellingGeneration) {
+			return;
+		}
+
+		setIsCancellingGeneration(true);
+		generationQueueBlockedRef.current = true;
+
+		try {
+			cancelledGenerationRunIdRef.current = activeRunId;
+			await dashboardApi.cancelGenerationRun(activeRunId);
+			await refreshWorkspaceAfterGeneration();
+		} catch (actionError) {
+			toastError(
+				actionError instanceof Error ?
+					actionError.message
+				:	"Failed to stop module generation.",
+			);
+		} finally {
+			setIsCancellingGeneration(false);
+		}
+	}, [
+		activeRunId,
+		isCancellingGeneration,
+		refreshWorkspaceAfterGeneration,
+	]);
 
 	const startUnitGenerationQueue = useCallback(async () => {
 		if (
@@ -1276,11 +1312,14 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				setActiveGeneratingChapterIndex(chapter.chapterIndex);
 				resetStreamingHtml();
 
+				let streamRunId: string | null = null;
 				try {
 					const {runId} = await dashboardApi.createGenerationRun(
 						didacticUnitId,
 						chapter.chapterIndex,
 					);
+					streamRunId = runId;
+					setActiveRunId(runId);
 					await dashboardApi.streamGenerationRun(runId, {
 						onPartialHtmlBlock: ({block}) => {
 							queueStreamingHtmlBlock(block);
@@ -1289,13 +1328,22 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 
 					flushStreamingHtml();
 				} catch (actionError) {
-					toastError(
-						actionError instanceof Error ?
-							actionError.message
-						:	"Module generation failed.",
-					);
+					if (cancelledGenerationRunIdRef.current !== streamRunId) {
+						toastError(
+							actionError instanceof Error ?
+								actionError.message
+							:	"Module generation failed.",
+						);
+					}
 				} finally {
 					await refreshWorkspaceAfterGeneration();
+					if (cancelledGenerationRunIdRef.current === streamRunId) {
+						cancelledGenerationRunIdRef.current = null;
+					}
+				}
+
+				if (generationQueueBlockedRef.current) {
+					break;
 				}
 			}
 		} catch (actionError) {
@@ -1311,6 +1359,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			setIsSubmitting(false);
 			setIsStreamingGeneration(false);
 			setActiveGeneratingChapterIndex(null);
+			setActiveRunId(null);
 			resetStreamingHtml();
 		}
 	}, [
@@ -2413,12 +2462,19 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 					{workspace.chapters.map((chapter, index) => {
 						const isActive =
 							activeChapterIndex === chapter.chapterIndex;
+						const isChapterGenerating =
+							isStreamingGeneration &&
+							activeGeneratingChapterIndex ===
+								chapter.chapterIndex;
 						const canAiModule =
 							hasConfiguredGenerationTier &&
 							(chapter.status === "ready" ||
 								chapter.status === "pending" ||
 								chapter.status === "failed");
-						const aiBusy = isSubmitting || isStreamingGeneration;
+						const aiBusy =
+							isSubmitting ||
+							isStreamingGeneration ||
+							isCancellingGeneration;
 						const aiLabel =
 							chapter.status === "ready" ? "Regenerate module"
 							: chapter.status === "failed" ? "Retry generation"
@@ -2426,6 +2482,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 						const chapterNeedsPaidRegeneration =
 							chapter.status === "ready" ||
 							chapter.status === "failed";
+						const moduleActionCost = regenerationCost;
 						const canPayChapterAction =
 							!chapterNeedsPaidRegeneration ||
 							canPayRegeneration;
@@ -2512,27 +2569,45 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 														className="text-[#86868B]"
 													/>
 													{aiLabel}
-													{chapterNeedsPaidRegeneration &&
-														regenerationCost && (
-															<span className="ml-auto">
-																<CoinAmount
-																	type={
-																		regenerationCost.coinType
-																	}
-																	amount={
-																		regenerationCost.amount
-																	}
-																	size={14}
-																/>
-															</span>
-														)}
+													{moduleActionCost && (
+														<span className="ml-auto">
+															<CoinAmount
+																type={
+																	moduleActionCost.coinType
+																}
+																amount={
+																	moduleActionCost.amount
+																}
+																size={14}
+															/>
+														</span>
+													)}
 												</DropdownMenuItem>
 											:	null}
-											{(
-												canAiModule &&
-												unitGenerationTier &&
-												canMarkRead
-											) ?
+											{isChapterGenerating ? (
+												<DropdownMenuItem
+													destructive
+													disabled={
+														!activeRunId ||
+														isCancellingGeneration
+													}
+													onSelect={() => {
+														void handleStopActiveGeneration();
+													}}
+												>
+													<X
+														size={14}
+														className="text-red-400"
+													/>
+													{isCancellingGeneration ?
+														"Stopping generation"
+													:	"Stop generation"}
+												</DropdownMenuItem>
+											) : null}
+											{canMarkRead &&
+											((canAiModule &&
+												unitGenerationTier) ||
+												isChapterGenerating) ?
 												<DropdownMenuSeparator />
 											:	null}
 											{canMarkRead ?
