@@ -47,6 +47,11 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+	Popover,
+	PopoverContent,
+	PopoverTrigger,
+} from "@/components/ui/popover";
 import {useNavigate} from "react-router-dom";
 import {
 	type BackendDidacticUnitReadingProgressResponse,
@@ -546,6 +551,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 	const [regenerateConfirmOpen, setRegenerateConfirmOpen] = useState(false);
 	const [currentSpread, setCurrentSpread] = useState(0);
+	const [pageSelectorValue, setPageSelectorValue] = useState("1");
 	const [collapsedOutlineChapterIndex, setCollapsedOutlineChapterIndex] =
 		useState<number | null>(null);
 	const [selectedOutlineItemId, setSelectedOutlineItemId] = useState<
@@ -2044,6 +2050,23 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		spreadStartPage === spreadEndPage ?
 			`Page ${spreadStartPage} of ${totalVisiblePages}`
 		:	`Pages ${spreadStartPage}-${spreadEndPage} of ${totalVisiblePages}`;
+	const pageSelectorPages = Array.from(
+		{length: totalVisiblePages},
+		(_, pageIndex) => ({
+			pageIndex,
+			pageNumber: pageIndex + 1,
+		}),
+	);
+	const submitPageSelector = () => {
+		const pageNumber = Number.parseInt(pageSelectorValue, 10);
+		if (!Number.isFinite(pageNumber)) {
+			return;
+		}
+
+		goToPageIndex(
+			Math.max(0, Math.min(pageNumber - 1, totalVisiblePages - 1)),
+		);
+	};
 
 	const updatePaginatedContentPage = (
 		pageIndex: number,
@@ -2572,9 +2595,95 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 										•
 									</span>
 								)}
-								<span className="text-[11px] text-[#86868B] md:text-[13px]">
-									{spreadPageLabel}
-								</span>
+								<Popover
+									onOpenChange={(open) => {
+										if (open) {
+											setPageSelectorValue(
+												String(spreadStartPage),
+											);
+										}
+									}}
+								>
+									<PopoverTrigger asChild>
+										<button
+											type="button"
+											className="rounded-full text-[11px] text-[#86868B] outline-none transition-colors hover:text-[#1D1D1F] focus-visible:ring-2 focus-visible:ring-[#4ADE80]/40 md:text-[13px]"
+										>
+											{spreadPageLabel}
+										</button>
+									</PopoverTrigger>
+									<PopoverContent
+										align="center"
+										side="top"
+										sideOffset={16}
+										className="w-[300px] rounded-[14px] p-3"
+									>
+										<form
+											className="flex items-center gap-2"
+											onSubmit={(event) => {
+												event.preventDefault();
+												submitPageSelector();
+											}}
+										>
+											<label
+												className="text-[12px] font-medium text-[#6E6E73]"
+												htmlFor="unit-page-selector-input"
+											>
+												Page
+											</label>
+											<input
+												id="unit-page-selector-input"
+												type="number"
+												min={1}
+												max={totalVisiblePages}
+												value={pageSelectorValue}
+												onChange={(event) =>
+													setPageSelectorValue(
+														event.target.value,
+													)
+												}
+												className="h-8 min-w-0 flex-1 rounded-[8px] border border-[#DADADF] bg-white px-2 text-[13px] font-medium text-[#1D1D1F] outline-none focus:border-[#34C759] focus:ring-2 focus:ring-[#4ADE80]/20"
+											/>
+											<button
+												type="submit"
+												className="h-8 rounded-[8px] bg-[#1D1D1F] px-3 text-[12px] font-semibold text-white transition-colors hover:bg-black"
+											>
+												Go
+											</button>
+										</form>
+										<div className="mt-3 max-h-56 overflow-y-auto pr-1">
+											<div className="grid grid-cols-6 gap-1">
+												{pageSelectorPages.map((page) => {
+													const isVisiblePage =
+														page.pageNumber >=
+															spreadStartPage &&
+														page.pageNumber <=
+															spreadEndPage;
+
+													return (
+														<button
+															key={page.pageNumber}
+															type="button"
+															onClick={() =>
+																goToPageIndex(
+																	page.pageIndex,
+																)
+															}
+															className={cn(
+																"flex h-8 items-center justify-center rounded-[8px] text-[12px] font-semibold tabular-nums transition-colors",
+																isVisiblePage ?
+																	"bg-[#34C759] text-white"
+																:	"bg-[#F5F5F7] text-[#6E6E73] hover:bg-[#EAEAED] hover:text-[#1D1D1F]",
+															)}
+														>
+															{page.pageNumber}
+														</button>
+													);
+												})}
+											</div>
+										</div>
+									</PopoverContent>
+								</Popover>
 							</Motion.div>
 						}
 					</AnimatePresence>
