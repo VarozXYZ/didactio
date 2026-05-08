@@ -52,9 +52,9 @@ export async function advanceToQuestionnaireAnswered(
 
 	expect(moderationResponse.status).toBe(200);
 
-	const questionnaireResponse = await request(app)
-		.post(`/api/didactic-unit/${didacticUnitId}/questionnaire/generate`)
-		.send({tier: "cheap"});
+	const questionnaireResponse = await request(app).get(
+		`/api/didactic-unit/${didacticUnitId}`,
+	);
 
 	expect(questionnaireResponse.status).toBe(200);
 

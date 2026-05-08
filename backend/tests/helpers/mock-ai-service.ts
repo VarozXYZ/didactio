@@ -4,28 +4,14 @@ import type {
 	FolderClassificationResult,
 	MarkdownStreamCallbacks,
 	ModerationResult,
-	QuestionnaireResult,
 	StructuredStreamCallbacks,
 	SummaryResult,
 	SyllabusResult,
 } from "../../src/ai/service.js";
 import type {AiCallTelemetry} from "../../src/ai/telemetry.js";
-import {
-	buildQuestionnaireForDidacticUnit,
-	type DidacticUnitQuestionAnswer,
-} from "../../src/didactic-unit/planning.js";
+import type {DidacticUnitQuestionAnswer} from "../../src/didactic-unit/planning.js";
 import {createCanonicalDidacticUnitChapter} from "../../src/didactic-unit/didactic-unit-chapter.js";
 import {resolveTargetChapterCount} from "../../src/ai/prompt-builders.js";
-
-function findAnswerValue(
-	answers: DidacticUnitQuestionAnswer[] | undefined,
-	questionId: string,
-): string {
-	return (
-		answers?.find((answer) => answer.questionId === questionId)?.value ??
-		"not provided"
-	);
-}
 
 function referenceSyllabusForLength(
 	topic: string,
@@ -79,12 +65,14 @@ function chapterHtml(input: {
 	chapterOverview: string;
 	answers?: DidacticUnitQuestionAnswer[];
 }): string {
-	const learningGoal = findAnswerValue(input.answers, "learning_goal");
+	const questionnaireContext =
+		input.answers?.map((answer) => `${answer.questionId}: ${answer.value}`).join("; ") ??
+		"not provided";
 
 	return [
 		"<h2>Core ideas</h2>",
 		`<p>This module explores ${input.chapterTitle} in the context of ${input.topic}.</p>`,
-		`<p>It keeps the learner goal in view: ${learningGoal}.</p>`,
+		`<p>It keeps the learner context in view: ${questionnaireContext}.</p>`,
 		"<p>Use the concepts, examples, and checkpoints to build confidence progressively.</p>",
 		"<h2>Practice in context</h2>",
 		`<p>Work through a realistic example related to ${input.chapterOverview.toLowerCase()}.</p>`,
@@ -242,29 +230,6 @@ export function createMockAiService(): AiService {
 					:	undefined,
 			});
 			const result = await this.moderateTopic(input);
-			await callbacks.onComplete?.(result);
-			return result;
-		},
-		async generateQuestionnaire(input): Promise<QuestionnaireResult> {
-			return {
-				provider,
-				model,
-				prompt: `Questionnaire ${input.topic}`,
-				telemetry,
-				questionnaire: buildQuestionnaireForDidacticUnit(input.topic),
-			};
-		},
-		async streamQuestionnaire(
-			input,
-			callbacks,
-		): Promise<QuestionnaireResult> {
-			await callbacks.onStart?.({
-				provider,
-				model,
-				modelId: `${provider}/${model}`,
-			});
-			const result = await this.generateQuestionnaire(input);
-			await callbacks.onPartial?.({questionnaire: result.questionnaire});
 			await callbacks.onComplete?.(result);
 			return result;
 		},

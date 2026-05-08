@@ -23,7 +23,7 @@ function createStoredDidacticUnit(): DidacticUnit {
 		],
 		questionnaireAnswers: [
 			{
-				questionId: "learning_goal",
+				questionId: "desired_outcome",
 				value: "Build production-ready applications",
 			},
 		],

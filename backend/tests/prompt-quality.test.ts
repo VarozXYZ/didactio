@@ -109,12 +109,12 @@ describe("prompt quality helpers", () => {
 				"Create a practical unit that moves from syntax fundamentals to small real-world programs.",
 			syllabusPrompt: "Deterministic syllabus prompt body",
 			questionnaireAnswers: [
-				{questionId: "topic_knowledge_level", value: "basic"},
-				{questionId: "related_knowledge_level", value: "basic"},
 				{
-					questionId: "learning_goal",
+					questionId: "desired_outcome",
 					value: "Build beginner confidence.",
 				},
+				{questionId: "use_context", value: "professional"},
+				{questionId: "learning_approach", value: "guided_project"},
 			],
 			authoring,
 			depth: "intermediate",
@@ -150,9 +150,9 @@ describe("prompt quality helpers", () => {
 			level: "beginner",
 			chapterIndex: 1,
 			questionnaireAnswers: [
-				{questionId: "topic_knowledge_level", value: "basic"},
-				{questionId: "related_knowledge_level", value: "basic"},
-				{questionId: "learning_goal", value: "Automate small tasks."},
+				{questionId: "desired_outcome", value: "Automate small tasks."},
+				{questionId: "use_context", value: "professional"},
+				{questionId: "learning_approach", value: "practical_exercises"},
 			],
 			continuitySummaries: [
 				"- Variables introduced\n- Basic syntax covered",
@@ -289,12 +289,10 @@ describe("prompt quality helpers", () => {
 			},
 		});
 
-		expect(syllabusPrompt).toContain("Topic knowledge: not provided");
-		expect(syllabusPrompt).toContain("Related knowledge: not provided");
-		expect(syllabusPrompt).toContain("Learning goal: not provided");
-		expect(chapterPrompt).toContain("Topic knowledge: not provided");
-		expect(chapterPrompt).toContain("Related knowledge: not provided");
-		expect(chapterPrompt).toContain("Learning goal: not provided");
+		expect(syllabusPrompt).toContain("Learner questionnaire context:");
+		expect(syllabusPrompt).toContain("not provided");
+		expect(chapterPrompt).toContain("Learner questionnaire context:");
+		expect(chapterPrompt).toContain("not provided");
 	});
 
 	it("adapts the reference syllabus schema into the compatibility syllabus object", () => {

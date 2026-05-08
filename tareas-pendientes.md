@@ -21,3 +21,4 @@
 21. En EditMode (cambiar nombre), la estructura de los bullet points y numeraciones se rompe
 22. Los enlaces no se pueden romper de página a página
 23. Marcar desde el principio el tipo de generacion (gold/silver) y el coste según longitud
+24. Mejorar botones y centralizar componentes de botones

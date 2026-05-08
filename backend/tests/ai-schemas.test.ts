@@ -2,7 +2,6 @@ import {describe, expect, it} from "vitest";
 import {
 	folderClassificationSchema,
 	moderationSchema,
-	questionnaireSchema,
 	syllabusSchema,
 } from "../src/ai/schemas.js";
 
@@ -71,55 +70,6 @@ describe("moderation schema", () => {
 		expect(parsed.notes).toBe(
 			"The request was approved and refined to create a clearer beginner path.",
 		);
-	});
-});
-
-describe("questionnaire schema", () => {
-	it("accepts the canonical questionnaire array shape", () => {
-		const parsed = questionnaireSchema.parse({
-			questions: [
-				{
-					id: "topic_knowledge_level",
-					prompt: "What is your current knowledge level?",
-					type: "single_select",
-					options: [
-						{value: "none", label: "No prior knowledge"},
-						{value: "basic", label: "Basic understanding"},
-					],
-				},
-				{
-					id: "related_knowledge_level",
-					prompt: "How comfortable are you with related concepts?",
-					type: "single_select",
-					options: [
-						{value: "none", label: "No prior knowledge"},
-						{value: "basic", label: "Basic understanding"},
-					],
-				},
-				{
-					id: "learning_goal",
-					prompt: "What do you want to achieve?",
-					type: "long_text",
-					options: null,
-				},
-			],
-		});
-
-		expect(parsed.questions).toHaveLength(3);
-		expect(parsed.questions[0]?.id).toBe("topic_knowledge_level");
-		expect(parsed.questions[2]?.id).toBe("learning_goal");
-	});
-
-	it("rejects legacy keyed questionnaire objects", () => {
-		expect(() =>
-			questionnaireSchema.parse({
-				topic_knowledge_level: {
-					question: "How much do you already know?",
-					type: "single_select",
-					options: ["Beginner", "Intermediate"],
-				},
-			}),
-		).toThrow();
 	});
 });
 

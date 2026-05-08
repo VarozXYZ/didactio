@@ -26,14 +26,16 @@ export function resolveTargetChapterCount(length: DidacticUnitLength): number {
 	return TARGET_CHAPTER_COUNT_BY_LENGTH[length];
 }
 
-function findAnswerValue(
+function formatQuestionnaireContext(
 	answers: DidacticUnitQuestionAnswer[] | undefined,
-	questionId: string,
 ): string {
-	return (
-		answers?.find((answer) => answer.questionId === questionId)?.value ??
-		"not provided"
-	);
+	if (!answers || answers.length === 0) {
+		return "not provided";
+	}
+
+	return answers
+		.map((answer) => `- ${answer.questionId}: ${answer.value}`)
+		.join("\n");
 }
 
 function toneInstruction(tone: AuthoringTone): string {
@@ -214,7 +216,6 @@ export function buildGatewaySystemPrompt(
 	stage:
 		| "folder_classification"
 		| "moderation"
-		| "questionnaire"
 		| "syllabus"
 		| "summary"
 		| "chapter",
@@ -224,8 +225,6 @@ export function buildGatewaySystemPrompt(
 			return "You classify educational units into an existing folder. Return only the requested structured object.";
 		case "moderation":
 			return "You are a prompt filter and improver for an educational course creation platform. Return only the requested structured object.";
-		case "questionnaire":
-			return "You design concise learner-discovery questionnaires for instructional planning. Return only the requested structured object.";
 		case "syllabus":
 			return "You are a curriculum designer. Return only a single valid structured syllabus object that exactly matches the requested schema.";
 		case "summary":
@@ -309,44 +308,6 @@ export function buildModerationPrompt(input: {
 	].join("\n\n");
 }
 
-export function buildQuestionnairePrompt(input: {
-	topic: string;
-	level: DidacticUnitLevel;
-	improvedTopicBrief?: string;
-	authoring: AuthoringConfig;
-}): string {
-	return [
-		buildSection("Role / Contract", [
-			"Create a learner questionnaire that helps refine a didactic unit plan.",
-			"Return exactly 3 questions in the canonical order and ids required by the schema.",
-		]),
-		buildSection(
-			"Authoring Profile",
-			buildAuthoringContext(input.authoring),
-		),
-		buildSection("Learner Context", [
-			`Declared learner level: ${input.level}`,
-		]),
-		buildSection("Generation Brief", [
-			`Topic: ${input.topic}`,
-			input.improvedTopicBrief ?
-				`Improved topic brief: ${input.improvedTopicBrief}`
-			:	"",
-		]),
-		buildSection("Output Contract", [
-			"Return a single JSON object with a top-level questions array.",
-			"Use these exact ids in this exact order: topic_knowledge_level, related_knowledge_level, learning_goal.",
-			"For each question, use these exact keys: id, prompt, type, options.",
-			"Use single_select for fixed choices and long_text for open responses.",
-			"For single_select questions, options must be an array of { value, label } objects.",
-			"For long_text questions, options must be null.",
-			"Do not use question ids as top-level object keys.",
-			"Keep prompts concise, learner-facing, and useful for planning.",
-			"Keep the questionnaire aligned with the authoring profile.",
-		]),
-	].join("\n\n");
-}
-
 export function buildFolderClassificationPrompt(input: {
 	topic: string;
 	additionalContext?: string;
@@ -414,9 +375,8 @@ export function buildSyllabusMarkdownPrompt(input: {
 		]),
 		buildSection("Learner / Profile Context", [
 			`Declared learner level: ${input.level}`,
-			`Topic knowledge: ${findAnswerValue(input.questionnaireAnswers, "topic_knowledge_level")}`,
-			`Related knowledge: ${findAnswerValue(input.questionnaireAnswers, "related_knowledge_level")}`,
-			`Learning goal: ${findAnswerValue(input.questionnaireAnswers, "learning_goal")}`,
+			"Learner questionnaire context:",
+			formatQuestionnaireContext(input.questionnaireAnswers),
 			`Requested depth: ${input.depth}`,
 			`Requested length: ${input.length}`,
 			`Target module count: ${targetModuleCount}`,
@@ -479,9 +439,8 @@ export function buildChapterHtmlPrompt(input: {
 			`Requested length: ${input.length}`,
 			depthInstruction(input.depth),
 			contentLengthInstruction(input.length),
-			`Topic knowledge: ${findAnswerValue(input.questionnaireAnswers, "topic_knowledge_level")}`,
-			`Related knowledge: ${findAnswerValue(input.questionnaireAnswers, "related_knowledge_level")}`,
-			`Learning goal: ${findAnswerValue(input.questionnaireAnswers, "learning_goal")}`,
+			"Learner questionnaire context:",
+			formatQuestionnaireContext(input.questionnaireAnswers),
 			input.additionalContext ?
 				`Additional learner or context notes: ${input.additionalContext}`
 			:	"",

@@ -197,7 +197,6 @@ function isSyllabusStage(nextAction: string): boolean {
 function resolveStepFromNextAction(nextAction: string): WizardStep {
 	if (isSyllabusStage(nextAction)) return 2;
 	if (nextAction === "answer_questionnaire") return 1;
-	if (nextAction === "generate_questionnaire") return 1;
 	return 0;
 }
 
@@ -271,7 +270,11 @@ export function CreateUnitWizard({
 			setDraftFolderId(pd.folder.id);
 			setActiveUnitId(pd.id);
 
-			const targetStep = resolveStepFromNextAction(pd.nextAction);
+			const targetStep =
+				pd.status === "questionnaire_pending_moderation" ||
+				pd.status === "moderation_failed" ?
+					1
+				:	resolveStepFromNextAction(pd.nextAction);
 			setCurrentStep(targetStep);
 		},
 		[],
@@ -296,7 +299,11 @@ export function CreateUnitWizard({
 			setIsLoading(true);
 			try {
 				let detail = await dashboardApi.getDidacticUnit(didacticUnitId);
-				if (detail.nextAction === "moderate_topic") {
+				if (
+					detail.nextAction === "moderate_topic" &&
+					detail.status !== "moderation_rejected" &&
+					detail.status !== "moderation_failed"
+				) {
 					detail =
 						await dashboardApi.moderateDidacticUnit(didacticUnitId);
 				}
@@ -327,16 +334,8 @@ export function CreateUnitWizard({
 					:	{mode: "auto"},
 			});
 
-			let detail = await dashboardApi.moderateDidacticUnit(created.id);
-			if (detail.nextAction === "generate_questionnaire") {
-				detail = await dashboardApi.generateDidacticUnitQuestionnaire(
-					created.id,
-					"silver",
-				);
-			}
-
 			onDataChanged();
-			const pd = adaptDidacticUnitPlanning(detail);
+			const pd = adaptDidacticUnitPlanning(created);
 			setPlanning(pd);
 			setQuestionnaireAnswers(pd.questionnaire?.answers ?? {});
 			setActiveUnitId(pd.id);
@@ -361,8 +360,72 @@ export function CreateUnitWizard({
 		onDataChanged,
 	]);
 
+	useEffect(() => {
+		if (
+			!activeUnitId ||
+			planning?.status !== "questionnaire_pending_moderation"
+		) {
+			return;
+		}
+
+		let cancelled = false;
+		const pollModeration = async () => {
+			try {
+				const detail = await dashboardApi.getDidacticUnit(activeUnitId);
+				if (cancelled) return;
+				const pd = adaptDidacticUnitPlanning(detail);
+				setPlanning(pd);
+				setQuestionnaireAnswers((prev) => ({
+					...(pd.questionnaire?.answers ?? {}),
+					...prev,
+				}));
+
+				if (pd.status === "moderation_rejected") {
+					toastError(
+						pd.moderationError ??
+							"This topic could not be approved. Please adjust it and try again.",
+					);
+					setCurrentStep(0);
+				} else if (pd.status === "moderation_failed") {
+					toastError(
+						pd.moderationError ??
+							"Moderation failed. You can retry or edit the topic.",
+					);
+				}
+			} catch (e) {
+				if (!cancelled) {
+					toastError(
+						e instanceof Error ?
+							e.message
+						:	"Failed to refresh moderation status.",
+					);
+				}
+			}
+		};
+
+		const interval = window.setInterval(() => {
+			void pollModeration();
+		}, 1200);
+		void pollModeration();
+
+		return () => {
+			cancelled = true;
+			window.clearInterval(interval);
+		};
+	}, [activeUnitId, planning?.status]);
+
 	const handleQuestionnaireSubmit = useCallback(async () => {
 		if (!planning?.questionnaire) return;
+		if (planning.status === "questionnaire_pending_moderation") return;
+		const missingAnswer = planning.questionnaire.questions.find((q) => {
+			const value = questionnaireAnswers[q.id]?.trim() ?? "";
+			return !value || value === "__other__";
+		});
+
+		if (missingAnswer) {
+			toastError("Answer all questions or skip the questionnaire.");
+			return;
+		}
 		setIsSubmitting(true);
 		try {
 			const detail = await dashboardApi.answerDidacticUnitQuestionnaire(
@@ -385,6 +448,7 @@ export function CreateUnitWizard({
 
 	const handleQuestionnaireSkip = useCallback(async () => {
 		if (!planning) return;
+		if (planning.status === "questionnaire_pending_moderation") return;
 		setIsSubmitting(true);
 		try {
 			const detail = await dashboardApi.answerDidacticUnitQuestionnaire(
@@ -401,6 +465,27 @@ export function CreateUnitWizard({
 			setIsSubmitting(false);
 		}
 	}, [planning, onDataChanged]);
+
+	const handleModerationRetry = useCallback(async () => {
+		if (!planning) return;
+		setIsSubmitting(true);
+		try {
+			const detail = await dashboardApi.moderateDidacticUnit(planning.id);
+			const pd = adaptDidacticUnitPlanning(detail);
+			setPlanning(pd);
+			setCurrentStep(pd.status === "moderation_rejected" ? 0 : 1);
+			if (pd.status === "moderation_rejected") {
+				toastError(
+					pd.moderationError ??
+						"This topic could not be approved. Please adjust it and try again.",
+				);
+			}
+		} catch (e) {
+			toastError(e instanceof Error ? e.message : "Action failed.");
+		} finally {
+			setIsSubmitting(false);
+		}
+	}, [planning]);
 
 	const handleGenerateSyllabus = useCallback(
 		async (tier: BackendGenerationQuality) => {
@@ -625,7 +710,21 @@ export function CreateUnitWizard({
 
 				{/* Content area */}
 				<div className="flex min-h-0 min-w-0 flex-1 flex-col">
-					<div className="flex shrink-0 justify-end px-4 pt-4">
+					<div
+						className={`flex shrink-0 items-center px-6 pt-5 ${
+							currentStep === 1 ? "justify-between" : "justify-end"
+						}`}
+					>
+						{currentStep === 1 && (
+							<div className="flex items-center gap-2">
+								<p className="text-[13px] text-[#86868B]">
+									Answer these questions to personalize your unit.
+								</p>
+								<span className="rounded-full border border-[#D1D1D6] bg-white/70 px-2 py-0.5 text-[10px] font-bold tracking-[0.12em] text-[#6E6E73]">
+									OPTIONAL
+								</span>
+							</div>
+						)}
 						<button
 							type="button"
 							onClick={onClose}
@@ -634,7 +733,7 @@ export function CreateUnitWizard({
 							<X size={15} />
 						</button>
 					</div>
-					<div className="min-h-0 flex-1 overflow-y-auto px-6 pb-5 pt-2">
+					<div className="min-h-0 flex-1 overflow-y-auto px-6 pb-5 pt-3">
 						{currentStep === 0 && (
 							<TopicStep
 								draftTopic={draftTopic}
@@ -682,6 +781,8 @@ export function CreateUnitWizard({
 								isSubmitting={isSubmitting}
 								onSubmit={handleQuestionnaireSubmit}
 								onSkip={handleQuestionnaireSkip}
+								onRetryModeration={handleModerationRetry}
+								onEditTopic={() => setCurrentStep(0)}
 							/>
 						)}
 

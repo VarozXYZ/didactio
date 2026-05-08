@@ -43,12 +43,13 @@ import {
 } from "./didactic-unit/module-reading-progress.js";
 import {
 	answerDidacticUnitQuestionnaire,
-	applyGeneratedDidacticUnitQuestionnaire,
 	applyGeneratedDidacticUnitSyllabus,
 	approveDidacticUnitSyllabus,
+	failDidacticUnitModeration,
 	generateDidacticUnitSyllabusPrompt,
 	moderateDidacticUnitPlanning,
 	prepareDidacticUnitSyllabusGeneration,
+	rejectDidacticUnitModeration,
 	updateDidacticUnitSyllabus,
 } from "./didactic-unit/planning-lifecycle.js";
 import {
@@ -383,6 +384,8 @@ function buildDidacticUnitResponseFromFolders(
 		createdAt: didacticUnit.createdAt,
 		updatedAt: didacticUnit.updatedAt,
 		moderatedAt: didacticUnit.moderatedAt,
+		moderationError: didacticUnit.moderationError,
+		moderationAttempts: didacticUnit.moderationAttempts,
 		questionnaireGeneratedAt: didacticUnit.questionnaireGeneratedAt,
 		questionnaireAnsweredAt: didacticUnit.questionnaireAnsweredAt,
 		improvedTopicBrief: didacticUnit.improvedTopicBrief,
@@ -941,6 +944,142 @@ export function createApp(options: CreateAppOptions) {
 	);
 	const requireAuth = createRequireAuth(authConfig);
 	const requireAdmin = createRequireRole("admin");
+	const sleep = (milliseconds: number) =>
+		new Promise((resolve) => setTimeout(resolve, milliseconds));
+
+	const runModerationJob = async (
+		ownerId: string,
+		didacticUnitId: string,
+	): Promise<void> => {
+		const maxAttempts = 3;
+
+		for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+			const didacticUnit = await didacticUnitStore.getById(
+				ownerId,
+				didacticUnitId,
+			);
+
+			if (
+				!didacticUnit ||
+				(didacticUnit.status !== "submitted" &&
+					didacticUnit.status !==
+						"questionnaire_pending_moderation" &&
+					didacticUnit.status !== "moderation_failed")
+			) {
+				return;
+			}
+
+			try {
+				const config = await aiConfigStore.get(ownerId);
+				const folders = await ensureDefaultFolders(
+					folderStore,
+					ownerId,
+				);
+				const generalFolder = folders.find(
+					(folder) => folder.slug === "general",
+				);
+
+				if (!generalFolder) {
+					throw new Error("General folder could not be resolved.");
+				}
+
+				const moderation = await aiService.moderateTopic({
+					topic: didacticUnit.topic,
+					level: didacticUnit.level,
+					additionalContext: didacticUnit.additionalContext,
+					folders:
+						didacticUnit.folderAssignmentMode === "auto" ?
+							folders.map((folder) => ({
+								name: folder.name,
+								description: buildFolderDescription(folder),
+							}))
+						:	undefined,
+					config,
+					tier: "silver",
+				});
+
+				if (!moderation.approved) {
+					await didacticUnitStore.save(
+						rejectDidacticUnitModeration(
+							didacticUnit,
+							moderation.notes,
+						),
+					);
+					appLogger.warn("Didactic unit moderation rejected", {
+						didacticUnitId,
+						notes: moderation.notes,
+						reasoningNotes: moderation.reasoningNotes,
+					});
+					return;
+				}
+
+				const moderatedDidacticUnit = moderateDidacticUnitPlanning(
+					didacticUnit,
+					{
+						normalizedTopic: moderation.normalizedTopic,
+						improvedTopicBrief: moderation.improvedTopicBrief,
+						reasoningNotes: moderation.reasoningNotes,
+					},
+				);
+				const folderUpdatedDidacticUnit =
+					moderatedDidacticUnit.folderAssignmentMode === "auto" ?
+						updateDidacticUnitFolder(moderatedDidacticUnit, {
+							mode: "auto",
+							folderId: resolveFolderIdFromModelName({
+								folderName: moderation.folderName,
+								folders,
+								fallbackFolderId: generalFolder.id,
+							}),
+						})
+					:	moderatedDidacticUnit;
+				const themedDidacticUnit =
+					moderation.stylePreset &&
+					!folderUpdatedDidacticUnit.presentationTheme?.stylePreset ?
+						{
+							...folderUpdatedDidacticUnit,
+							presentationTheme: {
+								...(folderUpdatedDidacticUnit.presentationTheme ??
+									SYSTEM_DEFAULT_THEME),
+								stylePreset: moderation.stylePreset,
+							},
+						}
+					:	folderUpdatedDidacticUnit;
+
+				await didacticUnitStore.save(themedDidacticUnit);
+				return;
+			} catch (error) {
+				if (attempt < maxAttempts) {
+					await sleep(250 * attempt);
+					continue;
+				}
+
+				const latest = await didacticUnitStore.getById(
+					ownerId,
+					didacticUnitId,
+				);
+
+				if (latest) {
+					await didacticUnitStore.save(
+						failDidacticUnitModeration(
+							latest,
+							error instanceof Error ?
+								error.message
+							:	"Didactic unit moderation failed.",
+							attempt,
+						),
+					);
+				}
+				appLogger.error("Didactic unit moderation job failed", {
+					didacticUnitId,
+					error,
+				});
+			}
+		}
+	};
+
+	const enqueueModerationJob = (ownerId: string, didacticUnitId: string) => {
+		void runModerationJob(ownerId, didacticUnitId);
+	};
 
 	configureGooglePassport(authConfig);
 	if (authConfig.trustProxy) {
@@ -1297,6 +1436,10 @@ export function createApp(options: CreateAppOptions) {
 			);
 
 			await didacticUnitStore.save(didacticUnit);
+			enqueueModerationJob(
+				requestWithMockOwner.mockOwner.id,
+				didacticUnit.id,
+			);
 			response
 				.status(201)
 				.json(
@@ -1470,7 +1613,11 @@ export function createApp(options: CreateAppOptions) {
 			return;
 		}
 
-		if (didacticUnit.status !== "submitted") {
+		if (
+			didacticUnit.status !== "submitted" &&
+			didacticUnit.status !== "questionnaire_pending_moderation" &&
+			didacticUnit.status !== "moderation_failed"
+		) {
 			response.json(
 				await buildDidacticUnitResponse(didacticUnit, folderStore),
 			);
@@ -1516,6 +1663,12 @@ export function createApp(options: CreateAppOptions) {
 					notes: moderation.notes,
 					reasoningNotes: moderation.reasoningNotes,
 				});
+				await didacticUnitStore.save(
+					rejectDidacticUnitModeration(
+						didacticUnit,
+						moderation.notes,
+					),
+				);
 				response.status(409).json({error: moderation.notes});
 				return;
 			}
@@ -1555,7 +1708,7 @@ export function createApp(options: CreateAppOptions) {
 			await didacticUnitStore.save(styledUnit);
 			response.json(
 				await buildDidacticUnitResponse(
-					folderResolvedDidacticUnit,
+					styledUnit,
 					folderStore,
 				),
 			);
@@ -1582,7 +1735,12 @@ export function createApp(options: CreateAppOptions) {
 				return;
 			}
 
-			if (didacticUnit.status !== "submitted") {
+			if (
+				didacticUnit.status !== "submitted" &&
+				didacticUnit.status !==
+					"questionnaire_pending_moderation" &&
+				didacticUnit.status !== "moderation_failed"
+			) {
 				openNdjsonStream(response);
 				writeNdjsonEvent(response, {
 					type: "complete",
@@ -1655,6 +1813,12 @@ export function createApp(options: CreateAppOptions) {
 						reasoningNotes: moderation.reasoningNotes,
 						streaming: true,
 					});
+					await didacticUnitStore.save(
+						rejectDidacticUnitModeration(
+							didacticUnit,
+							moderation.notes,
+						),
+					);
 					writeNdjsonEvent(response, {
 						type: "error",
 						message: moderation.notes,
@@ -1694,161 +1858,6 @@ export function createApp(options: CreateAppOptions) {
 				const resolved = resolveStageConfigError(
 					error,
 					"Didactic unit moderation failed.",
-				);
-				writeNdjsonEvent(response, {
-					type: "error",
-					message: resolved.message,
-				});
-			}
-
-			response.end();
-		},
-	);
-
-	app.post(
-		"/api/didactic-unit/:id/questionnaire/generate",
-		async (request, response) => {
-			const requestWithMockOwner = asRequestWithMockOwner(request);
-			const didacticUnit = await didacticUnitStore.getById(
-				requestWithMockOwner.mockOwner.id,
-				String(request.params.id),
-			);
-
-			if (!didacticUnit) {
-				response.status(404).json({error: "Didactic unit not found."});
-				return;
-			}
-
-			let tier: AiModelTier;
-			try {
-				tier = parseAiModelTier(request.body);
-			} catch (error) {
-				response.status(400).json({
-					error:
-						error instanceof Error ?
-							error.message
-						:	"Invalid didactic unit questionnaire generation request.",
-				});
-				return;
-			}
-
-			try {
-				const config = await aiConfigStore.get(
-					requestWithMockOwner.mockOwner.id,
-				);
-				const result = await aiService.generateQuestionnaire({
-					topic: didacticUnit.topic,
-					level: didacticUnit.level,
-					improvedTopicBrief: didacticUnit.improvedTopicBrief,
-					config,
-					tier,
-					abortSignal: createAbortSignal(request),
-				});
-				const updatedDidacticUnit =
-					applyGeneratedDidacticUnitQuestionnaire(
-						didacticUnit,
-						result.questionnaire,
-					);
-				updatedDidacticUnit.provider = result.provider;
-				await didacticUnitStore.save(updatedDidacticUnit);
-				response.json(
-					await buildDidacticUnitResponse(
-						updatedDidacticUnit,
-						folderStore,
-					),
-				);
-			} catch (error) {
-				const resolved = resolveStageConfigError(
-					error,
-					"Didactic unit questionnaire generation failed.",
-				);
-				response
-					.status(resolved.status)
-					.json({error: resolved.message});
-			}
-		},
-	);
-
-	app.post(
-		"/api/didactic-unit/:id/questionnaire/generate/stream",
-		async (request, response) => {
-			const requestWithMockOwner = asRequestWithMockOwner(request);
-			const didacticUnit = await didacticUnitStore.getById(
-				requestWithMockOwner.mockOwner.id,
-				String(request.params.id),
-			);
-
-			if (!didacticUnit) {
-				response.status(404).json({error: "Didactic unit not found."});
-				return;
-			}
-
-			openNdjsonStream(response);
-
-			let tier: AiModelTier;
-			try {
-				tier = parseAiModelTier(request.body);
-			} catch (error) {
-				writeNdjsonEvent(response, {
-					type: "error",
-					message:
-						error instanceof Error ?
-							error.message
-						:	"Invalid didactic unit questionnaire generation request.",
-				});
-				response.end();
-				return;
-			}
-
-			try {
-				const config = await aiConfigStore.get(
-					requestWithMockOwner.mockOwner.id,
-				);
-				const result = await aiService.streamQuestionnaire(
-					{
-						topic: didacticUnit.topic,
-						level: didacticUnit.level,
-						improvedTopicBrief: didacticUnit.improvedTopicBrief,
-						config,
-						tier,
-						abortSignal: createAbortSignal(request),
-					},
-					{
-						onStart: async (selection) => {
-							writeNdjsonEvent(response, {
-								type: "start",
-								stage: "questionnaire",
-								provider: selection.provider,
-								model: selection.model,
-							});
-						},
-						onPartial: async (partial) => {
-							writeNdjsonEvent(response, {
-								type: "partial_structured",
-								data: partial,
-							});
-						},
-					},
-				);
-
-				const updatedDidacticUnit =
-					applyGeneratedDidacticUnitQuestionnaire(
-						didacticUnit,
-						result.questionnaire,
-					);
-				updatedDidacticUnit.provider = result.provider;
-				await didacticUnitStore.save(updatedDidacticUnit);
-				writeNdjsonEvent(response, {
-					type: "complete",
-					data: await buildDidacticUnitResponse(
-						updatedDidacticUnit,
-						folderStore,
-					),
-				});
-			} catch (error) {
-				const resolved = resolveStageConfigError(
-					error,
-					"Didactic unit questionnaire generation failed.",
 				);
 				writeNdjsonEvent(response, {
 					type: "error",

@@ -7,10 +7,7 @@ import type {
 	DidacticUnitDepth,
 	DidacticUnitLength,
 	DidacticUnitLevel,
-	DidacticUnitQuestion,
 	DidacticUnitQuestionAnswer,
-	DidacticUnitQuestionnaire,
-	DidacticUnitQuestionOption,
 	DidacticUnitReferenceSyllabus,
 } from "../didactic-unit/planning.js";
 import type {AiConfig, AiModelConfig, AiModelTier} from "./config.js";
@@ -21,14 +18,12 @@ import {
 	buildGatewaySystemPrompt,
 	buildLearnerSummaryPrompt,
 	buildModerationPrompt,
-	buildQuestionnairePrompt,
 	resolveTargetChapterCount,
 	buildSyllabusMarkdownPrompt,
 } from "./prompt-builders.js";
 import {
 	folderClassificationSchema,
 	moderationSchema,
-	questionnaireSchema,
 	syllabusSchema,
 } from "./schemas.js";
 import {
@@ -47,6 +42,12 @@ interface ModelSelection {
 	model: string;
 	modelId: string;
 }
+
+const MODERATION_MODEL_SELECTION: ModelSelection = {
+	provider: "openai",
+	model: "gpt-oss-20b",
+	modelId: "openai/gpt-oss-20b",
+};
 
 interface BaseStageResult {
 	provider: string;
@@ -72,10 +73,6 @@ export interface FolderClassificationResult extends BaseStageResult {
 	stylePreset?: "modern" | "modern" | "classic" | "classic" | "plain";
 }
 
-export interface QuestionnaireResult extends BaseStageResult {
-	questionnaire: DidacticUnitQuestionnaire;
-}
-
 export interface SyllabusResult extends BaseStageResult {
 	syllabus: DidacticUnitReferenceSyllabus;
 }
@@ -93,7 +90,6 @@ export interface ChapterResult extends BaseStageResult {
 type AiStageName =
 	| "folder_classification"
 	| "moderation"
-	| "questionnaire"
 	| "syllabus"
 	| "summary"
 	| "module";
@@ -154,25 +150,6 @@ export interface AiService {
 		},
 		callbacks: StructuredStreamCallbacks<ModerationResult>,
 	): Promise<ModerationResult>;
-	generateQuestionnaire(input: {
-		topic: string;
-		level: DidacticUnitLevel;
-		improvedTopicBrief?: string;
-		config: AiConfig;
-		tier: AiModelTier;
-		abortSignal?: AbortSignal;
-	}): Promise<QuestionnaireResult>;
-	streamQuestionnaire(
-		input: {
-			topic: string;
-			level: DidacticUnitLevel;
-			improvedTopicBrief?: string;
-			config: AiConfig;
-			tier: AiModelTier;
-			abortSignal?: AbortSignal;
-		},
-		callbacks: StructuredStreamCallbacks<QuestionnaireResult>,
-	): Promise<QuestionnaireResult>;
 	generateSyllabus(input: {
 		topic: string;
 		level: DidacticUnitLevel;
@@ -267,7 +244,6 @@ function resolveStageMaxOutputTokens(
 	stage:
 		| "folder_classification"
 		| "moderation"
-		| "questionnaire"
 		| "syllabus"
 		| "summary"
 		| "chapter",
@@ -277,8 +253,6 @@ function resolveStageMaxOutputTokens(
 		case "folder_classification":
 		case "moderation":
 			return 1200;
-		case "questionnaire":
-			return 1800;
 		case "summary":
 			return 1000;
 		case "syllabus":
@@ -290,101 +264,6 @@ function resolveStageMaxOutputTokens(
 			}
 			return CONTENT_LENGTH_TOKENS[length];
 	}
-}
-
-function normalizeQuestionType(rawType: string): DidacticUnitQuestion["type"] {
-	const normalized = rawType
-		.trim()
-		.toLowerCase()
-		.replace(/[\s-]+/g, "_");
-
-	if (
-		normalized === "single_select" ||
-		normalized === "single" ||
-		normalized === "select"
-	) {
-		return "single_select";
-	}
-
-	if (
-		normalized === "long_text" ||
-		normalized === "text" ||
-		normalized === "free_text" ||
-		normalized === "open_text"
-	) {
-		return "long_text";
-	}
-
-	throw new Error(`Unsupported questionnaire question type "${rawType}".`);
-}
-
-function normalizeQuestionOptions(
-	options: Array<{value: string; label: string}> | null | undefined,
-): DidacticUnitQuestionOption[] | undefined {
-	if (!options || options.length === 0) {
-		return undefined;
-	}
-
-	const normalizedOptions = options
-		.map((option) => ({
-			value: option.value.trim(),
-			label: option.label.trim(),
-		}))
-		.filter((option) => option.value && option.label);
-
-	return normalizedOptions.length > 0 ? normalizedOptions : undefined;
-}
-
-function normalizeQuestionnaire(questionnaire: {
-	questions: Array<{
-		id: string;
-		prompt: string;
-		type: string;
-		options?: Array<{value: string; label: string}> | null;
-	}>;
-}): DidacticUnitQuestionnaire {
-	const normalizedQuestions = questionnaire.questions.map((question) => {
-		const normalizedType = normalizeQuestionType(question.type);
-		const normalizedOptions = normalizeQuestionOptions(question.options);
-
-		return {
-			id: question.id.trim(),
-			prompt: question.prompt.trim(),
-			type: normalizedType,
-			options:
-				normalizedType === "single_select" ? normalizedOptions : (
-					undefined
-				),
-		};
-	});
-
-	if (normalizedQuestions.length !== 3) {
-		throw new Error(
-			`Questionnaire generation returned ${normalizedQuestions.length} questions; expected exactly 3.`,
-		);
-	}
-
-	const ids = normalizedQuestions.map((question) => question.id);
-	if (new Set(ids).size !== ids.length) {
-		throw new Error(
-			"Questionnaire generation returned duplicate question ids.",
-		);
-	}
-
-	for (const question of normalizedQuestions) {
-		if (
-			question.type === "single_select" &&
-			(!question.options || question.options.length < 2)
-		) {
-			throw new Error(
-				`Question "${question.id}" must include at least 2 options for single_select.`,
-			);
-		}
-	}
-
-	return {
-		questions: normalizedQuestions,
-	};
 }
 
 function validateReferenceSyllabusLength(
@@ -450,6 +329,10 @@ export class GatewayAiService implements AiService {
 			model: tierConfig.model,
 			modelId: resolveGatewayModelId(tierConfig),
 		};
+	}
+
+	private selectModerationModel(): ModelSelection {
+		return MODERATION_MODEL_SELECTION;
 	}
 
 	private requireTierConfig(
@@ -620,7 +503,7 @@ export class GatewayAiService implements AiService {
 		tier: AiModelTier;
 		abortSignal?: AbortSignal;
 	}): Promise<ModerationResult> {
-		const selection = this.selectModel(input.tier, input.config);
+		const selection = this.selectModerationModel();
 		const prompt = buildModerationPrompt({
 			topic: input.topic,
 			level: input.level,
@@ -632,6 +515,7 @@ export class GatewayAiService implements AiService {
 
 		this.logAiCallStarted("moderation", selection, {
 			tier: input.tier,
+			modelPolicy: "fixed_fast_moderation",
 			topic: input.topic,
 			promptLength: prompt.length,
 		});
@@ -665,6 +549,7 @@ export class GatewayAiService implements AiService {
 
 			this.logAiCallCompleted("moderation", selection, telemetry, {
 				tier: input.tier,
+				modelPolicy: "fixed_fast_moderation",
 				approved: finalResult.approved,
 				folderName: finalResult.folderName,
 			});
@@ -673,6 +558,7 @@ export class GatewayAiService implements AiService {
 		} catch (error) {
 			this.logAiCallFailed("moderation", selection, {
 				tier: input.tier,
+				modelPolicy: "fixed_fast_moderation",
 				topic: input.topic,
 				durationMs: Date.now() - startedAt,
 				error,
@@ -696,7 +582,7 @@ export class GatewayAiService implements AiService {
 		},
 		callbacks: StructuredStreamCallbacks<ModerationResult>,
 	): Promise<ModerationResult> {
-		const selection = this.selectModel(input.tier, input.config);
+		const selection = this.selectModerationModel();
 		const prompt = buildModerationPrompt({
 			topic: input.topic,
 			level: input.level,
@@ -708,6 +594,7 @@ export class GatewayAiService implements AiService {
 
 		this.logAiCallStarted("moderation", selection, {
 			tier: input.tier,
+			modelPolicy: "fixed_fast_moderation",
 			topic: input.topic,
 			promptLength: prompt.length,
 			streaming: true,
@@ -759,6 +646,7 @@ export class GatewayAiService implements AiService {
 
 			this.logAiCallCompleted("moderation", selection, telemetry, {
 				tier: input.tier,
+				modelPolicy: "fixed_fast_moderation",
 				approved: finalResult.approved,
 				folderName: finalResult.folderName,
 				streaming: true,
@@ -769,145 +657,7 @@ export class GatewayAiService implements AiService {
 		} catch (error) {
 			this.logAiCallFailed("moderation", selection, {
 				tier: input.tier,
-				topic: input.topic,
-				durationMs: Date.now() - startedAt,
-				streaming: true,
-				error,
-			});
-			throw error;
-		}
-	}
-
-	async generateQuestionnaire(input: {
-		topic: string;
-		level: DidacticUnitLevel;
-		improvedTopicBrief?: string;
-		config: AiConfig;
-		tier: AiModelTier;
-		abortSignal?: AbortSignal;
-	}): Promise<QuestionnaireResult> {
-		const selection = this.selectModel(input.tier, input.config);
-		const prompt = buildQuestionnairePrompt({
-			topic: input.topic,
-			level: input.level,
-			improvedTopicBrief: input.improvedTopicBrief,
-			authoring: input.config.authoring,
-		});
-		const startedAt = Date.now();
-
-		this.logAiCallStarted("questionnaire", selection, {
-			tier: input.tier,
-			topic: input.topic,
-			promptLength: prompt.length,
-		});
-
-		try {
-			const result = await generateObject({
-				model: this.gateway(selection.modelId),
-				system: buildGatewaySystemPrompt("questionnaire"),
-				prompt,
-				schema: questionnaireSchema,
-				maxOutputTokens: resolveStageMaxOutputTokens("questionnaire"),
-				abortSignal: input.abortSignal,
-			});
-			const telemetry = await this.enrichAiCallTelemetry(
-				await collectAiCallTelemetry(result, Date.now() - startedAt),
-			);
-			const finalResult = {
-				provider: selection.provider,
-				model: selection.model,
-				prompt,
-				telemetry,
-				questionnaire: normalizeQuestionnaire(result.object),
-			};
-
-			this.logAiCallCompleted("questionnaire", selection, telemetry, {
-				tier: input.tier,
-				questionCount: finalResult.questionnaire.questions.length,
-			});
-
-			return finalResult;
-		} catch (error) {
-			this.logAiCallFailed("questionnaire", selection, {
-				tier: input.tier,
-				topic: input.topic,
-				durationMs: Date.now() - startedAt,
-				error,
-			});
-			throw error;
-		}
-	}
-
-	async streamQuestionnaire(
-		input: {
-			topic: string;
-			level: DidacticUnitLevel;
-			improvedTopicBrief?: string;
-			config: AiConfig;
-			tier: AiModelTier;
-			abortSignal?: AbortSignal;
-		},
-		callbacks: StructuredStreamCallbacks<QuestionnaireResult>,
-	): Promise<QuestionnaireResult> {
-		const selection = this.selectModel(input.tier, input.config);
-		const prompt = buildQuestionnairePrompt({
-			topic: input.topic,
-			level: input.level,
-			improvedTopicBrief: input.improvedTopicBrief,
-			authoring: input.config.authoring,
-		});
-		const startedAt = Date.now();
-
-		this.logAiCallStarted("questionnaire", selection, {
-			tier: input.tier,
-			topic: input.topic,
-			promptLength: prompt.length,
-			streaming: true,
-		});
-		await callbacks.onStart?.(selection);
-
-		try {
-			const result = streamObject({
-				model: this.gateway(selection.modelId),
-				system: buildGatewaySystemPrompt("questionnaire"),
-				prompt,
-				schema: questionnaireSchema,
-				maxOutputTokens: resolveStageMaxOutputTokens("questionnaire"),
-				abortSignal: input.abortSignal,
-			});
-
-			for await (const partial of result.partialObjectStream) {
-				await callbacks.onPartial?.({
-					provider: selection.provider,
-					model: selection.model,
-					prompt,
-					questionnaire: partial as DidacticUnitQuestionnaire,
-				});
-			}
-
-			const object = await result.object;
-			const telemetry = await this.enrichAiCallTelemetry(
-				await collectAiCallTelemetry(result, Date.now() - startedAt),
-			);
-			const finalResult: QuestionnaireResult = {
-				provider: selection.provider,
-				model: selection.model,
-				prompt,
-				telemetry,
-				questionnaire: normalizeQuestionnaire(object),
-			};
-
-			this.logAiCallCompleted("questionnaire", selection, telemetry, {
-				tier: input.tier,
-				questionCount: finalResult.questionnaire.questions.length,
-				streaming: true,
-			});
-
-			await callbacks.onComplete?.(finalResult);
-			return finalResult;
-		} catch (error) {
-			this.logAiCallFailed("questionnaire", selection, {
-				tier: input.tier,
+				modelPolicy: "fixed_fast_moderation",
 				topic: input.topic,
 				durationMs: Date.now() - startedAt,
 				streaming: true,

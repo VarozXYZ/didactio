@@ -26,6 +26,7 @@ import type {PresentationTheme} from "../types/presentationTheme";
 function resolveDisplayStatus(status: string): string {
 	switch (status) {
 		case "submitted":
+		case "questionnaire_pending_moderation":
 		case "moderation_completed":
 		case "questionnaire_ready":
 		case "questionnaire_answered":
@@ -37,6 +38,9 @@ function resolveDisplayStatus(status: string): string {
 		case "content_generation_in_progress":
 		case "content_generation_completed":
 			return "ready";
+		case "moderation_rejected":
+		case "moderation_failed":
+			return "failed";
 		default:
 			return "failed";
 	}
@@ -47,7 +51,11 @@ function resolvePlanningProgressPercent(
 ): number {
 	switch (status) {
 		case "submitted":
+		case "moderation_rejected":
 			return 0;
+		case "questionnaire_pending_moderation":
+		case "moderation_failed":
+			return 17;
 		case "moderation_completed":
 			return 17;
 		case "questionnaire_ready":
@@ -217,6 +225,8 @@ export function adaptDidacticUnitPlanning(
 		additionalContext: detail.additionalContext,
 		improvedTopicBrief: detail.improvedTopicBrief,
 		reasoningNotes: detail.reasoningNotes,
+		moderationError: detail.moderationError,
+		moderationAttempts: detail.moderationAttempts,
 		level: detail.level,
 		depth: detail.depth,
 		length: detail.length,

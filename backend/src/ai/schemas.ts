@@ -95,30 +95,6 @@ export const moderationSchema = z
 		};
 	});
 
-const questionnaireQuestionIdSchema = z.enum([
-	"topic_knowledge_level",
-	"related_knowledge_level",
-	"learning_goal",
-]);
-
-const questionnaireQuestionSchema = z.object({
-	id: questionnaireQuestionIdSchema,
-	prompt: z.string().min(1),
-	type: z.enum(["single_select", "long_text"]),
-	options: z
-		.array(
-			z.object({
-				value: z.string().min(1),
-				label: z.string().min(1),
-			}),
-		)
-		.nullable(),
-});
-
-export const questionnaireSchema = z.object({
-	questions: z.array(questionnaireQuestionSchema).length(3),
-});
-
 export const folderClassificationSchema = z
 	.object({
 		folderName: z.string().min(1).optional(),

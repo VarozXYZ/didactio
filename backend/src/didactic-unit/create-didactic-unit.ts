@@ -1,4 +1,5 @@
 import {randomUUID} from "node:crypto";
+import {buildQuestionnaireForDidacticUnit} from "./planning.js";
 import type {
 	CreateDidacticUnitInput,
 	DidacticUnitDepth,
@@ -25,6 +26,9 @@ import type {PresentationTheme} from "../presentation-theme/types.js";
 
 export type DidacticUnitStatus =
 	| "submitted"
+	| "questionnaire_pending_moderation"
+	| "moderation_rejected"
+	| "moderation_failed"
 	| "moderation_completed"
 	| "questionnaire_ready"
 	| "questionnaire_answered"
@@ -63,6 +67,8 @@ export interface DidacticUnit {
 	questionnaireAnswers?: DidacticUnitQuestionAnswer[];
 	questionnaireAnsweredAt?: string;
 	moderatedAt?: string;
+	moderationError?: string;
+	moderationAttempts?: number;
 	syllabusPrompt?: string;
 	syllabusPromptGeneratedAt?: string;
 	referenceSyllabus?: DidacticUnitReferenceSyllabus;
@@ -89,6 +95,9 @@ export function createDidacticUnit(
 ): DidacticUnit {
 	const createdAt = new Date().toISOString();
 	const id = randomUUID();
+	const questionnaire = input.questionnaireEnabled ?
+		buildQuestionnaireForDidacticUnit(input.topic)
+	:	undefined;
 
 	return {
 		id,
@@ -96,8 +105,14 @@ export function createDidacticUnit(
 		title: input.topic,
 		topic: input.topic,
 		provider: input.provider,
-		status: "submitted",
-		nextAction: "moderate_topic",
+		status:
+			input.questionnaireEnabled ?
+				"questionnaire_pending_moderation"
+			:	"submitted",
+		nextAction:
+			input.questionnaireEnabled ?
+				"answer_questionnaire"
+			:	"moderate_topic",
 		overview: "",
 		learningGoals: [],
 		keywords: [],
@@ -108,6 +123,8 @@ export function createDidacticUnit(
 		depth: input.depth,
 		length: input.length,
 		questionnaireEnabled: input.questionnaireEnabled,
+		questionnaire,
+		questionnaireGeneratedAt: questionnaire ? createdAt : undefined,
 		folderId: input.folderSelection.folderId ?? "",
 		folderAssignmentMode: input.folderSelection.mode,
 		presentationTheme: null,

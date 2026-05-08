@@ -6,7 +6,6 @@ export type DidacticUnitFolderAssignmentMode = "manual" | "auto";
 
 export type DidacticUnitNextAction =
 	| "moderate_topic"
-	| "generate_questionnaire"
 	| "answer_questionnaire"
 	| "generate_syllabus_prompt"
 	| "review_syllabus_prompt"
@@ -389,36 +388,54 @@ export function parseQuestionnaireAnswersInput(
 	return {answers};
 }
 
-function buildLevelOptions(): DidacticUnitQuestionOption[] {
-	return [
-		{value: "none", label: "No prior knowledge"},
-		{value: "basic", label: "Basic understanding"},
-		{value: "intermediate", label: "Intermediate experience"},
-		{value: "advanced", label: "Advanced experience"},
-	];
-}
-
 export function buildQuestionnaireForDidacticUnit(
-	topic: string,
+	_topic: string,
 ): DidacticUnitQuestionnaire {
 	return {
 		questions: [
 			{
-				id: "topic_knowledge_level",
-				prompt: `What is your current knowledge level in ${topic}?`,
+				id: "desired_outcome",
+				prompt: "What do you want to be able to do by the end of this unit?",
 				type: "single_select",
-				options: buildLevelOptions(),
+				options: [
+					{value: "solve_problems", label: "Solve problems"},
+					{value: "create_project", label: "Create a project"},
+					{value: "understand_theory", label: "Understand the theory"},
+					{value: "prepare_exam", label: "Prepare for an exam"},
+					{value: "apply_at_work", label: "Apply it at work"},
+					{value: "no_preference", label: "No preference"},
+					{value: "other", label: "Other"},
+				],
 			},
 			{
-				id: "related_knowledge_level",
-				prompt: `How comfortable are you with related concepts that may support learning ${topic}?`,
+				id: "use_context",
+				prompt: "Where or in what context do you want to apply this topic?",
 				type: "single_select",
-				options: buildLevelOptions(),
+				options: [
+					{value: "academic", label: "Academic study"},
+					{value: "professional", label: "Professional work"},
+					{value: "personal", label: "Personal learning"},
+					{value: "specific_project", label: "A specific project"},
+					{value: "research", label: "Research"},
+					{value: "teaching", label: "Teaching someone else"},
+					{value: "no_preference", label: "No preference"},
+					{value: "other", label: "Other"},
+				],
 			},
 			{
-				id: "learning_goal",
-				prompt: `What do you want to achieve by learning ${topic}?`,
-				type: "long_text",
+				id: "learning_approach",
+				prompt: "What kind of learning path would be most useful to you?",
+				type: "single_select",
+				options: [
+					{value: "practical_exercises", label: "Practical, with exercises"},
+					{value: "conceptual", label: "Conceptual and explanatory"},
+					{value: "real_cases", label: "Based on real-world cases"},
+					{value: "guided_project", label: "A guided project"},
+					{value: "comparative", label: "Comparative"},
+					{value: "technical", label: "Technical and precise"},
+					{value: "no_preference", label: "No preference"},
+					{value: "other", label: "Other"},
+				],
 			},
 		],
 	};

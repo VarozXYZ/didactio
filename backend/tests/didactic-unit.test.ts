@@ -1,6 +1,7 @@
 import request from "supertest";
 import {describe, expect, it} from "vitest";
 import {createTestApp} from "./helpers/create-test-app.js";
+import {createMockAiService} from "./helpers/mock-ai-service.js";
 
 async function createDidacticUnit(app: ReturnType<typeof createTestApp>) {
 	const response = await request(app)
@@ -9,6 +10,25 @@ async function createDidacticUnit(app: ReturnType<typeof createTestApp>) {
 
 	expect(response.status).toBe(201);
 	return response.body as {id: string};
+}
+
+async function waitForDidacticUnitStatus(
+	app: ReturnType<typeof createTestApp>,
+	didacticUnitId: string,
+	status: string,
+) {
+	for (let attempt = 0; attempt < 20; attempt += 1) {
+		const response = await request(app).get(
+			`/api/didactic-unit/${didacticUnitId}`,
+		);
+		expect(response.status).toBe(200);
+		if (response.body.status === status) {
+			return response.body;
+		}
+		await new Promise((resolve) => setTimeout(resolve, 100));
+	}
+
+	throw new Error(`Didactic unit did not reach status "${status}".`);
 }
 
 function parseStreamComplete<T>(body: string): T {
@@ -36,9 +56,9 @@ async function advanceToQuestionnaireAnswered(
 
 	expect(moderationResponse.status).toBe(200);
 
-	const questionnaireResponse = await request(app)
-		.post(`/api/didactic-unit/${didacticUnitId}/questionnaire/generate`)
-		.send({tier: "cheap"});
+	const questionnaireResponse = await request(app).get(
+		`/api/didactic-unit/${didacticUnitId}`,
+	);
 
 	expect(questionnaireResponse.status).toBe(200);
 
@@ -111,10 +131,15 @@ describe("didactic-unit lifecycle", () => {
 			topic: "next.js framework",
 			title: "next.js framework",
 			provider: "deepseek",
-			status: "submitted",
-			nextAction: "moderate_topic",
+			status: "questionnaire_pending_moderation",
+			nextAction: "answer_questionnaire",
 			overview: "",
 			chapters: [],
+		});
+		expect(response.body.questionnaire.questions).toHaveLength(3);
+		expect(response.body.questionnaire.questions[0]).toMatchObject({
+			id: "desired_outcome",
+			type: "single_select",
 		});
 		expect(typeof response.body.id).toBe("string");
 		expect(response.body.studyProgress).toEqual({
@@ -122,6 +147,62 @@ describe("didactic-unit lifecycle", () => {
 			readBlockCount: 0,
 			totalBlockCount: 0,
 			studyProgressPercent: 0,
+		});
+	});
+
+	it("persists a moderation rejection from the background moderation job", async () => {
+		const baseAiService = createMockAiService();
+		const app = createTestApp({
+			aiService: {
+				...baseAiService,
+				async moderateTopic(input) {
+					const result = await baseAiService.moderateTopic(input);
+					return {
+						...result,
+						approved: false,
+						notes: "Topic was rejected.",
+					};
+				},
+			},
+		});
+
+		const created = await createDidacticUnit(app);
+		const rejected = await waitForDidacticUnitStatus(
+			app,
+			created.id,
+			"moderation_rejected",
+		);
+
+		expect(rejected).toMatchObject({
+			status: "moderation_rejected",
+			nextAction: "moderate_topic",
+			moderationError: "Topic was rejected.",
+		});
+	});
+
+	it("marks moderation as failed after three background job attempts", async () => {
+		const baseAiService = createMockAiService();
+		const app = createTestApp({
+			aiService: {
+				...baseAiService,
+				async moderateTopic() {
+					throw new Error("Gateway unavailable.");
+				},
+			},
+		});
+
+		const created = await createDidacticUnit(app);
+		const failed = await waitForDidacticUnitStatus(
+			app,
+			created.id,
+			"moderation_failed",
+		);
+
+		expect(failed).toMatchObject({
+			status: "moderation_failed",
+			nextAction: "moderate_topic",
+			moderationError: "Gateway unavailable.",
+			moderationAttempts: 3,
 		});
 	});
 
@@ -137,11 +218,16 @@ describe("didactic-unit lifecycle", () => {
 			id: created.id,
 			title: "next.js framework",
 			topic: "next.js framework",
-			status: "submitted",
-			nextAction: "moderate_topic",
+			nextAction: "answer_questionnaire",
 			moduleCount: 0,
-			progressPercent: 0,
 		});
+		expect([
+			"questionnaire_pending_moderation",
+			"questionnaire_ready",
+		]).toContain(response.body.didacticUnits[0].status);
+		expect([17, 33]).toContain(
+			response.body.didacticUnits[0].progressPercent,
+		);
 		expect(response.body.didacticUnits[0]).not.toHaveProperty(
 			"legacyPlanningId",
 		);
@@ -228,13 +314,7 @@ describe("didactic-unit lifecycle", () => {
 
 		expect(moderatedResponse.status).toBe(200);
 
-		const questionnaireResponse = await request(app)
-			.post(`/api/didactic-unit/${created.id}/questionnaire/generate`)
-			.send({tier: "cheap"});
-
-		expect(questionnaireResponse.status).toBe(200);
-
-		const skippedResponse = await request(app)
+	const skippedResponse = await request(app)
 			.patch(`/api/didactic-unit/${created.id}/questionnaire/answers`)
 			.send({answers: []});
 

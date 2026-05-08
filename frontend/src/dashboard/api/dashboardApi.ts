@@ -116,6 +116,8 @@ export interface BackendDidacticUnitDetail {
 	createdAt: string;
 	updatedAt: string;
 	moderatedAt?: string;
+	moderationError?: string;
+	moderationAttempts?: number;
 	improvedTopicBrief?: string;
 	reasoningNotes?: string;
 	additionalContext?: string;
@@ -580,15 +582,6 @@ export const dashboardApi = {
 			{
 				method: "POST",
 				body: JSON.stringify({}),
-			},
-		);
-	},
-	generateDidacticUnitQuestionnaire(id: string, tier: BackendAiModelTier) {
-		return requestJson<BackendDidacticUnitDetail>(
-			`/api/didactic-unit/${id}/questionnaire/generate`,
-			{
-				method: "POST",
-				body: JSON.stringify({tier}),
 			},
 		);
 	},

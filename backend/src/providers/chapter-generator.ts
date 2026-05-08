@@ -20,15 +20,14 @@ export interface ChapterGenerator {
 	): Promise<DidacticUnitGeneratedChapter>;
 }
 
-function findAnswerValue(
-	source: ChapterGenerationSource,
-	questionId: string,
-): string {
-	return (
-		source.questionnaireAnswers?.find(
-			(answer) => answer.questionId === questionId,
-		)?.value ?? "not provided"
-	);
+function formatQuestionnaireContext(source: ChapterGenerationSource): string {
+	if (!source.questionnaireAnswers?.length) {
+		return "not provided";
+	}
+
+	return source.questionnaireAnswers
+		.map((answer) => `- ${answer.questionId}: ${answer.value}`)
+		.join("\n");
 }
 
 function getSyllabusChapter(
@@ -51,15 +50,6 @@ export function buildChapterGenerationPrompt(
 	chapterIndex: number,
 ): string {
 	const chapter = getSyllabusChapter(source, chapterIndex);
-	const topicKnowledgeLevel = findAnswerValue(
-		source,
-		"topic_knowledge_level",
-	);
-	const relatedKnowledgeLevel = findAnswerValue(
-		source,
-		"related_knowledge_level",
-	);
-	const learningGoal = findAnswerValue(source, "learning_goal");
 
 	return [
 		"Write one didactic chapter in sanitized HTML.",
@@ -69,9 +59,8 @@ export function buildChapterGenerationPrompt(
 		`Module title: ${chapter.title}`,
 		`Module overview: ${chapter.overview}`,
 		`Module lessons: ${chapter.lessons.map((lesson) => lesson.title).join(", ")}`,
-		`Current topic knowledge: ${topicKnowledgeLevel}`,
-		`Related knowledge: ${relatedKnowledgeLevel}`,
-		`Learner goal: ${learningGoal}`,
+		"Learner questionnaire context:",
+		formatQuestionnaireContext(source),
 		"Return only HTML instructional content.",
 		"Use h2, h3, h4, p, ul, ol, li, blockquote, pre, code, table, thead, tbody, tr, th, td, hr, br, strong, em, u, a, sub, sup, and mark only.",
 		"Do not include JSON, markdown fences, script, style, iframe, img, div, section, or inline style attributes.",

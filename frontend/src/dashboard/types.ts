@@ -94,6 +94,8 @@ export interface PlanningDetailViewModel {
 	additionalContext?: string;
 	improvedTopicBrief?: string;
 	reasoningNotes?: string;
+	moderationError?: string;
+	moderationAttempts?: number;
 	level: "beginner" | "intermediate" | "advanced";
 	depth: "basic" | "intermediate" | "technical";
 	length: "intro" | "short" | "long" | "textbook";

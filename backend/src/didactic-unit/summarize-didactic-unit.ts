@@ -56,6 +56,9 @@ const planningProgressPercentByStatus: Partial<
 	Record<DidacticUnit["status"], number>
 > = {
 	submitted: 0,
+	questionnaire_pending_moderation: 17,
+	moderation_rejected: 0,
+	moderation_failed: 17,
 	moderation_completed: 17,
 	questionnaire_ready: 33,
 	questionnaire_answered: 50,

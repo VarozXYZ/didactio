@@ -2,14 +2,12 @@ import type {
 	DidacticUnitReferenceSyllabus,
 	DidacticUnitQuestionAnswer,
 	DidacticUnitQuestionnaireAnswersInput,
-	DidacticUnitQuestionnaire,
 	DidacticUnitSyllabus,
 	UpdateDidacticUnitSyllabusInput,
 } from "./planning.js";
 import {
 	adaptDidacticUnitSyllabusToReferenceSyllabus,
 	adaptReferenceSyllabusToDidacticUnitSyllabus,
-	buildQuestionnaireForDidacticUnit,
 } from "./planning.js";
 import type {DidacticUnit} from "./create-didactic-unit.js";
 import type {GenerationQuality} from "../credits/generation-pricing.js";
@@ -23,32 +21,30 @@ function withUpdatedAt<T extends DidacticUnit>(didacticUnit: T): T {
 	};
 }
 
-function findAnswerValue(
-	answers: DidacticUnitQuestionAnswer[] | undefined,
-	questionId: string,
+function formatQuestionnaireAnswers(
+	didacticUnit: DidacticUnit,
 ): string {
-	return (
-		answers?.find((answer) => answer.questionId === questionId)?.value ??
-		"not provided"
-	);
+	const answers = didacticUnit.questionnaireAnswers ?? [];
+
+	if (answers.length === 0) {
+		return "Questionnaire skipped or not provided.";
+	}
+
+	return answers
+		.map((answer) => {
+			const question = didacticUnit.questionnaire?.questions.find(
+				(candidate) => candidate.id === answer.questionId,
+			);
+			const label = question?.prompt ?? answer.questionId;
+			return `- ${label}: ${answer.value}`;
+		})
+		.join("\n");
 }
 
 function buildSyllabusPrompt(
 	didacticUnit: DidacticUnit,
 	authoring: AuthoringConfig,
 ): string {
-	const topicKnowledge = findAnswerValue(
-		didacticUnit.questionnaireAnswers,
-		"topic_knowledge_level",
-	);
-	const relatedKnowledge = findAnswerValue(
-		didacticUnit.questionnaireAnswers,
-		"related_knowledge_level",
-	);
-	const learningGoal = findAnswerValue(
-		didacticUnit.questionnaireAnswers,
-		"learning_goal",
-	);
 	const continuityBrief =
 		didacticUnit.improvedTopicBrief ?? didacticUnit.topic;
 	const additionalContext = didacticUnit.additionalContext?.trim();
@@ -60,9 +56,8 @@ function buildSyllabusPrompt(
 		continuityBrief,
 		"",
 		`Normalized topic: ${didacticUnit.topic}.`,
-		`Learner current knowledge of the topic: ${topicKnowledge}.`,
-		`Learner knowledge of related concepts: ${relatedKnowledge}.`,
-		`Learning goal: ${learningGoal}.`,
+		"Learner questionnaire context:",
+		formatQuestionnaireAnswers(didacticUnit),
 		`Explicit learner level: ${didacticUnit.level}.`,
 		`Requested unit depth: ${didacticUnit.depth}.`,
 		`Requested unit length: ${didacticUnit.length}.`,
@@ -127,7 +122,11 @@ export function moderateDidacticUnitPlanning(
 		reasoningNotes: string;
 	},
 ): DidacticUnit {
-	if (didacticUnit.status !== "submitted") {
+	if (
+		didacticUnit.status !== "submitted" &&
+		didacticUnit.status !== "questionnaire_pending_moderation" &&
+		didacticUnit.status !== "moderation_failed"
+	) {
 		throw new Error(
 			"Didactic unit cannot be moderated from its current state.",
 		);
@@ -137,56 +136,45 @@ export function moderateDidacticUnitPlanning(
 		...didacticUnit,
 		title: input.normalizedTopic,
 		topic: input.normalizedTopic,
-		status: "moderation_completed",
+		status:
+			didacticUnit.questionnaireEnabled ?
+				"questionnaire_ready"
+			:	"moderation_completed",
 		nextAction:
 			didacticUnit.questionnaireEnabled ?
-				"generate_questionnaire"
+				"answer_questionnaire"
 			:	"generate_syllabus_prompt",
 		moderatedAt: new Date().toISOString(),
+		moderationError: undefined,
+		moderationAttempts: undefined,
 		improvedTopicBrief: input.improvedTopicBrief,
 		reasoningNotes: input.reasoningNotes,
 	});
 }
 
-export function generateDidacticUnitQuestionnaire(
+export function rejectDidacticUnitModeration(
 	didacticUnit: DidacticUnit,
+	message: string,
 ): DidacticUnit {
-	if (didacticUnit.status !== "moderation_completed") {
-		throw new Error(
-			"Questionnaire cannot be generated from the current didactic unit state.",
-		);
-	}
-
 	return withUpdatedAt({
 		...didacticUnit,
-		status: "questionnaire_ready",
-		nextAction: "answer_questionnaire",
-		questionnaire: buildQuestionnaireForDidacticUnit(didacticUnit.topic),
-		questionnaireGeneratedAt: new Date().toISOString(),
+		status: "moderation_rejected",
+		nextAction: "moderate_topic",
+		moderationError: message,
 	});
 }
 
-export function applyGeneratedDidacticUnitQuestionnaire(
+export function failDidacticUnitModeration(
 	didacticUnit: DidacticUnit,
-	questionnaire: DidacticUnitQuestionnaire,
+	message: string,
+	attempts: number,
 ): DidacticUnit {
-	if (didacticUnit.status !== "moderation_completed") {
-		throw new Error(
-			"Questionnaire cannot be generated from the current didactic unit state.",
-		);
-	}
-
 	return withUpdatedAt({
 		...didacticUnit,
-		status: "questionnaire_ready",
-		nextAction: "answer_questionnaire",
-		questionnaire: {
-			questions: questionnaire.questions.map((question) => ({
-				...question,
-				options: question.options ? [...question.options] : undefined,
-			})),
-		},
-		questionnaireGeneratedAt: new Date().toISOString(),
+		status: "moderation_failed",
+		nextAction: "moderate_topic",
+		moderationError: message,
+		moderationAttempts: attempts,
 	});
 }
 
@@ -237,6 +225,9 @@ export function answerDidacticUnitQuestionnaire(
 			throw new Error(
 				"Questionnaire answers must match the generated questions.",
 			);
+		}
+		if (!answer.value.trim()) {
+			throw new Error("Questionnaire answers cannot be empty.");
 		}
 	}
 
