@@ -254,6 +254,124 @@ function isMeasuredContentPage(
 	return page.kind === "content" || page.kind === "content_with_actions";
 }
 
+type ModuleOutlineItem = {
+	id: string;
+	level: 2 | 3;
+	number: string;
+	pageIndex: number;
+	title: string;
+};
+
+function parseHeadingFromHtml(
+	html: string,
+): {level: 2 | 3 | 4; title: string} | null {
+	const parser = new DOMParser();
+	const document = parser.parseFromString(html, "text/html");
+	const heading = document.body.firstElementChild;
+
+	if (!(heading instanceof HTMLElement)) {
+		return null;
+	}
+
+	const tagName = heading.tagName.toUpperCase();
+	if (tagName !== "H2" && tagName !== "H3" && tagName !== "H4") {
+		return null;
+	}
+
+	const level =
+		tagName === "H2" ? 2
+		: tagName === "H3" ? 3
+		: 4;
+	const title = (heading.textContent ?? "").replace(/\s+/g, " ").trim();
+
+	if (!title) {
+		return null;
+	}
+
+	return {level, title};
+}
+
+function stripLeadingHeadingNumber(title: string): string {
+	return title
+		.replace(/^\s*\d+(?:\.\d+)+(?:[.)])?\s+/, "")
+		.replace(/^\s*\d+[.)]\s+/, "")
+		.trim();
+}
+
+function findMeasuredPageIndexForOffset(
+	pages: MeasuredModulePage[],
+	characterOffset: number,
+): number {
+	const exactIndex = pages.findIndex(
+		(page) =>
+			isMeasuredContentPage(page) &&
+			characterOffset >= page.startCharacterOffset &&
+			characterOffset < page.endCharacterOffset,
+	);
+
+	if (exactIndex >= 0) {
+		return exactIndex;
+	}
+
+	const fallbackIndex = pages.findIndex(
+		(page) =>
+			isMeasuredContentPage(page) &&
+			characterOffset <= page.endCharacterOffset,
+	);
+
+	return Math.max(0, fallbackIndex);
+}
+
+function buildModuleOutline(
+	chapter: DidacticUnitEditorChapter,
+	pages: MeasuredModulePage[],
+): ModuleOutlineItem[] {
+	if (chapter.status !== "ready" || pages.length === 0) {
+		return [];
+	}
+
+	let section = 0;
+	let subsection = 0;
+
+	return chapter.htmlBlocks.flatMap((block): ModuleOutlineItem[] => {
+		if (block.type !== "heading") {
+			return [];
+		}
+
+		const heading = parseHeadingFromHtml(block.html);
+		if (!heading || heading.level === 4) {
+			return [];
+		}
+
+		if (heading.level === 2) {
+			section += 1;
+			subsection = 0;
+		} else {
+			if (section === 0) {
+				section = 1;
+			}
+			subsection += 1;
+		}
+
+		const number =
+			heading.level === 2 ? `${section}` : `${section}.${subsection}`;
+		const title = stripLeadingHeadingNumber(heading.title);
+
+		return [
+			{
+				id: block.id,
+				level: heading.level,
+				number,
+				pageIndex: findMeasuredPageIndexForOffset(
+					pages,
+					block.textStartOffset,
+				),
+				title: title || heading.title,
+			},
+		];
+	});
+}
+
 function calculateUnitStudyProgressPercent(
 	chapters: DidacticUnitEditorChapter[],
 	input: {
@@ -428,6 +546,11 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 	const [regenerateConfirmOpen, setRegenerateConfirmOpen] = useState(false);
 	const [currentSpread, setCurrentSpread] = useState(0);
+	const [collapsedOutlineChapterIndex, setCollapsedOutlineChapterIndex] =
+		useState<number | null>(null);
+	const [selectedOutlineItemId, setSelectedOutlineItemId] = useState<
+		string | null
+	>(null);
 	const [activeChapterActivation, setActiveChapterActivation] = useState({
 		chapterIndex: 0,
 		key: 0,
@@ -690,6 +813,8 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 
 	useEffect(() => {
 		activeChapterIndexRef.current = activeChapterIndex;
+		setCollapsedOutlineChapterIndex(null);
+		setSelectedOutlineItemId(null);
 		setActiveChapterActivation((previousActivation) => ({
 			chapterIndex: activeChapterIndex,
 			key: previousActivation.key + 1,
@@ -843,6 +968,13 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				.filter(isMeasuredContentPage)
 				.map((page) => page.html),
 		[measuredReadPages],
+	);
+	const moduleOutline = useMemo(
+		() =>
+			activeChapter && !isEditMode ?
+				buildModuleOutline(activeChapter, measuredReadPages)
+			:	[],
+		[activeChapter, isEditMode, measuredReadPages],
 	);
 	const visibleEditablePages =
 		isEditMode && contentPageDrafts.length > 0 ?
@@ -1755,6 +1887,20 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		[activeChapter, isEditMode, measuredReadPages, persistReadProgress],
 	);
 
+	const goToPageIndex = useCallback(
+		(pageIndex: number, outlineItemId?: string) => {
+			const nextSpread = Math.max(
+				0,
+				Math.min(Math.floor(pageIndex / 2), totalSpreads - 1),
+			);
+
+			setSelectedOutlineItemId(outlineItemId ?? null);
+			setCurrentSpread(nextSpread);
+			persistVisitedSpread(nextSpread);
+		},
+		[persistVisitedSpread, totalSpreads],
+	);
+
 	const goToNextSpread = useCallback(() => {
 		if (!canGoNext) {
 			return;
@@ -1766,6 +1912,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		}
 
 		setCurrentSpread(nextSpread);
+		setSelectedOutlineItemId(null);
 		persistVisitedSpread(nextSpread);
 	}, [
 		canGoNext,
@@ -1781,6 +1928,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		}
 
 		setCurrentSpread(nextSpread);
+		setSelectedOutlineItemId(null);
 		persistVisitedSpread(nextSpread);
 	}, [currentSpread, persistVisitedSpread]);
 
@@ -1789,6 +1937,34 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			setCurrentSpread(Math.max(0, totalSpreads - 1));
 		}
 	}, [currentSpread, totalSpreads]);
+
+	const activeOutlineItemId = useMemo(() => {
+		if (moduleOutline.length === 0) {
+			return null;
+		}
+
+		if (
+			selectedOutlineItemId &&
+			moduleOutline.some((item) => item.id === selectedOutlineItemId)
+		) {
+			return selectedOutlineItemId;
+		}
+
+		const visibleEndPageIndex = Math.min(
+			currentSpread * 2 + 1,
+			totalVisiblePages - 1,
+		);
+		const activeItem = moduleOutline
+			.filter((item) => item.pageIndex <= visibleEndPageIndex)
+			.at(-1);
+
+		return activeItem?.id ?? null;
+	}, [
+		currentSpread,
+		moduleOutline,
+		selectedOutlineItemId,
+		totalVisiblePages,
+	]);
 
 	useEffect(() => {
 		const handleKeyDown = (event: KeyboardEvent) => {
@@ -2487,12 +2663,17 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 							canPayRegeneration;
 						const canMarkRead =
 							chapter.status === "ready" && !chapter.isCompleted;
+						const showModuleOutline =
+							isActive &&
+							moduleOutline.length > 0 &&
+							collapsedOutlineChapterIndex !==
+								chapter.chapterIndex;
 
 						return (
 							<div
 								key={chapter.chapterIndex}
 								className={cn(
-									"group relative flex w-full items-start gap-1.5 rounded-[14px] transition-all duration-200",
+									"group relative flex w-full flex-col items-stretch gap-2 rounded-[14px] transition-all duration-200",
 									"px-2 py-2.5",
 									isActive ?
 										"bg-[#F5F5F7] text-[#1D1D1F] shadow-[inset_0_0_0_1px_rgba(0,0,0,0.06)]"
@@ -2505,51 +2686,63 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 										className="absolute left-0 top-3 bottom-3 w-[3px] rounded-r-full bg-[#34C759]"
 									/>
 								)}
-								<button
-									className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
-									onClick={() =>
-										setActiveChapterIndex(
-											chapter.chapterIndex,
-										)
-									}
-									type="button"
-								>
-									<span
-										className={cn(
-											"flex h-6 w-6 shrink-0 items-center justify-center rounded-[8px] text-[11px] font-bold tabular-nums transition-colors",
-											isActive ?
-												"bg-white text-[#1D1D1F] shadow-[0_1px_2px_rgba(0,0,0,0.06)] ring-1 ring-black/[0.05]"
-											:	"bg-black/[0.05] text-[#86868B] group-hover:bg-black/[0.07] group-hover:text-[#1D1D1F]",
-										)}
+								<div className="flex w-full items-start gap-1.5">
+									<button
+										className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
+										onClick={() => {
+											if (isActive) {
+												setCollapsedOutlineChapterIndex(
+													(current) =>
+														current ===
+														chapter.chapterIndex ?
+															null
+														:	chapter.chapterIndex,
+												);
+												return;
+											}
+
+											setActiveChapterIndex(
+												chapter.chapterIndex,
+											);
+										}}
+										type="button"
 									>
-										{index + 1}
-									</span>
-									<span className="min-w-0 flex-1 text-[12.5px] font-medium leading-[1.4] text-balance">
-										{chapter.title}
-									</span>
-								</button>
-								<div className="flex shrink-0 items-center gap-0.5 self-center">
-									<div className="flex shrink-0">
-										{getStatusIcon(chapter)}
-									</div>
-									<DropdownMenu>
-										<DropdownMenuTrigger asChild>
-											<button
-												aria-label={`Module ${index + 1} actions`}
-												className="flex h-7 w-7 items-center justify-center rounded-md text-[#86868B] opacity-0 transition-opacity hover:bg-black/[0.06] hover:text-[#1D1D1F] group-hover:opacity-100 data-[state=open]:opacity-100"
-												type="button"
-												onClick={(e) =>
-													e.stopPropagation()
-												}
-											>
-												<MoreHorizontal size={15} />
-											</button>
-										</DropdownMenuTrigger>
-										<DropdownMenuContent
-											side="right"
-											align="start"
-											className="w-52"
+										<span
+											className={cn(
+												"flex h-6 w-6 shrink-0 items-center justify-center rounded-[8px] text-[11px] font-bold tabular-nums transition-colors",
+												isActive ?
+													"bg-white text-[#1D1D1F] shadow-[0_1px_2px_rgba(0,0,0,0.06)] ring-1 ring-black/[0.05]"
+												:	"bg-black/[0.05] text-[#86868B] group-hover:bg-black/[0.07] group-hover:text-[#1D1D1F]",
+											)}
 										>
+											{index + 1}
+										</span>
+										<span className="min-w-0 flex-1 text-[12.5px] font-medium leading-[1.4] text-balance">
+											{chapter.title}
+										</span>
+									</button>
+									<div className="flex shrink-0 items-center gap-0.5 self-center">
+										<div className="flex shrink-0">
+											{getStatusIcon(chapter)}
+										</div>
+										<DropdownMenu>
+											<DropdownMenuTrigger asChild>
+												<button
+													aria-label={`Module ${index + 1} actions`}
+													className="flex h-7 w-7 items-center justify-center rounded-md text-[#86868B] opacity-0 transition-opacity hover:bg-black/[0.06] hover:text-[#1D1D1F] group-hover:opacity-100 data-[state=open]:opacity-100"
+													type="button"
+													onClick={(e) =>
+														e.stopPropagation()
+													}
+												>
+													<MoreHorizontal size={15} />
+												</button>
+											</DropdownMenuTrigger>
+											<DropdownMenuContent
+												side="right"
+												align="start"
+												className="w-52"
+											>
 											{canAiModule && unitGenerationTier ?
 												<DropdownMenuItem
 													disabled={
@@ -2638,6 +2831,107 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 										</DropdownMenuContent>
 									</DropdownMenu>
 								</div>
+							</div>
+								{showModuleOutline && (
+									<Motion.div
+										animate={{opacity: 1, height: "auto"}}
+										className="relative ml-3 space-y-0.5 overflow-hidden py-1"
+										initial={{opacity: 0, height: 0}}
+										transition={{
+											duration: 0.18,
+											ease: [0.22, 1, 0.36, 1],
+										}}
+									>
+										{moduleOutline.map((item, index) => {
+											const isCurrentOutlineItem =
+												item.id === activeOutlineItemId;
+											const isFirst = index === 0;
+											const isLast =
+												index ===
+												moduleOutline.length - 1;
+
+											return (
+												<button
+													key={item.id}
+													type="button"
+													onClick={() =>
+														goToPageIndex(
+															item.pageIndex,
+															item.id,
+														)
+													}
+													className={cn(
+														"relative grid min-w-0 items-center gap-1 rounded-[6px] text-left text-[12px] leading-[1.35] transition-colors",
+														item.level === 2 ?
+															"mt-1 ml-1.5 w-[calc(100%-0.375rem)] grid-cols-[1.25rem_minmax(0,1fr)] py-1.5 pl-1 pr-1.5 font-medium"
+														:	"ml-5 w-[calc(100%-1.25rem)] grid-cols-[1.55rem_minmax(0,1fr)] py-1.5 pl-1 pr-1.5",
+														isCurrentOutlineItem ?
+															"text-[#1D1D1F]"
+														:	"text-[#86868B] hover:text-[#1D1D1F]",
+													)}
+													aria-current={
+														isCurrentOutlineItem ?
+															"location"
+														:	undefined
+													}
+												>
+													{moduleOutline.length >
+														1 && (
+														<span
+															aria-hidden
+															className={cn(
+																"absolute w-0.5 bg-[#DADADF]",
+																item.level ===
+																2 ?
+																	"-left-1.5"
+																:	"-left-5",
+																isFirst ?
+																	"-top-2 rounded-t-full"
+																:	"top-0",
+																isLast ?
+																	"bottom-1/2 rounded-b-full"
+																:	"-bottom-1.5",
+															)}
+														/>
+													)}
+													<span
+														aria-hidden
+														className={cn(
+															"absolute top-1/2 h-0.5 -translate-y-1/2 rounded-full bg-[#DADADF]",
+															item.level === 2 ?
+																"-left-1.5 w-2"
+															:	"-left-5 w-6",
+														)}
+													/>
+													<span
+														className={cn(
+															"flex min-h-5 shrink-0 items-center justify-end font-semibold tabular-nums",
+															isCurrentOutlineItem ?
+																"text-[#34C759]"
+															: item.level === 2 ?
+																"text-[#8E8E93]"
+															:	"text-[#AEAEB2]",
+														)}
+													>
+														{item.number}
+													</span>
+													<span
+														className={cn(
+															"min-w-0 flex-1 overflow-hidden [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]",
+															item.level === 2 ?
+																"text-[#4B5563]"
+															:	"text-[#6E6E73]",
+															isCurrentOutlineItem &&
+																"font-medium text-[#1D1D1F]",
+														)}
+													>
+														{item.title}
+													</span>
+												</button>
+											);
+										})}
+									</Motion.div>
+								)}
 							</div>
 						);
 					})}

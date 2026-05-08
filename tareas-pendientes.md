@@ -1,4 +1,4 @@
-1. Mejorar preguntas cuestionario pre-syllabus (siempre son las mismas)
+1. ~~Mejorar preguntas cuestionario pre-syllabus (siempre son las mismas)~~
 2. Añadir índice del módulo en EditorView y acceso directo
 3. Añadir selector de página en EvitorView
 4. Actualizar páginas de prizing, personalizacion, etc.
@@ -22,3 +22,4 @@
 22. Los enlaces no se pueden romper de página a página
 23. Marcar desde el principio el tipo de generacion (gold/silver) y el coste según longitud
 24. Mejorar botones y centralizar componentes de botones
+25. La ultima página nunca se marca como leida
