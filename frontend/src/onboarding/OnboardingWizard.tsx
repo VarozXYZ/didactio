@@ -89,7 +89,11 @@ export function OnboardingWizard() {
 			await dashboardApi.updateAiConfig({
 				silver,
 				gold,
-				authoring: {language},
+				authoring: {
+					language,
+					tone: "neutral",
+					learnerLevel: "beginner",
+				},
 			});
 
 			await authClient.completeOnboarding();

@@ -16,7 +16,7 @@ export function getSyllabusGenerationCost(): {
 	coinType: BackendCoinType;
 	amount: number;
 } {
-	return {coinType: "silver", amount: 1};
+	return {coinType: "bronze", amount: 1};
 }
 
 export function getUnitGenerationCost(input: {
@@ -34,6 +34,6 @@ export function getModuleRegenerationCost(input: {
 }): {coinType: BackendCoinType; amount: number} {
 	return {
 		coinType: input.quality === "gold" ? "silver" : "bronze",
-		amount: 1,
+		amount: input.quality === "gold" ? 5 : 1,
 	};
 }

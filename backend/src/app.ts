@@ -88,6 +88,12 @@ import {
 import {
 	InMemoryCreditTransactionStore,
 } from "./auth/adapters/memory/credit-transaction-store.js";
+import {InMemoryBillingEventStore, type BillingEventStore} from "./billing/billing-event-store.js";
+import {
+	createBillingRouter,
+	createBillingWebhookHandler,
+} from "./billing/routes.js";
+import {BillingService, type BillingConfig, type StripeClientLike} from "./billing/service.js";
 import {InMemorySessionStore} from "./auth/adapters/memory/session-store.js";
 import {InMemoryUserStore} from "./auth/adapters/memory/user-store.js";
 import {createAdminRouter} from "./auth/admin/routes.js";
@@ -136,6 +142,9 @@ export interface CreateAppOptions {
 	userStore?: UserStore;
 	sessionStore?: SessionStore;
 	creditTransactionStore?: CreditTransactionStore;
+	billingEventStore?: BillingEventStore;
+	billingConfig?: BillingConfig;
+	stripeClient?: StripeClientLike | null;
 	testPrincipal?: AuthenticatedPrincipal;
 }
 
@@ -936,11 +945,27 @@ export function createApp(options: CreateAppOptions) {
 	const sessionStore = options.sessionStore ?? new InMemorySessionStore();
 	const creditTransactionStore =
 		options.creditTransactionStore ?? new InMemoryCreditTransactionStore();
+	const billingEventStore =
+		options.billingEventStore ?? new InMemoryBillingEventStore();
+	const billingConfig =
+		options.billingConfig ?? {
+			stripeSecretKey: null,
+			stripeWebhookSecret: null,
+			appPublicUrl: "http://localhost:5173",
+			stripePriceIds: {},
+		};
 	const authService = new AuthService(
 		userStore,
 		sessionStore,
 		creditTransactionStore,
 		authConfig,
+	);
+	const billingService = new BillingService(
+		authService,
+		userStore,
+		billingEventStore,
+		billingConfig,
+		options.stripeClient,
 	);
 	const requireAuth = createRequireAuth(authConfig);
 	const requireAdmin = createRequireRole("admin");
@@ -1104,6 +1129,11 @@ export function createApp(options: CreateAppOptions) {
 		}),
 	);
 	app.use(helmet());
+	app.post(
+		"/api/billing/webhook",
+		express.raw({type: "application/json"}),
+		createBillingWebhookHandler(billingService),
+	);
 	app.use(express.json());
 	app.use(express.urlencoded({extended: true}));
 	app.use(cookieParser());
@@ -1141,6 +1171,8 @@ export function createApp(options: CreateAppOptions) {
 	app.locals.userStore = userStore;
 	app.locals.sessionStore = sessionStore;
 	app.locals.creditTransactionStore = creditTransactionStore;
+	app.locals.billingService = billingService;
+	app.locals.billingEventStore = billingEventStore;
 
 	app.use("/auth", createAuthRouter(authConfig, authService, passport));
 	app.use("/api", (request, response, next) => {
@@ -1152,7 +1184,7 @@ export function createApp(options: CreateAppOptions) {
 		response.setHeader("Expires", "0");
 		response.removeHeader("ETag");
 
-		if (request.path === "/health") {
+		if (request.path === "/health" || request.path === "/billing/pricing") {
 			next();
 			return;
 		}
@@ -1166,6 +1198,7 @@ export function createApp(options: CreateAppOptions) {
 		requireAuth(request, response, next);
 	});
 	app.use("/api/admin", requireAdmin, createAdminRouter(authService));
+	app.use("/api/billing", createBillingRouter(billingService));
 
 	app.get("/api/health", (_request, response) => {
 

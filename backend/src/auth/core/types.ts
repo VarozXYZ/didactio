@@ -12,6 +12,18 @@ export interface CreditBalances {
 	gold: number;
 }
 
+export type BillingSubscriptionTier = "teacher" | "teacher_pro";
+
+export interface UserBillingProfile {
+	stripeCustomerId?: string;
+	stripeSubscriptionId?: string;
+	subscriptionTier?: BillingSubscriptionTier;
+	subscriptionStatus?: string;
+	currentPeriodStart?: Date;
+	currentPeriodEnd?: Date;
+	cancelAtPeriodEnd?: boolean;
+}
+
 export interface AuthUser {
 	id: string;
 	provider: AuthProvider;
@@ -26,6 +38,7 @@ export interface AuthUser {
 	role: UserRole;
 	status: AuthUserStatus;
 	credits: CreditBalances;
+	billing?: UserBillingProfile;
 	defaultPresentationTheme?: PresentationTheme;
 	launchGiftGrantedAt?: Date;
 	onboardingCompletedAt?: Date;
@@ -141,6 +154,15 @@ export interface PublicAuthUser {
 	role: UserRole;
 	status: AuthUserStatus;
 	credits: CreditBalances;
+	billing?: {
+		stripeCustomerId?: string;
+		stripeSubscriptionId?: string;
+		subscriptionTier?: BillingSubscriptionTier;
+		subscriptionStatus?: string;
+		currentPeriodStart?: string;
+		currentPeriodEnd?: string;
+		cancelAtPeriodEnd?: boolean;
+	};
 	defaultPresentationTheme: PresentationTheme;
 	launchGiftGrantedAt?: string;
 	onboardingCompletedAt?: string;
@@ -153,6 +175,7 @@ export interface UserStore {
 		providerUserId: string,
 	): Promise<AuthUser | null>;
 	findById(id: string): Promise<AuthUser | null>;
+	findByStripeCustomerId(stripeCustomerId: string): Promise<AuthUser | null>;
 	list(): Promise<AuthUser[]>;
 	upsertFromGoogleProfile(
 		profile: NormalizedGoogleProfile,
@@ -171,6 +194,10 @@ export interface UserStore {
 	updateDefaultPresentationTheme(
 		id: string,
 		theme: PresentationTheme,
+	): Promise<AuthUser | null>;
+	updateBillingProfile(
+		id: string,
+		billing: UserBillingProfile,
 	): Promise<AuthUser | null>;
 	applyCreditDelta(input: {
 		id: string;

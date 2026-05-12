@@ -41,7 +41,7 @@ export function resolveModuleRegenerationCost(input: {
 }): GenerationCoinCost {
 	return {
 		coinType: input.quality === "gold" ? "silver" : "bronze",
-		amount: 1,
+		amount: input.quality === "gold" ? 5 : 1,
 	};
 }
 

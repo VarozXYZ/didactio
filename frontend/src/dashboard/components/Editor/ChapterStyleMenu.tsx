@@ -102,8 +102,8 @@ export function ChapterStyleMenu({
 					{/* Style presets */}
 					<SectionLabel headingFont={headingFontFamily}>Style</SectionLabel>
 					<div className="grid grid-cols-3 gap-1.5">
-						{["modern", "classic", "plain"].map((presetId) => {
-							const preset = STYLE_PRESETS[presetId as StylePresetId];
+						{PRESET_ROWS.flat().map((presetId) => {
+							const preset = STYLE_PRESETS[presetId];
 							const isActive = activePreset === presetId;
 							return (
 								<button
@@ -112,7 +112,7 @@ export function ChapterStyleMenu({
 									onClick={() =>
 										onChange({
 											...value,
-											stylePreset: presetId as StylePresetId,
+											stylePreset: presetId,
 										})
 									}
 									className={`flex flex-col items-center gap-1 rounded-lg border py-2 transition-colors ${

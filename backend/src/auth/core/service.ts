@@ -26,6 +26,10 @@ import type {
 } from "./types.js";
 import {SYSTEM_DEFAULT_THEME, type PresentationTheme} from "../../presentation-theme/types.js";
 import {normalizePresentationTheme} from "../../presentation-theme/validate.js";
+import {
+	BRONZE_FAIR_USE_MONTHLY_LIMIT,
+	isActiveBillingStatus,
+} from "../../billing/pricing.js";
 
 function emptyCredits(): CreditBalances {
 	return {
@@ -315,6 +319,47 @@ export class AuthService {
 			throw new AuthError("user_not_found", 404, "User not found.");
 		}
 
+		if (
+			input.coinType === "bronze" &&
+			isActiveBillingStatus(user.billing?.subscriptionStatus)
+		) {
+			const transactions = await this.creditTransactionStore.listByUserId(user.id);
+			const periodStart = new Date();
+			periodStart.setUTCDate(1);
+			periodStart.setUTCHours(0, 0, 0, 0);
+			const coveredBronzeThisMonth = transactions
+				.filter(
+					(transaction) =>
+						transaction.coinType === "bronze" &&
+						transaction.direction === "debit" &&
+						transaction.createdAt >= periodStart &&
+						typeof transaction.metadata === "object" &&
+						transaction.metadata !== null &&
+						(transaction.metadata as {subscriptionCovered?: unknown})
+							.subscriptionCovered === true,
+				)
+				.reduce((sum, transaction) => sum + transaction.amount, 0);
+
+			if (coveredBronzeThisMonth + input.amount <= BRONZE_FAIR_USE_MONTHLY_LIMIT) {
+				const transaction = await this.createCreditTransaction({
+					userId: user.id,
+					coinType: input.coinType,
+					direction: "debit",
+					amount: input.amount,
+					reason: input.reason,
+					actorUserId: user.id,
+					metadata: {
+						...(typeof input.metadata === "object" && input.metadata !== null ?
+							input.metadata
+						:	{}),
+						subscriptionCovered: true,
+						fairUseMonthlyLimit: BRONZE_FAIR_USE_MONTHLY_LIMIT,
+					},
+				});
+				return {user, transaction};
+			}
+		}
+
 		const updatedUser = await this.userStore.applyCreditDelta({
 			id: user.id,
 			coinType: input.coinType,
@@ -437,6 +482,18 @@ export class AuthService {
 			role: user.role,
 			status: user.status,
 			credits: user.credits ?? emptyCredits(),
+			billing: user.billing ?
+				{
+					stripeCustomerId: user.billing.stripeCustomerId,
+					stripeSubscriptionId: user.billing.stripeSubscriptionId,
+					subscriptionTier: user.billing.subscriptionTier,
+					subscriptionStatus: user.billing.subscriptionStatus,
+					currentPeriodStart:
+						user.billing.currentPeriodStart?.toISOString(),
+					currentPeriodEnd: user.billing.currentPeriodEnd?.toISOString(),
+					cancelAtPeriodEnd: user.billing.cancelAtPeriodEnd,
+				}
+			:	undefined,
 			defaultPresentationTheme:
 				user.defaultPresentationTheme ?? SYSTEM_DEFAULT_THEME,
 			launchGiftGrantedAt: user.launchGiftGrantedAt?.toISOString(),

@@ -5,6 +5,7 @@ import type {
 	AuthUser,
 	CreditBalances,
 	NormalizedGoogleProfile,
+	UserBillingProfile,
 	UserRole,
 	UserStore,
 } from "./core/types.js";
@@ -42,6 +43,7 @@ export class MongoUserStore implements UserStore {
 			{unique: true},
 		);
 		void this.collection.createIndex({email: 1});
+		void this.collection.createIndex({"billing.stripeCustomerId": 1});
 	}
 
 	async findByProviderAccount(
@@ -58,6 +60,12 @@ export class MongoUserStore implements UserStore {
 
 	async findById(id: string): Promise<AuthUser | null> {
 		return stripMongoId(await this.collection.findOne({id}));
+	}
+
+	async findByStripeCustomerId(stripeCustomerId: string): Promise<AuthUser | null> {
+		return stripMongoId(
+			await this.collection.findOne({"billing.stripeCustomerId": stripeCustomerId}),
+		);
 	}
 
 	async list(): Promise<AuthUser[]> {
@@ -191,6 +199,27 @@ export class MongoUserStore implements UserStore {
 					updatedAt: new Date(),
 				},
 			},
+			{returnDocument: "after"},
+		);
+
+		return stripMongoId(result);
+	}
+
+	async updateBillingProfile(
+		id: string,
+		billing: UserBillingProfile,
+	): Promise<AuthUser | null> {
+		const $set: Record<string, unknown> = {
+			updatedAt: new Date(),
+		};
+
+		for (const [key, value] of Object.entries(billing)) {
+			$set[`billing.${key}`] = value;
+		}
+
+		const result = await this.collection.findOneAndUpdate(
+			{id},
+			{$set},
 			{returnDocument: "after"},
 		);
 

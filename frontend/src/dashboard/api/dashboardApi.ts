@@ -15,6 +15,38 @@ type BackendProvider = string;
 export type BackendGenerationQuality = "silver" | "gold";
 export type BackendCoinType = "bronze" | "silver" | "gold";
 export type BackendAiModelTier = BackendGenerationQuality;
+export type BackendBillingProductKind = "credit_pack" | "subscription";
+
+export interface BackendBillingProduct {
+	id: string;
+	kind: BackendBillingProductKind;
+	name: string;
+	description: string;
+	priceLabel: string;
+	interval?: "/month";
+	stripePriceEnvKey: string;
+	stripeConfigured: boolean;
+	credits: Record<BackendCoinType, number>;
+	subscriptionTier?: "teacher" | "teacher_pro";
+	recommended?: boolean;
+	features: string[];
+}
+
+export interface BackendBillingSummary {
+	billing?: {
+		stripeCustomerId?: string;
+		stripeSubscriptionId?: string;
+		subscriptionTier?: "teacher" | "teacher_pro";
+		subscriptionStatus?: string;
+		currentPeriodStart?: string;
+		currentPeriodEnd?: string;
+		cancelAtPeriodEnd?: boolean;
+		bronzeFairUseActive?: boolean;
+	};
+	pricing: {
+		products: BackendBillingProduct[];
+	};
+}
 
 export interface BackendFolder {
 	id: string;
@@ -489,6 +521,26 @@ async function streamNdjson<T>(
 export const dashboardApi = {
 	listFolders() {
 		return requestJson<{folders: BackendFolder[]}>("/api/folders");
+	},
+	getBillingPricing() {
+		return requestJson<{products: BackendBillingProduct[]}>(
+			"/api/billing/pricing",
+		);
+	},
+	getBillingSummary() {
+		return requestJson<BackendBillingSummary>("/api/billing/me");
+	},
+	createBillingCheckoutSession(productId: string) {
+		return requestJson<{url: string}>("/api/billing/checkout-session", {
+			method: "POST",
+			body: JSON.stringify({productId}),
+		});
+	},
+	createBillingPortalSession() {
+		return requestJson<{url: string}>("/api/billing/portal-session", {
+			method: "POST",
+			body: JSON.stringify({}),
+		});
 	},
 	createFolder(input: {name: string; icon?: string; color?: string}) {
 		return requestJson<BackendFolder>("/api/folders", {

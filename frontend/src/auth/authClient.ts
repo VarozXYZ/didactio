@@ -18,6 +18,15 @@ export type AuthUser = {
 		silver: number;
 		gold: number;
 	};
+	billing?: {
+		stripeCustomerId?: string;
+		stripeSubscriptionId?: string;
+		subscriptionTier?: "teacher" | "teacher_pro";
+		subscriptionStatus?: string;
+		currentPeriodStart?: string;
+		currentPeriodEnd?: string;
+		cancelAtPeriodEnd?: boolean;
+	};
 	defaultPresentationTheme: PresentationTheme;
 	launchGiftGrantedAt?: string;
 	onboardingCompletedAt?: string;

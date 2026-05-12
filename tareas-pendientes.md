@@ -1,6 +1,6 @@
 1. ~~Mejorar preguntas cuestionario pre-syllabus (siempre son las mismas)~~
 2. ~~Añadir índice del módulo en EditorView y acceso directo~~
-3. Añadir selector de página en EvitorView
+3. ~~Añadir selector de página en EvitorView~~
 4. Actualizar páginas de prizing, personalizacion, etc.
 5. Quitar todas las referencias a "Streaming"
 6. Implementar pasarela de pago

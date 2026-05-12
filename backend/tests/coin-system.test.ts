@@ -88,7 +88,7 @@ describe("coin system", () => {
 
 		await generateDidacticUnitChapter(app, syllabusReady.id, 0);
 		await generateDidacticUnitChapter(app, syllabusReady.id, 0);
-		expect((await authService.getUserById("mock-user"))?.credits.silver).toBe(14);
+		expect((await authService.getUserById("mock-user"))?.credits.silver).toBe(10);
 	});
 
 	it("records a failed initial module attempt once without charging extra coins", async () => {

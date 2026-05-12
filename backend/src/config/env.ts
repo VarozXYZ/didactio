@@ -18,6 +18,13 @@ export interface AppEnv {
 	aiExtraInstructions: string | null;
 	mongoDbUri: string | null;
 	mongoDbName: string;
+	stripeSecretKey: string | null;
+	stripeWebhookSecret: string | null;
+	stripePriceStarterPack: string | null;
+	stripePriceCreatorPack: string | null;
+	stripePriceTeacherMonthly: string | null;
+	stripePriceTeacherProMonthly: string | null;
+	appPublicUrl: string;
 }
 
 function parsePort(value: string | undefined): number {
@@ -96,5 +103,22 @@ export function getAppEnv(): AppEnv {
 		mongoDbUri: parseOptionalString(process.env.MONGODB_URI),
 		mongoDbName:
 			parseOptionalString(process.env.MONGODB_DB_NAME) ?? "didactio",
+		stripeSecretKey: parseOptionalString(process.env.STRIPE_SECRET_KEY),
+		stripeWebhookSecret: parseOptionalString(process.env.STRIPE_WEBHOOK_SECRET),
+		stripePriceStarterPack: parseOptionalString(
+			process.env.STRIPE_PRICE_STARTER_PACK,
+		),
+		stripePriceCreatorPack: parseOptionalString(
+			process.env.STRIPE_PRICE_CREATOR_PACK,
+		),
+		stripePriceTeacherMonthly: parseOptionalString(
+			process.env.STRIPE_PRICE_TEACHER_MONTHLY,
+		),
+		stripePriceTeacherProMonthly: parseOptionalString(
+			process.env.STRIPE_PRICE_TEACHER_PRO_MONTHLY,
+		),
+		appPublicUrl:
+			parseOptionalString(process.env.APP_PUBLIC_URL) ??
+			"http://localhost:5173",
 	};
 }

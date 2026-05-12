@@ -3,6 +3,14 @@ import {InMemorySessionStore} from "../../src/auth/adapters/memory/session-store
 import {InMemoryUserStore} from "../../src/auth/adapters/memory/user-store.js";
 import type {AuthConfig} from "../../src/auth/core/types.js";
 import {
+	InMemoryBillingEventStore,
+	type BillingEventStore,
+} from "../../src/billing/billing-event-store.js";
+import type {
+	BillingConfig,
+	StripeClientLike,
+} from "../../src/billing/service.js";
+import {
 	InMemoryDidacticUnitStore,
 	type DidacticUnitStore,
 } from "../../src/didactic-unit/didactic-unit-store.js";
@@ -56,6 +64,9 @@ interface CreateTestAppOptions {
 	aiService?: AiService;
 	mongoHealth?: MongoHealthStatus;
 	authConfig?: AuthConfig;
+	billingConfig?: BillingConfig;
+	billingEventStore?: BillingEventStore;
+	stripeClient?: StripeClientLike | null;
 	disableAuthBypass?: boolean;
 }
 
@@ -89,6 +100,10 @@ export function createTestApp(options: CreateTestAppOptions = {}) {
 		aiService: options.aiService ?? createMockAiService(),
 		mongoHealth: options.mongoHealth,
 		authConfig: options.authConfig ?? buildTestAuthConfig(),
+		billingConfig: options.billingConfig,
+		billingEventStore:
+			options.billingEventStore ?? new InMemoryBillingEventStore(),
+		stripeClient: options.stripeClient,
 		userStore,
 		sessionStore: new InMemorySessionStore(),
 		creditTransactionStore: new InMemoryCreditTransactionStore(),

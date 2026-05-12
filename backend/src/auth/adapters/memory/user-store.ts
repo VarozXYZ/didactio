@@ -4,6 +4,7 @@ import type {
 	AuthUser,
 	CreditBalances,
 	NormalizedGoogleProfile,
+	UserBillingProfile,
 	UserRole,
 	UserStore,
 } from "../../core/types.js";
@@ -50,6 +51,14 @@ export class InMemoryUserStore implements UserStore {
 
 	async findById(id: string): Promise<AuthUser | null> {
 		return this.usersById.get(id) ?? null;
+	}
+
+	async findByStripeCustomerId(stripeCustomerId: string): Promise<AuthUser | null> {
+		return (
+			[...this.usersById.values()].find(
+				(user) => user.billing?.stripeCustomerId === stripeCustomerId,
+			) ?? null
+		);
 	}
 
 	async list(): Promise<AuthUser[]> {
@@ -191,6 +200,24 @@ export class InMemoryUserStore implements UserStore {
 		const updated: AuthUser = {
 			...user,
 			defaultPresentationTheme: theme,
+			updatedAt: new Date(),
+		};
+		this.usersById.set(id, updated);
+		return updated;
+	}
+
+	async updateBillingProfile(
+		id: string,
+		billing: UserBillingProfile,
+	): Promise<AuthUser | null> {
+		const user = this.usersById.get(id);
+		if (!user) {
+			return null;
+		}
+
+		const updated: AuthUser = {
+			...user,
+			billing: {...(user.billing ?? {}), ...billing},
 			updatedAt: new Date(),
 		};
 		this.usersById.set(id, updated);
