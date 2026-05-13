@@ -256,6 +256,12 @@ body {
 	text-indent: -1.1em;
 }
 
+.prose li > p,
+.typography-scope li > p,
+.unit-page-scope li > p {
+	display: inline;
+}
+
 .unit-page-scope li::marker {
 	color: var(--unit-body-color, #1d1d1f);
 	font-size: 0.9em;
