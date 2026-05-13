@@ -1,15 +1,25 @@
+import {Suspense, lazy} from "react";
 import {Route, Routes, useLocation} from "react-router-dom";
 import {RequireAuth} from "./auth/RequireAuth";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
-import HomePage from "./pages/HomePage";
-import PricingPage from "./pages/PricingPage";
-import ContactPage from "./pages/ContactPage";
-import LoginPage from "./pages/LoginPage";
-import RegisterPage from "./pages/RegisterPage";
-import DashboardPage from "./pages/DashboardPage";
-import AuthCallbackPage from "./pages/AuthCallbackPage";
-import OnboardingPage from "./pages/OnboardingPage";
+
+const HomePage = lazy(() => import("./pages/HomePage"));
+const PricingPage = lazy(() => import("./pages/PricingPage"));
+const ContactPage = lazy(() => import("./pages/ContactPage"));
+const LoginPage = lazy(() => import("./pages/LoginPage"));
+const RegisterPage = lazy(() => import("./pages/RegisterPage"));
+const DashboardPage = lazy(() => import("./pages/DashboardPage"));
+const AuthCallbackPage = lazy(() => import("./pages/AuthCallbackPage"));
+const OnboardingPage = lazy(() => import("./pages/OnboardingPage"));
+
+function RouteFallback() {
+	return (
+		<div className="flex min-h-[280px] w-full items-center justify-center px-6 text-center font-inter text-sm font-medium text-dark/55">
+			Loading...
+		</div>
+	);
+}
 
 function App() {
 	const location = useLocation();
@@ -34,32 +44,34 @@ function App() {
 					)
 				}
 			>
-				<Routes>
-					<Route path="/" element={<HomePage />} />
-					<Route path="/pricing" element={<PricingPage />} />
-					<Route path="/contact" element={<ContactPage />} />
-					<Route path="/login" element={<LoginPage />} />
-					<Route path="/register" element={<RegisterPage />} />
-					<Route path="/auth/callback" element={<AuthCallbackPage />} />
-					<Route path="/oauth/callback" element={<AuthCallbackPage />} />
-					<Route
-						path="/onboarding"
-						element={
-							<RequireAuth skipOnboardingCheck>
-								<OnboardingPage />
-							</RequireAuth>
-						}
-					/>
-					<Route
-						path="/dashboard/*"
-						element={
-							<RequireAuth>
-								<DashboardPage />
-							</RequireAuth>
-						}
-					/>
-					<Route path="*" element={<HomePage />} />
-				</Routes>
+				<Suspense fallback={<RouteFallback />}>
+					<Routes>
+						<Route path="/" element={<HomePage />} />
+						<Route path="/pricing" element={<PricingPage />} />
+						<Route path="/contact" element={<ContactPage />} />
+						<Route path="/login" element={<LoginPage />} />
+						<Route path="/register" element={<RegisterPage />} />
+						<Route path="/auth/callback" element={<AuthCallbackPage />} />
+						<Route path="/oauth/callback" element={<AuthCallbackPage />} />
+						<Route
+							path="/onboarding"
+							element={
+								<RequireAuth skipOnboardingCheck>
+									<OnboardingPage />
+								</RequireAuth>
+							}
+						/>
+						<Route
+							path="/dashboard/*"
+							element={
+								<RequireAuth>
+									<DashboardPage />
+								</RequireAuth>
+							}
+						/>
+						<Route path="*" element={<HomePage />} />
+					</Routes>
+				</Suspense>
 			</main>
 			{!hideMainChrome && <Footer />}
 		</div>
