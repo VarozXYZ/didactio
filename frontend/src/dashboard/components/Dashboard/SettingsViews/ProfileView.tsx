@@ -26,7 +26,7 @@ export function ProfileView() {
 			</header>
 
 			<div className="min-h-0 flex-1 overflow-y-auto p-8">
-				<div className="max-w-[700px] space-y-6">
+				<div className="mx-auto max-w-[740px] space-y-6">
 					<div className="rounded-[12px] border border-[#E5E5E7] bg-white p-8">
 						<h2 className="mb-6 text-[18px] font-bold text-[#1D1D1F]">
 							Profile Photo

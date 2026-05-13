@@ -236,7 +236,7 @@ export function SubscriptionView() {
 			</header>
 
 			<div className="min-h-0 flex-1 overflow-y-auto p-8">
-				<div className="max-w-[1100px] space-y-6">
+				<div className="mx-auto max-w-[960px] space-y-6">
 					{error && (
 						<div className="rounded-[10px] border border-red-200 bg-red-50 px-4 py-3 text-[13px] font-medium text-red-700">
 							{error}
@@ -308,7 +308,7 @@ export function SubscriptionView() {
 							</p>
 						</div>
 						<div className="mt-4 grid gap-4 lg:grid-cols-2">
-							<div className="rounded-[10px] bg-[#F5FAFF] p-3">
+							<div className="rounded-[10px] border border-[#E5E5E7] bg-white p-3">
 								<div className="mb-3 flex items-center justify-between">
 									<div>
 										<h3 className="text-[13px] font-bold uppercase text-[#0066CC]">
@@ -330,7 +330,7 @@ export function SubscriptionView() {
 									))}
 								</div>
 							</div>
-							<div className="rounded-[10px] bg-[#F3FBF7] p-3">
+							<div className="rounded-[10px] border border-[#E5E5E7] bg-white p-3">
 								<div className="mb-3 flex items-center justify-between">
 									<div>
 										<h3 className="text-[13px] font-bold uppercase text-[#047857]">

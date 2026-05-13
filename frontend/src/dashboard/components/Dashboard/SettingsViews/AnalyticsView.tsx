@@ -1,5 +1,14 @@
-import {type ReactNode, useEffect, useMemo, useState} from "react";
+import {type ReactNode, useEffect, useState} from "react";
 import {AlertCircle, Loader2, Sparkles} from "lucide-react";
+import {
+	Area,
+	AreaChart,
+	CartesianGrid,
+	ResponsiveContainer,
+	Tooltip,
+	XAxis,
+	YAxis,
+} from "recharts";
 import {
 	type BackendUsageAnalytics,
 	type BackendUsageAnalyticsPeriod,
@@ -106,16 +115,6 @@ function FavoriteTopicMetric({analytics}: {analytics: BackendUsageAnalytics}) {
 	);
 }
 
-const CHART_W = 720;
-const CHART_H = 200;
-const PAD_L = 44;
-const PAD_R = 16;
-const PAD_T = 14;
-const PAD_B = 30;
-const PLOT_W = CHART_W - PAD_L - PAD_R;
-const PLOT_H = CHART_H - PAD_T - PAD_B;
-const BASE_Y = PAD_T + PLOT_H;
-
 function ActivityChart({
 	analytics,
 	onPeriodChange,
@@ -123,44 +122,11 @@ function ActivityChart({
 	analytics: BackendUsageAnalytics;
 	onPeriodChange: (period: BackendUsageAnalyticsPeriod) => void;
 }) {
-	const chart = analytics.chart;
-	const maxCount = Math.max(...chart.map((p) => p.count), 1);
-
-	const points = useMemo(
-		() =>
-			chart.map((bucket, index) => {
-				const x = PAD_L + (index / Math.max(chart.length - 1, 1)) * PLOT_W;
-				const y = PAD_T + PLOT_H - (bucket.count / maxCount) * PLOT_H;
-				return {x, y, count: bucket.count};
-			}),
-		[chart, maxCount],
-	);
-
-	const linePath = points
-		.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`)
-		.join(" ");
-
-	const areaPath =
-		points.length > 0 ?
-			`${linePath} L ${points.at(-1)!.x.toFixed(1)} ${BASE_Y} L ${points[0]!.x.toFixed(1)} ${BASE_Y} Z`
-		:	"";
-
-	const yLevels = [0, 1, 2, 3].map((i) => ({
-		y: PAD_T + (i / 3) * PLOT_H,
-		label: Math.round(maxCount * (1 - i / 3)),
-	}));
-
-	const visibleLabels = chart.filter((_b, i) => {
-		if (chart.length <= 8) return true;
-		const step = Math.ceil(chart.length / 6);
-		return i === 0 || i === chart.length - 1 || i % step === 0;
-	});
-
 	return (
-		<div className="rounded-[16px] border border-black/[0.07] bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
-			<div className="flex flex-wrap items-start justify-between gap-4">
+		<div className="rounded-[14px] border border-[#E5E5E7] bg-white p-6">
+			<div className="mb-5 flex flex-wrap items-start justify-between gap-4">
 				<div>
-					<h2 className="text-[20px] font-bold tracking-tight text-[#1D1D1F]">
+					<h2 className="text-[17px] font-bold tracking-tight text-[#1D1D1F]">
 						AI Generations Over Time
 					</h2>
 					<p className="mt-0.5 text-[13px] text-[#AEAEB2]">
@@ -185,89 +151,59 @@ function ActivityChart({
 				</div>
 			</div>
 
-			<svg
-				viewBox={`0 0 ${CHART_W} ${CHART_H}`}
-				className="mt-4 w-full"
-				style={{height: 200}}
-				preserveAspectRatio="none"
-				role="img"
-				aria-label="AI generations chart"
-			>
-				<defs>
-					<linearGradient id="chart-area-fill" x1="0" x2="0" y1="0" y2="1">
-						<stop offset="0%" stopColor="#3B82F6" stopOpacity="0.12" />
-						<stop offset="100%" stopColor="#3B82F6" stopOpacity="0" />
-					</linearGradient>
-				</defs>
-
-				{yLevels.map(({y, label}) => (
-					<g key={label}>
-						<line
-							x1={PAD_L}
-							x2={CHART_W - PAD_R}
-							y1={y}
-							y2={y}
-							stroke={y === BASE_Y ? "#E5E5E7" : "#F0F0F2"}
-							strokeWidth={y === BASE_Y ? "1.5" : "1"}
-						/>
-						<text
-							x={PAD_L - 8}
-							y={y + 4}
-							textAnchor="end"
-							fill="#C7C7CC"
-							fontSize="11"
-							fontWeight="600"
-						>
-							{label}
-						</text>
-					</g>
-				))}
-
-				{areaPath && <path d={areaPath} fill="url(#chart-area-fill)" />}
-
-				{linePath && (
-					<path
-						d={linePath}
-						fill="none"
-						stroke="#3B82F6"
-						strokeWidth="2"
-						strokeLinecap="round"
-						strokeLinejoin="round"
+			<ResponsiveContainer width="100%" height={220}>
+				<AreaChart
+					data={analytics.chart}
+					margin={{top: 4, right: 4, left: -16, bottom: 0}}
+				>
+					<defs>
+						<linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
+							<stop offset="0%" stopColor="#3B82F6" stopOpacity={0.15} />
+							<stop offset="100%" stopColor="#3B82F6" stopOpacity={0} />
+						</linearGradient>
+					</defs>
+					<CartesianGrid
+						strokeDasharray="3 6"
+						stroke="#F0F0F2"
+						vertical={false}
 					/>
-				)}
-
-				{points
-					.filter((p) => p.count > 0)
-					.map((p, i) => (
-						<circle
-							key={i}
-							cx={p.x}
-							cy={p.y}
-							r="3.5"
-							fill="#fff"
-							stroke="#3B82F6"
-							strokeWidth="2"
-						/>
-					))}
-
-				{visibleLabels.map((bucket) => {
-					const point = points[chart.indexOf(bucket)];
-					if (!point) return null;
-					return (
-						<text
-							key={bucket.key}
-							x={point.x}
-							y={CHART_H - 6}
-							textAnchor="middle"
-							fill="#C7C7CC"
-							fontSize="11"
-							fontWeight="600"
-						>
-							{bucket.label}
-						</text>
-					);
-				})}
-			</svg>
+					<XAxis
+						dataKey="label"
+						tick={{fontSize: 11, fill: "#AEAEB2", fontWeight: 600}}
+						tickLine={false}
+						axisLine={false}
+						interval="preserveStartEnd"
+					/>
+					<YAxis
+						tick={{fontSize: 11, fill: "#AEAEB2", fontWeight: 600}}
+						tickLine={false}
+						axisLine={false}
+						allowDecimals={false}
+						width={40}
+					/>
+					<Tooltip
+						contentStyle={{
+							fontSize: 13,
+							borderRadius: 10,
+							border: "1px solid #E5E5E7",
+							boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
+							color: "#1D1D1F",
+						}}
+						labelStyle={{fontWeight: 600, marginBottom: 2}}
+						formatter={(value: number) => [value, "Generations"]}
+						cursor={{stroke: "#E5E5E7", strokeWidth: 1}}
+					/>
+					<Area
+						type="monotone"
+						dataKey="count"
+						stroke="#3B82F6"
+						strokeWidth={2}
+						fill="url(#areaGradient)"
+						dot={false}
+						activeDot={{r: 4, fill: "#3B82F6", strokeWidth: 0}}
+					/>
+				</AreaChart>
+			</ResponsiveContainer>
 		</div>
 	);
 }
@@ -322,7 +258,7 @@ export function AnalyticsView() {
 			</header>
 
 			<div className="min-h-0 flex-1 overflow-y-auto p-8">
-				<div className="mx-auto max-w-[1180px] space-y-5">
+				<div className="mx-auto max-w-[960px] space-y-5">
 					{error ? (
 						<div className="flex items-center gap-3 rounded-[16px] border border-red-200 bg-red-50 px-4 py-3 text-[13px] font-medium text-red-700">
 							<AlertCircle size={16} />

@@ -91,7 +91,7 @@ function SettingSection({
 	title: string;
 }) {
 	return (
-		<section className="rounded-[16px] border border-black/[0.07] bg-white/70 p-5 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+		<section className="rounded-[16px] border border-black/[0.07] bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
 			<div className="mb-4">
 				<h2 className="text-[18px] font-bold tracking-tight text-[#1D1D1F]">
 					{title}
@@ -374,7 +374,7 @@ export function PreferencesView() {
 			</header>
 
 			<div className="min-h-0 flex-1 overflow-y-auto p-8">
-				<div className="mx-auto max-w-[1040px] space-y-5">
+				<div className="mx-auto max-w-[740px] space-y-5">
 					{isLoading ? (
 						<div className="flex min-h-[320px] items-center justify-center rounded-[18px] border border-black/[0.07] bg-white text-[13px] text-[#86868B]">
 							<Loader2

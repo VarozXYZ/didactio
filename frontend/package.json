@@ -49,6 +49,7 @@
     "react-fast-marquee": "^1.6.5",
     "react-markdown": "^10.1.0",
     "react-router-dom": "^7.12.0",
+    "recharts": "^3.8.1",
     "rehype-stringify": "^10.0.1",
     "remark-breaks": "^4.0.0",
     "remark-gfm": "^4.0.1",
