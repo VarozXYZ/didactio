@@ -29,6 +29,7 @@ export interface BackendBillingProduct {
 	credits: Record<BackendCoinType, number>;
 	subscriptionTier?: "teacher" | "teacher_pro";
 	recommended?: boolean;
+	unlimitedBronze?: boolean;
 	features: string[];
 }
 

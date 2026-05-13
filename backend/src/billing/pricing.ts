@@ -14,6 +14,7 @@ export interface BillingProduct {
 	credits: CreditBalances;
 	subscriptionTier?: BillingSubscriptionTier;
 	recommended?: boolean;
+	unlimitedBronze?: boolean;
 	features: string[];
 }
 
@@ -27,8 +28,8 @@ export const BILLING_PRODUCTS: BillingProduct[] = [
 		description: "A focused top-up for trying richer generations.",
 		priceLabel: "5€ + VAT",
 		stripePriceEnvKey: "STRIPE_PRICE_STARTER_PACK",
-		credits: {bronze: 100, silver: 30, gold: 3},
-		features: ["100 bronze", "30 silver", "3 gold", "Credits never expire"],
+		credits: {bronze: 50, silver: 25, gold: 5},
+		features: ["50 bronze", "25 silver", "5 gold", "Credits never expire"],
 	},
 	{
 		id: "creator_pack",
@@ -37,8 +38,8 @@ export const BILLING_PRODUCTS: BillingProduct[] = [
 		description: "Better value for regular lesson planning bursts.",
 		priceLabel: "15€ + VAT",
 		stripePriceEnvKey: "STRIPE_PRICE_CREATOR_PACK",
-		credits: {bronze: 400, silver: 110, gold: 12},
-		features: ["400 bronze", "110 silver", "12 gold", "Credits never expire"],
+		credits: {bronze: 100, silver: 50, gold: 15},
+		features: ["100 bronze", "50 silver", "15 gold", "Credits never expire"],
 	},
 	{
 		id: "teacher_monthly",
@@ -48,12 +49,12 @@ export const BILLING_PRODUCTS: BillingProduct[] = [
 		priceLabel: "10€ + VAT",
 		interval: "/month",
 		stripePriceEnvKey: "STRIPE_PRICE_TEACHER_MONTHLY",
-		credits: {bronze: 0, silver: 50, gold: 5},
+		credits: {bronze: 100, silver: 50, gold: 10},
 		subscriptionTier: "teacher",
 		features: [
-			"Unlimited bronze with fair use",
+			"100 bronze every month",
 			"50 silver every month",
-			"5 gold every month",
+			"10 gold every month",
 			"Unused silver and gold never expire",
 		],
 	},
@@ -65,13 +66,14 @@ export const BILLING_PRODUCTS: BillingProduct[] = [
 		priceLabel: "20€ + VAT",
 		interval: "/month",
 		stripePriceEnvKey: "STRIPE_PRICE_TEACHER_PRO_MONTHLY",
-		credits: {bronze: 0, silver: 120, gold: 15},
+		credits: {bronze: 0, silver: 100, gold: 20},
 		subscriptionTier: "teacher_pro",
 		recommended: true,
+		unlimitedBronze: true,
 		features: [
 			"Unlimited bronze with fair use",
-			"120 silver every month",
-			"15 gold every month",
+			"100 silver every month",
+			"20 gold every month",
 			"Unused silver and gold never expire",
 		],
 	},

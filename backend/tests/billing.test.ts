@@ -132,7 +132,7 @@ describe("billing", () => {
 
 		const authService = app.locals.authService as AuthService;
 		const user = await authService.getUserById("mock-user");
-		expect(user?.credits).toEqual({bronze: 130, silver: 45, gold: 4});
+		expect(user?.credits).toEqual({bronze: 80, silver: 40, gold: 6});
 	});
 
 	it("grants subscription renewal credits once per invoice event", async () => {
@@ -165,7 +165,7 @@ describe("billing", () => {
 
 		const authService = app.locals.authService as AuthService;
 		const user = await authService.getUserById("mock-user");
-		expect(user?.credits).toEqual({bronze: 30, silver: 135, gold: 16});
+		expect(user?.credits).toEqual({bronze: 30, silver: 115, gold: 21});
 		expect(user?.billing).toMatchObject({
 			stripeSubscriptionId: "sub_test",
 			subscriptionStatus: "active",
@@ -173,7 +173,7 @@ describe("billing", () => {
 		});
 	});
 
-	it("covers bronze debits for active subscribers without reducing wallet balance", async () => {
+	it("covers bronze debits for active Teacher Pro subscribers without reducing wallet balance", async () => {
 		const app = createTestApp({billingConfig, stripeClient: createFakeStripe()});
 		const authService = app.locals.authService as AuthService;
 		const userStore = app.locals.userStore as UserStore;
@@ -188,7 +188,7 @@ describe("billing", () => {
 		});
 		await userStore.updateBillingProfile("mock-user", {
 			subscriptionStatus: "active",
-			subscriptionTier: "teacher",
+			subscriptionTier: "teacher_pro",
 		});
 
 		const reservation = await authService.reserveUserCredits({

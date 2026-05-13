@@ -121,7 +121,7 @@ function ProductCard({
 						className="rounded-[8px] border border-[#E5E5E7] bg-white px-2 py-1.5"
 					>
 						<div className="flex min-h-[22px] items-center justify-center gap-1">
-							{isSubscription && type === "bronze" ?
+							{product.unlimitedBronze && type === "bronze" ?
 								<>
 									<CoinIcon type={type} size={16} />
 									<span className="text-[12px] font-semibold text-[#1D1D1F]">

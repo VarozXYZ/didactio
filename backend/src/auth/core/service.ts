@@ -321,7 +321,8 @@ export class AuthService {
 
 		if (
 			input.coinType === "bronze" &&
-			isActiveBillingStatus(user.billing?.subscriptionStatus)
+			isActiveBillingStatus(user.billing?.subscriptionStatus) &&
+			user.billing?.subscriptionTier === "teacher_pro"
 		) {
 			const transactions = await this.creditTransactionStore.listByUserId(user.id);
 			const periodStart = new Date();

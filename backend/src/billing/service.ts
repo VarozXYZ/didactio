@@ -413,7 +413,9 @@ export class BillingService {
 			...user.billing,
 			currentPeriodStart: user.billing?.currentPeriodStart?.toISOString(),
 			currentPeriodEnd: user.billing?.currentPeriodEnd?.toISOString(),
-			bronzeFairUseActive: isActiveBillingStatus(user.billing?.subscriptionStatus),
+			bronzeFairUseActive:
+				isActiveBillingStatus(user.billing?.subscriptionStatus) &&
+				user.billing?.subscriptionTier === "teacher_pro",
 		};
 	}
 }
