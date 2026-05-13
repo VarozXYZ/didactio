@@ -555,6 +555,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 	const [regenerateConfirmOpen, setRegenerateConfirmOpen] = useState(false);
 	const [currentSpread, setCurrentSpread] = useState(0);
+	const [isPagePickerOpen, setIsPagePickerOpen] = useState(false);
 	const [collapsedOutlineChapterIndex, setCollapsedOutlineChapterIndex] =
 		useState<number | null>(null);
 	const [selectedOutlineItemId, setSelectedOutlineItemId] = useState<
@@ -2064,15 +2065,15 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			Math.min(contentPageOffset + 2, totalVisiblePages)
 		:	spreadStartPage;
 	const spreadPageShortLabel =
-		spreadMetrics.isMobile ? `Page ${spreadStartPage}`
+		spreadMetrics.isMobile ? `${spreadStartPage} / ${totalVisiblePages}`
 		: spreadStartPage === spreadEndPage ?
-			`Page ${spreadStartPage}`
-		:	`Pages ${spreadStartPage}-${spreadEndPage}`;
+			`${spreadStartPage} / ${totalVisiblePages}`
+		:	`${spreadStartPage}-${spreadEndPage} / ${totalVisiblePages}`;
 	const pageWheelOptions: WheelPickerOption<number>[] =
 		spreadMetrics.isMobile ?
 			Array.from({length: totalVisiblePages}, (_, pageIndex) => ({
 				label: `${pageIndex + 1}`,
-				textValue: `Page ${pageIndex + 1}`,
+				textValue: `${pageIndex + 1} / ${totalVisiblePages}`,
 				value: pageIndex,
 			}))
 		:	Array.from({length: totalSpreads}, (_, spreadIndex) => {
@@ -2083,7 +2084,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 
 				return {
 					label,
-					textValue: `Pages ${label}`,
+					textValue: `${label} / ${totalVisiblePages}`,
 					value: spreadIndex,
 				};
 			});
@@ -2540,7 +2541,11 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			</div>
 
 			<div
-				className="mt-3 flex max-w-full items-center justify-center gap-1.5 md:gap-2"
+				className={cn(
+					"mt-3 flex max-w-full items-center justify-center gap-1.5 transition-all duration-150 md:gap-2",
+					isPagePickerOpen &&
+						"pointer-events-none translate-y-1 scale-95 opacity-0",
+				)}
 				style={{marginTop: `${spreadMetrics.indicatorGap}px`}}
 			>
 				{!editable && (
@@ -2617,7 +2622,10 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 										•
 									</span>
 								)}
-								<Popover>
+								<Popover
+									open={isPagePickerOpen}
+									onOpenChange={setIsPagePickerOpen}
+								>
 									<PopoverTrigger asChild>
 										<button
 											type="button"

@@ -3,7 +3,6 @@ import {useEffect, useRef, useState} from "react";
 import type {EditorTextStyle} from "../../types";
 import {
 	STYLE_PRESETS,
-	FONT_CATALOG,
 	type StylePresetId,
 	type SizeProfile,
 	type FontId,
@@ -30,12 +29,9 @@ const PRESET_ROWS: Array<StylePresetId[]> = [
 	["modern", "classic", "plain"],
 ];
 
-function SectionLabel({children, headingFont}: {children: string; headingFont?: string}) {
+function SectionLabel({children}: {children: string}) {
 	return (
-		<div
-			className="px-1 pb-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#86868B]"
-			style={{fontFamily: headingFont}}
-		>
+		<div className="px-1 pb-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#86868B]">
 			{children}
 		</div>
 	);
@@ -70,8 +66,6 @@ export function ChapterStyleMenu({
 	}, []);
 
 	const activePreset = value.stylePreset ?? "classic";
-	const activePresetObj = STYLE_PRESETS[activePreset];
-	const headingFontFamily = FONT_CATALOG[activePresetObj.heading].family;
 
 	return (
 		<div ref={containerRef} className="relative shrink-0">
@@ -100,7 +94,7 @@ export function ChapterStyleMenu({
 			{isOpen ?
 				<div className="absolute top-[calc(100%+10px)] right-0 z-30 w-[280px] rounded-md border border-[#D4D7DD] bg-white p-4 shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
 					{/* Style presets */}
-					<SectionLabel headingFont={headingFontFamily}>Style</SectionLabel>
+					<SectionLabel>Style</SectionLabel>
 					<div className="grid grid-cols-3 gap-1.5">
 						{PRESET_ROWS.flat().map((presetId) => {
 							const preset = STYLE_PRESETS[presetId];
@@ -131,7 +125,7 @@ export function ChapterStyleMenu({
 
 					{/* Text size */}
 					<div className="mt-3 border-t border-[#EEE8DC] pt-3">
-						<SectionLabel headingFont={headingFontFamily}>Text size</SectionLabel>
+						<SectionLabel>Text size</SectionLabel>
 						<div className="grid grid-cols-3 gap-1.5">
 							{SIZE_PROFILES.map((profile) => {
 								const isActive =

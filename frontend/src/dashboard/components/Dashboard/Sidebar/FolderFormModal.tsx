@@ -210,7 +210,7 @@ export function FolderFormModal({
                                         <input
                                             value={selectedColor}
                                             onChange={(e) => setSelectedColor(e.target.value)}
-                                            className="w-[88px] rounded-lg border border-[#E5E5E7] bg-[#FAFAFA] px-2 py-1 font-mono text-[12px] text-[#1D1D1F] outline-none transition-colors focus:border-[#1D1D1F] focus:bg-white"
+                                            className="w-[88px] rounded-lg border border-[#E5E5E7] bg-[#FAFAFA] px-2 py-1 text-[12px] text-[#1D1D1F] outline-none transition-colors focus:border-[#1D1D1F] focus:bg-white"
                                             placeholder="#6B7280"
                                             spellCheck={false}
                                         />
