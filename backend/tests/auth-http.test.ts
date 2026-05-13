@@ -70,7 +70,7 @@ describe("auth http", () => {
 		expect(response.body.error).toBe("missing_authorization_header");
 	});
 
-	it("detects refresh token reuse", async () => {
+	it("tolerates an immediate duplicate refresh request", async () => {
 		const app = createTestApp({disableAuthBypass: true});
 		const config = buildTestAuthConfig();
 		const login = await loginTestUser(app, {
@@ -87,7 +87,10 @@ describe("auth http", () => {
 		const reused = await request(app)
 			.post("/auth/refresh")
 			.set("Cookie", `${config.cookie.name}=${login.refreshToken}`);
-		expect(reused.status).toBe(401);
-		expect(reused.body.error).toBe("refresh_token_reuse_detected");
+		expect(reused.status).toBe(200);
+		expect(reused.body.accessToken).toBeTruthy();
+		expect(reused.headers["set-cookie"][0]).toContain(
+			`${config.cookie.name}=`,
+		);
 	});
 });

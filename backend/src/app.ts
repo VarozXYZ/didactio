@@ -117,7 +117,7 @@ import {
 	type MongoHealthStatus,
 } from "./mongo/mongo-connection.js";
 import {createLogger, type Logger} from "./logging/logger.js";
-import {AuthError} from "./auth/core/errors.js";
+import {AuthError, getPublicAuthErrorMessage} from "./auth/core/errors.js";
 import {
 	isGenerationQuality,
 	legacyTierToGenerationQuality,
@@ -909,7 +909,7 @@ function sendAuthErrorResponse(
 ): void {
 	response.status(error.statusCode).json({
 		error: error.code,
-		message: error.message,
+		message: getPublicAuthErrorMessage(error),
 		...(error.details ?? {}),
 	});
 }

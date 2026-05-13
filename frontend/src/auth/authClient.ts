@@ -60,6 +60,8 @@ type RefreshResponse = {
 
 type Listener = (snapshot: AuthSnapshot) => void;
 
+const SESSION_EXPIRED_MESSAGE = "Your session expired. Please sign in again.";
+
 let snapshot: AuthSnapshot = {
 	status: "loading",
 	user: null,
@@ -96,6 +98,23 @@ async function parseErrorBody(response: Response): Promise<{message: string; err
 	}
 }
 
+function isAuthTechnicalError(error: string): boolean {
+	return (
+		error.includes("token") ||
+		error.includes("authorization") ||
+		error.includes("session") ||
+		error === "unauthenticated"
+	);
+}
+
+function getPublicAuthErrorMessage(error: string, message: string): string {
+	if (isAuthTechnicalError(error) || isAuthTechnicalError(message.toLowerCase())) {
+		return SESSION_EXPIRED_MESSAGE;
+	}
+
+	return message;
+}
+
 async function requestRefresh(): Promise<string | null> {
 	const response = await fetch("/auth/refresh", {
 		method: "POST",
@@ -108,7 +127,10 @@ async function requestRefresh(): Promise<string | null> {
 			status: "unauthenticated",
 			user: null,
 			accessToken: null,
-			error: error === "missing_refresh_token" ? null : message,
+			error:
+				error === "missing_refresh_token" ? null : (
+					getPublicAuthErrorMessage(error, message)
+				),
 		});
 		return null;
 	}
@@ -277,7 +299,7 @@ export const authClient = {
 				status: "unauthenticated",
 				user: null,
 				accessToken: null,
-				error: "Your session expired. Please sign in again.",
+				error: SESSION_EXPIRED_MESSAGE,
 			});
 		}
 

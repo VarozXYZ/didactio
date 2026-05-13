@@ -1,5 +1,9 @@
 import type {NextFunction, Request, Response} from "express";
-import {AuthError, isAuthError} from "../core/errors.js";
+import {
+	AuthError,
+	getPublicAuthErrorMessage,
+	isAuthError,
+} from "../core/errors.js";
 import {verifyAccessToken} from "../core/tokens.js";
 import type {AuthConfig, UserRole} from "../core/types.js";
 
@@ -59,7 +63,7 @@ export function authErrorHandler(
 	if (isAuthError(error)) {
 		response.status(error.statusCode).json({
 			error: error.code,
-			message: error.message,
+			message: getPublicAuthErrorMessage(error),
 			...(error.details ?? {}),
 		});
 		return;

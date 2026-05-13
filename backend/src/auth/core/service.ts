@@ -31,6 +31,8 @@ import {
 	isActiveBillingStatus,
 } from "../../billing/pricing.js";
 
+const REFRESH_REUSE_GRACE_MS = 30_000;
+
 function emptyCredits(): CreditBalances {
 	return {
 		bronze: 0,
@@ -154,12 +156,16 @@ export class AuthService {
 
 		const reuseDetected = session.refreshTokenHash !== refreshTokenHash;
 		if (reuseDetected) {
-			await this.sessionStore.revokeAllForUser(session.userId);
-			throw new AuthError(
-				"refresh_token_reuse_detected",
-				401,
-				"Refresh token reuse detected.",
-			);
+			const recentlyRotated =
+				Date.now() - session.updatedAt.getTime() <= REFRESH_REUSE_GRACE_MS;
+			if (!recentlyRotated) {
+				await this.sessionStore.revokeAllForUser(session.userId);
+				throw new AuthError(
+					"refresh_token_reuse_detected",
+					401,
+					"Session could not be refreshed.",
+				);
+			}
 		}
 
 		const foundUser = await this.userStore.findById(session.userId);

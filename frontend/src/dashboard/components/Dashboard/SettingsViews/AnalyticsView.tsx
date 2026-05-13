@@ -190,7 +190,7 @@ function ActivityChart({
 							color: "#1D1D1F",
 						}}
 						labelStyle={{fontWeight: 600, marginBottom: 2}}
-						formatter={(value: number) => [value, "Generations"]}
+						formatter={(value) => [Number(value ?? 0), "Generations"]}
 						cursor={{stroke: "#E5E5E7", strokeWidth: 1}}
 					/>
 					<Area

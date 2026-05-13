@@ -417,10 +417,13 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
 
 	if (!response.ok) {
 		let message = `Request failed with status ${response.status}.`;
+		if (response.status === 401) {
+			message = "Your session expired. Please sign in again.";
+		}
 
 		try {
 			const body = (await response.json()) as {error?: string; message?: string};
-			if (body.error) {
+			if (body.error && response.status !== 401) {
 				message = body.message ?? body.error;
 			}
 		} catch {
@@ -459,10 +462,13 @@ async function streamNdjson<T>(
 
 	if (!response.ok) {
 		let message = `Request failed with status ${response.status}.`;
+		if (response.status === 401) {
+			message = "Your session expired. Please sign in again.";
+		}
 
 		try {
 			const body = (await response.json()) as {error?: string; message?: string};
-			if (body.error) {
+			if (body.error && response.status !== 401) {
 				message = body.message ?? body.error;
 			}
 		} catch {
