@@ -2,6 +2,8 @@ import type {
 	AiService,
 	ChapterResult,
 	FolderClassificationResult,
+	LearningActivityFeedbackResult,
+	LearningActivityResult,
 	MarkdownStreamCallbacks,
 	ModerationResult,
 	StructuredStreamCallbacks,
@@ -316,6 +318,61 @@ export function createMockAiService(): AiService {
 			await callbacks.onHtml?.(result.html, result.html);
 			await callbacks.onComplete?.(result);
 			return result;
+		},
+		async generateLearningActivity(input): Promise<LearningActivityResult> {
+			return {
+				provider,
+				model,
+				prompt: `Activity ${input.type} for ${input.moduleTitle}`,
+				telemetry,
+				title: `${input.moduleTitle} practice`,
+				instructions: "Complete the activity using the module concepts.",
+				dedupeSummary:
+					"Covers one compact practice prompt with a distinct example.",
+				content:
+					input.type === "multiple_choice" ?
+						{
+							questions: [
+								{
+									id: "q1",
+									prompt: "Which option best matches the core idea?",
+									options: [
+										{id: "a", text: "A distractor"},
+										{id: "b", text: "The correct idea"},
+									],
+									correctOptionId: "b",
+									explanation: "The correct idea follows the module.",
+								},
+							],
+						}
+					: input.type === "flashcards" ?
+						{cards: [{id: "c1", front: "Core idea", back: "Explanation"}]}
+					:	{
+							prompts: [
+								{
+									id: "p1",
+									prompt: "Explain the concept briefly.",
+									expectedAnswer: "A concise explanation.",
+									rubric: ["Uses the key concept"],
+								},
+							],
+						},
+				raw: {},
+			};
+		},
+		async generateLearningActivityFeedback(
+			input,
+		): Promise<LearningActivityFeedbackResult> {
+			return {
+				provider,
+				model,
+				prompt: `Feedback for ${input.activityTitle}`,
+				telemetry,
+				score: 80,
+				feedback: "Good answer. Add one more concrete connection to the module.",
+				strengths: ["Clear attempt"],
+				improvements: ["Add a concrete example"],
+			};
 		},
 	};
 }

@@ -72,6 +72,64 @@ export interface BackendUsageAnalytics {
 	}>;
 }
 
+export type BackendLearningActivityScope =
+	| "current_module"
+	| "cumulative_until_module";
+export type BackendLearningActivityType =
+	| "multiple_choice"
+	| "short_answer"
+	| "coding_practice"
+	| "flashcards"
+	| "matching"
+	| "ordering"
+	| "case_study"
+	| "debate_reflection"
+	| "cloze"
+	| "guided_project"
+	| "freeform_html";
+
+export interface BackendLearningActivity {
+	id: string;
+	ownerId: string;
+	didacticUnitId: string;
+	chapterIndex: number;
+	scope: BackendLearningActivityScope;
+	type: BackendLearningActivityType;
+	quality: BackendGenerationQuality;
+	title: string;
+	instructions: string;
+	content: Record<string, unknown>;
+	dedupeSummary: string;
+	sourceModuleIndexes: number[];
+	feedbackAttemptLimit: number;
+	generationRunId?: string;
+	createdAt: string;
+	updatedAt: string;
+}
+
+export interface BackendLearningActivityAttempt {
+	id: string;
+	activityId: string;
+	ownerId: string;
+	answers: unknown;
+	score?: number;
+	feedback: string;
+	completedAt: string;
+}
+
+export interface BackendActivityProgress {
+	activityId: string;
+	ownerId: string;
+	confirmedAnswers: Record<string, {
+		selectedOptionId: string;
+		isCorrect: boolean;
+		correctOptionId: string;
+		explanation: string;
+	}>;
+	completed: boolean;
+	updatedAt: string;
+}
+
 export interface BackendFolder {
 	id: string;
 	name: string;
@@ -736,6 +794,51 @@ export const dashboardApi = {
 	getDidacticUnitChapter(id: string, chapterIndex: number) {
 		return requestJson<BackendDidacticUnitChapterDetail>(
 			`/api/didactic-unit/${id}/modules/${chapterIndex}`,
+		);
+	},
+	listLearningActivities(id: string, chapterIndex: number) {
+		return requestJson<{activities: BackendLearningActivity[]}>(
+			`/api/didactic-unit/${id}/modules/${chapterIndex}/activities`,
+		);
+	},
+	createLearningActivity(
+		id: string,
+		chapterIndex: number,
+		input: {
+			scope: BackendLearningActivityScope;
+			type: BackendLearningActivityType;
+			quality: BackendGenerationQuality;
+		},
+	) {
+		return requestJson<{activity: BackendLearningActivity}>(
+			`/api/didactic-unit/${id}/modules/${chapterIndex}/activities`,
+			{
+				method: "POST",
+				body: JSON.stringify(input),
+			},
+		);
+	},
+	createLearningActivityAttempt(activityId: string, answers: unknown) {
+		return requestJson<{attempt: BackendLearningActivityAttempt}>(
+			`/api/activities/${activityId}/attempts`,
+			{
+				method: "POST",
+				body: JSON.stringify({answers}),
+			},
+		);
+	},
+	getActivityProgress(activityId: string) {
+		return requestJson<{progress: BackendActivityProgress | null}>(
+			`/api/activities/${activityId}/progress`,
+		);
+	},
+	saveActivityProgress(activityId: string, payload: {confirmedAnswers: BackendActivityProgress["confirmedAnswers"]; completed: boolean}) {
+		return requestJson<{progress: BackendActivityProgress}>(
+			`/api/activities/${activityId}/progress`,
+			{
+				method: "PUT",
+				body: JSON.stringify(payload),
+			},
 		);
 	},
 	updateDidacticUnitChapter(

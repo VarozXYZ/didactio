@@ -5,7 +5,8 @@ export type GenerationQuality = "silver" | "gold";
 export type GenerationChargeOperation =
 	| "syllabus_generation"
 	| "unit_generation"
-	| "module_regeneration";
+	| "module_regeneration"
+	| "activity_generation";
 
 export interface GenerationCoinCost {
 	coinType: CreditCoinType;
@@ -42,6 +43,15 @@ export function resolveModuleRegenerationCost(input: {
 	return {
 		coinType: input.quality === "gold" ? "silver" : "bronze",
 		amount: input.quality === "gold" ? 5 : 1,
+	};
+}
+
+export function resolveActivityGenerationCost(input: {
+	quality: GenerationQuality;
+}): GenerationCoinCost {
+	return {
+		coinType: "silver",
+		amount: input.quality === "gold" ? 20 : 1,
 	};
 }
 

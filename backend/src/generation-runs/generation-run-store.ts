@@ -6,7 +6,11 @@ import type {
 import type {DidacticUnitSyllabus} from "../didactic-unit/planning.js";
 import type {AiCallTelemetry} from "../ai/telemetry.js";
 
-export type GenerationRunStage = "syllabus" | "chapter";
+export type GenerationRunStage =
+	| "syllabus"
+	| "chapter"
+	| "activity"
+	| "activity_feedback";
 export type GenerationRunStatus =
 	| "payment_pending"
 	| "queued"
@@ -53,9 +57,29 @@ export interface ChapterGenerationRunRecord extends GenerationRunBase {
 	chapter?: DidacticUnitGeneratedChapter;
 }
 
+export interface ActivityGenerationRunRecord extends GenerationRunBase {
+	stage: "activity";
+	chapterIndex: number;
+	activityId?: string;
+	activityType: string;
+	scope: string;
+	coinTxId?: string;
+	completedAt?: string;
+}
+
+export interface ActivityFeedbackGenerationRunRecord extends GenerationRunBase {
+	stage: "activity_feedback";
+	chapterIndex: number;
+	activityId: string;
+	attemptId?: string;
+	completedAt?: string;
+}
+
 export type GenerationRun =
 	| SyllabusGenerationRunRecord
-	| ChapterGenerationRunRecord;
+	| ChapterGenerationRunRecord
+	| ActivityGenerationRunRecord
+	| ActivityFeedbackGenerationRunRecord;
 
 export interface GenerationRunStore {
 	save(run: GenerationRun): Promise<void>;
@@ -177,6 +201,52 @@ interface CreateFailedChapterGenerationRunInput {
 	telemetry?: AiCallTelemetry;
 }
 
+interface CreateCompletedActivityGenerationRunInput {
+	didacticUnitId: string;
+	ownerId: string;
+	chapterIndex: number;
+	activityId: string;
+	activityType: string;
+	scope: string;
+	provider: string;
+	model: string;
+	prompt: string;
+	rawOutput?: string;
+	coinTxId?: string;
+	createdAt: string;
+	telemetry?: AiCallTelemetry;
+}
+
+interface CreateFailedActivityGenerationRunInput {
+	didacticUnitId: string;
+	ownerId: string;
+	chapterIndex: number;
+	activityType: string;
+	scope: string;
+	provider: string;
+	model: string;
+	prompt: string;
+	error: string;
+	rawOutput?: string;
+	coinTxId?: string;
+	createdAt: string;
+	telemetry?: AiCallTelemetry;
+}
+
+interface CreateCompletedActivityFeedbackRunInput {
+	didacticUnitId: string;
+	ownerId: string;
+	chapterIndex: number;
+	activityId: string;
+	attemptId: string;
+	provider: string;
+	model: string;
+	prompt: string;
+	rawOutput?: string;
+	createdAt: string;
+	telemetry?: AiCallTelemetry;
+}
+
 export function createCompletedSyllabusGenerationRunRecord(
 	input: CreateCompletedSyllabusGenerationRunInput,
 ): SyllabusGenerationRunRecord {
@@ -265,6 +335,80 @@ export function createFailedChapterGenerationRunRecord(
 		status: "failed",
 		createdAt: input.createdAt,
 		updatedAt: input.createdAt,
+		telemetry: input.telemetry,
+	};
+}
+
+export function createCompletedActivityGenerationRunRecord(
+	input: CreateCompletedActivityGenerationRunInput,
+): ActivityGenerationRunRecord {
+	return {
+		id: randomUUID(),
+		stage: "activity",
+		didacticUnitId: input.didacticUnitId,
+		ownerId: input.ownerId,
+		chapterIndex: input.chapterIndex,
+		activityId: input.activityId,
+		activityType: input.activityType,
+		scope: input.scope,
+		provider: input.provider,
+		model: input.model,
+		prompt: input.prompt,
+		rawOutput: input.rawOutput,
+		coinTxId: input.coinTxId,
+		status: "completed",
+		createdAt: input.createdAt,
+		updatedAt: input.createdAt,
+		completedAt: input.createdAt,
+		telemetry: input.telemetry,
+	};
+}
+
+export function createFailedActivityGenerationRunRecord(
+	input: CreateFailedActivityGenerationRunInput,
+): ActivityGenerationRunRecord {
+	return {
+		id: randomUUID(),
+		stage: "activity",
+		didacticUnitId: input.didacticUnitId,
+		ownerId: input.ownerId,
+		chapterIndex: input.chapterIndex,
+		activityType: input.activityType,
+		scope: input.scope,
+		provider: input.provider,
+		model: input.model,
+		prompt: input.prompt,
+		rawOutput: input.rawOutput,
+		coinTxId: input.coinTxId,
+		error: input.error,
+		errorMessage: input.error,
+		status: "failed",
+		createdAt: input.createdAt,
+		updatedAt: input.createdAt,
+		completedAt: input.createdAt,
+		telemetry: input.telemetry,
+	};
+}
+
+export function createCompletedActivityFeedbackRunRecord(
+	input: CreateCompletedActivityFeedbackRunInput,
+): ActivityFeedbackGenerationRunRecord {
+	return {
+		id: randomUUID(),
+		stage: "activity_feedback",
+		didacticUnitId: input.didacticUnitId,
+		ownerId: input.ownerId,
+		chapterIndex: input.chapterIndex,
+		activityId: input.activityId,
+		attemptId: input.attemptId,
+		provider: input.provider,
+		model: input.model,
+		prompt: input.prompt,
+		rawOutput: input.rawOutput,
+		status: "completed",
+		createdAt: input.createdAt,
+		updatedAt: input.createdAt,
+		completedAt: input.createdAt,
 		telemetry: input.telemetry,
 	};
 }

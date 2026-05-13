@@ -145,6 +145,8 @@ const SIZE_PROFILES: Record<
 };
 
 const LINE_HEIGHT_BODY = 1.9;
+const PLAIN_LINE_HEIGHT_BODY = 2.1;
+const CLASSIC_LINE_HEIGHT_BODY = 1.9;
 const LINE_HEIGHT_HEADING = 1.25;
 const MARGIN_BOTTOM_BODY_EM = 0.8;
 const MARGIN_TOP_H2_EM = 1.2;
@@ -217,6 +219,12 @@ export type ResolvedTypography = {
 	blockquote: {paddingLeftPx: number; borderWidthPx: number};
 };
 
+export function resolveBodyLineHeight(stylePreset?: string): number {
+	if (stylePreset === "classic") return CLASSIC_LINE_HEIGHT_BODY;
+	if (stylePreset === "plain") return PLAIN_LINE_HEIGHT_BODY;
+	return LINE_HEIGHT_BODY;
+}
+
 export function resolveTypography(settings: {
 	sizeProfile: SizeProfile;
 	bodyFontId: FontId;
@@ -239,6 +247,7 @@ export function resolveTypography(settings: {
 
 	const bodyFamily = FONT_CATALOG[bodyFontId].family;
 	const headingFamily = FONT_CATALOG[headingFontId].family;
+	const bodyLineHeight = resolveBodyLineHeight(stylePreset);
 
 	const codeSz = bodySz * CODE_FONT_SIZE_EM;
 	const codePaddingPx = bodySz * CODE_PADDING_H_EM * 2;
@@ -247,7 +256,7 @@ export function resolveTypography(settings: {
 		body: {
 			family: bodyFamily,
 			sizePx: bodySz,
-			lineHeight: LINE_HEIGHT_BODY,
+			lineHeight: bodyLineHeight,
 			marginBottomPx: bodySz * MARGIN_BOTTOM_BODY_EM,
 		},
 		inline: {
@@ -291,7 +300,7 @@ export function resolveTypography(settings: {
 		},
 		listItem: {
 			marginBottomPx: bodySz * LIST_ITEM_MARGIN_EM,
-			lineHeight: LINE_HEIGHT_BODY,
+			lineHeight: bodyLineHeight,
 		},
 		blockquote: {
 			paddingLeftPx: bodySz * BLOCKQUOTE_INDENT_EM,
@@ -314,6 +323,7 @@ export function defaultTypography(isMobile = false): ResolvedTypography {
 export const TYPO_VARS = {
 	bodyFamily: "--typo-body-family",
 	bodySize: "--typo-body-size",
+	lineHeight: "--typo-line-height",
 	headingFamily: "--typo-heading-family",
 	h1Size: "--typo-h1-size",
 	h2Size: "--typo-h2-size",
@@ -326,6 +336,7 @@ export function makeTypographyVars(
 	return {
 		[TYPO_VARS.bodyFamily]: resolved.body.family,
 		[TYPO_VARS.bodySize]: `${resolved.body.sizePx}px`,
+		[TYPO_VARS.lineHeight]: String(resolved.body.lineHeight),
 		[TYPO_VARS.headingFamily]: resolved.h2.family,
 		[TYPO_VARS.h1Size]: `${resolved.h1.sizePx}px`,
 		[TYPO_VARS.h2Size]: `${resolved.h2.sizePx}px`,
@@ -339,6 +350,7 @@ export function applyTypographyVars(
 ): void {
 	element.style.setProperty(TYPO_VARS.bodyFamily, resolved.body.family);
 	element.style.setProperty(TYPO_VARS.bodySize, `${resolved.body.sizePx}px`);
+	element.style.setProperty(TYPO_VARS.lineHeight, String(resolved.body.lineHeight));
 	element.style.setProperty(TYPO_VARS.headingFamily, resolved.h2.family);
 	element.style.setProperty(TYPO_VARS.h1Size, `${resolved.h1.sizePx}px`);
 	element.style.setProperty(TYPO_VARS.h2Size, `${resolved.h2.sizePx}px`);

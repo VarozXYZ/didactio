@@ -9,6 +9,7 @@ import {MongoAiConfigStore} from "./ai/config.js";
 import {MongoDidacticUnitStore} from "./didactic-unit/mongo-didactic-unit-store.js";
 import {MongoFolderStore} from "./folders/mongo-folder-store.js";
 import {MongoGenerationRunStore} from "./generation-runs/mongo-generation-run-store.js";
+import {MongoLearningActivityStore} from "./activities/mongo-learning-activity-store.js";
 import {createLogger} from "./logging/logger.js";
 import {connectMongo, getMongoHealthStatus} from "./mongo/mongo-connection.js";
 
@@ -27,6 +28,9 @@ const didacticUnitStore = new MongoDidacticUnitStore(mongoConnection.database);
 const generationRunStore = new MongoGenerationRunStore(
 	mongoConnection.database,
 );
+const learningActivityStore = new MongoLearningActivityStore(
+	mongoConnection.database,
+);
 const folderStore = new MongoFolderStore(mongoConnection.database);
 const userStore = new MongoUserStore(mongoConnection.database);
 const sessionStore = new MongoSessionStore(mongoConnection.database);
@@ -38,6 +42,7 @@ const aiConfigStore = new MongoAiConfigStore(mongoConnection.database);
 const app = createApp({
 	didacticUnitStore,
 	generationRunStore,
+	learningActivityStore,
 	folderStore,
 	aiConfigStore,
 	authConfig,

@@ -920,22 +920,91 @@ function buildMeasuredPage(
 function createPostModuleActionMeasurementMarkup(input: {
 	hasNextModule: boolean;
 	primaryActionLabel: string;
+	stylePresetId: string;
 }): string {
-	const eyebrow = input.hasNextModule ? "Ready to continue" : "Unit complete";
-	const body =
+	const palette =
+		input.stylePresetId === "classic" ?
+			{
+				border: "#D8B98F",
+				panelBg:
+					"linear-gradient(135deg,#FFFDF8 0%,#FFFFFF 58%,#FBF2E7 100%)",
+				accent: "#996633",
+				accentSoft: "#F7EEE4",
+				accentText: "#7A4E28",
+				heading: "#2A1A0A",
+				body: "#5B4630",
+				primary: "#2A1A0A",
+				tipBorder: "#EAD8C2",
+			}
+		: input.stylePresetId === "plain" ?
+			{
+				border: "#BFDBFE",
+				panelBg:
+					"linear-gradient(135deg,#F8FBFF 0%,#FFFFFF 58%,#EFF6FF 100%)",
+				accent: "#2563EB",
+				accentSoft: "#EFF6FF",
+				accentText: "#1D4ED8",
+				heading: "#111827",
+				body: "#4B5563",
+				primary: "#111827",
+				tipBorder: "#DBEAFE",
+			}
+		:	{
+				border: "#86EFAC",
+				panelBg:
+					"linear-gradient(135deg,#F8FFFB 0%,#FFFFFF 58%,#F0FFF7 100%)",
+				accent: "#16A34A",
+				accentSoft: "#DCFCE7",
+				accentText: "#15803D",
+				heading: "#111827",
+				body: "#4B5563",
+				primary: "#111827",
+				tipBorder: "#DCFCE7",
+			};
+	const continueBody =
 		input.hasNextModule ?
-			"You can keep your momentum going with the next module, or come back later for practice exercises."
-		:	"You have reached the end of this unit. Practice exercises are coming soon, and you can wrap up for now.";
+			"Move forward when you are ready."
+		:	"Finish this unit and return to your dashboard.";
+	const footerLabel = input.hasNextModule ? "Next lesson" : "Unit finished";
+	return `
+        <div style="border:1px solid ${palette.border}; background:${palette.panelBg}; border-radius:22px; padding:20px;">
+            <div style="text-align:center;">
+                <div style="width:44px;height:44px;margin:0 auto;border-radius:999px;border:1px solid ${palette.tipBorder};background:${palette.accentSoft};color:${palette.accent};display:flex;align-items:center;justify-content:center;font-weight:700;">✓</div>
+                <div style="margin-top:12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.24em;color:#6B7280;">Next steps</div>
+                <div style="margin-top:4px;font-size:24px;line-height:1.15;font-weight:700;color:${palette.heading};">Module complete</div>
+                <div style="max-width:460px;margin:8px auto 0;font-size:14px;line-height:1.45;color:${palette.body};">You have finished the theory part. Practice now or continue to the next topic.</div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:24px;">
+                <div style="min-height:164px;border-radius:20px;background:${palette.primary};color:white;padding:20px;display:flex;flex-direction:column;">
+                    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
+                        <div style="width:44px;height:44px;border-radius:12px;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;">◇</div>
+                        <div style="border-radius:999px;background:white;color:${palette.accentText};font-size:11px;font-weight:700;padding:4px 12px;">Recommended</div>
+                    </div>
+                    <div style="margin-top:20px;font-size:18px;font-weight:700;line-height:1.2;">Exercises &amp; Practice</div>
+                    <div style="margin-top:8px;font-size:14px;font-weight:500;line-height:1.45;color:rgba(255,255,255,.75);">Apply what you learned with guided exercises.</div>
+                    <div style="margin-top:auto;border-top:1px solid rgba(255,255,255,.15);padding-top:16px;font-size:12px;font-weight:600;color:rgba(255,255,255,.8);">Custom activity · AI feedback</div>
+                </div>
+                <div style="min-height:164px;border-radius:20px;border:1px solid #E5E5E7;background:white;color:#111827;padding:20px;display:flex;flex-direction:column;">
+                    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
+                        <div style="width:44px;height:44px;border-radius:12px;background:${palette.accentSoft};color:${palette.accent};display:flex;align-items:center;justify-content:center;">□</div>
+                        <div style="border-radius:999px;background:${palette.accentSoft};color:${palette.accentText};font-size:11px;font-weight:700;padding:4px 12px;">Continue</div>
+                    </div>
+                    <div style="margin-top:20px;font-size:18px;font-weight:700;line-height:1.2;color:${palette.heading};">${escapeHtml(input.primaryActionLabel)}</div>
+                    <div style="margin-top:8px;font-size:14px;font-weight:500;line-height:1.45;color:#4B5563;">${escapeHtml(continueBody)}</div>
+                    <div style="margin-top:auto;border-top:1px solid #E5E5E7;padding-top:16px;font-size:12px;font-weight:600;color:#4B5563;">${escapeHtml(footerLabel)}</div>
+                </div>
+            </div>
+            <div style="margin-top:20px;border:1px solid ${palette.tipBorder};background:rgba(255,255,255,.82);border-radius:16px;padding:12px 16px;text-align:center;font-size:14px;line-height:1.35;color:${palette.body};"><strong style="color:${palette.accentText};">Tip:</strong> Practicing now helps retain the concepts before moving on.</div>
+        </div>
+    `;
 
 	return `
-        <div class="space-y-4">
-            <div class="space-y-2">
-                <p class="text-[10px] font-bold uppercase tracking-[0.24em] text-[#86868B]">
-                    ${escapeHtml(eyebrow)}
-                </p>
-                <p class="text-sm font-medium leading-[1.6] text-[#4B5563]">
-                    ${escapeHtml(body)}
-                </p>
+        <div style="border:1px solid ${palette.border}; background:${palette.panelBg}; border-radius:22px; padding:20px;">
+            <div style="text-align:center;">
+                <div style="width:44px;height:44px;margin:0 auto;border-radius:999px;border:1px solid ${palette.tipBorder};background:${palette.accentSoft};color:${palette.accent};display:flex;align-items:center;justify-content:center;font-weight:700;">✓</div>
+                <div style="margin-top:12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.24em;color:#6B7280;">Next steps</div>
+                <div style="margin-top:4px;font-size:24px;line-height:1.15;font-weight:700;color:${palette.heading};">Module complete</div>
+                <div style="max-width:460px;margin:8px auto 0;font-size:14px;line-height:1.45;color:${palette.body};">You have finished the theory part. Practice now or continue to the next topic.</div>
             </div>
             <div class="grid gap-2">
                 <button type="button" disabled class="w-full rounded-2xl border border-[#E5E5E7] bg-[#F8F8F9] px-4 py-3 text-left text-sm font-semibold text-[#A1A1AA]">
@@ -1132,9 +1201,11 @@ export function measurePages({
 
 	const actionMeasure = document.createElement("div");
 	actionMeasure.style.width = `${contentWidth}px`;
+	actionMeasure.style.fontFamily = typography.body.family;
 	actionMeasure.innerHTML = createPostModuleActionMeasurementMarkup({
 		hasNextModule,
 		primaryActionLabel,
+		stylePresetId,
 	});
 
 	sandbox.appendChild(headerMeasure);

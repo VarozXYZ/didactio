@@ -16,6 +16,8 @@ import {
 	buildFolderClassificationPrompt,
 	buildChapterHtmlPrompt,
 	buildGatewaySystemPrompt,
+	buildLearningActivityFeedbackPrompt,
+	buildLearningActivityPrompt,
 	buildLearnerSummaryPrompt,
 	buildModerationPrompt,
 	resolveTargetChapterCount,
@@ -23,6 +25,8 @@ import {
 } from "./prompt-builders.js";
 import {
 	folderClassificationSchema,
+	learningActivityFeedbackSchema,
+	learningActivitySchema,
 	moderationSchema,
 	syllabusSchema,
 } from "./schemas.js";
@@ -34,6 +38,10 @@ import {
 } from "./telemetry.js";
 import {createCanonicalDidacticUnitChapter} from "../didactic-unit/didactic-unit-chapter.js";
 import {extractContinuitySummary} from "../html/extractContinuity.js";
+import type {
+	LearningActivityScope,
+	LearningActivityType,
+} from "../activities/learning-activity.js";
 
 export class AiGatewayConfigurationError extends Error {}
 
@@ -87,12 +95,29 @@ export interface ChapterResult extends BaseStageResult {
 	continuitySummary: string;
 }
 
+export interface LearningActivityResult extends BaseStageResult {
+	title: string;
+	instructions: string;
+	dedupeSummary: string;
+	content: Record<string, unknown>;
+	raw: unknown;
+}
+
+export interface LearningActivityFeedbackResult extends BaseStageResult {
+	score?: number;
+	feedback: string;
+	strengths: string[];
+	improvements: string[];
+}
+
 type AiStageName =
 	| "folder_classification"
 	| "moderation"
 	| "syllabus"
 	| "summary"
-	| "module";
+	| "module"
+	| "activity"
+	| "activity_feedback";
 
 interface GatewayAiServiceOptions {
 	logger?: Logger;
@@ -231,6 +256,39 @@ export interface AiService {
 		},
 		callbacks: MarkdownStreamCallbacks<ChapterResult>,
 	): Promise<ChapterResult>;
+	generateLearningActivity(input: {
+		topic: string;
+		moduleTitle: string;
+		scope: LearningActivityScope;
+		type: LearningActivityType;
+		contextModules: Array<{
+			index: number;
+			title: string;
+			overview: string;
+			html?: string;
+			continuitySummary?: string;
+		}>;
+		previousActivities: Array<{
+			chapterIndex: number;
+			type: string;
+			title: string;
+			instructions: string;
+			dedupeSummary: string;
+		}>;
+		config: AiConfig;
+		tier: AiModelTier;
+		abortSignal?: AbortSignal;
+	}): Promise<LearningActivityResult>;
+	generateLearningActivityFeedback(input: {
+		activityTitle: string;
+		activityType: LearningActivityType;
+		instructions: string;
+		content: Record<string, unknown>;
+		answers: unknown;
+		config: AiConfig;
+		tier: AiModelTier;
+		abortSignal?: AbortSignal;
+	}): Promise<LearningActivityFeedbackResult>;
 }
 
 const CONTENT_LENGTH_TOKENS: Record<DidacticUnitLength, number> = {
@@ -246,7 +304,9 @@ function resolveStageMaxOutputTokens(
 		| "moderation"
 		| "syllabus"
 		| "summary"
-		| "chapter",
+		| "chapter"
+		| "activity"
+		| "activity_feedback",
 	length?: DidacticUnitLength,
 ): number {
 	switch (stage) {
@@ -255,6 +315,10 @@ function resolveStageMaxOutputTokens(
 			return 1200;
 		case "summary":
 			return 1000;
+		case "activity_feedback":
+			return 1600;
+		case "activity":
+			return 4500;
 		case "syllabus":
 		case "chapter":
 			if (!length) {
@@ -1012,6 +1076,154 @@ export class GatewayAiService implements AiService {
 				depth: input.depth,
 				durationMs: Date.now() - startedAt,
 				streaming: true,
+				error,
+			});
+			throw error;
+		}
+	}
+
+	async generateLearningActivity(input: {
+		topic: string;
+		moduleTitle: string;
+		scope: LearningActivityScope;
+		type: LearningActivityType;
+		contextModules: Array<{
+			index: number;
+			title: string;
+			overview: string;
+			html?: string;
+			continuitySummary?: string;
+		}>;
+		previousActivities: Array<{
+			chapterIndex: number;
+			type: string;
+			title: string;
+			instructions: string;
+			dedupeSummary: string;
+		}>;
+		config: AiConfig;
+		tier: AiModelTier;
+		abortSignal?: AbortSignal;
+	}): Promise<LearningActivityResult> {
+		const selection = this.selectModel(input.tier, input.config);
+		const prompt = buildLearningActivityPrompt({
+			topic: input.topic,
+			moduleTitle: input.moduleTitle,
+			scope: input.scope,
+			type: input.type,
+			contextModules: input.contextModules,
+			previousActivities: input.previousActivities,
+			authoring: input.config.authoring,
+		});
+		const startedAt = Date.now();
+		const maxOutputTokens = resolveStageMaxOutputTokens("activity");
+
+		this.logAiCallStarted("activity", selection, {
+			tier: input.tier,
+			topic: input.topic,
+			moduleTitle: input.moduleTitle,
+			type: input.type,
+			scope: input.scope,
+			promptLength: prompt.length,
+			maxOutputTokens,
+		});
+
+		try {
+			const result = await generateObject({
+				model: this.gateway(selection.modelId),
+				system: buildGatewaySystemPrompt("activity"),
+				prompt,
+				schema: learningActivitySchema,
+				maxOutputTokens,
+				abortSignal: input.abortSignal,
+			});
+			const telemetry = await this.enrichAiCallTelemetry(
+				await collectAiCallTelemetry(result, Date.now() - startedAt),
+			);
+			this.logAiCallCompleted("activity", selection, telemetry, {
+				tier: input.tier,
+				type: input.type,
+				scope: input.scope,
+			});
+
+			return {
+				provider: selection.provider,
+				model: selection.model,
+				prompt,
+				telemetry,
+				title: result.object.title,
+				instructions: result.object.instructions,
+				dedupeSummary: result.object.dedupeSummary,
+				content: result.object.content,
+				raw: result.object,
+			};
+		} catch (error) {
+			this.logAiCallFailed("activity", selection, {
+				tier: input.tier,
+				topic: input.topic,
+				type: input.type,
+				scope: input.scope,
+				durationMs: Date.now() - startedAt,
+				error,
+			});
+			throw error;
+		}
+	}
+
+	async generateLearningActivityFeedback(input: {
+		activityTitle: string;
+		activityType: LearningActivityType;
+		instructions: string;
+		content: Record<string, unknown>;
+		answers: unknown;
+		config: AiConfig;
+		tier: AiModelTier;
+		abortSignal?: AbortSignal;
+	}): Promise<LearningActivityFeedbackResult> {
+		const selection = this.selectModel(input.tier, input.config);
+		const prompt = buildLearningActivityFeedbackPrompt(input);
+		const startedAt = Date.now();
+		const maxOutputTokens = resolveStageMaxOutputTokens("activity_feedback");
+
+		this.logAiCallStarted("activity_feedback", selection, {
+			tier: input.tier,
+			activityType: input.activityType,
+			promptLength: prompt.length,
+			maxOutputTokens,
+		});
+
+		try {
+			const result = await generateObject({
+				model: this.gateway(selection.modelId),
+				system: buildGatewaySystemPrompt("activity_feedback"),
+				prompt,
+				schema: learningActivityFeedbackSchema,
+				maxOutputTokens,
+				abortSignal: input.abortSignal,
+			});
+			const telemetry = await this.enrichAiCallTelemetry(
+				await collectAiCallTelemetry(result, Date.now() - startedAt),
+			);
+			this.logAiCallCompleted("activity_feedback", selection, telemetry, {
+				tier: input.tier,
+				activityType: input.activityType,
+			});
+
+			return {
+				provider: selection.provider,
+				model: selection.model,
+				prompt,
+				telemetry,
+				score: result.object.score,
+				feedback: result.object.feedback,
+				strengths: result.object.strengths,
+				improvements: result.object.improvements,
+			};
+		} catch (error) {
+			this.logAiCallFailed("activity_feedback", selection, {
+				tier: input.tier,
+				activityType: input.activityType,
+				durationMs: Date.now() - startedAt,
 				error,
 			});
 			throw error;

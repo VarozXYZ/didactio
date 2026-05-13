@@ -24,3 +24,4 @@
 24. Mejorar botones y centralizar componentes de botones
 25. La ultima página nunca se marca como leida
 26. Botón redondo de modulos en EditorView más utilidad visual tras la generacion (por ejemplo, tracking de read % y finalizado)
+27. Actualizar la forma el precio / coste en monedas se muestra. En vez de selectar Precio/moneda, seleccionar modelo y enseñar coste dinámicamente segun seleccion

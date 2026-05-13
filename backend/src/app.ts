@@ -78,6 +78,9 @@ import {
 import type {Folder, FolderStore} from "./folders/folder-store.js";
 import {
 	createCompletedSyllabusGenerationRunRecord,
+	createCompletedActivityFeedbackRunRecord,
+	createCompletedActivityGenerationRunRecord,
+	createFailedActivityGenerationRunRecord,
 	createFailedSyllabusGenerationRunRecord,
 	createQueuedChapterGenerationRunRecord,
 	type ChapterGenerationRunRecord,
@@ -122,6 +125,7 @@ import {
 	isGenerationQuality,
 	legacyTierToGenerationQuality,
 	resolveModuleRegenerationCost,
+	resolveActivityGenerationCost,
 	resolveSyllabusGenerationCost,
 	resolveUnitGenerationCost,
 	type GenerationCoinCost,
@@ -129,10 +133,23 @@ import {
 } from "./credits/generation-pricing.js";
 import {parsePresentationTheme} from "./presentation-theme/validate.js";
 import {SYSTEM_DEFAULT_THEME} from "./presentation-theme/types.js";
+import {
+	OBJECTIVE_ACTIVITY_TYPES,
+	gradeObjectiveActivity,
+	parseCreateLearningActivityInput,
+	type LearningActivity,
+	type LearningActivityAttempt,
+	type LearningActivityProgress,
+} from "./activities/learning-activity.js";
+import {
+	InMemoryLearningActivityStore,
+	type LearningActivityStore,
+} from "./activities/learning-activity-store.js";
 
 export interface CreateAppOptions {
 	didacticUnitStore: DidacticUnitStore;
 	generationRunStore: GenerationRunStore;
+	learningActivityStore?: LearningActivityStore;
 	folderStore: FolderStore;
 	aiConfigStore?: AiConfigStore;
 	aiService?: AiService;
@@ -326,8 +343,8 @@ function parseOptionalSyllabusContext(body: unknown): string | undefined {
 }
 
 function compareRunsByCreatedAtDesc(
-	left: SyllabusGenerationRunRecord | ChapterGenerationRunRecord,
-	right: SyllabusGenerationRunRecord | ChapterGenerationRunRecord,
+	left: GenerationRun,
+	right: GenerationRun,
 ): number {
 	return right.createdAt.localeCompare(left.createdAt);
 }
@@ -952,6 +969,83 @@ async function refundGenerationCredits(input: {
 	});
 }
 
+function getGeneratedChapterOrThrow(
+	didacticUnit: DidacticUnit,
+	chapterIndex: number,
+) {
+	const generatedChapter = didacticUnit.generatedChapters?.find(
+		(chapter) => chapter.chapterIndex === chapterIndex,
+	);
+
+	if (!generatedChapter) {
+		throw new Error("Generated didactic unit module not found.");
+	}
+
+	return generatedChapter;
+}
+
+function resolveActivitySourceModuleIndexes(input: {
+	scope: "current_module" | "cumulative_until_module";
+	chapterIndex: number;
+}): number[] {
+	return input.scope === "current_module" ?
+			[input.chapterIndex]
+		:	Array.from({length: input.chapterIndex + 1}, (_, index) => index);
+}
+
+function buildActivityContextModules(input: {
+	didacticUnit: DidacticUnit;
+	sourceModuleIndexes: number[];
+}) {
+	return input.sourceModuleIndexes.map((index) => {
+		const planned =
+			input.didacticUnit.referenceSyllabus?.modules[index] ??
+			input.didacticUnit.modules[index] ??
+			input.didacticUnit.chapters[index];
+		const generated = input.didacticUnit.generatedChapters?.find(
+			(chapter) => chapter.chapterIndex === index,
+		);
+
+		return {
+			index,
+			title: planned?.title ?? generated?.title ?? `Module ${index + 1}`,
+			overview:
+				"overview" in (planned ?? {}) ?
+					String((planned as {overview?: unknown}).overview ?? "")
+				:	"",
+			html: generated?.html,
+			continuitySummary: input.didacticUnit.continuitySummaries?.[index],
+		};
+	});
+}
+
+function sortPreviousActivitiesForPrompt(input: {
+	activities: LearningActivity[];
+	chapterIndex: number;
+	type: string;
+}): LearningActivity[] {
+	return [...input.activities].sort((left, right) => {
+		const leftScore =
+			(left.chapterIndex === input.chapterIndex ? 4 : 0) +
+			(left.type === input.type ? 2 : 0);
+		const rightScore =
+			(right.chapterIndex === input.chapterIndex ? 4 : 0) +
+			(right.type === input.type ? 2 : 0);
+		if (leftScore !== rightScore) {
+			return rightScore - leftScore;
+		}
+		return right.createdAt.localeCompare(left.createdAt);
+	});
+}
+
+function parseAttemptAnswers(body: unknown): unknown {
+	if (!body || typeof body !== "object" || !("answers" in body)) {
+		throw new Error("Activity attempt answers are required.");
+	}
+
+	return (body as {answers: unknown}).answers;
+}
+
 const TOP_LEVEL_HTML_BLOCK_TAGS = new Set([
 	"h2",
 	"h3",
@@ -1179,6 +1273,8 @@ export function createApp(options: CreateAppOptions) {
 	const activeGenerationControllers = new Map<string, AbortController>();
 	const didacticUnitStore = options.didacticUnitStore;
 	const generationRunStore = options.generationRunStore;
+	const learningActivityStore =
+		options.learningActivityStore ?? new InMemoryLearningActivityStore();
 	const folderStore = options.folderStore;
 	const aiConfigStore = options.aiConfigStore ?? new InMemoryAiConfigStore();
 	const authConfig = options.authConfig;
@@ -2663,6 +2759,442 @@ export function createApp(options: CreateAppOptions) {
 					chapterRuns,
 				}),
 			);
+		},
+	);
+
+	app.get(
+		"/api/didactic-unit/:id/modules/:chapterIndex/activities",
+		async (request, response) => {
+			const requestWithMockOwner = asRequestWithMockOwner(request);
+			const ownerId = requestWithMockOwner.mockOwner.id;
+			const didacticUnit = await didacticUnitStore.getById(
+				ownerId,
+				String(request.params.id),
+			);
+
+			if (!didacticUnit) {
+				response.status(404).json({error: "Didactic unit not found."});
+				return;
+			}
+
+			let chapterIndex;
+			try {
+				chapterIndex = parseChapterIndex(String(request.params.chapterIndex));
+			} catch (error) {
+				response.status(400).json({
+					error:
+						error instanceof Error ?
+							error.message
+						:	"Invalid learning activity lookup request.",
+				});
+				return;
+			}
+
+			response.json({
+				activities: await learningActivityStore.listByModule({
+					ownerId,
+					didacticUnitId: didacticUnit.id,
+					chapterIndex,
+				}),
+			});
+		},
+	);
+
+	app.post(
+		"/api/didactic-unit/:id/modules/:chapterIndex/activities",
+		async (request, response) => {
+			const requestWithMockOwner = asRequestWithMockOwner(request);
+			const ownerId = requestWithMockOwner.mockOwner.id;
+			const didacticUnit = await didacticUnitStore.getById(
+				ownerId,
+				String(request.params.id),
+			);
+
+			if (!didacticUnit) {
+				response.status(404).json({error: "Didactic unit not found."});
+				return;
+			}
+
+			let chapterIndex;
+			let input;
+			try {
+				chapterIndex = parseChapterIndex(String(request.params.chapterIndex));
+				input = parseCreateLearningActivityInput(request.body);
+				getGeneratedChapterOrThrow(didacticUnit, chapterIndex);
+			} catch (error) {
+				response.status(400).json({
+					error:
+						error instanceof Error ?
+							error.message
+						:	"Invalid learning activity creation request.",
+				});
+				return;
+			}
+
+			if (
+				input.type === "freeform_html" &&
+				process.env.LEARNING_ACTIVITY_FREEFORM_ENABLED !== "true"
+			) {
+				response.status(403).json({
+					error: "Freeform activity creation is not enabled.",
+				});
+				return;
+			}
+
+			const sourceModuleIndexes = resolveActivitySourceModuleIndexes({
+				scope: input.scope,
+				chapterIndex,
+			});
+			const previousActivities = sortPreviousActivitiesForPrompt({
+				activities:
+					input.scope === "current_module" ?
+						await learningActivityStore.listByModule({
+							ownerId,
+							didacticUnitId: didacticUnit.id,
+							chapterIndex,
+						})
+					:	await learningActivityStore.listByUnitRange({
+							ownerId,
+							didacticUnitId: didacticUnit.id,
+							maxChapterIndex: chapterIndex,
+						}),
+				chapterIndex,
+				type: input.type,
+			});
+			const config = await aiConfigStore.get(ownerId);
+			let reservation: CreditReservation | null = null;
+
+			try {
+				reservation = await reserveGenerationCredits({
+					authService,
+					ownerId,
+					cost: resolveActivityGenerationCost({quality: input.quality}),
+					reason: "activity_generation",
+					metadata: {
+						operation: "activity_generation",
+						didacticUnitId: didacticUnit.id,
+						chapterIndex,
+						scope: input.scope,
+						type: input.type,
+						quality: input.quality,
+					},
+				});
+			} catch (error) {
+				if (error instanceof AuthError) {
+					sendAuthErrorResponse(response, error);
+					return;
+				}
+				throw error;
+			}
+
+			try {
+				const result = await aiService.generateLearningActivity({
+					topic: didacticUnit.topic,
+					moduleTitle:
+						didacticUnit.modules[chapterIndex]?.title ??
+						didacticUnit.chapters[chapterIndex]?.title ??
+						`Module ${chapterIndex + 1}`,
+					scope: input.scope,
+					type: input.type,
+					contextModules: buildActivityContextModules({
+						didacticUnit,
+						sourceModuleIndexes,
+					}),
+					previousActivities: previousActivities.map((activity) => ({
+						chapterIndex: activity.chapterIndex,
+						type: activity.type,
+						title: activity.title,
+						instructions: activity.instructions,
+						dedupeSummary: activity.dedupeSummary,
+					})),
+					config,
+					tier: input.quality,
+					abortSignal: createAbortSignal(request),
+				});
+				const now = new Date().toISOString();
+				const activityId = randomUUID();
+				const run = createCompletedActivityGenerationRunRecord({
+					didacticUnitId: didacticUnit.id,
+					ownerId,
+					chapterIndex,
+					activityId,
+					activityType: input.type,
+					scope: input.scope,
+					provider: result.provider,
+					model: result.model,
+					prompt: result.prompt,
+					rawOutput: JSON.stringify(result.raw),
+					coinTxId: reservation.transaction.id,
+					createdAt: now,
+					telemetry: result.telemetry,
+				});
+				const activity: LearningActivity = {
+					id: activityId,
+					ownerId,
+					didacticUnitId: didacticUnit.id,
+					chapterIndex,
+					scope: input.scope,
+					type: input.type,
+					quality: input.quality,
+					title: result.title,
+					instructions: result.instructions,
+					content: result.content,
+					dedupeSummary: result.dedupeSummary,
+					sourceModuleIndexes,
+					feedbackAttemptLimit: 3,
+					generationRunId: run.id,
+					createdAt: now,
+					updatedAt: now,
+				};
+				await generationRunStore.save(run);
+				await learningActivityStore.saveActivity(activity);
+				response.status(201).json({activity});
+			} catch (error) {
+				await refundGenerationCredits({
+					authService,
+					reservation,
+					reason: "activity_generation_refund",
+					metadata: {
+						operation: "activity_generation",
+						didacticUnitId: didacticUnit.id,
+						chapterIndex,
+						scope: input.scope,
+						type: input.type,
+						quality: input.quality,
+						error:
+							error instanceof Error ?
+								error.message
+							:	"Learning activity generation failed.",
+					},
+				});
+				await generationRunStore.save(
+					createFailedActivityGenerationRunRecord({
+						didacticUnitId: didacticUnit.id,
+						ownerId,
+						chapterIndex,
+						activityType: input.type,
+						scope: input.scope,
+						provider: config[input.quality].provider,
+						model: config[input.quality].model,
+						prompt: "",
+						error:
+							error instanceof Error ?
+								error.message
+							:	"Learning activity generation failed.",
+						coinTxId: reservation?.transaction.id,
+						createdAt: new Date().toISOString(),
+					}),
+				);
+				const resolved = resolveStageConfigError(
+					error,
+					"Learning activity generation failed.",
+				);
+				response.status(resolved.status).json({error: resolved.message});
+			}
+		},
+	);
+
+	app.get("/api/activities/:activityId/progress", async (request, response) => {
+		const ownerId = asRequestWithMockOwner(request).mockOwner.id;
+		const activity = await learningActivityStore.getActivity(
+			ownerId,
+			String(request.params.activityId),
+		);
+		if (!activity) {
+			response.status(404).json({error: "Learning activity not found."});
+			return;
+		}
+		const progress = await learningActivityStore.getProgress(ownerId, activity.id);
+		response.json({progress});
+	});
+
+	app.put("/api/activities/:activityId/progress", async (request, response) => {
+		const ownerId = asRequestWithMockOwner(request).mockOwner.id;
+		const activity = await learningActivityStore.getActivity(
+			ownerId,
+			String(request.params.activityId),
+		);
+		if (!activity) {
+			response.status(404).json({error: "Learning activity not found."});
+			return;
+		}
+		const {confirmedAnswers, completed} = request.body as {
+			confirmedAnswers: LearningActivityProgress["confirmedAnswers"];
+			completed: boolean;
+		};
+		const progress: LearningActivityProgress = {
+			activityId: activity.id,
+			ownerId,
+			confirmedAnswers: confirmedAnswers ?? {},
+			completed: completed ?? false,
+			updatedAt: new Date().toISOString(),
+		};
+		await learningActivityStore.saveProgress(progress);
+		response.json({progress});
+	});
+
+	app.get("/api/activities/:activityId", async (request, response) => {
+		const requestWithMockOwner = asRequestWithMockOwner(request);
+		const ownerId = requestWithMockOwner.mockOwner.id;
+		const activity = await learningActivityStore.getActivity(
+			ownerId,
+			String(request.params.activityId),
+		);
+
+		if (!activity) {
+			response.status(404).json({error: "Learning activity not found."});
+			return;
+		}
+
+		response.json({
+			activity,
+			attempts: await learningActivityStore.listAttempts(ownerId, activity.id),
+		});
+	});
+
+	app.get(
+		"/api/activities/:activityId/attempts",
+		async (request, response) => {
+			const requestWithMockOwner = asRequestWithMockOwner(request);
+			const ownerId = requestWithMockOwner.mockOwner.id;
+			const activity = await learningActivityStore.getActivity(
+				ownerId,
+				String(request.params.activityId),
+			);
+
+			if (!activity) {
+				response.status(404).json({error: "Learning activity not found."});
+				return;
+			}
+
+			response.json({
+				attempts: await learningActivityStore.listAttempts(ownerId, activity.id),
+			});
+		},
+	);
+
+	app.post(
+		"/api/activities/:activityId/attempts",
+		async (request, response) => {
+			const requestWithMockOwner = asRequestWithMockOwner(request);
+			const ownerId = requestWithMockOwner.mockOwner.id;
+			const activity = await learningActivityStore.getActivity(
+				ownerId,
+				String(request.params.activityId),
+			);
+
+			if (!activity) {
+				response.status(404).json({error: "Learning activity not found."});
+				return;
+			}
+
+			let answers: unknown;
+			try {
+				answers = parseAttemptAnswers(request.body);
+			} catch (error) {
+				response.status(400).json({
+					error:
+						error instanceof Error ?
+							error.message
+						:	"Invalid learning activity attempt request.",
+				});
+				return;
+			}
+
+			const existingAttempts = await learningActivityStore.listAttempts(
+				ownerId,
+				activity.id,
+			);
+			if (existingAttempts.length >= activity.feedbackAttemptLimit) {
+				response.status(409).json({
+					error: "No feedback attempts remain for this activity.",
+				});
+				return;
+			}
+
+			const now = new Date().toISOString();
+			const attemptId = randomUUID();
+			try {
+				let score: number | undefined;
+				let feedback: string;
+
+				if (OBJECTIVE_ACTIVITY_TYPES.has(activity.type)) {
+					const result = gradeObjectiveActivity({activity, answers});
+					score = result.score;
+					feedback = result.feedback;
+				} else {
+					const didacticUnit = await didacticUnitStore.getById(
+						ownerId,
+						activity.didacticUnitId,
+					);
+					if (!didacticUnit) {
+						response.status(404).json({error: "Didactic unit not found."});
+						return;
+					}
+					const config = await aiConfigStore.get(ownerId);
+					const result =
+						await aiService.generateLearningActivityFeedback({
+							activityTitle: activity.title,
+							activityType: activity.type,
+							instructions: activity.instructions,
+							content: activity.content,
+							answers,
+							config,
+							tier: activity.quality,
+							abortSignal: createAbortSignal(request),
+						});
+					score = result.score;
+					feedback = [
+						result.feedback,
+						result.strengths.length ?
+							`Strengths: ${result.strengths.join("; ")}`
+						:	"",
+						result.improvements.length ?
+							`Improve: ${result.improvements.join("; ")}`
+						:	"",
+					]
+						.filter(Boolean)
+						.join("\n");
+					await generationRunStore.save(
+						createCompletedActivityFeedbackRunRecord({
+							didacticUnitId: activity.didacticUnitId,
+							ownerId,
+							chapterIndex: activity.chapterIndex,
+							activityId: activity.id,
+							attemptId,
+							provider: result.provider,
+							model: result.model,
+							prompt: result.prompt,
+							rawOutput: JSON.stringify({
+								score: result.score,
+								feedback: result.feedback,
+								strengths: result.strengths,
+								improvements: result.improvements,
+							}),
+							createdAt: now,
+							telemetry: result.telemetry,
+						}),
+					);
+				}
+
+				const attempt: LearningActivityAttempt = {
+					id: attemptId,
+					activityId: activity.id,
+					ownerId,
+					answers,
+					score,
+					feedback,
+					completedAt: now,
+				};
+				await learningActivityStore.saveAttempt(attempt);
+				response.status(201).json({attempt});
+			} catch (error) {
+				const resolved = resolveStageConfigError(
+					error,
+					"Learning activity feedback failed.",
+				);
+				response.status(resolved.status).json({error: resolved.message});
+			}
 		},
 	);
 

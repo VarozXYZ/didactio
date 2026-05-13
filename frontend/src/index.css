@@ -151,8 +151,10 @@ option {
 	letter-spacing: -0.01em;
 }
 
-.unit-page-scope h2:first-of-type {
-	margin-top: 0.4em;
+.unit-page-scope > h2:first-child,
+.unit-page-scope > h3:first-child,
+.unit-page-scope > h4:first-child {
+	margin-top: 0;
 }
 
 .prose h3,
@@ -179,7 +181,7 @@ option {
 	color: #1d1d1f;
 	font-family: var(--typo-body-family, Inter);
 	font-size: var(--typo-body-size, 16px);
-	line-height: 1.9;
+	line-height: var(--typo-line-height, 1.9);
 	text-align: justify;
 	text-justify: inter-word;
 	text-wrap: pretty;
@@ -190,7 +192,6 @@ option {
 
 .unit-page-scope p {
 	margin-bottom: 0.8em;
-	line-height: 1.9;
 	text-align: justify;
 	text-justify: inter-word;
 	text-wrap: pretty;
@@ -267,10 +268,13 @@ option {
 }
 
 .prose li,
-.typography-scope li,
+.typography-scope li {
+	margin-bottom: 0.3em;
+	line-height: var(--typo-line-height, 1.9);
+}
+
 .unit-page-scope li {
 	margin-bottom: 0.3em;
-	line-height: 1.9;
 	padding-left: 1.1em;
 	text-indent: -1.1em;
 }

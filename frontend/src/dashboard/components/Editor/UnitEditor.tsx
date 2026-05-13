@@ -8,14 +8,21 @@ import {
 } from "react";
 import {
 	AlertCircle,
+	BookOpenCheck,
 	Check,
 	CheckCircle2,
 	ChevronLeft,
 	ChevronRight,
+	CirclePlus,
+	Code2,
+	Dumbbell,
 	Edit3,
+	FileQuestion,
+	Layers3,
 	History,
 	Loader2,
 	MoreHorizontal,
+	Brain,
 	Undo2,
 	RotateCcw,
 	Settings,
@@ -48,6 +55,14 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
+import {
 	Popover,
 	PopoverContent,
 	PopoverTrigger,
@@ -62,6 +77,10 @@ import {
 	type BackendGenerationQuality,
 	type BackendDidacticUnitChapterDetail,
 	type BackendGenerationRun,
+	type BackendLearningActivity,
+	type BackendLearningActivityAttempt,
+	type BackendLearningActivityScope,
+	type BackendLearningActivityType,
 	DashboardApiError,
 	dashboardApi,
 } from "../../api/dashboardApi";
@@ -80,6 +99,7 @@ import {TiptapHtmlEditor} from "./TiptapHtmlEditor";
 import {ChapterRenderer} from "../Content/ChapterRenderer";
 import {ChapterStyleMenu} from "./ChapterStyleMenu";
 import {EditorToolbar} from "./EditorToolbar";
+import {LearningActivityRenderer} from "../Activities/LearningActivityRenderer";
 import type {
 	EditorTextStyle,
 	DidacticUnitEditorChapter,
@@ -100,7 +120,12 @@ import {
 	themeVars,
 } from "../../utils/themeVars";
 import type {PresentationTheme} from "../../../types/presentationTheme";
-import {FONT_CATALOG, STYLE_PRESETS, type FontId} from "../../utils/typography";
+import {
+	FONT_CATALOG,
+	STYLE_PRESETS,
+	resolveBodyLineHeight,
+	type FontId,
+} from "../../utils/typography";
 
 function ChapterStatusIcon({
 	status,
@@ -255,7 +280,7 @@ function cn(...inputs: Array<string | false | null | undefined>) {
 const STREAMING_HTML_FLUSH_MS = 350;
 
 function isMeasuredContentPage(
-	page: MeasuredModulePage,
+	page: {kind: string},
 ): page is Extract<
 	MeasuredModulePage,
 	{kind: "content" | "content_with_actions"}
@@ -470,7 +495,7 @@ function themeFromTextStyle(
 		bodyFont: fontIdToPresFont(preset.body),
 		headingFont: fontIdToPresFont(preset.heading),
 		bodyFontSize: settings.sizeProfile,
-		lineHeight: 1.6,
+		lineHeight: resolveBodyLineHeight(presetId),
 		bodyColor: "#1D1D1F",
 		headingColor: preset.headingColor,
 		accentColor: preset.accentColor,
@@ -535,6 +560,131 @@ function formatRunLabel(run: BackendGenerationRun): string {
 	return `Module ${run.chapterIndex !== undefined ? run.chapterIndex + 1 : "-"}`;
 }
 
+type ActivityPage = {
+	kind: "learning_activity";
+	activity: BackendLearningActivity;
+};
+
+type ReadPage = MeasuredModulePage | ActivityPage;
+
+const ACTIVITY_OPTIONS: Array<{
+	type: BackendLearningActivityType;
+	label: string;
+	description: string;
+	icon: typeof FileQuestion;
+}> = [
+	{
+		type: "multiple_choice",
+		label: "Quick check",
+		description: "Fast concept checks",
+		icon: FileQuestion,
+	},
+	{
+		type: "short_answer",
+		label: "Short answer",
+		description: "Explain in your words",
+		icon: BookOpenCheck,
+	},
+	{
+		type: "coding_practice",
+		label: "Code practice",
+		description: "Practice with starter code",
+		icon: Code2,
+	},
+	{
+		type: "flashcards",
+		label: "Flashcards",
+		description: "Review key ideas",
+		icon: Layers3,
+	},
+	{
+		type: "case_study",
+		label: "Case study",
+		description: "Apply to a scenario",
+		icon: Edit3,
+	},
+	{
+		type: "guided_project",
+		label: "Mini project",
+		description: "Build a small deliverable",
+		icon: WandSparkles,
+	},
+];
+
+function resolvePostModuleCompletionStyle(presetId: string | undefined) {
+	const resolvedPresetId = presetId ?? "classic";
+	const preset = STYLE_PRESETS[resolvedPresetId] ?? STYLE_PRESETS.classic;
+	const headingFamily = FONT_CATALOG[preset.heading].family;
+	const bodyFamily = FONT_CATALOG[preset.body].family;
+
+	if (resolvedPresetId === "classic") {
+		return {
+			headingFamily,
+			bodyFamily,
+			panelBorder: "#D8B98F",
+			panelBackground:
+				"linear-gradient(135deg,#FFFDF8 0%,#FFFFFF 58%,#FBF2E7 100%)",
+			panelShadow: "none",
+			accent: "#996633",
+			accentSoft: "#F7EEE4",
+			accentText: "#7A4E28",
+			headingColor: "#2A1A0A",
+			bodyColor: "#5B4630",
+			primaryBackground: "#2A1A0A",
+			primaryHover: "#3A2410",
+			primaryIconBackground: "rgba(216,185,143,0.22)",
+			secondaryIconBackground: "#F7EEE4",
+			badgeBackground: "#F7EEE4",
+			tipBackground: "rgba(255,255,255,0.78)",
+			tipBorder: "#EAD8C2",
+		};
+	}
+
+	if (resolvedPresetId === "plain") {
+		return {
+			headingFamily,
+			bodyFamily,
+			panelBorder: "#BFDBFE",
+			panelBackground:
+				"linear-gradient(135deg,#F8FBFF 0%,#FFFFFF 58%,#EFF6FF 100%)",
+			panelShadow: "none",
+			accent: "#2563EB",
+			accentSoft: "#EFF6FF",
+			accentText: "#1D4ED8",
+			headingColor: "#111827",
+			bodyColor: "#4B5563",
+			primaryBackground: "#111827",
+			primaryHover: "#1F2937",
+			primaryIconBackground: "rgba(37,99,235,0.20)",
+			secondaryIconBackground: "#EFF6FF",
+			badgeBackground: "#EFF6FF",
+			tipBackground: "rgba(255,255,255,0.86)",
+			tipBorder: "#DBEAFE",
+		};
+	}
+
+	return {
+		headingFamily,
+		bodyFamily,
+		panelBorder: "#86EFAC",
+		panelBackground:
+			"linear-gradient(135deg,#F8FFFB 0%,#FFFFFF 58%,#F0FFF7 100%)",
+		panelShadow: "none",
+		accent: "#16A34A",
+		accentSoft: "#DCFCE7",
+		accentText: "#15803D",
+		headingColor: "#111827",
+		bodyColor: "#4B5563",
+		primaryBackground: "#111827",
+		primaryHover: "#1F2937",
+		primaryIconBackground: "rgba(16,185,129,0.20)",
+		secondaryIconBackground: "#ECFDF5",
+		badgeBackground: "#ECFDF5",
+		tipBackground: "rgba(255,255,255,0.80)",
+		tipBorder: "#DCFCE7",
+	};
+}
+
 export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	const navigate = useNavigate();
 	const [workspace, setWorkspace] =
@@ -550,6 +700,22 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	const [isSaving, setIsSaving] = useState(false);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [isPostModuleActionPending, setIsPostModuleActionPending] =
+		useState(false);
+	const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
+	const [learningActivities, setLearningActivities] = useState<
+		Record<number, BackendLearningActivity[]>
+	>({});
+	const [activityAttempts, setActivityAttempts] = useState<
+		Record<string, BackendLearningActivityAttempt[]>
+	>({});
+	const [activityScope, setActivityScope] =
+		useState<BackendLearningActivityScope>("current_module");
+	const [activityType, setActivityType] =
+		useState<BackendLearningActivityType>("multiple_choice");
+	const [activityQuality, setActivityQuality] =
+		useState<BackendGenerationQuality>("silver");
+	const [isActivityLoading, setIsActivityLoading] = useState(false);
+	const [isActivityAttemptSubmitting, setIsActivityAttemptSubmitting] =
 		useState(false);
 	const [isEditMode, setIsEditMode] = useState(false);
 	const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -690,6 +856,39 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		[activeChapter?.chapterIndex, workspace?.chapters.length],
 	);
 	const activeRuns = [] as BackendGenerationRun[];
+
+	const activeLearningActivities =
+		activeChapter ? learningActivities[activeChapter.chapterIndex] ?? [] : [];
+
+	useEffect(() => {
+		if (!activeChapter || activeChapter.status !== "ready") {
+			return;
+		}
+
+		let cancelled = false;
+		void dashboardApi
+			.listLearningActivities(didacticUnitId, activeChapter.chapterIndex)
+			.then(({activities}) => {
+				if (cancelled) return;
+				setLearningActivities((previous) => ({
+					...previous,
+					[activeChapter.chapterIndex]: activities,
+				}));
+			})
+			.catch((error) => {
+				if (!cancelled) {
+					toastError(
+						error instanceof Error ?
+							error.message
+						:	"Could not load learning activities.",
+					);
+				}
+			});
+
+		return () => {
+			cancelled = true;
+		};
+	}, [activeChapter?.chapterIndex, activeChapter?.status, didacticUnitId]);
 
 	const loadRevisions = useCallback(
 		async (chapterIndex: number) => {
@@ -972,6 +1171,58 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			activeDraftSettings,
 		],
 	);
+	const readPages: ReadPage[] = useMemo(() => {
+		if (activeLearningActivities.length === 0) {
+			return measuredReadPages;
+		}
+
+		const activityPages = activeLearningActivities.map((activity) => ({
+			kind: "learning_activity" as const,
+			activity,
+		}));
+
+		const postModuleIndex = measuredReadPages.findIndex(
+			(page) =>
+				page.kind === "post_module_actions" ||
+				page.kind === "content_with_actions",
+		);
+
+		if (postModuleIndex !== -1) {
+			const modulePage = measuredReadPages[postModuleIndex];
+
+			if (modulePage.kind === "content_with_actions") {
+				// Strip the Module complete from the content page so it stays as
+				// regular content, insert activities after it, then add a standalone
+				// post_module_actions at the very end.
+				const contentOnly = {
+					...modulePage,
+					kind: "content" as const,
+				};
+				const postModulePage = {
+					kind: "post_module_actions" as const,
+					startCharacterOffset: modulePage.startCharacterOffset,
+					endCharacterOffset: modulePage.endCharacterOffset,
+					hasNextModule: modulePage.hasNextModule,
+					primaryActionLabel: modulePage.primaryActionLabel,
+				};
+				return [
+					...measuredReadPages.slice(0, postModuleIndex),
+					contentOnly,
+					...activityPages,
+					postModulePage,
+				];
+			}
+
+			// post_module_actions is already standalone — insert activities before it.
+			return [
+				...measuredReadPages.slice(0, postModuleIndex),
+				...activityPages,
+				...measuredReadPages.slice(postModuleIndex),
+			];
+		}
+
+		return [...measuredReadPages, ...activityPages];
+	}, [activeLearningActivities, measuredReadPages]);
 	const paginatedContentPages = useMemo(
 		() =>
 			measuredReadPages
@@ -1864,7 +2115,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	const totalVisiblePages =
 		isEditMode ?
 			Math.max(visibleEditablePages.length, 1)
-		:	Math.max(measuredReadPages.length, 1);
+		:	Math.max(readPages.length, 1);
 	const totalSpreads = Math.max(1, Math.ceil(totalVisiblePages / 2));
 	const canGoPrev = currentSpread > 0;
 	const canGoNext = currentSpread < totalSpreads - 1;
@@ -2051,8 +2302,8 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		(user?.credits[regenerationCost.coinType] ?? 0) >=
 			regenerationCost.amount;
 	const contentPageOffset = currentSpread * 2;
-	const leftReadPage = measuredReadPages[contentPageOffset];
-	const rightReadPage = measuredReadPages[contentPageOffset + 1];
+	const leftReadPage = readPages[contentPageOffset];
+	const rightReadPage = readPages[contentPageOffset + 1];
 	const leftEditablePage = visibleEditablePages[contentPageOffset];
 	const rightEditablePage = visibleEditablePages[contentPageOffset + 1];
 	const spreadStartPage = contentPageOffset + 1;
@@ -2122,6 +2373,90 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		});
 	};
 
+	const handleCreateLearningActivity = async () => {
+		if (!activeChapter || isActivityLoading) {
+			return;
+		}
+
+		setIsActivityLoading(true);
+		try {
+			const existingCount =
+				learningActivities[activeChapter.chapterIndex]?.length ?? 0;
+			const {activity} = await dashboardApi.createLearningActivity(
+				didacticUnitId,
+				activeChapter.chapterIndex,
+				{
+					scope: activityScope,
+					type: activityType,
+					quality: activityQuality,
+				},
+			);
+			setLearningActivities((previous) => ({
+				...previous,
+				[activeChapter.chapterIndex]: [
+					...(previous[activeChapter.chapterIndex] ?? []),
+					activity,
+				],
+			}));
+			setActivityAttempts((previous) => ({
+				...previous,
+				[activity.id]: [],
+			}));
+			void refreshUser();
+
+			const actionPageIndex = measuredReadPages.findIndex(
+				(page) => page.kind === "post_module_actions",
+			);
+			const targetPageIndex =
+				actionPageIndex >= 0 ?
+					actionPageIndex + existingCount
+				:	measuredReadPages.length + existingCount;
+			setCurrentSpread(Math.floor(targetPageIndex / 2));
+			setIsActivityModalOpen(false);
+		} catch (error) {
+			toastError(
+				error instanceof Error ?
+					error.message
+				:	"Could not create the activity.",
+			);
+		} finally {
+			setIsActivityLoading(false);
+		}
+	};
+
+	const handleLearningActivityAttempt = async (
+		activityId: string,
+		answers: unknown,
+	) => {
+		if (isActivityAttemptSubmitting) {
+			return;
+		}
+
+		setIsActivityAttemptSubmitting(true);
+		try {
+			const {attempt} = await dashboardApi.createLearningActivityAttempt(
+				activityId,
+				answers,
+			);
+			setActivityAttempts((previous) => ({
+				...previous,
+				[activityId]: [...(previous[activityId] ?? []), attempt],
+			}));
+		} catch (error) {
+			toastError(
+				error instanceof Error ?
+					error.message
+				:	"Could not check this activity.",
+			);
+		} finally {
+			setIsActivityAttemptSubmitting(false);
+		}
+	};
+
+	const postModuleCompletionStyle = resolvePostModuleCompletionStyle(
+		draft.textStyle.stylePreset,
+	);
+
 	const renderPostModuleActionBody = ({
 		hasNextModule,
 		primaryActionLabel,
@@ -2129,53 +2464,336 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		hasNextModule: boolean;
 		primaryActionLabel: string;
 	}) => (
-		<div className="flex-shrink-0 space-y-4">
-			<div className="space-y-2">
-				<div className="text-[11px] font-bold uppercase tracking-[0.24em] text-[#86868B]">
-					{hasNextModule ? "Ready to continue" : "Unit complete"}
+		<div
+			className="flex-shrink-0 rounded-[22px] border p-5"
+			style={{
+				background: postModuleCompletionStyle.panelBackground,
+				borderColor: postModuleCompletionStyle.panelBorder,
+				boxShadow: postModuleCompletionStyle.panelShadow,
+				color: postModuleCompletionStyle.bodyColor,
+				fontFamily: postModuleCompletionStyle.bodyFamily,
+			}}
+		>
+			<div className="text-center">
+				<div
+					className="mx-auto flex h-11 w-11 items-center justify-center rounded-full border"
+					style={{
+						backgroundColor: postModuleCompletionStyle.accentSoft,
+						borderColor: postModuleCompletionStyle.tipBorder,
+						color: postModuleCompletionStyle.accent,
+					}}
+				>
+					<CheckCircle2 size={22} />
 				</div>
-				<p className="text-[13px] leading-[1.7] text-[#4B5563]">
-					{hasNextModule ?
-						"You can keep your momentum going with the next module, or come back later for practice exercises."
-					:	"You have reached the end of this unit. Practice exercises are coming soon, and you can wrap up for now."
-					}
+				<div className="mt-3 text-[11px] font-bold uppercase tracking-[0.24em] text-[#6B7280]">
+					Next steps
+				</div>
+				<h3
+					className="mt-1 text-2xl font-bold tracking-tight"
+					style={{
+						color: postModuleCompletionStyle.headingColor,
+						fontFamily: postModuleCompletionStyle.headingFamily,
+					}}
+				>
+					Module complete
+				</h3>
+				<p
+					className="mx-auto mt-2 max-w-[460px] text-sm leading-relaxed"
+					style={{color: postModuleCompletionStyle.bodyColor}}
+				>
+					You have finished the theory part. Practice now or continue to the next topic.
 				</p>
 			</div>
-			<div className="grid gap-2.5">
+
+			<div className="mt-6 grid gap-4 sm:grid-cols-2">
 				<button
-					className="flex w-full items-center gap-2 rounded-2xl border border-[#E5E5E7] bg-[#F8F8F9] px-4 py-3 text-left text-sm font-semibold text-[#A1A1AA]"
-					disabled
+					className="group flex min-h-[164px] w-full flex-col rounded-[20px] p-5 text-left text-white shadow-[0_18px_35px_rgba(17,24,39,0.24)] transition-all hover:-translate-y-0.5"
+					onClick={() => setIsActivityModalOpen(true)}
+					onMouseEnter={(event) => {
+						event.currentTarget.style.backgroundColor =
+							postModuleCompletionStyle.primaryHover;
+					}}
+					onMouseLeave={(event) => {
+						event.currentTarget.style.backgroundColor =
+							postModuleCompletionStyle.primaryBackground;
+					}}
+					style={{
+						backgroundColor:
+							postModuleCompletionStyle.primaryBackground,
+						fontFamily: postModuleCompletionStyle.bodyFamily,
+					}}
 					type="button"
 				>
-					<WandSparkles size={16} />
-					<span>Quick Check</span>
-					<span className="ml-auto text-[11px] font-medium uppercase tracking-wide">
-						Coming soon
+					<span className="flex w-full items-start justify-between gap-3">
+						<span
+							className="flex h-11 w-11 items-center justify-center rounded-xl"
+							style={{
+								backgroundColor:
+									postModuleCompletionStyle.primaryIconBackground,
+								color: postModuleCompletionStyle.panelBorder,
+							}}
+						>
+							<Dumbbell size={20} />
+						</span>
+						<span
+							className="rounded-full bg-white px-3 py-1 text-[11px] font-bold"
+							style={{
+								color: postModuleCompletionStyle.accentText,
+							}}
+						>
+							Recommended
+						</span>
+					</span>
+					<span className="mt-5 flex w-full items-center gap-3">
+						<span className="min-w-0 flex-1">
+							<span
+								className="block text-lg font-bold"
+								style={{fontFamily: postModuleCompletionStyle.headingFamily}}
+							>
+								Exercises & Practice
+							</span>
+							<span className="mt-2 block text-sm font-medium leading-relaxed text-white/75">
+								Apply what you learned with guided exercises.
+							</span>
+						</span>
+						<ChevronRight size={18} className="transition-transform group-hover:translate-x-1" />
 					</span>
 				</button>
 				<button
-					className="flex w-full items-center gap-2 rounded-2xl border border-[#E5E5E7] bg-[#F8F8F9] px-4 py-3 text-left text-sm font-semibold text-[#A1A1AA]"
-					disabled
-					type="button"
-				>
-					<Sparkles size={16} />
-					<span>Applied Practice</span>
-					<span className="ml-auto text-[11px] font-medium uppercase tracking-wide">
-						Coming soon
-					</span>
-				</button>
-				<button
-					className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#111827] px-4 py-3 text-sm font-semibold text-white transition-all hover:bg-[#1F2937] disabled:cursor-not-allowed disabled:opacity-60"
+					className="group flex min-h-[164px] w-full flex-col rounded-[20px] border border-[#E5E5E7] bg-white p-5 text-left text-[#111827] transition-all hover:-translate-y-0.5 hover:border-[#111827] disabled:cursor-not-allowed disabled:opacity-60"
 					disabled={isSubmitting || isPostModuleActionPending}
 					onClick={() => {
 						void handlePostModulePrimaryAction();
 					}}
 					type="button"
+					style={{fontFamily: postModuleCompletionStyle.bodyFamily}}
 				>
-					<span>{primaryActionLabel}</span>
-					<ChevronRight size={16} />
+					<span className="flex w-full items-start justify-between gap-3">
+						<span
+							className="flex h-11 w-11 items-center justify-center rounded-xl"
+							style={{
+								backgroundColor:
+									postModuleCompletionStyle.secondaryIconBackground,
+								color: postModuleCompletionStyle.accent,
+							}}
+						>
+							<BookOpenCheck size={20} />
+						</span>
+						<span
+							className="rounded-full px-3 py-1 text-[11px] font-bold"
+							style={{
+								backgroundColor:
+									postModuleCompletionStyle.badgeBackground,
+								color: postModuleCompletionStyle.accentText,
+							}}
+						>
+							Continue
+						</span>
+					</span>
+					<span className="mt-5 flex w-full items-center gap-3">
+						<span className="min-w-0 flex-1">
+							<span
+								className="block text-lg font-bold"
+								style={{
+									color: postModuleCompletionStyle.headingColor,
+									fontFamily: postModuleCompletionStyle.headingFamily,
+								}}
+							>
+								{primaryActionLabel}
+							</span>
+							<span className="mt-2 block text-sm font-medium leading-relaxed text-[#4B5563]">
+								{hasNextModule ?
+									"Move forward when you are ready."
+								:	"Finish this unit and return to your dashboard."
+								}
+							</span>
+						</span>
+						<ChevronRight size={18} className="transition-transform group-hover:translate-x-1" />
+					</span>
 				</button>
 			</div>
+			<div
+				className="mx-auto mt-5 w-fit rounded-2xl border px-4 py-3 text-center text-sm"
+				style={{
+					backgroundColor: postModuleCompletionStyle.tipBackground,
+					borderColor: postModuleCompletionStyle.tipBorder,
+					color: postModuleCompletionStyle.bodyColor,
+				}}
+			>
+				<span
+					className="font-semibold"
+					style={{color: postModuleCompletionStyle.accentText}}
+				>
+					Tip:
+				</span>{" "}
+				Practicing now helps retain the concepts before moving on.
+			</div>
+			<Dialog open={isActivityModalOpen} onOpenChange={setIsActivityModalOpen}>
+				<DialogContent className="max-h-[88vh] overflow-y-auto sm:max-w-[760px]">
+					<DialogHeader>
+						<DialogTitle>Exercises & Practice</DialogTitle>
+						<DialogDescription>
+							{hasNextModule ?
+								"Create a structured activity before moving to the next module."
+							:	"Create a structured activity to close out this unit."
+							}
+						</DialogDescription>
+					</DialogHeader>
+
+					<div className="space-y-6 px-6 py-5">
+						<div className="rounded-[18px] bg-[#F5F5F7] p-1">
+							<div className="grid grid-cols-2 gap-1">
+								{[
+									{value: "current_module" as const, label: "Current module", icon: BookOpenCheck},
+									{value: "cumulative_until_module" as const, label: "All past modules", icon: History},
+								].map((option) => {
+									const TabIcon = option.icon;
+									const selected = activityScope === option.value;
+									return (
+										<button
+											key={option.value}
+											type="button"
+											onClick={() => setActivityScope(option.value)}
+											className={cn(
+												"flex items-center justify-center gap-2 rounded-[14px] px-4 py-2.5 text-sm font-bold transition",
+												selected ?
+													"bg-white text-[#16A34A] shadow-sm ring-1 ring-[#4ADE80]"
+												:	"text-[#6B7280] hover:text-[#111827]",
+											)}
+										>
+											<TabIcon size={15} />
+											{option.label}
+										</button>
+									);
+								})}
+							</div>
+						</div>
+
+						<div className="-mx-6 border-t border-[#F0F0F2]" />
+
+						<div>
+							<div className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-[#86868B]">
+								Activity type
+							</div>
+							<div className="grid gap-2 sm:grid-cols-2">
+								{ACTIVITY_OPTIONS.map((option) => {
+									const Icon = option.icon;
+									const selected = activityType === option.type;
+									return (
+										<button
+											key={option.type}
+											type="button"
+											onClick={() => setActivityType(option.type)}
+											className={cn(
+												"relative flex items-start gap-3 rounded-2xl border p-3 text-left transition",
+												selected ?
+													"border-[#4ADE80] bg-[#F0FDF4] text-[#111827]"
+												:	"border-[#E5E5E7] bg-white text-[#111827] hover:border-[#D1D5DB]",
+											)}
+										>
+											{selected && (
+												<CheckCircle2
+													size={16}
+													className="absolute right-3 top-3 text-[#16A34A]"
+													fill="white"
+												/>
+											)}
+											<span
+												className={cn(
+													"flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
+													selected ?
+														"bg-[#DCFCE7] text-[#16A34A]"
+													:	"bg-[#F3F4F6] text-[#111827]",
+												)}
+											>
+												<Icon size={17} />
+											</span>
+											<span>
+												<span className="block text-sm font-bold">{option.label}</span>
+												<span className="mt-1 block text-xs leading-relaxed text-[#6B7280]">
+													{option.description}
+												</span>
+											</span>
+										</button>
+									);
+								})}
+							</div>
+						</div>
+
+						<div className="-mx-6 border-t border-[#F0F0F2]" />
+
+						<div>
+							<div className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-[#86868B]">
+								Model
+							</div>
+							<div className="grid gap-2 sm:grid-cols-2">
+								{[
+									{value: "silver" as const, label: "Silver model", cost: "1 silver", detail: "Fast practice generation"},
+									{value: "gold" as const, label: "Gold model", cost: "20 silver", detail: "Deeper activity and feedback"},
+								].map((option) => {
+									const selected = activityQuality === option.value;
+									return (
+										<button
+											key={option.value}
+											type="button"
+											onClick={() => setActivityQuality(option.value)}
+											className={cn(
+												"relative flex items-center gap-3 rounded-2xl border p-3 text-left transition",
+												selected ?
+													"border-[#4ADE80] bg-white"
+												:	"border-[#E5E5E7] bg-[#F8F8F9] hover:border-[#D1D5DB]",
+											)}
+										>
+											{selected && (
+												<CheckCircle2
+													size={16}
+													className="absolute right-3 top-3 text-[#16A34A]"
+													fill="white"
+												/>
+											)}
+											<span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#111827] text-white">
+												<Brain size={17} />
+											</span>
+											<span className="min-w-0">
+												<span className="block text-sm font-bold text-[#111827]">{option.label}</span>
+												<span className="block text-xs text-[#6B7280]">{option.detail}</span>
+											</span>
+											<span className="ml-auto whitespace-nowrap rounded-full bg-[#F3F4F6] px-2.5 py-1 text-xs font-bold text-[#374151]">
+												{option.cost}
+											</span>
+										</button>
+									);
+								})}
+							</div>
+						</div>
+
+					</div>
+
+					<DialogFooter>
+						<Button
+							type="button"
+							variant="outline"
+							onClick={() => setIsActivityModalOpen(false)}
+						>
+							Cancel
+						</Button>
+						<Button
+							type="button"
+							disabled={isActivityLoading}
+							onClick={() => {
+								void handleCreateLearningActivity();
+							}}
+							className="gap-2 bg-[#4ADE80] text-[#111827] hover:bg-[#3BCD6F]"
+						>
+							{isActivityLoading ?
+								<Loader2 size={16} className="animate-spin" />
+							:	<CirclePlus size={16} />
+							}
+							{isActivityLoading ? "Creating..." : "Create activity"}
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
 		</div>
 	);
 	const unitPageBackground =
@@ -2198,7 +2816,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	}) => {
 		return (
 			<div
-				className="relative overflow-hidden rounded-[16px] border border-[#E5E5E7] shadow-[0_8px_60px_rgba(0,0,0,0.08)] md:rounded-[24px]"
+				className={cn("relative overflow-hidden rounded-[16px] border border-[#E5E5E7] md:rounded-[24px]", !extraContent && "shadow-[0_8px_60px_rgba(0,0,0,0.08)]")}
 				style={{
 					height: `${spreadMetrics.pageHeight}px`,
 					width: `${spreadMetrics.pageWidth}px`,
@@ -2209,7 +2827,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 					<div
 						className={cn(
 							"relative flex min-h-0 flex-1 flex-col",
-							extraContent ? "overflow-y-auto" : (
+							extraContent ? "overflow-hidden" : (
 								"overflow-hidden"
 							),
 						)}
@@ -2252,7 +2870,9 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 							/>
 						}
 						{extraContent ?
-							<div className="mt-5 shrink-0">{extraContent}</div>
+							<div className="flex flex-1 items-center justify-center py-4">
+								{extraContent}
+							</div>
 						:	null}
 					</div>
 
@@ -2348,7 +2968,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				<div
 					className={cn(
 						"relative flex min-h-0 flex-1 flex-col",
-						extraContent ? "overflow-y-auto" : "overflow-hidden",
+						"overflow-hidden",
 					)}
 				>
 					{editable ?
@@ -2401,15 +3021,14 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		page,
 		pageNumber,
 	}: {
-		page: MeasuredModulePage | undefined;
+		page: ReadPage | undefined;
 		pageNumber: number;
 	}) => {
 		if (!page) {
 			return null;
 		}
 
-		if (page.kind === "post_module_actions") {
-			if (isActiveChapterStreaming) return null;
+		if (page.kind === "learning_activity") {
 			return (
 				<div
 					className="relative overflow-hidden rounded-[16px] border border-[#E5E5E7] bg-white shadow-[0_8px_60px_rgba(0,0,0,0.08)] md:rounded-[24px]"
@@ -2419,10 +3038,32 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 					}}
 				>
 					<div className="flex h-full flex-col overflow-hidden px-5 py-4 md:px-6 md:py-5">
-						<div className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-[#86868B]">
-							Next Steps
+						<LearningActivityRenderer
+							activity={page.activity}
+							attempts={activityAttempts[page.activity.id] ?? []}
+							isSubmitting={isActivityAttemptSubmitting}
+							onSubmitAttempt={handleLearningActivityAttempt}
+						/>
+						<div className="pointer-events-none absolute bottom-4 right-6 text-[10px] font-medium text-[#86868B] md:bottom-6 md:right-10">
+							{pageNumber}
 						</div>
-						<div className="flex min-h-0 flex-1 flex-col justify-start">
+					</div>
+				</div>
+			);
+		}
+
+		if (page.kind === "post_module_actions") {
+			if (isActiveChapterStreaming) return null;
+			return (
+				<div
+					className="relative overflow-hidden rounded-[16px] border border-[#E5E5E7] bg-white md:rounded-[24px]"
+					style={{
+						height: `${spreadMetrics.pageHeight}px`,
+						width: `${spreadMetrics.pageWidth}px`,
+					}}
+				>
+					<div className="flex h-full flex-col overflow-hidden px-5 py-4 md:px-6 md:py-5">
+						<div className="flex min-h-0 flex-1 items-center justify-center">
 							{renderPostModuleActionBody({
 								hasNextModule: page.hasNextModule,
 								primaryActionLabel: page.primaryActionLabel,

@@ -81,8 +81,8 @@ function parseLineHeight(value: unknown): number {
 	if (typeof value !== "number" || !Number.isFinite(value)) {
 		throw new Error("lineHeight must be a number.");
 	}
-	if (value < 1.2 || value > 2) {
-		throw new Error("lineHeight must be between 1.2 and 2.0.");
+	if (value < 1.2 || value > 2.5) {
+		throw new Error("lineHeight must be between 1.2 and 2.5.");
 	}
 
 	return value;

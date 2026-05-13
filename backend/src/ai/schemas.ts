@@ -232,3 +232,17 @@ export const syllabusSchema = z
 		description: value.description.trim(),
 		modules: value.modules,
 	}));
+
+export const learningActivitySchema = z.object({
+	title: z.string().min(1),
+	instructions: z.string().min(1),
+	dedupeSummary: z.string().min(1),
+	content: z.record(z.string(), z.unknown()),
+});
+
+export const learningActivityFeedbackSchema = z.object({
+	score: z.number().min(0).max(100).optional(),
+	feedback: z.string().min(1),
+	strengths: z.array(z.string().min(1)).default([]),
+	improvements: z.array(z.string().min(1)).default([]),
+});

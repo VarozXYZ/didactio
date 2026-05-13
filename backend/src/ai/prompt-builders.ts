@@ -11,6 +11,10 @@ import type {
 	DidacticUnitReferenceSyllabus,
 	DidacticUnitModule,
 } from "../didactic-unit/planning.js";
+import type {
+	LearningActivityScope,
+	LearningActivityType,
+} from "../activities/learning-activity.js";
 
 export const TARGET_CHAPTER_COUNT_BY_LENGTH: Record<
 	DidacticUnitLength,
@@ -218,7 +222,9 @@ export function buildGatewaySystemPrompt(
 		| "moderation"
 		| "syllabus"
 		| "summary"
-		| "chapter",
+		| "chapter"
+		| "activity"
+		| "activity_feedback",
 ): string {
 	switch (stage) {
 		case "folder_classification":
@@ -231,7 +237,116 @@ export function buildGatewaySystemPrompt(
 			return "You write concise internal continuity summaries or learner-facing recaps depending on the prompt.";
 		case "chapter":
 			return "You are an expert curriculum designer and instructional design specialist. Return only sanitized-HTML-compatible educational content.";
+		case "activity":
+			return "You design structured learning activities. Return only the requested JSON object; never generate UI HTML except for the explicitly allowed freeform_html type.";
+		case "activity_feedback":
+			return "You assess a learner's activity attempt against a rubric. Return only concise structured feedback.";
 	}
+}
+
+function activityTypeContract(type: LearningActivityType): string {
+	switch (type) {
+		case "multiple_choice":
+			return 'content.questions: array of EXACTLY 10 items, each with {id, prompt, options:[{id,text}] (exactly 4 options per question), correctOptionId, explanation}. Cover a wide range of concepts from the module — do not cluster all questions around a single idea.';
+		case "short_answer":
+			return "content.prompts: array of {id, prompt, expectedAnswer, rubric:string[]}.";
+		case "coding_practice":
+			return "content.language, content.prompt, content.starterCode, content.expectedOutcome, content.testCases:[{input, expected}], content.rubric:string[].";
+		case "flashcards":
+			return "content.cards: array of {id, front, back}.";
+		case "matching":
+			return "content.pairs: array of {id, left, right}.";
+		case "ordering":
+			return "content.items: array of {id, text, correctOrder:number}.";
+		case "case_study":
+			return "content.scenario and content.questions:[{id, prompt, rubric:string[]}].";
+		case "debate_reflection":
+			return "content.prompt, content.positions:string[], content.reflectionQuestions:string[].";
+		case "cloze":
+			return "content.textWithBlanks using {{blank_id}} markers and content.blanks:[{id, answer, hint}].";
+		case "guided_project":
+			return "content.brief, content.steps:string[], content.deliverable, content.rubric:string[].";
+		case "freeform_html":
+			return "content.html with sanitized compact HTML only: no scripts, event handlers, forms, iframes, inline styles, or external assets.";
+	}
+}
+
+export function buildLearningActivityPrompt(input: {
+	topic: string;
+	moduleTitle: string;
+	scope: LearningActivityScope;
+	type: LearningActivityType;
+	contextModules: Array<{
+		index: number;
+		title: string;
+		overview: string;
+		html?: string;
+		continuitySummary?: string;
+	}>;
+	previousActivities: Array<{
+		chapterIndex: number;
+		type: string;
+		title: string;
+		instructions: string;
+		dedupeSummary: string;
+	}>;
+	authoring: AuthoringConfig;
+}): string {
+	const previous =
+		input.previousActivities.length === 0 ?
+			"No previous activities in this context."
+		:	input.previousActivities
+				.slice(0, 12)
+				.map(
+					(activity) =>
+						`- Module ${activity.chapterIndex + 1}, ${activity.type}: ${activity.title}. ${activity.instructions}. Anti-repeat: ${activity.dedupeSummary}`,
+				)
+				.join("\n");
+
+	return [
+		buildSection("Activity Contract", [
+			`Create one ${input.type} activity for "${input.moduleTitle}" in ${input.topic}.`,
+			`Scope: ${input.scope}.`,
+			"Return JSON with exactly: title, instructions, dedupeSummary, content.",
+			activityTypeContract(input.type),
+			"Keep the activity compact enough to fit in one reading page when possible.",
+		]),
+		buildSection("Authoring Profile", buildAuthoringContext(input.authoring)),
+		buildSection("Learning Context", [
+			input.contextModules
+				.map(
+					(module) =>
+						`## Module ${module.index + 1}: ${module.title}\nOverview: ${module.overview}\nSummary: ${module.continuitySummary ?? "not available"}\nContent excerpt:\n${(module.html ?? "").replace(/<[^>]+>/g, " ").slice(0, 2500)}`,
+				)
+				.join("\n\n"),
+		]),
+		buildSection("Previous Activities: anti-repetition priority", [
+			previous,
+			"These previous activities are more important than the lesson content for avoiding repetition.",
+			"Do not repeat the exact format, question, example, dataset, coding challenge, case, or assessed skill.",
+			"If the same activity type is requested again, vary the angle, difficulty, example and concrete skill.",
+		]),
+	].join("\n\n");
+}
+
+export function buildLearningActivityFeedbackPrompt(input: {
+	activityTitle: string;
+	activityType: LearningActivityType;
+	instructions: string;
+	content: Record<string, unknown>;
+	answers: unknown;
+}): string {
+	return [
+		buildSection("Assessment Contract", [
+			`Activity: ${input.activityTitle}`,
+			`Type: ${input.activityType}`,
+			`Instructions: ${input.instructions}`,
+			"Return JSON with feedback, score 0-100 when possible, strengths, and improvements.",
+			"Be direct, useful, and specific. Do not reveal hidden answers unless needed to explain a misconception.",
+		]),
+		buildSection("Activity Content", [JSON.stringify(input.content).slice(0, 6000)]),
+		buildSection("Learner Answers", [JSON.stringify(input.answers).slice(0, 4000)]),
+	].join("\n\n");
 }
 
 export function buildModerationPrompt(input: {
