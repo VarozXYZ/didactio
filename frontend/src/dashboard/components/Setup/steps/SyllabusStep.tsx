@@ -343,7 +343,7 @@ function SyllabusCard({
 					{isStreaming && (
 						<span className="flex items-center gap-1.5 rounded-full bg-[#EAF9EF] px-2.5 py-0.5 text-[10px] font-semibold text-[#2D8F4B]">
 							<span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-[#34C759]" />
-							Streaming
+							Generando
 						</span>
 					)}
 				</div>

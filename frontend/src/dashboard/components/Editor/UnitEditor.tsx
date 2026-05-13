@@ -2614,7 +2614,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 											size={12}
 											className="animate-spin"
 										/>
-										Streaming
+										Generando
 									</span>
 								)}
 								{isActiveChapterStreaming && (
