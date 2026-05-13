@@ -47,9 +47,7 @@ function ModelCard({
 		>
 			{entry.recommended && (
 				<span
-					className={`absolute top-2.5 right-2.5 flex items-center gap-1 rounded-full px-2 py-0.5 text-[9.5px] font-bold ${
-						selected ? "bg-white/20 text-white" : "bg-[#EFA047]/15 text-[#EFA047]"
-					}`}
+					className="absolute top-2.5 right-2.5 flex items-center gap-1 rounded-full bg-[#EFA047]/15 px-2 py-0.5 text-[9.5px] font-bold text-[#EFA047]"
 				>
 					<Star size={8} fill="currentColor" strokeWidth={0} />
 					Best

@@ -51,6 +51,17 @@ interface State {
 }
 
 const toastTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
+const toastAutoDismissTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
+
+const clearAutoDismissTimeout = (toastId: string) => {
+	const timeout = toastAutoDismissTimeouts.get(toastId);
+	if (!timeout) {
+		return;
+	}
+
+	clearTimeout(timeout);
+	toastAutoDismissTimeouts.delete(toastId);
+};
 
 const addToRemoveQueue = (toastId: string) => {
 	if (toastTimeouts.has(toastId)) {
@@ -68,9 +79,26 @@ const addToRemoveQueue = (toastId: string) => {
 	toastTimeouts.set(toastId, timeout);
 };
 
+const addToAutoDismissQueue = (toastId: string, duration?: number) => {
+	if (!duration || duration === Infinity || toastAutoDismissTimeouts.has(toastId)) {
+		return;
+	}
+
+	const timeout = setTimeout(() => {
+		toastAutoDismissTimeouts.delete(toastId);
+		dispatch({
+			type: "DISMISS_TOAST",
+			toastId,
+		});
+	}, duration);
+
+	toastAutoDismissTimeouts.set(toastId, timeout);
+};
+
 export const reducer = (state: State, action: Action): State => {
 	switch (action.type) {
 		case "ADD_TOAST":
+			addToAutoDismissQueue(action.toast.id, action.toast.duration);
 			return {
 				...state,
 				toasts: [action.toast, ...state.toasts].slice(0, TOAST_LIMIT),
@@ -88,9 +116,11 @@ export const reducer = (state: State, action: Action): State => {
 			const {toastId} = action;
 
 			if (toastId) {
+				clearAutoDismissTimeout(toastId);
 				addToRemoveQueue(toastId);
 			} else {
 				for (const t of state.toasts) {
+					clearAutoDismissTimeout(t.id);
 					addToRemoveQueue(t.id);
 				}
 			}
@@ -109,11 +139,15 @@ export const reducer = (state: State, action: Action): State => {
 		}
 		case "REMOVE_TOAST":
 			if (action.toastId === undefined) {
+				for (const t of state.toasts) {
+					clearAutoDismissTimeout(t.id);
+				}
 				return {
 					...state,
 					toasts: [],
 				};
 			}
+			clearAutoDismissTimeout(action.toastId);
 			return {
 				...state,
 				toasts: state.toasts.filter((t) => t.id !== action.toastId),

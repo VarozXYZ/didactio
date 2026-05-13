@@ -226,9 +226,12 @@ export class MongoAiConfigStore implements AiConfigStore {
 		}
 
 		return {
-			silver: doc.aiConfig.silver ?? this.defaults.silver,
-			gold: doc.aiConfig.gold ?? this.defaults.gold,
-			authoring: {...this.defaults.authoring, ...doc.aiConfig.authoring},
+			silver: normalizeModelConfig("silver", doc.aiConfig.silver, this.defaults.silver),
+			gold: normalizeModelConfig("gold", doc.aiConfig.gold, this.defaults.gold),
+			authoring: normalizeAuthoringConfig(
+				doc.aiConfig.authoring,
+				this.defaults.authoring,
+			),
 		};
 	}
 

@@ -31,14 +31,15 @@ export const MODEL_CATALOG: ModelCatalog = {
 	],
 	gold: [
 		{
-			id: "openai/gpt-5.5",
-			label: "GPT-5.5",
-			description: "OpenAI's powerful model. Superior reasoning and depth.",
-		},
-		{
 			id: "anthropic/claude-sonnet-4-6",
 			label: "Claude Sonnet 4.6",
 			description: "Anthropic's balanced model. Excellent at structured content.",
+			recommended: true,
+		},
+		{
+			id: "openai/gpt-5.5",
+			label: "GPT-5.5",
+			description: "OpenAI's powerful model. Superior reasoning and depth.",
 		},
 		{
 			id: "google/gemini-3.1-pro-preview",

@@ -2,7 +2,7 @@
 2. ~~Añadir índice del módulo en EditorView y acceso directo~~
 3. ~~Añadir selector de página en EvitorView~~
 4. Actualizar páginas de prizing, personalizacion, etc.
-5. Quitar todas las referencias a "Streaming"
+5. ~~Quitar todas las referencias a "Streaming"~~
 6. Implementar pasarela de pago
 7. Actualizar landing para el nuevo concepto de la web actual y el nuevo pricing
 8. Problema: cuando se va a rechazar una syllabus y se va a regenerar, no se debe pedir silver/gold ya que esto no se cobra ya al usuario
