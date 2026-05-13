@@ -147,7 +147,7 @@ export function Sidebar({
 				initial={false}
 				animate={{width: isSidebarOpen ? 280 : 80}}
 				transition={{type: "spring", stiffness: 300, damping: 30}}
-				className="z-20 flex min-h-screen flex-col overflow-hidden border-r border-[#E5E5E7] bg-white"
+				className="z-20 flex h-screen flex-col overflow-hidden border-r border-[#E5E5E7] bg-white"
 			>
 				<div
 					className={`flex shrink-0 items-center p-6 ${

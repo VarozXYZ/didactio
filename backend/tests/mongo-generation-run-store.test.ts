@@ -76,6 +76,7 @@ describe("MongoGenerationRunStore", () => {
 			"mock-user",
 			"didactic-unit-1",
 		);
+		const ownerRuns = await store.listByOwner("mock-user");
 
 		expect(updateOne).toHaveBeenCalledWith(
 			{id: runs[0]!.id},
@@ -88,5 +89,6 @@ describe("MongoGenerationRunStore", () => {
 		});
 		expect(sort).toHaveBeenCalledWith({createdAt: -1});
 		expect(storedRuns).toEqual(runs);
+		expect(ownerRuns).toEqual(runs);
 	});
 });

@@ -287,7 +287,7 @@ export default function DashboardApp() {
 
 	const indexView =
 		activeSection === "all-units" ?
-			<div className="flex min-w-0 flex-1 flex-col">
+			<div className="flex min-w-0 flex-1 flex-col overflow-hidden">
 				{isLoadingIndex && items.length === 0 ?
 					<div className="flex min-w-0 flex-1 items-center justify-center bg-[#F5F5F7] text-[#86868B]">
 						Loading library...
@@ -311,7 +311,7 @@ export default function DashboardApp() {
 					/>
 				}
 			</div>
-		:	<div className="relative flex min-w-0 flex-1 flex-col">
+		:	<div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
 			{renderSettingsView(activeSection)}
 			<div className="absolute right-8 top-5">
 				<CreateUnitButton onClick={openCreateView} />
@@ -338,7 +338,7 @@ export default function DashboardApp() {
 	}
 
 	return (
-		<div className="flex min-h-screen bg-[#F5F5F7] font-sans text-[#1D1D1F]">
+		<div className="flex h-screen overflow-hidden bg-[#F5F5F7] font-sans text-[#1D1D1F]">
 			<Sidebar
 				activeSection={activeSection}
 				allFolders={allFolders}
@@ -358,13 +358,15 @@ export default function DashboardApp() {
 				toggleFolder={toggleFolder}
 			/>
 
-			<Routes>
-				<Route index element={indexView} />
-				<Route
-					path="*"
-					element={<Navigate replace to="/dashboard" />}
-				/>
-			</Routes>
+			<div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+				<Routes>
+					<Route index element={indexView} />
+					<Route
+						path="*"
+						element={<Navigate replace to="/dashboard" />}
+					/>
+				</Routes>
+			</div>
 
 			{modalState.isOpen && (
 				<CreateUnitWizard

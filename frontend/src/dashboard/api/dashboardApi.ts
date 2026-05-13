@@ -49,6 +49,29 @@ export interface BackendBillingSummary {
 	};
 }
 
+export type BackendUsageAnalyticsPeriod = "7d" | "30d" | "6m" | "12m";
+
+export interface BackendUsageAnalytics {
+	period: BackendUsageAnalyticsPeriod;
+	unitsCreated: number;
+	aiGenerations: number;
+	completionRate: number;
+	readBlockCount: number;
+	totalBlockCount: number;
+	favoriteModel: {
+		provider: string;
+		model: string;
+		label: string;
+		count: number;
+	} | null;
+	favoriteTopic: (BackendFolder & {unitCount: number}) | null;
+	chart: Array<{
+		key: string;
+		label: string;
+		count: number;
+	}>;
+}
+
 export interface BackendFolder {
 	id: string;
 	name: string;
@@ -530,6 +553,11 @@ export const dashboardApi = {
 	},
 	getBillingSummary() {
 		return requestJson<BackendBillingSummary>("/api/billing/me");
+	},
+	getUsageAnalytics(period: BackendUsageAnalyticsPeriod) {
+		return requestJson<BackendUsageAnalytics>(
+			`/api/analytics/usage?period=${encodeURIComponent(period)}`,
+		);
 	},
 	createBillingCheckoutSession(productId: string) {
 		return requestJson<{url: string}>("/api/billing/checkout-session", {

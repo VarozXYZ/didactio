@@ -60,6 +60,7 @@ export type GenerationRun =
 export interface GenerationRunStore {
 	save(run: GenerationRun): Promise<void>;
 	getById(ownerId: string, id: string): Promise<GenerationRun | null>;
+	listByOwner(ownerId: string): Promise<GenerationRun[]>;
 	findActiveChapterRun(
 		ownerId: string,
 		didacticUnitId: string,
@@ -81,6 +82,12 @@ export class InMemoryGenerationRunStore implements GenerationRunStore {
 	async getById(ownerId: string, id: string): Promise<GenerationRun | null> {
 		const run = this.runsById.get(id);
 		return run?.ownerId === ownerId ? run : null;
+	}
+
+	async listByOwner(ownerId: string): Promise<GenerationRun[]> {
+		return [...this.runsById.values()]
+			.filter((run) => run.ownerId === ownerId)
+			.sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 	}
 
 	async findActiveChapterRun(

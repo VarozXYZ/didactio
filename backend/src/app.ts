@@ -154,6 +154,14 @@ interface RequestWithMockOwner extends express.Request {
 	};
 }
 
+type UsageAnalyticsPeriod = "7d" | "30d" | "6m" | "12m";
+
+interface UsageAnalyticsBucket {
+	key: string;
+	label: string;
+	count: number;
+}
+
 function asRequestWithMockOwner(request: express.Request): RequestWithMockOwner {
 	const ownerId = request.auth?.sub;
 	if (!ownerId) {
@@ -493,6 +501,247 @@ async function listFoldersWithUnitCounts(
 		...buildFolderResponse(folder),
 		unitCount: unitCounts.get(folder.id) ?? 0,
 	}));
+}
+
+function parseUsageAnalyticsPeriod(value: unknown): UsageAnalyticsPeriod {
+	if (
+		value === undefined ||
+		value === "7d" ||
+		value === "30d" ||
+		value === "6m" ||
+		value === "12m"
+	) {
+		return value ?? "30d";
+	}
+
+	throw new Error("Invalid analytics period.");
+}
+
+function startOfUtcDay(date: Date): Date {
+	return new Date(
+		Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
+	);
+}
+
+function startOfUtcMonth(date: Date): Date {
+	return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
+}
+
+function formatDayKey(date: Date): string {
+	return date.toISOString().slice(0, 10);
+}
+
+function formatMonthKey(date: Date): string {
+	return date.toISOString().slice(0, 7);
+}
+
+function formatDayLabel(date: Date): string {
+	return date.toLocaleDateString("en", {
+		day: "numeric",
+		month: "short",
+		timeZone: "UTC",
+	});
+}
+
+function formatMonthLabel(date: Date): string {
+	return date.toLocaleDateString("en", {
+		month: "short",
+		timeZone: "UTC",
+	});
+}
+
+function addUtcDays(date: Date, amount: number): Date {
+	const next = new Date(date);
+	next.setUTCDate(next.getUTCDate() + amount);
+	return next;
+}
+
+function addUtcMonths(date: Date, amount: number): Date {
+	const next = new Date(date);
+	next.setUTCMonth(next.getUTCMonth() + amount);
+	return next;
+}
+
+function buildEmptyAnalyticsBuckets(
+	period: UsageAnalyticsPeriod,
+	now = new Date(),
+): UsageAnalyticsBucket[] {
+	if (period === "7d" || period === "30d") {
+		const dayCount = period === "7d" ? 7 : 30;
+		const firstDay = addUtcDays(startOfUtcDay(now), -(dayCount - 1));
+		return Array.from({length: dayCount}, (_ignored, index) => {
+			const bucketDate = addUtcDays(firstDay, index);
+			return {
+				key: formatDayKey(bucketDate),
+				label: formatDayLabel(bucketDate),
+				count: 0,
+			};
+		});
+	}
+
+	const monthCount = period === "6m" ? 6 : 12;
+	const firstMonth = addUtcMonths(startOfUtcMonth(now), -(monthCount - 1));
+	return Array.from({length: monthCount}, (_ignored, index) => {
+		const bucketDate = addUtcMonths(firstMonth, index);
+		return {
+			key: formatMonthKey(bucketDate),
+			label: formatMonthLabel(bucketDate),
+			count: 0,
+		};
+	});
+}
+
+function getRunActivityDate(run: GenerationRun): Date {
+	return new Date(
+		(run.stage === "chapter" ? run.completedAt : undefined) ??
+			run.updatedAt ??
+			run.createdAt,
+	);
+}
+
+function getBucketKeyForDate(
+	date: Date,
+	period: UsageAnalyticsPeriod,
+): string {
+	return period === "7d" || period === "30d" ?
+			formatDayKey(startOfUtcDay(date))
+		:	formatMonthKey(startOfUtcMonth(date));
+}
+
+function getModelDisplayName(provider: string, model: string): string {
+	const modelId = `${provider}/${model}`;
+	const catalogEntry = [...MODEL_CATALOG.silver, ...MODEL_CATALOG.gold].find(
+		(entry) => entry.id === modelId,
+	);
+
+	return catalogEntry?.label ?? modelId;
+}
+
+function buildFavoriteModel(completedRuns: GenerationRun[]) {
+	const counts = completedRuns.reduce<
+		Map<string, {provider: string; model: string; count: number}>
+	>((accumulator, run) => {
+		const key = `${run.provider}/${run.model}`;
+		const current = accumulator.get(key);
+		accumulator.set(key, {
+			provider: run.provider,
+			model: run.model,
+			count: (current?.count ?? 0) + 1,
+		});
+		return accumulator;
+	}, new Map());
+
+	const favorite = [...counts.values()].sort(
+		(left, right) =>
+			right.count - left.count ||
+			getModelDisplayName(left.provider, left.model).localeCompare(
+				getModelDisplayName(right.provider, right.model),
+			),
+	)[0];
+
+	if (!favorite) {
+		return null;
+	}
+
+	return {
+		provider: favorite.provider,
+		model: favorite.model,
+		label: getModelDisplayName(favorite.provider, favorite.model),
+		count: favorite.count,
+	};
+}
+
+function buildFavoriteTopic(
+	didacticUnits: DidacticUnit[],
+	foldersById: Map<string, Folder>,
+) {
+	const counts = didacticUnits.reduce<Map<string, number>>(
+		(accumulator, didacticUnit) => {
+			const folder = resolveFolderOrFallback(didacticUnit, foldersById);
+			accumulator.set(folder.id, (accumulator.get(folder.id) ?? 0) + 1);
+			return accumulator;
+		},
+		new Map(),
+	);
+
+	const favorite = [...counts.entries()]
+		.map(([folderId, count]) => ({folder: foldersById.get(folderId), count}))
+		.filter(
+			(entry): entry is {folder: Folder; count: number} =>
+				entry.folder !== undefined,
+		)
+		.sort(
+			(left, right) =>
+				right.count - left.count ||
+				left.folder.name.localeCompare(right.folder.name),
+		)[0];
+
+	if (!favorite) {
+		return null;
+	}
+
+	return {
+		...buildFolderResponse(favorite.folder),
+		unitCount: favorite.count,
+	};
+}
+
+async function buildUsageAnalytics(input: {
+	ownerId: string;
+	period: UsageAnalyticsPeriod;
+	didacticUnitStore: DidacticUnitStore;
+	folderStore: FolderStore;
+	generationRunStore: GenerationRunStore;
+}) {
+	const [didacticUnits, foldersById, generationRuns] = await Promise.all([
+		input.didacticUnitStore.listByOwner(input.ownerId),
+		loadFoldersById(input.folderStore, input.ownerId),
+		input.generationRunStore.listByOwner(input.ownerId),
+	]);
+
+	const unitSummaries = didacticUnits.map((didacticUnit) =>
+		summarizeDidacticUnit(didacticUnit),
+	);
+	const readBlockCount = unitSummaries.reduce(
+		(total, summary) => total + summary.readBlockCount,
+		0,
+	);
+	const totalBlockCount = unitSummaries.reduce(
+		(total, summary) => total + summary.totalBlockCount,
+		0,
+	);
+	const completedRuns = generationRuns.filter(
+		(run) => run.status === "completed",
+	);
+	const buckets = buildEmptyAnalyticsBuckets(input.period);
+	const bucketCounts = new Map(
+		buckets.map((bucket) => [bucket.key, bucket.count] as const),
+	);
+
+	for (const run of completedRuns) {
+		const key = getBucketKeyForDate(getRunActivityDate(run), input.period);
+		if (bucketCounts.has(key)) {
+			bucketCounts.set(key, (bucketCounts.get(key) ?? 0) + 1);
+		}
+	}
+
+	return {
+		period: input.period,
+		unitsCreated: didacticUnits.length,
+		aiGenerations: completedRuns.length,
+		completionRate:
+			totalBlockCount === 0 ?
+				0
+			:	Math.round((readBlockCount / totalBlockCount) * 100),
+		readBlockCount,
+		totalBlockCount,
+		favoriteModel: buildFavoriteModel(completedRuns),
+		favoriteTopic: buildFavoriteTopic(didacticUnits, foldersById),
+		chart: buckets.map((bucket) => ({
+			...bucket,
+			count: bucketCounts.get(bucket.key) ?? 0,
+		})),
+	};
 }
 
 function resolveFolderSelectionForManualMode(
@@ -1237,6 +1486,30 @@ export function createApp(options: CreateAppOptions) {
 					error instanceof Error ?
 						error.message
 					:	"Invalid AI config update request.",
+			});
+		}
+	});
+
+	app.get("/api/analytics/usage", async (request, response) => {
+		const requestWithMockOwner = asRequestWithMockOwner(request);
+
+		try {
+			const period = parseUsageAnalyticsPeriod(request.query.period);
+			response.json(
+				await buildUsageAnalytics({
+					ownerId: requestWithMockOwner.mockOwner.id,
+					period,
+					didacticUnitStore,
+					folderStore,
+					generationRunStore,
+				}),
+			);
+		} catch (error) {
+			response.status(400).json({
+				error:
+					error instanceof Error ?
+						error.message
+					:	"Invalid analytics request.",
 			});
 		}
 	});

@@ -1,79 +1,406 @@
-import {BarChart3, BookOpen, Clock, Sparkles, Target} from "lucide-react";
+import {type ReactNode, useEffect, useMemo, useState} from "react";
+import {AlertCircle, Loader2, Sparkles} from "lucide-react";
+import {
+	type BackendUsageAnalytics,
+	type BackendUsageAnalyticsPeriod,
+	dashboardApi,
+} from "../../../api/dashboardApi";
+import {getFolderEmoji, getFolderVisuals} from "../../../utils/folderDisplay";
 
-export function AnalyticsView() {
-	const stats = [
-		{label: "Units Created", value: "24", icon: BookOpen, color: "#4ADE80"},
-		{
-			label: "AI Generations",
-			value: "156",
-			icon: Sparkles,
-			color: "#3B82F6",
-		},
-		{label: "Hours Saved", value: "42", icon: Clock, color: "#F59E0B"},
-		{
-			label: "Completion Rate",
-			value: "73%",
-			icon: Target,
-			color: "#EC4899",
-		},
-	];
+const PERIOD_OPTIONS: Array<{
+	label: string;
+	value: BackendUsageAnalyticsPeriod;
+}> = [
+	{label: "7D", value: "7d"},
+	{label: "30D", value: "30d"},
+	{label: "6M", value: "6m"},
+	{label: "12M", value: "12m"},
+];
+
+function formatNumber(value: number): string {
+	return new Intl.NumberFormat("en").format(value);
+}
+
+const PROVIDER_LOGOS: Record<string, string> = {
+	anthropic: "/assets/brands/claude-reduced.svg",
+	deepseek: "/assets/brands/deepseek-reduced.svg",
+	google: "/assets/brands/gemini.png",
+	openai: "/assets/brands/chatgpt.png",
+};
+
+function AssetIcon({src, alt}: {src: string; alt: string}) {
+	return <img src={src} alt={alt} className="h-5 w-5 object-contain" />;
+}
+
+function ProviderIcon({
+	provider,
+	label,
+}: {
+	provider?: string;
+	label: string;
+}) {
+	const logo = provider ? PROVIDER_LOGOS[provider] : undefined;
+
+	if (!logo) {
+		return <Sparkles size={18} />;
+	}
+
+	return <img src={logo} alt={label} className="h-5 w-5 object-contain" />;
+}
+
+function MetricCard({
+	icon,
+	label,
+	value,
+	description,
+	iconBg,
+}: {
+	icon: ReactNode;
+	label: string;
+	value: string;
+	description: string;
+	iconBg?: string;
+}) {
+	return (
+		<div className="flex h-[130px] flex-col justify-between rounded-[14px] border border-black/[0.07] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.025)]">
+			<div className="flex items-center justify-between gap-2">
+				<p className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-[#AEAEB2]">
+					{label}
+				</p>
+				<div
+					className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[9px] border border-black/[0.05] text-[#1D1D1F]"
+					style={{backgroundColor: iconBg ?? "#F5F5F7"}}
+				>
+					{icon}
+				</div>
+			</div>
+			<div>
+				<p className="line-clamp-2 text-[21px] font-bold leading-tight tracking-tight text-[#1D1D1F]">
+					{value}
+				</p>
+				<p className="mt-1 line-clamp-1 text-[11.5px] text-[#86868B]">
+					{description}
+				</p>
+			</div>
+		</div>
+	);
+}
+
+function FavoriteTopicMetric({analytics}: {analytics: BackendUsageAnalytics}) {
+	const topic = analytics.favoriteTopic;
+	const folderVisuals = topic ? getFolderVisuals(topic) : null;
+	const emoji = topic ? getFolderEmoji(topic.icon) : "📁";
 
 	return (
-		<div className="flex min-w-0 flex-1 flex-col">
+		<MetricCard
+			icon={<span className="text-[15px] leading-none">{emoji}</span>}
+			iconBg={folderVisuals?.bgColor ?? "#F5F5F7"}
+			label="Favorite Topic"
+			value={topic ? topic.name : "None yet"}
+			description={
+				topic ?
+					`Most active folder · ${topic.unitCount} unit${topic.unitCount === 1 ? "" : "s"}`
+				:	"Create units inside folders to discover it"
+			}
+		/>
+	);
+}
+
+const CHART_W = 720;
+const CHART_H = 200;
+const PAD_L = 44;
+const PAD_R = 16;
+const PAD_T = 14;
+const PAD_B = 30;
+const PLOT_W = CHART_W - PAD_L - PAD_R;
+const PLOT_H = CHART_H - PAD_T - PAD_B;
+const BASE_Y = PAD_T + PLOT_H;
+
+function ActivityChart({
+	analytics,
+	onPeriodChange,
+}: {
+	analytics: BackendUsageAnalytics;
+	onPeriodChange: (period: BackendUsageAnalyticsPeriod) => void;
+}) {
+	const chart = analytics.chart;
+	const maxCount = Math.max(...chart.map((p) => p.count), 1);
+
+	const points = useMemo(
+		() =>
+			chart.map((bucket, index) => {
+				const x = PAD_L + (index / Math.max(chart.length - 1, 1)) * PLOT_W;
+				const y = PAD_T + PLOT_H - (bucket.count / maxCount) * PLOT_H;
+				return {x, y, count: bucket.count};
+			}),
+		[chart, maxCount],
+	);
+
+	const linePath = points
+		.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`)
+		.join(" ");
+
+	const areaPath =
+		points.length > 0 ?
+			`${linePath} L ${points.at(-1)!.x.toFixed(1)} ${BASE_Y} L ${points[0]!.x.toFixed(1)} ${BASE_Y} Z`
+		:	"";
+
+	const yLevels = [0, 1, 2, 3].map((i) => ({
+		y: PAD_T + (i / 3) * PLOT_H,
+		label: Math.round(maxCount * (1 - i / 3)),
+	}));
+
+	const visibleLabels = chart.filter((_b, i) => {
+		if (chart.length <= 8) return true;
+		const step = Math.ceil(chart.length / 6);
+		return i === 0 || i === chart.length - 1 || i % step === 0;
+	});
+
+	return (
+		<div className="rounded-[16px] border border-black/[0.07] bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+			<div className="flex flex-wrap items-start justify-between gap-4">
+				<div>
+					<h2 className="text-[20px] font-bold tracking-tight text-[#1D1D1F]">
+						AI Generations Over Time
+					</h2>
+					<p className="mt-0.5 text-[13px] text-[#AEAEB2]">
+						Completed syllabus and module generations
+					</p>
+				</div>
+				<div className="flex items-center gap-1 rounded-[10px] bg-[#F5F5F7] p-1">
+					{PERIOD_OPTIONS.map((option) => (
+						<button
+							key={option.value}
+							type="button"
+							onClick={() => onPeriodChange(option.value)}
+							className={`rounded-[7px] px-3 py-1.5 text-[12px] font-bold transition ${
+								analytics.period === option.value ?
+									"bg-white text-[#1D1D1F] shadow-sm"
+								:	"text-[#AEAEB2] hover:text-[#6E6E73]"
+							}`}
+						>
+							{option.label}
+						</button>
+					))}
+				</div>
+			</div>
+
+			<svg
+				viewBox={`0 0 ${CHART_W} ${CHART_H}`}
+				className="mt-4 w-full"
+				style={{height: 200}}
+				preserveAspectRatio="none"
+				role="img"
+				aria-label="AI generations chart"
+			>
+				<defs>
+					<linearGradient id="chart-area-fill" x1="0" x2="0" y1="0" y2="1">
+						<stop offset="0%" stopColor="#3B82F6" stopOpacity="0.12" />
+						<stop offset="100%" stopColor="#3B82F6" stopOpacity="0" />
+					</linearGradient>
+				</defs>
+
+				{yLevels.map(({y, label}) => (
+					<g key={label}>
+						<line
+							x1={PAD_L}
+							x2={CHART_W - PAD_R}
+							y1={y}
+							y2={y}
+							stroke={y === BASE_Y ? "#E5E5E7" : "#F0F0F2"}
+							strokeWidth={y === BASE_Y ? "1.5" : "1"}
+						/>
+						<text
+							x={PAD_L - 8}
+							y={y + 4}
+							textAnchor="end"
+							fill="#C7C7CC"
+							fontSize="11"
+							fontWeight="600"
+						>
+							{label}
+						</text>
+					</g>
+				))}
+
+				{areaPath && <path d={areaPath} fill="url(#chart-area-fill)" />}
+
+				{linePath && (
+					<path
+						d={linePath}
+						fill="none"
+						stroke="#3B82F6"
+						strokeWidth="2"
+						strokeLinecap="round"
+						strokeLinejoin="round"
+					/>
+				)}
+
+				{points
+					.filter((p) => p.count > 0)
+					.map((p, i) => (
+						<circle
+							key={i}
+							cx={p.x}
+							cy={p.y}
+							r="3.5"
+							fill="#fff"
+							stroke="#3B82F6"
+							strokeWidth="2"
+						/>
+					))}
+
+				{visibleLabels.map((bucket) => {
+					const point = points[chart.indexOf(bucket)];
+					if (!point) return null;
+					return (
+						<text
+							key={bucket.key}
+							x={point.x}
+							y={CHART_H - 6}
+							textAnchor="middle"
+							fill="#C7C7CC"
+							fontSize="11"
+							fontWeight="600"
+						>
+							{bucket.label}
+						</text>
+					);
+				})}
+			</svg>
+		</div>
+	);
+}
+
+export function AnalyticsView() {
+	const [period, setPeriod] = useState<BackendUsageAnalyticsPeriod>("30d");
+	const [analytics, setAnalytics] = useState<BackendUsageAnalytics | null>(null);
+	const [isLoading, setIsLoading] = useState(true);
+	const [error, setError] = useState<string | null>(null);
+
+	useEffect(() => {
+		let isMounted = true;
+		setIsLoading(true);
+		setError(null);
+
+		void dashboardApi
+			.getUsageAnalytics(period)
+			.then((nextAnalytics) => {
+				if (!isMounted) return;
+				setAnalytics(nextAnalytics);
+			})
+			.catch((loadError) => {
+				if (!isMounted) return;
+				setError(
+					loadError instanceof Error ?
+						loadError.message
+					:	"Failed to load usage metrics.",
+				);
+			})
+			.finally(() => {
+				if (isMounted) {
+					setIsLoading(false);
+				}
+			});
+
+		return () => {
+			isMounted = false;
+		};
+	}, [period]);
+
+	return (
+		<div className="flex min-w-0 flex-1 flex-col overflow-hidden">
 			<header className="flex h-[80px] shrink-0 items-center border-b border-[#E5E5E7] bg-white/80 px-8 backdrop-blur-md">
 				<div>
 					<h1 className="text-[28px] font-bold tracking-tight text-[#1D1D1F]">
-						Usage & Analytics
+						Usage & Metrics
 					</h1>
 					<p className="mt-0.5 text-[13px] text-[#86868B]">
-						Track your productivity and usage
+						Track real unit progress and AI generation activity.
 					</p>
 				</div>
 			</header>
 
-			<div className="p-8">
-				<div className="max-w-[1200px] space-y-6">
-					<div className="grid grid-cols-4 gap-6">
-						{stats.map((stat) => (
-							<div
-								key={stat.label}
-								className="rounded-[12px] border border-[#E5E5E7] bg-white p-6"
-							>
-								<div
-									className="mb-4 flex h-12 w-12 items-center justify-center rounded-full"
-									style={{backgroundColor: `${stat.color}15`}}
-								>
-									<stat.icon
-										size={22}
-										style={{color: stat.color}}
-									/>
-								</div>
-								<div className="text-[28px] font-bold text-[#1D1D1F]">
-									{stat.value}
-								</div>
-								<div className="mt-1 text-[13px] text-[#86868B]">
-									{stat.label}
-								</div>
-							</div>
-						))}
-					</div>
+			<div className="min-h-0 flex-1 overflow-y-auto p-8">
+				<div className="mx-auto max-w-[1180px] space-y-5">
+					{error ? (
+						<div className="flex items-center gap-3 rounded-[16px] border border-red-200 bg-red-50 px-4 py-3 text-[13px] font-medium text-red-700">
+							<AlertCircle size={16} />
+							{error}
+						</div>
+					) : null}
 
-					<div className="rounded-[12px] border border-[#E5E5E7] bg-white p-8">
-						<h2 className="mb-6 text-[18px] font-bold text-[#1D1D1F]">
-							Activity Over Time
-						</h2>
-						<div className="flex h-[300px] items-center justify-center rounded-[10px] border-2 border-dashed border-[#E5E5E7]">
-							<div className="text-center">
-								<BarChart3
-									size={48}
-									className="mx-auto mb-3 text-[#86868B]"
+					{isLoading && !analytics ? (
+						<div className="flex min-h-[360px] items-center justify-center rounded-[18px] border border-black/[0.07] bg-white text-[13px] text-[#86868B]">
+							<Loader2
+								size={18}
+								className="mr-2 animate-spin text-[#3B82F6]"
+							/>
+							Loading usage metrics...
+						</div>
+					) : null}
+
+					{analytics ? (
+						<div className={isLoading ? "opacity-60 transition" : "transition"}>
+							<div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+								<MetricCard
+									icon={
+										<AssetIcon
+											src="/assets/icons/project.png"
+											alt="Units created"
+										/>
+									}
+									label="Units Created"
+									value={formatNumber(analytics.unitsCreated)}
+									description="Total units across all your folders"
 								/>
-								<p className="text-[14px] text-[#86868B]">
-									Chart visualization would go here
-								</p>
+								<MetricCard
+									icon={<Sparkles size={15} />}
+									label="AI Generations"
+									value={formatNumber(analytics.aiGenerations)}
+									description="Syllabuses and modules generated"
+								/>
+								<MetricCard
+									icon={
+										<AssetIcon
+											src="/assets/icons/check-mark.png"
+											alt="Completion rate"
+										/>
+									}
+									label="Completion Rate"
+									value={`${analytics.completionRate}%`}
+									description={`${formatNumber(analytics.readBlockCount)} of ${formatNumber(
+										analytics.totalBlockCount,
+									)} blocks read`}
+								/>
+								<MetricCard
+									icon={
+										<ProviderIcon
+											provider={analytics.favoriteModel?.provider}
+											label={analytics.favoriteModel?.label ?? "Favorite model"}
+										/>
+									}
+									label="Favorite Model"
+									value={analytics.favoriteModel?.label ?? "None yet"}
+									description={
+										analytics.favoriteModel ?
+											`Most-used AI · ${analytics.favoriteModel.count} run${
+												analytics.favoriteModel.count === 1 ? "" : "s"
+											}`
+										:	"Complete AI generations to discover it"
+									}
+								/>
+								<FavoriteTopicMetric analytics={analytics} />
+							</div>
+
+							<div className="mt-5">
+								<ActivityChart
+									analytics={{...analytics, period}}
+									onPeriodChange={setPeriod}
+								/>
 							</div>
 						</div>
-					</div>
+					) : null}
 				</div>
 			</div>
 		</div>

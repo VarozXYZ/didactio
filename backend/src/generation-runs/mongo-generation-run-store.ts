@@ -40,6 +40,17 @@ export class MongoGenerationRunStore implements GenerationRunStore {
 		return stripMongoId(await this.collection.findOne({id, ownerId}));
 	}
 
+	async listByOwner(ownerId: string): Promise<GenerationRun[]> {
+		const documents = await this.collection
+			.find({ownerId})
+			.sort({createdAt: -1})
+			.toArray();
+
+		return documents
+			.map((document) => stripMongoId(document))
+			.filter((document): document is GenerationRun => document !== null);
+	}
+
 	async findActiveChapterRun(
 		ownerId: string,
 		didacticUnitId: string,

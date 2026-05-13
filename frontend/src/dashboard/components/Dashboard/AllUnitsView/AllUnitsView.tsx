@@ -50,7 +50,7 @@ export function AllUnitsView({
 				filteredUnitsCount={filteredUnits.length}
 				onCreateUnit={onCreateUnit}
 			/>
-			<div className="bg-[#F5F5F7] p-8">
+			<div className="min-h-0 flex-1 overflow-y-auto bg-[#F5F5F7] p-8">
 				<div className="mx-auto w-full max-w-[1560px]">
 					<div className="mb-6 flex items-center justify-between gap-4">
 						<div className="relative">

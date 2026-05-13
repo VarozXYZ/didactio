@@ -7,15 +7,21 @@ describe("api authentication", () => {
 	it("rejects unauthenticated access to protected routes", async () => {
 		const app = createTestApp({disableAuthBypass: true});
 
-		const [folderResponse, didacticUnitResponse] = await Promise.all([
-			request(app).get("/api/folders"),
-			request(app).get("/api/didactic-unit"),
-		]);
+		const [folderResponse, didacticUnitResponse, analyticsResponse] =
+			await Promise.all([
+				request(app).get("/api/folders"),
+				request(app).get("/api/didactic-unit"),
+				request(app).get("/api/analytics/usage"),
+			]);
 
 		expect(folderResponse.status).toBe(401);
 		expect(folderResponse.body.error).toBe("missing_authorization_header");
 		expect(didacticUnitResponse.status).toBe(401);
 		expect(didacticUnitResponse.body.error).toBe(
+			"missing_authorization_header",
+		);
+		expect(analyticsResponse.status).toBe(401);
+		expect(analyticsResponse.body.error).toBe(
 			"missing_authorization_header",
 		);
 	});

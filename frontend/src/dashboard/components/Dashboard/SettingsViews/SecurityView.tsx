@@ -5,7 +5,7 @@ export function SecurityView() {
 	const {user} = useAuth();
 
 	return (
-		<div className="flex min-w-0 flex-1 flex-col">
+		<div className="flex min-w-0 flex-1 flex-col overflow-hidden">
 			<header className="flex h-[80px] shrink-0 items-center border-b border-[#E5E5E7] bg-white/80 px-8 backdrop-blur-md">
 				<div>
 					<h1 className="text-[28px] font-bold tracking-tight text-[#1D1D1F]">
@@ -17,7 +17,7 @@ export function SecurityView() {
 				</div>
 			</header>
 
-			<div className="p-8">
+			<div className="min-h-0 flex-1 overflow-y-auto p-8">
 				<div className="max-w-[700px] space-y-6">
 					<div className="rounded-[12px] border border-[#E5E5E7] bg-white p-8">
 						<h2 className="mb-6 text-[18px] font-bold text-[#1D1D1F]">
