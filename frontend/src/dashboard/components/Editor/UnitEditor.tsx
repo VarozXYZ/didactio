@@ -2505,7 +2505,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				</p>
 			</div>
 
-			<div className="mt-6 grid gap-4 sm:grid-cols-2">
+			<div className="mt-6 grid gap-4">
 				<button
 					className="group flex min-h-[164px] w-full flex-col rounded-[20px] p-5 text-left text-white shadow-[0_18px_35px_rgba(17,24,39,0.24)] transition-all hover:-translate-y-0.5"
 					onClick={() => setIsActivityModalOpen(true)}

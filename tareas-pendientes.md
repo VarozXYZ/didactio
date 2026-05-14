@@ -13,8 +13,8 @@
 13. Sistema de generacion de actividades
 14. Sistema de generación de notas/preguntas
 15. Dar funcionalidad al botón de settings desde EditorView
-16. Telemetría ?
-17. Admin pannel?
+16. Telemetría ? 
+17. Admin panel?
 18. En unidades "gold", la regeneracion de una unidad cuesta 5 Silver
 19. Cambiar la "longitud" de las unidades por un badge que tenga la misma forma que cuando se selecciona en el wizard
 20. Crear una "guía" interactiva para 1. La primera vez que se genera una unidad 2. La primera vez que se entra en el editor
@@ -25,3 +25,6 @@
 25. La ultima página nunca se marca como leida
 26. Botón redondo de modulos en EditorView más utilidad visual tras la generacion (por ejemplo, tracking de read % y finalizado)
 27. Actualizar la forma el precio / coste en monedas se muestra. En vez de selectar Precio/moneda, seleccionar modelo y enseñar coste dinámicamente segun seleccion
+28. Mejorar la informacio en el onboarding
+29. Crear guias de uso para: 1. primera vez que abres el wizard de syllabus 2. Primera vez que entras en el editor
+30. Añadir las actividades creadas al indice del modulo
