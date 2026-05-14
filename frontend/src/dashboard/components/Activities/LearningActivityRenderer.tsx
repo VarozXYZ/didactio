@@ -439,7 +439,7 @@ function MultipleChoiceActivity({
 						onClick={handleConfirm}
 						className="w-full rounded-xl bg-[#1D1D1F] py-2.5 text-[13px] font-bold text-white transition hover:bg-[#1F2937] disabled:cursor-not-allowed disabled:opacity-40"
 					>
-						Confirmar respuesta
+						Confirm answer
 					</button>
 				)}
 				{confirmed && viewIndex < questions.length - 1 && (
