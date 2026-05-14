@@ -114,6 +114,16 @@ export interface BackendLearningActivityAttempt {
 	answers: unknown;
 	score?: number;
 	feedback: string;
+	questionFeedback?: Array<{
+		id: string;
+		feedback?: string;
+		simplifiedScore?: "wrong" | "Almost there" | "Perfect";
+		expectedAnswer?: string;
+		improvementReason?: string;
+		score?: number;
+		strengths: string[];
+		improvements: string[];
+	}>;
 	completedAt: string;
 }
 
@@ -126,6 +136,7 @@ export interface BackendActivityProgress {
 		correctOptionId: string;
 		explanation: string;
 	}>;
+	answers?: Record<string, unknown>;
 	completed: boolean;
 	updatedAt: string;
 }
@@ -818,6 +829,17 @@ export const dashboardApi = {
 			},
 		);
 	},
+	listLearningActivityAttempts(activityId: string) {
+		return requestJson<{attempts: BackendLearningActivityAttempt[]}>(
+			`/api/activities/${activityId}/attempts`,
+		);
+	},
+	refillActivityAttempts(activityId: string) {
+		return requestJson<{activity: BackendLearningActivity}>(
+			`/api/activities/${activityId}/refill`,
+			{method: "POST"},
+		);
+	},
 	createLearningActivityAttempt(activityId: string, answers: unknown) {
 		return requestJson<{attempt: BackendLearningActivityAttempt}>(
 			`/api/activities/${activityId}/attempts`,
@@ -832,7 +854,14 @@ export const dashboardApi = {
 			`/api/activities/${activityId}/progress`,
 		);
 	},
-	saveActivityProgress(activityId: string, payload: {confirmedAnswers: BackendActivityProgress["confirmedAnswers"]; completed: boolean}) {
+	saveActivityProgress(
+		activityId: string,
+		payload: {
+			confirmedAnswers: BackendActivityProgress["confirmedAnswers"];
+			answers?: BackendActivityProgress["answers"];
+			completed: boolean;
+		},
+	) {
 		return requestJson<{progress: BackendActivityProgress}>(
 			`/api/activities/${activityId}/progress`,
 			{

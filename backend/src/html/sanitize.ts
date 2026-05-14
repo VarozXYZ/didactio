@@ -234,3 +234,25 @@ export function sanitizeChapterHtml(rawHtml: string): SanitizeResult {
 		isEmpty: normalizedHtml.length === 0,
 	};
 }
+
+export function sanitizeSimpleFeedbackHtml(rawHtml: string): string {
+	return sanitizeHtml(rawHtml, {
+		allowedTags: [
+			"p",
+			"ul",
+			"ol",
+			"li",
+			"br",
+			"strong",
+			"em",
+			"u",
+			"mark",
+			"code",
+		],
+		allowedAttributes: {},
+		disallowedTagsMode: "discard",
+		enforceHtmlBoundary: false,
+	})
+		.replace(/\s+\n/g, "\n")
+		.trim();
+}

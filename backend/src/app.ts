@@ -126,6 +126,7 @@ import {
 	legacyTierToGenerationQuality,
 	resolveModuleRegenerationCost,
 	resolveActivityGenerationCost,
+	resolveActivityFeedbackRefillCost,
 	resolveSyllabusGenerationCost,
 	resolveUnitGenerationCost,
 	type GenerationCoinCost,
@@ -3018,14 +3019,19 @@ export function createApp(options: CreateAppOptions) {
 			response.status(404).json({error: "Learning activity not found."});
 			return;
 		}
-		const {confirmedAnswers, completed} = request.body as {
+		const {confirmedAnswers, answers, completed} = request.body as {
 			confirmedAnswers: LearningActivityProgress["confirmedAnswers"];
+			answers?: LearningActivityProgress["answers"];
 			completed: boolean;
 		};
 		const progress: LearningActivityProgress = {
 			activityId: activity.id,
 			ownerId,
 			confirmedAnswers: confirmedAnswers ?? {},
+			answers:
+				answers && typeof answers === "object" && !Array.isArray(answers) ?
+					answers
+				:	undefined,
 			completed: completed ?? false,
 			updatedAt: new Date().toISOString(),
 		};
@@ -3074,6 +3080,53 @@ export function createApp(options: CreateAppOptions) {
 	);
 
 	app.post(
+		"/api/activities/:activityId/refill",
+		async (request, response) => {
+			const requestWithMockOwner = asRequestWithMockOwner(request);
+			const ownerId = requestWithMockOwner.mockOwner.id;
+			const activity = await learningActivityStore.getActivity(
+				ownerId,
+				String(request.params.activityId),
+			);
+
+			if (!activity) {
+				response.status(404).json({error: "Learning activity not found."});
+				return;
+			}
+
+			const cost = resolveActivityFeedbackRefillCost({quality: activity.quality});
+
+			try {
+				await reserveGenerationCredits({
+					authService,
+					ownerId,
+					cost,
+					reason: "activity_feedback_refill",
+					metadata: {
+						operation: "activity_feedback_refill",
+						activityId: activity.id,
+						quality: activity.quality,
+					},
+				});
+			} catch (error) {
+				if (error instanceof AuthError) {
+					sendAuthErrorResponse(response, error);
+					return;
+				}
+				throw error;
+			}
+
+			const updatedActivity: LearningActivity = {
+				...activity,
+				feedbackAttemptLimit: activity.feedbackAttemptLimit + 3,
+				updatedAt: new Date().toISOString(),
+			};
+			await learningActivityStore.saveActivity(updatedActivity);
+			response.json({activity: updatedActivity});
+		},
+	);
+
+	app.post(
 		"/api/activities/:activityId/attempts",
 		async (request, response) => {
 			const requestWithMockOwner = asRequestWithMockOwner(request);
@@ -3117,6 +3170,7 @@ export function createApp(options: CreateAppOptions) {
 			try {
 				let score: number | undefined;
 				let feedback: string;
+				let questionFeedback: LearningActivityAttempt["questionFeedback"];
 
 				if (OBJECTIVE_ACTIVITY_TYPES.has(activity.type)) {
 					const result = gradeObjectiveActivity({activity, answers});
@@ -3144,6 +3198,7 @@ export function createApp(options: CreateAppOptions) {
 							abortSignal: createAbortSignal(request),
 						});
 					score = result.score;
+					questionFeedback = result.questionFeedback;
 					feedback = [
 						result.feedback,
 						result.strengths.length ?
@@ -3170,6 +3225,7 @@ export function createApp(options: CreateAppOptions) {
 								feedback: result.feedback,
 								strengths: result.strengths,
 								improvements: result.improvements,
+								questionFeedback: result.questionFeedback,
 							}),
 							createdAt: now,
 							telemetry: result.telemetry,
@@ -3184,6 +3240,7 @@ export function createApp(options: CreateAppOptions) {
 					answers,
 					score,
 					feedback,
+					questionFeedback,
 					completedAt: now,
 				};
 				await learningActivityStore.saveAttempt(attempt);

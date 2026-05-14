@@ -355,6 +355,18 @@ export function createMockAiService(): AiService {
 									expectedAnswer: "A concise explanation.",
 									rubric: ["Uses the key concept"],
 								},
+								{
+									id: "p2",
+									prompt: "Apply the concept to a realistic example.",
+									expectedAnswer: "A grounded application.",
+									rubric: ["Applies the key concept"],
+								},
+								{
+									id: "p3",
+									prompt: "Compare this concept with a related idea.",
+									expectedAnswer: "A clear comparison.",
+									rubric: ["Compares ideas accurately"],
+								},
 							],
 						},
 				raw: {},
@@ -372,6 +384,19 @@ export function createMockAiService(): AiService {
 				feedback: "Good answer. Add one more concrete connection to the module.",
 				strengths: ["Clear attempt"],
 				improvements: ["Add a concrete example"],
+				questionFeedback: [
+					{
+						id: "p1",
+						simplifiedScore: "Almost there",
+						expectedAnswer: "A concise explanation tied to the module concept.",
+						improvementReason:
+							"The answer is clear but needs a concrete module connection.",
+						score: 80,
+						feedback: "Good answer. Add one more concrete connection to the module.",
+						strengths: ["Clear attempt"],
+						improvements: ["Add a concrete example"],
+					},
+				],
 			};
 		},
 	};

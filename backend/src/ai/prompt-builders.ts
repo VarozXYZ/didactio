@@ -249,7 +249,7 @@ function activityTypeContract(type: LearningActivityType): string {
 		case "multiple_choice":
 			return 'content.questions: array of EXACTLY 10 items, each with {id, prompt, options:[{id,text}] (exactly 4 options per question), correctOptionId, explanation}. Cover a wide range of concepts from the module — do not cluster all questions around a single idea.';
 		case "short_answer":
-			return "content.prompts: array of {id, prompt, expectedAnswer, rubric:string[]}.";
+			return "content.prompts: array of EXACTLY 3 items, each with {id, prompt, expectedAnswer, rubric:string[]}. Each prompt must be a medium-length open-ended free-response question that asks the learner to explain, justify, compare, or apply an idea in natural language over several sentences. Do NOT ask the learner to write, generate, complete, debug, refactor, or output code, markup, commands, config files, interfaces, types, components, functions, or snippets; those belong to coding_practice. Do NOT create quiz-style, multiple-choice, yes/no, fill-in-the-blank, or very short recall questions. Keep top-level instructions generic and do not repeat any prompt there.";
 		case "coding_practice":
 			return "content.language, content.prompt, content.starterCode, content.expectedOutcome, content.testCases:[{input, expected}], content.rubric:string[].";
 		case "flashcards":
@@ -336,14 +336,41 @@ export function buildLearningActivityFeedbackPrompt(input: {
 	content: Record<string, unknown>;
 	answers: unknown;
 }): string {
+	const shortAnswerPrompts =
+		input.activityType === "short_answer" && Array.isArray(input.content.prompts) ?
+			input.content.prompts
+				.slice(0, 3)
+				.map((prompt, index) => {
+					const item =
+						prompt && typeof prompt === "object" && !Array.isArray(prompt) ?
+							prompt as Record<string, unknown>
+						:	{};
+					const id =
+						typeof item.id === "string" || typeof item.id === "number" ?
+							String(item.id)
+						:	`prompt${index + 1}`;
+					return `- ${id}: ${typeof item.prompt === "string" ? item.prompt : ""}`;
+				})
+				.join("\n")
+		:	"";
+
 	return [
 		buildSection("Assessment Contract", [
 			`Activity: ${input.activityTitle}`,
 			`Type: ${input.activityType}`,
 			`Instructions: ${input.instructions}`,
-			"Return JSON with feedback, score 0-100 when possible, strengths, and improvements.",
+			"Return JSON with feedback, score 0-100 when possible, strengths, improvements, and questionFeedback.",
+			'For short_answer, questionFeedback must include EXACTLY 3 items: one separate correction for each content.prompts item. Use the same id as the prompt. Do not reuse the same correction across questions. Each item must include simplifiedScore exactly one of "wrong", "Almost there", "Perfect"; expectedAnswer with the correction / expected answer for that specific prompt; improvementReason explaining why that specific score was given and how to improve that specific learner answer.',
+			"Compare each learner answer only against its matching prompt and rubric. If an answer is blank, mark that specific item as wrong and explain what should have been answered.",
+			"expectedAnswer and improvementReason may use simple sanitized HTML only: <p>, <ul>, <ol>, <li>, <strong>, <em>, <u>, <mark>, <code>, <br>. No headings, links, styles, scripts, tables, or code blocks.",
 			"Be direct, useful, and specific. Do not reveal hidden answers unless needed to explain a misconception.",
 		]),
+		input.activityType === "short_answer" ?
+			buildSection("Required questionFeedback ids", [
+				shortAnswerPrompts,
+				"Return questionFeedback in this exact order and with these exact ids.",
+			])
+		:	"",
 		buildSection("Activity Content", [JSON.stringify(input.content).slice(0, 6000)]),
 		buildSection("Learner Answers", [JSON.stringify(input.answers).slice(0, 4000)]),
 	].join("\n\n");

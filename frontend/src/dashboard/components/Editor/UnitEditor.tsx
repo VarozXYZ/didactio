@@ -27,7 +27,6 @@ import {
 	RotateCcw,
 	Settings,
 	Share2,
-	Sparkles,
 	WandSparkles,
 	X,
 } from "lucide-react";
@@ -581,7 +580,7 @@ const ACTIVITY_OPTIONS: Array<{
 	},
 	{
 		type: "short_answer",
-		label: "Short answer",
+		label: "Open response questions",
 		description: "Explain in your words",
 		icon: BookOpenCheck,
 	},
@@ -868,11 +867,22 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		let cancelled = false;
 		void dashboardApi
 			.listLearningActivities(didacticUnitId, activeChapter.chapterIndex)
-			.then(({activities}) => {
+			.then(async ({activities}) => {
 				if (cancelled) return;
 				setLearningActivities((previous) => ({
 					...previous,
 					[activeChapter.chapterIndex]: activities,
+				}));
+				const attemptsEntries = await Promise.all(
+					activities.map(async (activity) => {
+						const {attempts} = await dashboardApi.listLearningActivityAttempts(activity.id);
+						return [activity.id, attempts] as const;
+					}),
+				);
+				if (cancelled) return;
+				setActivityAttempts((previous) => ({
+					...previous,
+					...Object.fromEntries(attemptsEntries),
 				}));
 			})
 			.catch((error) => {
@@ -2453,6 +2463,20 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		}
 	};
 
+	const handleRefillActivityAttempts = async (activityId: string) => {
+		const {activity} = await dashboardApi.refillActivityAttempts(activityId);
+		setLearningActivities((previous) => {
+			const chapterActivities = previous[activity.chapterIndex] ?? [];
+			return {
+				...previous,
+				[activity.chapterIndex]: chapterActivities.map((a) =>
+					a.id === activity.id ? activity : a,
+				),
+			};
+		});
+		void refreshUser();
+	};
+
 	const postModuleCompletionStyle = resolvePostModuleCompletionStyle(
 		draft.textStyle.stylePreset,
 	);
@@ -2507,7 +2531,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 
 			<div className="mt-6 grid gap-4">
 				<button
-					className="group flex min-h-[164px] w-full flex-col rounded-[20px] p-5 text-left text-white shadow-[0_18px_35px_rgba(17,24,39,0.24)] transition-all hover:-translate-y-0.5"
+					className="group flex min-h-[164px] w-full flex-col rounded-[20px] p-5 text-left text-white transition-all hover:-translate-y-0.5"
 					onClick={() => setIsActivityModalOpen(true)}
 					onMouseEnter={(event) => {
 						event.currentTarget.style.backgroundColor =
@@ -3043,6 +3067,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 							attempts={activityAttempts[page.activity.id] ?? []}
 							isSubmitting={isActivityAttemptSubmitting}
 							onSubmitAttempt={handleLearningActivityAttempt}
+							onRefillAttempts={handleRefillActivityAttempts}
 						/>
 						<div className="pointer-events-none absolute bottom-4 right-6 text-[10px] font-medium text-[#86868B] md:bottom-6 md:right-10">
 							{pageNumber}

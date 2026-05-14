@@ -46,6 +46,16 @@ export interface LearningActivityAttempt {
 	answers: unknown;
 	score?: number;
 	feedback: string;
+	questionFeedback?: Array<{
+		id: string;
+		feedback?: string;
+		simplifiedScore?: "wrong" | "Almost there" | "Perfect";
+		expectedAnswer?: string;
+		improvementReason?: string;
+		score?: number;
+		strengths: string[];
+		improvements: string[];
+	}>;
 	completedAt: string;
 }
 
@@ -58,6 +68,7 @@ export interface LearningActivityProgress {
 		correctOptionId: string;
 		explanation: string;
 	}>;
+	answers?: Record<string, unknown>;
 	completed: boolean;
 	updatedAt: string;
 }

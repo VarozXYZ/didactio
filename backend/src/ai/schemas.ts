@@ -233,11 +233,34 @@ export const syllabusSchema = z
 		modules: value.modules,
 	}));
 
+const learningActivityContentSchema = z.object({
+	questions: z.array(z.any()).optional(),
+	prompts: z.array(z.any()).optional(),
+	language: z.string().optional(),
+	prompt: z.string().optional(),
+	starterCode: z.string().optional(),
+	expectedOutcome: z.string().optional(),
+	testCases: z.array(z.any()).optional(),
+	rubric: z.array(z.string()).optional(),
+	cards: z.array(z.any()).optional(),
+	pairs: z.array(z.any()).optional(),
+	items: z.array(z.any()).optional(),
+	scenario: z.string().optional(),
+	positions: z.array(z.string()).optional(),
+	reflectionQuestions: z.array(z.string()).optional(),
+	textWithBlanks: z.string().optional(),
+	blanks: z.array(z.any()).optional(),
+	brief: z.string().optional(),
+	steps: z.array(z.string()).optional(),
+	deliverable: z.string().optional(),
+	html: z.string().optional(),
+});
+
 export const learningActivitySchema = z.object({
 	title: z.string().min(1),
 	instructions: z.string().min(1),
 	dedupeSummary: z.string().min(1),
-	content: z.record(z.string(), z.unknown()),
+	content: learningActivityContentSchema,
 });
 
 export const learningActivityFeedbackSchema = z.object({
@@ -245,4 +268,19 @@ export const learningActivityFeedbackSchema = z.object({
 	feedback: z.string().min(1),
 	strengths: z.array(z.string().min(1)).default([]),
 	improvements: z.array(z.string().min(1)).default([]),
+	questionFeedback: z
+		.array(
+			z.object({
+				id: z.union([z.string(), z.number()]).transform(String),
+				simplifiedScore: z
+					.enum(["wrong", "Almost there", "Perfect"]),
+				expectedAnswer: z.string().min(1),
+				improvementReason: z.string().min(1),
+				score: z.number().min(0).max(100).optional(),
+				feedback: z.string().min(1).optional(),
+				strengths: z.array(z.string().min(1)).default([]),
+				improvements: z.array(z.string().min(1)).default([]),
+			}),
+		)
+		.default([]),
 });

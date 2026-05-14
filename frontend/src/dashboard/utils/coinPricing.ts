@@ -37,3 +37,12 @@ export function getModuleRegenerationCost(input: {
 		amount: input.quality === "gold" ? 5 : 1,
 	};
 }
+
+export function getActivityFeedbackRefillCost(input: {
+	quality: BackendGenerationQuality;
+}): {coinType: BackendCoinType; amount: number} {
+	return {
+		coinType: input.quality,
+		amount: 1,
+	};
+}

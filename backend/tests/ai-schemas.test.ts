@@ -1,6 +1,7 @@
 import {describe, expect, it} from "vitest";
 import {
 	folderClassificationSchema,
+	learningActivitySchema,
 	moderationSchema,
 	syllabusSchema,
 } from "../src/ai/schemas.js";
@@ -182,5 +183,39 @@ describe("syllabus schema", () => {
 			"Understanding hue, saturation, and value",
 			"Using texture to add visual depth",
 		]);
+	});
+});
+
+describe("learning activity schema", () => {
+	it("accepts three short-answer prompts", () => {
+		const parsed = learningActivitySchema.parse({
+			title: "TypeScript props",
+			instructions: "Answer the prompts in your own words.",
+			dedupeSummary: "Checks TypeScript prop typing and reasoning.",
+			content: {
+				prompts: [
+					{
+						id: "q1",
+						prompt: "Explain how you would type the props for UserCard.",
+						expectedAnswer: "A clear explanation of typed props.",
+						rubric: ["Defines all props", "Uses correct primitive types"],
+					},
+					{
+						id: "q2",
+						prompt: "Justify when you would use optional props.",
+						expectedAnswer: "A clear justification of optional props.",
+						rubric: ["Explains optionality"],
+					},
+					{
+						id: "q3",
+						prompt: "Compare type aliases and interfaces for props.",
+						expectedAnswer: "A balanced comparison.",
+						rubric: ["Compares both options"],
+					},
+				],
+			},
+		});
+
+		expect(parsed.content.prompts).toHaveLength(3);
 	});
 });

@@ -38,6 +38,7 @@ import {
 } from "./telemetry.js";
 import {createCanonicalDidacticUnitChapter} from "../didactic-unit/didactic-unit-chapter.js";
 import {extractContinuitySummary} from "../html/extractContinuity.js";
+import {sanitizeSimpleFeedbackHtml} from "../html/sanitize.js";
 import type {
 	LearningActivityScope,
 	LearningActivityType,
@@ -62,6 +63,127 @@ interface BaseStageResult {
 	model: string;
 	prompt: string;
 	telemetry: AiCallTelemetry;
+}
+
+function extractBalancedJsonObjects(text: string): string[] {
+	const candidates: string[] = [];
+
+	for (let start = 0; start < text.length; start += 1) {
+		if (text[start] !== "{") {
+			continue;
+		}
+
+		let depth = 0;
+		let inString = false;
+		let escaped = false;
+
+		for (let index = start; index < text.length; index += 1) {
+			const char = text[index];
+
+			if (inString) {
+				if (escaped) {
+					escaped = false;
+				} else if (char === "\\") {
+					escaped = true;
+				} else if (char === "\"") {
+					inString = false;
+				}
+				continue;
+			}
+
+			if (char === "\"") {
+				inString = true;
+				continue;
+			}
+
+			if (char === "{") {
+				depth += 1;
+			} else if (char === "}") {
+				depth -= 1;
+
+				if (depth === 0) {
+					candidates.push(text.slice(start, index + 1));
+					break;
+				}
+			}
+		}
+	}
+
+	return candidates;
+}
+
+export function repairLearningActivityJsonText(text: string): string | null {
+	const normalized = text.replace(/<｜end▁of▁thinking｜>/g, "");
+
+	for (const candidate of extractBalancedJsonObjects(normalized)) {
+		try {
+			const parsed = JSON.parse(candidate);
+			const validation = learningActivitySchema.safeParse(parsed);
+
+			if (validation.success) {
+				return JSON.stringify(validation.data);
+			}
+		} catch {
+			// Continue scanning: some providers prepend partial JSON snippets.
+		}
+	}
+
+	return null;
+}
+
+export function repairLearningActivityFeedbackJsonText(text: string): string | null {
+	const normalized = text.replace(/<｜end▁of▁thinking｜>/g, "");
+
+	for (const candidate of extractBalancedJsonObjects(normalized)) {
+		try {
+			const parsed = JSON.parse(candidate);
+			const validation = learningActivityFeedbackSchema.safeParse(parsed);
+
+			if (validation.success) {
+				return JSON.stringify(validation.data);
+			}
+		} catch {
+			// Continue scanning: some providers prepend partial JSON snippets.
+		}
+	}
+
+	return null;
+}
+
+function normalizeLearningActivityContent(
+	type: LearningActivityType,
+	content: Record<string, unknown>,
+): Record<string, unknown> {
+	if (type !== "short_answer") {
+		return content;
+	}
+
+	const prompts = Array.isArray(content.prompts) ? content.prompts : [];
+
+	if (prompts.length <= 3) {
+		return content;
+	}
+
+	return {
+		...content,
+		prompts: prompts.slice(0, 3),
+	};
+}
+
+function sanitizeQuestionFeedback(
+	questionFeedback: LearningActivityFeedbackResult["questionFeedback"],
+): LearningActivityFeedbackResult["questionFeedback"] {
+	return questionFeedback.map((item) => ({
+		...item,
+		expectedAnswer:
+			item.expectedAnswer ?
+				sanitizeSimpleFeedbackHtml(item.expectedAnswer)
+			:	undefined,
+		improvementReason:
+			item.improvementReason ?
+				sanitizeSimpleFeedbackHtml(item.improvementReason)
+			:	undefined,
+	}));
 }
 
 export interface ModerationResult extends BaseStageResult {
@@ -108,6 +230,16 @@ export interface LearningActivityFeedbackResult extends BaseStageResult {
 	feedback: string;
 	strengths: string[];
 	improvements: string[];
+	questionFeedback: Array<{
+		id: string;
+		feedback?: string;
+		simplifiedScore?: "wrong" | "Almost there" | "Perfect";
+		expectedAnswer?: string;
+		improvementReason?: string;
+		score?: number;
+		strengths: string[];
+		improvements: string[];
+	}>;
 }
 
 type AiStageName =
@@ -316,7 +448,7 @@ function resolveStageMaxOutputTokens(
 		case "summary":
 			return 1000;
 		case "activity_feedback":
-			return 1600;
+			return 4500;
 		case "activity":
 			return 4500;
 		case "syllabus":
@@ -1136,6 +1268,8 @@ export class GatewayAiService implements AiService {
 				schema: learningActivitySchema,
 				maxOutputTokens,
 				abortSignal: input.abortSignal,
+				experimental_repairText: async ({text}) =>
+					repairLearningActivityJsonText(text),
 			});
 			const telemetry = await this.enrichAiCallTelemetry(
 				await collectAiCallTelemetry(result, Date.now() - startedAt),
@@ -1145,6 +1279,10 @@ export class GatewayAiService implements AiService {
 				type: input.type,
 				scope: input.scope,
 			});
+			const content = normalizeLearningActivityContent(
+				input.type,
+				result.object.content,
+			);
 
 			return {
 				provider: selection.provider,
@@ -1154,7 +1292,7 @@ export class GatewayAiService implements AiService {
 				title: result.object.title,
 				instructions: result.object.instructions,
 				dedupeSummary: result.object.dedupeSummary,
-				content: result.object.content,
+				content,
 				raw: result.object,
 			};
 		} catch (error) {
@@ -1200,6 +1338,8 @@ export class GatewayAiService implements AiService {
 				schema: learningActivityFeedbackSchema,
 				maxOutputTokens,
 				abortSignal: input.abortSignal,
+				experimental_repairText: async ({text}) =>
+					repairLearningActivityFeedbackJsonText(text),
 			});
 			const telemetry = await this.enrichAiCallTelemetry(
 				await collectAiCallTelemetry(result, Date.now() - startedAt),
@@ -1208,6 +1348,9 @@ export class GatewayAiService implements AiService {
 				tier: input.tier,
 				activityType: input.activityType,
 			});
+			const questionFeedback = sanitizeQuestionFeedback(
+				result.object.questionFeedback,
+			);
 
 			return {
 				provider: selection.provider,
@@ -1218,6 +1361,7 @@ export class GatewayAiService implements AiService {
 				feedback: result.object.feedback,
 				strengths: result.object.strengths,
 				improvements: result.object.improvements,
+				questionFeedback,
 			};
 		} catch (error) {
 			this.logAiCallFailed("activity_feedback", selection, {
