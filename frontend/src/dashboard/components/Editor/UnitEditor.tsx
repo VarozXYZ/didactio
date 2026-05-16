@@ -50,7 +50,6 @@ import {
 	DropdownMenu,
 	DropdownMenuContent,
 	DropdownMenuItem,
-	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -773,10 +772,10 @@ function resolvePostModuleCompletionStyle(presetId: string | undefined) {
 			accent: "#2563EB",
 			accentSoft: "#EFF6FF",
 			accentText: "#1D4ED8",
-			headingColor: "#111827",
+			headingColor: "#1D1D1F",
 			bodyColor: "#4B5563",
-			primaryBackground: "#111827",
-			primaryHover: "#1F2937",
+			primaryBackground: "#1D1D1F",
+			primaryHover: "#333333",
 			primaryIconBackground: "rgba(37,99,235,0.20)",
 			secondaryIconBackground: "#EFF6FF",
 			badgeBackground: "#EFF6FF",
@@ -795,10 +794,10 @@ function resolvePostModuleCompletionStyle(presetId: string | undefined) {
 		accent: "#16A34A",
 		accentSoft: "#DCFCE7",
 		accentText: "#15803D",
-		headingColor: "#111827",
+		headingColor: "#1D1D1F",
 		bodyColor: "#4B5563",
-		primaryBackground: "#111827",
-		primaryHover: "#1F2937",
+		primaryBackground: "#1D1D1F",
+		primaryHover: "#333333",
 		primaryIconBackground: "rgba(16,185,129,0.20)",
 		secondaryIconBackground: "#ECFDF5",
 		badgeBackground: "#ECFDF5",
@@ -2620,14 +2619,6 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				<button
 					className="group flex min-h-[164px] w-full flex-col rounded-[20px] p-5 text-left text-white transition-all hover:-translate-y-0.5"
 					onClick={() => setIsActivityModalOpen(true)}
-					onMouseEnter={(event) => {
-						event.currentTarget.style.backgroundColor =
-							postModuleCompletionStyle.primaryHover;
-					}}
-					onMouseLeave={(event) => {
-						event.currentTarget.style.backgroundColor =
-							postModuleCompletionStyle.primaryBackground;
-					}}
 					style={{
 						backgroundColor:
 							postModuleCompletionStyle.primaryBackground,
@@ -3484,7 +3475,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 							isStreamingGeneration ||
 							isCancellingGeneration;
 						const aiLabel =
-							chapter.status === "ready" ? "Regenerate module"
+							chapter.status === "ready" ? "Regenerate"
 							: chapter.status === "failed" ? "Retry generation"
 							: "Generate module";
 						const chapterNeedsPaidRegeneration =
@@ -3496,6 +3487,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 							canPayRegeneration;
 						const canMarkRead =
 							chapter.status === "ready" && !chapter.isCompleted;
+						const canCreateActivity = chapter.status === "ready";
 						const showModuleOutline =
 							isActive &&
 							moduleOutline.length > 0 &&
@@ -3574,7 +3566,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 											<DropdownMenuContent
 												side="right"
 												align="start"
-												className="w-52"
+												className="w-44"
 											>
 											{canAiModule && unitGenerationTier ?
 												<DropdownMenuItem
@@ -3593,9 +3585,11 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 														size={14}
 														className="text-[#86868B]"
 													/>
-													{aiLabel}
+													<span className="min-w-0 flex-1">
+														{aiLabel}
+													</span>
 													{moduleActionCost && (
-														<span className="ml-auto">
+														<span className="ml-2 shrink-0">
 															<CoinAmount
 																type={
 																	moduleActionCost.coinType
@@ -3629,11 +3623,27 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 													:	"Stop generation"}
 												</DropdownMenuItem>
 											) : null}
-											{canMarkRead &&
-											((canAiModule &&
-												unitGenerationTier) ||
-												isChapterGenerating) ?
-												<DropdownMenuSeparator />
+											{canCreateActivity ?
+												<DropdownMenuItem
+													disabled={isActivityLoading}
+													onSelect={() => {
+														setActiveChapterIndex(
+															chapter.chapterIndex,
+														);
+														setCollapsedOutlineChapterIndex(
+															null,
+														);
+														setIsActivityModalOpen(
+															true,
+														);
+													}}
+												>
+													<CirclePlus
+														size={14}
+														className="text-[#86868B]"
+													/>
+													Create exercise
+												</DropdownMenuItem>
 											:	null}
 											{canMarkRead ?
 												<DropdownMenuItem
