@@ -136,6 +136,7 @@ import {parsePresentationTheme} from "./presentation-theme/validate.js";
 import {SYSTEM_DEFAULT_THEME} from "./presentation-theme/types.js";
 import {
 	OBJECTIVE_ACTIVITY_TYPES,
+	getFlashcardVisibleModuleIndexes,
 	gradeObjectiveActivity,
 	parseCreateLearningActivityInput,
 	type LearningActivity,
@@ -938,7 +939,12 @@ async function reserveGenerationCredits(input: {
 	cost: GenerationCoinCost;
 	reason: string;
 	metadata: Record<string, unknown>;
-}): Promise<CreditReservation> {
+}): Promise<CreditReservation | null> {
+	const user = await input.authService.getUserById(input.ownerId);
+	if (user?.role === "admin") {
+		return null;
+	}
+
 	return input.authService.reserveUserCredits({
 		userId: input.ownerId,
 		coinType: input.cost.coinType,
@@ -1037,6 +1043,200 @@ function sortPreviousActivitiesForPrompt(input: {
 		}
 		return right.createdAt.localeCompare(left.createdAt);
 	});
+}
+
+function uniqueLearningActivitiesById(
+	activities: LearningActivity[],
+): LearningActivity[] {
+	const seen = new Set<string>();
+	const unique: LearningActivity[] = [];
+
+	for (const activity of activities) {
+		if (seen.has(activity.id)) {
+			continue;
+		}
+
+		seen.add(activity.id);
+		unique.push(activity);
+	}
+
+	return unique;
+}
+
+function resolveFlashcardGenerationCount(quality: GenerationQuality): number {
+	return quality === "gold" ? 15 : 5;
+}
+
+function normalizeActivityRecord(value: unknown): Record<string, unknown> {
+	return value && typeof value === "object" && !Array.isArray(value) ?
+			(value as Record<string, unknown>)
+		:	{};
+}
+
+function normalizeFlashcardText(value: unknown): string {
+	return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeFlashcardKey(value: unknown): string {
+	return normalizeFlashcardText(value)
+		.toLowerCase()
+		.replace(/\s+/g, " ");
+}
+
+function normalizeFlashcardCards(value: unknown): Array<Record<string, unknown>> {
+	return Array.isArray(value) ?
+			value
+				.map((item) => normalizeActivityRecord(item))
+				.filter(
+					(card) =>
+						normalizeFlashcardText(card.front).length > 0 &&
+						normalizeFlashcardText(card.back).length > 0,
+				)
+		:	[];
+}
+
+function prepareGeneratedFlashcardCards(input: {
+	cards: unknown;
+	existingCards: Array<Record<string, unknown>>;
+	count: number;
+}): Array<Record<string, unknown>> {
+	const existingKeys = new Set(
+		input.existingCards.map((card) => normalizeFlashcardKey(card.front)),
+	);
+	const seenKeys = new Set<string>();
+
+	return normalizeFlashcardCards(input.cards)
+		.filter((card) => {
+			const key = normalizeFlashcardKey(card.front);
+			if (!key || existingKeys.has(key) || seenKeys.has(key)) {
+				return false;
+			}
+			seenKeys.add(key);
+			return true;
+		})
+		.slice(0, input.count)
+		.map((card, index) => ({
+			...card,
+			id:
+				normalizeFlashcardText(card.id) ||
+				`card-${Date.now()}-${index + 1}`,
+		}));
+}
+
+async function resolveCanonicalFlashcardActivity(input: {
+	learningActivityStore: LearningActivityStore;
+	ownerId: string;
+	didacticUnitId: string;
+	chapterIndex: number;
+	sourceModuleIndexes: number[];
+	quality: GenerationQuality;
+	result: {
+		title: string;
+		instructions: string;
+		content: Record<string, unknown>;
+		dedupeSummary: string;
+	};
+	generationRunId: string;
+	activityId: string;
+	now: string;
+}): Promise<LearningActivity> {
+	const count = resolveFlashcardGenerationCount(input.quality);
+	const unitActivities = await input.learningActivityStore.listByUnit({
+		ownerId: input.ownerId,
+		didacticUnitId: input.didacticUnitId,
+	});
+	const flashcardActivities = unitActivities
+		.filter((activity) => activity.type === "flashcards")
+		.sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+	const canonical = flashcardActivities[0];
+	const duplicateActivities = flashcardActivities.slice(1);
+	const duplicateCards = duplicateActivities.flatMap((activity) =>
+		normalizeFlashcardCards(activity.content.cards),
+	);
+	const existingCards =
+		canonical ? normalizeFlashcardCards(canonical.content.cards) : [];
+	const generatedCards = prepareGeneratedFlashcardCards({
+		cards: input.result.content.cards,
+		existingCards: [...existingCards, ...duplicateCards],
+		count,
+	});
+	const mergedCards = [
+		...existingCards,
+		...duplicateCards.filter((card) => {
+			const key = normalizeFlashcardKey(card.front);
+			return !existingCards.some(
+				(existing) => normalizeFlashcardKey(existing.front) === key,
+			);
+		}),
+		...generatedCards,
+	];
+
+	if (canonical) {
+		const visibleModuleIndexes = Array.from(
+			new Set([
+				...getFlashcardVisibleModuleIndexes(canonical),
+				...duplicateActivities.flatMap(getFlashcardVisibleModuleIndexes),
+				input.chapterIndex,
+			]),
+		).sort((left, right) => left - right);
+		const updated: LearningActivity = {
+			...canonical,
+			quality: input.quality,
+			title: input.result.title || canonical.title,
+			instructions: input.result.instructions || canonical.instructions,
+			content: {
+				...canonical.content,
+				...input.result.content,
+				cards: mergedCards,
+				visibleModuleIndexes,
+			},
+			dedupeSummary: [
+				canonical.dedupeSummary,
+				input.result.dedupeSummary,
+			].filter(Boolean).join(" "),
+			sourceModuleIndexes: Array.from(
+				new Set([
+					...canonical.sourceModuleIndexes,
+					...input.sourceModuleIndexes,
+				]),
+			).sort((left, right) => left - right),
+			feedbackAttemptLimit: Math.max(canonical.feedbackAttemptLimit, 3),
+			generationRunId: input.generationRunId,
+			updatedAt: input.now,
+		};
+		await input.learningActivityStore.saveActivity(updated);
+		for (const duplicate of duplicateActivities) {
+			await input.learningActivityStore.saveActivity({
+				...duplicate,
+				content: {...duplicate.content, archived: true},
+				updatedAt: input.now,
+			});
+		}
+		return updated;
+	}
+
+	return {
+		id: input.activityId,
+		ownerId: input.ownerId,
+		didacticUnitId: input.didacticUnitId,
+		chapterIndex: input.chapterIndex,
+		scope: "cumulative_until_module",
+		type: "flashcards",
+		quality: input.quality,
+		title: input.result.title,
+		instructions: input.result.instructions,
+		content: {
+			...input.result.content,
+			cards: generatedCards,
+			visibleModuleIndexes: [input.chapterIndex],
+		},
+		dedupeSummary: input.result.dedupeSummary,
+		sourceModuleIndexes: input.sourceModuleIndexes,
+		feedbackAttemptLimit: 3,
+		generationRunId: input.generationRunId,
+		createdAt: input.now,
+		updatedAt: input.now,
+	};
 }
 
 function parseAttemptAnswers(body: unknown): unknown {
@@ -2095,7 +2295,6 @@ export function createApp(options: CreateAppOptions) {
 						}),
 					})
 				:	moderatedDidacticUnit;
-			// Apply AI-suggested style preset if no theme is set yet
 			const styledUnit =
 				moderation.stylePreset &&
 				!folderResolvedDidacticUnit.presentationTheme?.stylePreset ?
@@ -2623,8 +2822,10 @@ export function createApp(options: CreateAppOptions) {
 					didacticUnit,
 					{
 						generationQuality: quality,
-						creditTransactionId: reservation.transaction.id,
-						paidAt: reservation.transaction.createdAt.toISOString(),
+						creditTransactionId: reservation?.transaction.id,
+						paidAt:
+							reservation?.transaction.createdAt.toISOString() ??
+							new Date().toISOString(),
 					},
 				);
 				await didacticUnitStore.save(approvedDidacticUnit);
@@ -2846,19 +3047,30 @@ export function createApp(options: CreateAppOptions) {
 				scope: input.scope,
 				chapterIndex,
 			});
+			const activityPromptPool =
+				input.scope === "current_module" ?
+					await learningActivityStore.listByModule({
+						ownerId,
+						didacticUnitId: didacticUnit.id,
+						chapterIndex,
+					})
+				:	await learningActivityStore.listByUnitRange({
+						ownerId,
+						didacticUnitId: didacticUnit.id,
+						maxChapterIndex: chapterIndex,
+					});
+			const flashcardPromptPool =
+				input.type === "flashcards" ?
+					(await learningActivityStore.listByUnit({
+						ownerId,
+						didacticUnitId: didacticUnit.id,
+					})).filter((activity) => activity.type === "flashcards")
+				:	[];
 			const previousActivities = sortPreviousActivitiesForPrompt({
-				activities:
-					input.scope === "current_module" ?
-						await learningActivityStore.listByModule({
-							ownerId,
-							didacticUnitId: didacticUnit.id,
-							chapterIndex,
-						})
-					:	await learningActivityStore.listByUnitRange({
-							ownerId,
-							didacticUnitId: didacticUnit.id,
-							maxChapterIndex: chapterIndex,
-						}),
+				activities: uniqueLearningActivitiesById([
+					...activityPromptPool,
+					...flashcardPromptPool,
+				]),
 				chapterIndex,
 				type: input.type,
 			});
@@ -2906,14 +3118,40 @@ export function createApp(options: CreateAppOptions) {
 						type: activity.type,
 						title: activity.title,
 						instructions: activity.instructions,
-						dedupeSummary: activity.dedupeSummary,
+						dedupeSummary:
+							activity.type === "flashcards" ?
+								[
+									activity.dedupeSummary,
+									"Existing cards:",
+									normalizeFlashcardCards(activity.content.cards)
+										.slice(0, 80)
+										.map(
+											(card) =>
+												`${normalizeFlashcardText(card.front)} -> ${normalizeFlashcardText(card.back)}`,
+										)
+										.join("; "),
+								]
+									.filter(Boolean)
+									.join(" ")
+							:	activity.dedupeSummary,
 					})),
 					config,
 					tier: input.quality,
 					abortSignal: createAbortSignal(request),
 				});
 				const now = new Date().toISOString();
-				const activityId = randomUUID();
+				const existingFlashcardActivity =
+					input.type === "flashcards" ?
+						(await learningActivityStore.listByUnit({
+							ownerId,
+							didacticUnitId: didacticUnit.id,
+						}))
+							.filter((activity) => activity.type === "flashcards")
+							.sort((left, right) =>
+								left.createdAt.localeCompare(right.createdAt),
+							)[0]
+					:	null;
+				const activityId = existingFlashcardActivity?.id ?? randomUUID();
 				const run = createCompletedActivityGenerationRunRecord({
 					didacticUnitId: didacticUnit.id,
 					ownerId,
@@ -2925,29 +3163,43 @@ export function createApp(options: CreateAppOptions) {
 					model: result.model,
 					prompt: result.prompt,
 					rawOutput: JSON.stringify(result.raw),
-					coinTxId: reservation.transaction.id,
+					coinTxId: reservation?.transaction.id,
 					createdAt: now,
 					telemetry: result.telemetry,
 				});
-				const activity: LearningActivity = {
-					id: activityId,
-					ownerId,
-					didacticUnitId: didacticUnit.id,
-					chapterIndex,
-					scope: input.scope,
-					type: input.type,
-					quality: input.quality,
-					title: result.title,
-					instructions: result.instructions,
-					content: result.content,
-					dedupeSummary: result.dedupeSummary,
-					sourceModuleIndexes,
-					feedbackAttemptLimit: 3,
-					generationRunId: run.id,
-					createdAt: now,
-					updatedAt: now,
-				};
 				await generationRunStore.save(run);
+				const activity: LearningActivity =
+					input.type === "flashcards" ?
+						await resolveCanonicalFlashcardActivity({
+							learningActivityStore,
+							ownerId,
+							didacticUnitId: didacticUnit.id,
+							chapterIndex,
+							sourceModuleIndexes,
+							quality: input.quality,
+							result,
+							generationRunId: run.id,
+							activityId,
+							now,
+						})
+					:	{
+							id: activityId,
+							ownerId,
+							didacticUnitId: didacticUnit.id,
+							chapterIndex,
+							scope: input.scope,
+							type: input.type,
+							quality: input.quality,
+							title: result.title,
+							instructions: result.instructions,
+							content: result.content,
+							dedupeSummary: result.dedupeSummary,
+							sourceModuleIndexes,
+							feedbackAttemptLimit: 3,
+							generationRunId: run.id,
+							createdAt: now,
+							updatedAt: now,
+						};
 				await learningActivityStore.saveActivity(activity);
 				response.status(201).json({activity});
 			} catch (error) {

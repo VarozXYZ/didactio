@@ -73,6 +73,50 @@ export interface LearningActivityProgress {
 	updatedAt: string;
 }
 
+export function isLearningActivityArchived(activity: LearningActivity): boolean {
+	return normalizeRecord(activity.content).archived === true;
+}
+
+export function getFlashcardVisibleModuleIndexes(
+	activity: LearningActivity,
+): number[] {
+	const content = normalizeRecord(activity.content);
+	const indexes = normalizeArray(content.visibleModuleIndexes)
+		.map((value) => Number(value))
+		.filter((value) => Number.isInteger(value) && value >= 0);
+
+	return indexes.length > 0 ? indexes : [activity.chapterIndex];
+}
+
+export function isLearningActivityVisibleInModule(
+	activity: LearningActivity,
+	chapterIndex: number,
+): boolean {
+	if (isLearningActivityArchived(activity)) {
+		return false;
+	}
+
+	if (activity.type === "flashcards") {
+		return getFlashcardVisibleModuleIndexes(activity).includes(chapterIndex);
+	}
+
+	return activity.chapterIndex === chapterIndex;
+}
+
+export function sortLearningActivitiesForModule(
+	activities: LearningActivity[],
+): LearningActivity[] {
+	return [...activities].sort((left, right) => {
+		if (left.type === "flashcards" && right.type !== "flashcards") {
+			return 1;
+		}
+		if (left.type !== "flashcards" && right.type === "flashcards") {
+			return -1;
+		}
+		return left.createdAt.localeCompare(right.createdAt);
+	});
+}
+
 export interface LearningActivityCreateInput {
 	scope: LearningActivityScope;
 	type: LearningActivityType;

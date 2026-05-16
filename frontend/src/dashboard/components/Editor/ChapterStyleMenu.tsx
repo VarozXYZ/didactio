@@ -93,7 +93,6 @@ export function ChapterStyleMenu({
 
 			{isOpen ?
 				<div className="absolute top-[calc(100%+10px)] right-0 z-30 w-[280px] rounded-md border border-[#D4D7DD] bg-white p-4 shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
-					{/* Style presets */}
 					<SectionLabel>Style</SectionLabel>
 					<div className="grid grid-cols-3 gap-1.5">
 						{PRESET_ROWS.flat().map((presetId) => {
@@ -123,7 +122,6 @@ export function ChapterStyleMenu({
 						})}
 					</div>
 
-					{/* Text size */}
 					<div className="mt-3 border-t border-[#EEE8DC] pt-3">
 						<SectionLabel>Text size</SectionLabel>
 						<div className="grid grid-cols-3 gap-1.5">

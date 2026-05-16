@@ -90,7 +90,6 @@ export function resolveTextStyle(): EditorTextStyle {
 	};
 }
 
-// Map old preset IDs to the new 5-preset system for backward compat.
 const LEGACY_PRESET_MAP: Record<string, import("./utils/typography").StylePresetId> = {
 	tech: "modern",
 	educational: "modern",

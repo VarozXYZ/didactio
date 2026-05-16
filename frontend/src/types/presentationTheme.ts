@@ -6,7 +6,6 @@ export type PresentationFont =
 	| "eb-garamond"
 	| "crimson-pro"
 	| "dm-sans"
-	// Legacy values kept for backward compatibility
 	| "merriweather"
 	| "source-serif"
 	| "system-sans"
@@ -43,7 +42,6 @@ export interface PresentationTheme {
 	paragraphAlign: PresentationParagraphAlign;
 	headingScale: PresentationHeadingScale;
 	paragraphSpacing: PresentationParagraphSpacing;
-	// Extended color palette (set from preset)
 	numberColor?: string;
 	codeAccentColor?: string;
 	codeBorderColor?: string;

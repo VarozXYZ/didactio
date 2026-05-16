@@ -1,16 +1,13 @@
 import {FONT_CATALOG, type FontId} from "./typography";
 
-// Tracks which fonts have finished loading.
-const loadedFonts = new Set<FontId>(["inter"]); // Inter is already in index.css
+const loadedFonts = new Set<FontId>(["inter"]);
 
-// In-flight load promises, keyed by FontId.
 const pendingLoads = new Map<FontId, Promise<void>>();
 
 async function doLoad(fontId: FontId): Promise<void> {
 	const entry = FONT_CATALOG[fontId];
-	if (!entry.googleId) return; // Already bundled (Inter)
+	if (!entry.googleId) return;
 
-	// Inject the Google Fonts stylesheet if not already present.
 	const selector = `link[data-gfont="${fontId}"]`;
 	if (!document.querySelector(selector)) {
 		const link = document.createElement("link");
@@ -20,7 +17,6 @@ async function doLoad(fontId: FontId): Promise<void> {
 		document.head.appendChild(link);
 	}
 
-	// Wait until the browser has the specific weights we care about.
 	await Promise.allSettled([
 		document.fonts.load(`400 16px "${entry.family}"`),
 		document.fonts.load(`700 16px "${entry.family}"`),

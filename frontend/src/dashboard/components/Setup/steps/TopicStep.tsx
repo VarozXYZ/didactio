@@ -291,7 +291,6 @@ export function TopicStep({
 
 	return (
 		<form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
-			{/* Topic input */}
 			<div>
 				<label className="mb-1.5 block text-[13px] font-semibold text-[#1D1D1F]">
 					What do you want to learn?
@@ -311,7 +310,6 @@ export function TopicStep({
 				/>
 			</div>
 
-			{/* Additional context toggle */}
 			<div>
 				<button
 					type="button"
@@ -342,13 +340,11 @@ export function TopicStep({
 				)}
 			</div>
 
-			{/* Folder assignment */}
 			<div>
 				<div className="mb-1.5 text-[12px] font-semibold text-[#86868B]">
 					Folder
 				</div>
 				<div className="flex items-center gap-2">
-					{/* Dropdown trigger — intentionally narrower than full width */}
 					<div className="relative w-[240px] shrink-0">
 						<button
 							type="button"
@@ -446,7 +442,6 @@ export function TopicStep({
 						)}
 					</div>
 
-					{/* New folder button */}
 					<button
 						type="button"
 						onClick={() => setShowFolderModal(true)}
@@ -473,7 +468,6 @@ export function TopicStep({
 				}}
 			/>
 
-			{/* Level / depth / length: one row each, full width */}
 			<div className="flex flex-col gap-4">
 				<SegmentedControl
 					label="Level"
@@ -501,7 +495,6 @@ export function TopicStep({
 				/>
 			</div>
 
-			{/* Progress bar during submission */}
 			{isSubmitting && (
 				<div className="space-y-2">
 					<Progress value={progressValue} className="h-1.5" />
@@ -511,7 +504,6 @@ export function TopicStep({
 				</div>
 			)}
 
-			{/* Actions */}
 			<div className="flex justify-end gap-3 pt-2">
 				<button
 					type="button"

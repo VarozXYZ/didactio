@@ -1,4 +1,9 @@
-import {useEffect, useMemo, useRef, useState} from "react";
+import {useEffect, useMemo, useRef, useState, type CSSProperties} from "react";
+import {
+	Flashcard,
+	useFlashcard,
+} from "react-quizlet-flashcard";
+import "react-quizlet-flashcard/dist/index.css";
 import {
 	BookOpenCheck,
 	BadgeQuestionMark,
@@ -145,7 +150,6 @@ function MultipleChoiceActivity({
 	const [confirmedAnswers, setConfirmedAnswers] = useState<Record<string, ConfirmedAnswer>>({});
 	const [completed, setCompleted] = useState(false);
 
-	// Load persisted progress on mount
 	useEffect(() => {
 		void dashboardApi.getActivityProgress(activity.id).then(({progress}) => {
 			if (!progress) return;
@@ -153,9 +157,9 @@ function MultipleChoiceActivity({
 			setCompleted(progress.completed);
 			const answeredCount = Object.keys(progress.confirmedAnswers).length;
 			if (answeredCount > 0 && !progress.completed) {
-				setViewIndex(answeredCount); // resume at next unanswered question
+				setViewIndex(answeredCount); 
 			}
-		}).catch(() => {/* ignore — no saved progress */});
+		}).catch(() => {});
 	}, [activity.id]);
 
 	const activeQuestionIndex = Object.keys(confirmedAnswers).length;
@@ -170,7 +174,7 @@ function MultipleChoiceActivity({
 		void dashboardApi.saveActivityProgress(activity.id, {
 			confirmedAnswers: nextConfirmed,
 			completed: isCompleted,
-		}).catch(() => {/* silent — non-critical */});
+		}).catch(() => {});
 	};
 
 	const handleConfirm = () => {
@@ -270,7 +274,6 @@ function MultipleChoiceActivity({
 
 	return (
 		<div className="flex flex-1 flex-col overflow-hidden">
-			{/* Progress stepper */}
 			<div className="mb-3 flex items-center gap-1.5">
 				{questions.map((_, i) => {
 					const qId = asText(questions[i]?.id) || `q${i + 1}`;
@@ -297,7 +300,6 @@ function MultipleChoiceActivity({
 				})}
 			</div>
 
-			{/* Question counter + nav */}
 			<div className="mb-2 flex items-center justify-between">
 				<span className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#AEAEB2]">
 					Pregunta {viewIndex + 1} de {questions.length}
@@ -322,7 +324,6 @@ function MultipleChoiceActivity({
 				</div>
 			</div>
 
-			{/* Question + options */}
 			<div className="min-h-0 flex-1 overflow-y-auto">
 				{currentQuestion && (
 					<div>
@@ -401,7 +402,6 @@ function MultipleChoiceActivity({
 							})}
 						</div>
 
-						{/* Per-question feedback */}
 						{confirmed && (
 							<div className={cn(
 								"mt-3 rounded-md border p-3",
@@ -430,7 +430,6 @@ function MultipleChoiceActivity({
 				)}
 			</div>
 
-			{/* Footer actions */}
 			<div className="mt-3 border-t border-[#F0F0F2] pt-3">
 				{isCurrentInteractive && !confirmed && (
 					<button
@@ -589,7 +588,7 @@ function ShortAnswerActivity({
 								</div>
 								<FeedbackHtml
 									className="mt-1 text-[#1D1D1F]"
-									html={activeFeedback.expectedAnswer || activeFeedback.feedback}
+									html={activeFeedback.expectedAnswer || activeFeedback.feedback || ""}
 								/>
 							</div>
 							<div>
@@ -600,7 +599,8 @@ function ShortAnswerActivity({
 									className="mt-1 text-[#374151]"
 									html={activeFeedback.improvementReason ||
 										activeFeedback.improvements.join("; ") ||
-										activeFeedback.feedback}
+										activeFeedback.feedback ||
+										""}
 								/>
 							</div>
 						</div>
@@ -614,6 +614,394 @@ function ShortAnswerActivity({
 		</div>
 	);
 }
+
+type FlashcardProgress = {
+	learnedIds: string[];
+	queueIds: string[];
+	revealedCardId?: string;
+	revealed?: boolean;
+};
+
+function asStringArray(value: unknown): string[] {
+	return Array.isArray(value) ?
+			value
+				.map((item) =>
+					typeof item === "string" || typeof item === "number" ?
+						String(item)
+					:	"",
+				)
+				.filter(Boolean)
+		:	[];
+}
+
+function getSavedFlashcardProgress(
+	answers: Record<string, unknown> | undefined,
+): FlashcardProgress {
+	const flashcards =
+		answers?.flashcards &&
+		typeof answers.flashcards === "object" &&
+		!Array.isArray(answers.flashcards) ?
+			(answers.flashcards as Record<string, unknown>)
+		:	{};
+
+	return {
+		learnedIds: asStringArray(flashcards.learnedIds),
+		queueIds: asStringArray(flashcards.queueIds),
+		revealedCardId:
+			typeof flashcards.revealedCardId === "string" ?
+				flashcards.revealedCardId
+			:	undefined,
+		revealed: flashcards.revealed === true,
+	};
+}
+
+function buildFlashcardQueue(input: {
+	cardIds: string[];
+	learnedIds: string[];
+	queueIds: string[];
+}): string[] {
+	const cardIdSet = new Set(input.cardIds);
+	const learnedSet = new Set(
+		input.learnedIds.filter((id) => cardIdSet.has(id)),
+	);
+	const savedQueue = input.queueIds.filter((id) => cardIdSet.has(id));
+	const missingIds = input.cardIds.filter((id) => !savedQueue.includes(id));
+	const fullQueue = [...savedQueue, ...missingIds];
+	const notLearned = fullQueue.filter((id) => !learnedSet.has(id));
+	const learned = fullQueue.filter((id) => learnedSet.has(id));
+
+	return [...notLearned, ...learned];
+}
+
+function FlashcardsActivity({activity}: {activity: BackendLearningActivity}) {
+	const cards = useMemo(
+		() =>
+			asArray(activity.content.cards).map((card, index) => ({
+				id: asId(card.id, `card${index + 1}`),
+				front: asText(card.front),
+				back: asText(card.back),
+			})),
+		[activity.content.cards],
+	);
+	const cardIds = useMemo(() => cards.map((card) => card.id), [cards]);
+	const cardById = useMemo(
+		() => new Map(cards.map((card) => [card.id, card])),
+		[cards],
+	);
+	const [learnedIds, setLearnedIds] = useState<string[]>([]);
+	const [queueIds, setQueueIds] = useState<string[]>(cardIds);
+	const [revealedCardId, setRevealedCardId] = useState<string | undefined>();
+	const [revealed, setRevealed] = useState(false);
+	const [loadedActivityId, setLoadedActivityId] = useState<string | null>(null);
+	const flashcardFlip = useFlashcard({
+		manualFlip: true,
+		flipDirection: "rtl",
+	});
+	const {flip, resetCardState} = flashcardFlip;
+
+	useEffect(() => {
+		let mounted = true;
+
+		void dashboardApi.getActivityProgress(activity.id).then(({progress}) => {
+			if (!mounted) return;
+			const saved = getSavedFlashcardProgress(progress?.answers);
+			const nextQueue = buildFlashcardQueue({
+				cardIds,
+				learnedIds: saved.learnedIds,
+				queueIds: saved.queueIds,
+			});
+			setLearnedIds(saved.learnedIds.filter((id) => cardIds.includes(id)));
+			setQueueIds(nextQueue);
+			setRevealedCardId(saved.revealedCardId);
+			setRevealed(saved.revealed === true);
+			setLoadedActivityId(activity.id);
+		});
+
+		return () => {
+			mounted = false;
+		};
+	}, [activity.id, cardIds]);
+
+	const persist = (next: FlashcardProgress) => {
+		void dashboardApi.saveActivityProgress(activity.id, {
+			confirmedAnswers: {},
+			answers: {flashcards: next},
+			completed: next.learnedIds.length >= cardIds.length && cardIds.length > 0,
+		});
+	};
+
+	const visibleQueue = loadedActivityId === activity.id ? queueIds : cardIds;
+	const visibleLearnedIds = loadedActivityId === activity.id ? learnedIds : [];
+	const learnedSet = new Set(visibleLearnedIds);
+	const nextCardId =
+		visibleQueue.find((id) => !learnedSet.has(id)) ?? visibleQueue[0];
+	const currentCard = nextCardId ? cardById.get(nextCardId) : undefined;
+	const completed = cards.length > 0 && visibleLearnedIds.length >= cards.length;
+	const isCurrentRevealed =
+		revealed && revealedCardId === currentCard?.id && !completed;
+	const currentQueuePosition = currentCard ?
+		visibleQueue.findIndex((id) => id === currentCard.id) + 1
+	:	0;
+
+	useEffect(() => {
+		resetCardState();
+		if (isCurrentRevealed) {
+			window.setTimeout(() => flip("back"), 0);
+		}
+	}, [currentCard?.id, flip, isCurrentRevealed, resetCardState]);
+
+	const saveState = (next: FlashcardProgress) => {
+		setLearnedIds(next.learnedIds);
+		setQueueIds(next.queueIds);
+		setRevealedCardId(next.revealedCardId);
+		setRevealed(next.revealed === true);
+		setLoadedActivityId(activity.id);
+		persist(next);
+	};
+
+	const handleReveal = () => {
+		if (!currentCard) return;
+		flip("back");
+		saveState({
+			learnedIds: visibleLearnedIds,
+			queueIds: visibleQueue,
+			revealedCardId: currentCard.id,
+			revealed: true,
+		});
+	};
+
+	const handleHideBack = () => {
+		if (!currentCard) return;
+		flip("front");
+		saveState({
+			learnedIds: visibleLearnedIds,
+			queueIds: visibleQueue,
+			revealedCardId: currentCard.id,
+			revealed: false,
+		});
+	};
+
+	const handleCardClick = () => {
+		if (isCurrentRevealed) {
+			handleHideBack();
+			return;
+		}
+		handleReveal();
+	};
+
+	const handleLearned = () => {
+		if (!currentCard) return;
+		resetCardState();
+		const nextLearnedIds = Array.from(
+			new Set([...visibleLearnedIds, currentCard.id]),
+		).filter((id) => cardById.has(id));
+		const nextLearnedSet = new Set(nextLearnedIds);
+		const remaining = visibleQueue.filter(
+			(id) => id !== currentCard.id && !nextLearnedSet.has(id),
+		);
+		const learnedQueue = visibleQueue.filter(
+			(id) => id !== currentCard.id && nextLearnedSet.has(id),
+		);
+		const missingIds = cardIds.filter(
+			(id) =>
+				id !== currentCard.id &&
+				!remaining.includes(id) &&
+				!learnedQueue.includes(id) &&
+				!nextLearnedSet.has(id),
+		);
+		saveState({
+			learnedIds: nextLearnedIds,
+			queueIds: [...remaining, ...missingIds, ...learnedQueue, currentCard.id],
+			revealedCardId: undefined,
+			revealed: false,
+		});
+	};
+
+	const handleNotYet = () => {
+		if (!currentCard) return;
+		resetCardState();
+		const nextLearnedIds = visibleLearnedIds.filter((id) => id !== currentCard.id);
+		const nextLearnedSet = new Set(nextLearnedIds);
+		const remaining = visibleQueue.filter(
+			(id) => id !== currentCard.id && !nextLearnedSet.has(id),
+		);
+		const learnedQueue = visibleQueue.filter(
+			(id) => id !== currentCard.id && nextLearnedSet.has(id),
+		);
+		saveState({
+			learnedIds: nextLearnedIds,
+			queueIds: [...remaining, currentCard.id, ...learnedQueue],
+			revealedCardId: undefined,
+			revealed: false,
+		});
+	};
+
+	const handleReviewAgain = () => {
+		resetCardState();
+		saveState({
+			learnedIds: [],
+			queueIds: cardIds,
+			revealedCardId: undefined,
+			revealed: false,
+		});
+	};
+
+	if (cards.length === 0) {
+		return (
+			<div className="flex min-h-[220px] items-center justify-center rounded-lg border border-[#E8E8EA] bg-[#F9F9FB] text-sm font-medium text-[#6B7280]">
+				No flashcards available yet.
+			</div>
+		);
+	}
+
+	if (completed) {
+		return (
+			<div className="flex min-h-0 flex-1 items-center justify-center">
+				<div className="flex h-[260px] w-full max-w-[560px] flex-col items-center justify-center rounded-[10px] border border-[#BBF7D0] bg-[#F0FDF4] px-6 text-center shadow-[0_14px_34px_rgba(17,24,39,0.08)]">
+					<div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#DCFCE7] text-[#16A34A]">
+						<CheckCircle2 size={20} />
+					</div>
+					<h4 className="mt-3 text-[16px] font-bold text-[#166534]">
+						Deck learned
+					</h4>
+					<p className="mt-1 max-w-[360px] text-[13px] leading-relaxed text-[#166534]">
+						All {cards.length} flashcards are marked as learned.
+					</p>
+					<button
+						type="button"
+						onClick={handleReviewAgain}
+						className="mt-5 rounded-md bg-[#16A34A] px-4 py-1.5 text-[12px] font-bold text-white transition hover:bg-[#15803D]"
+					>
+						Review again
+					</button>
+				</div>
+			</div>
+		);
+	}
+
+	const cardStyle = {
+		width: "100%",
+		height: "260px",
+		borderRadius: "10px",
+		"--box-shadow": "0 14px 34px rgba(17, 24, 39, 0.08)",
+		"--front-bg": "#FFFFFF",
+		"--back-bg": "#F8FFF9",
+	} as CSSProperties;
+
+	return (
+		<div className="flex min-h-0 flex-1 flex-col gap-3">
+			<div className="space-y-2">
+				<div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-[0.14em] text-[#AEAEB2]">
+					<span>{visibleLearnedIds.length} / {cards.length} learned</span>
+					<span>{cards.length - visibleLearnedIds.length} remaining</span>
+				</div>
+				<div className="h-1.5 overflow-hidden rounded-full bg-[#F0F0F2]">
+					<div
+						className="h-full rounded-full bg-[#16A34A] transition-all"
+						style={{width: `${Math.round((visibleLearnedIds.length / cards.length) * 100)}%`}}
+					/>
+				</div>
+			</div>
+			<div className="flex min-h-0 flex-1 items-center justify-center">
+				<div className="flex w-full flex-col items-center">
+					<div className="mb-3 flex w-full max-w-[560px] items-center justify-between text-[11px] font-semibold text-[#86868B]">
+						<span>Card {currentQueuePosition} of {cards.length}</span>
+						<span>{isCurrentRevealed ? "Back side" : "Front side"}</span>
+					</div>
+						<div
+							role="button"
+							tabIndex={0}
+							onClick={handleCardClick}
+						onKeyDown={(event) => {
+							if (event.key === "Enter" || event.key === " ") {
+								event.preventDefault();
+								handleCardClick();
+							}
+						}}
+							className="w-full max-w-[560px] cursor-pointer rounded-[10px] outline-none focus-visible:ring-2 focus-visible:ring-[#86EFAC]"
+							aria-label={isCurrentRevealed ? "Show card front" : "Reveal card back"}
+						>
+						<Flashcard
+							flipHook={flashcardFlip}
+							style={cardStyle}
+							front={{
+								html: (
+									<div className="flex h-full flex-col justify-between p-5 text-left">
+										<span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#A1A1AA]">
+											Front
+										</span>
+										<div className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto py-4 text-center">
+											<p className="w-full max-w-[480px] whitespace-pre-wrap break-words text-[18px] font-semibold leading-relaxed text-[#1D1D1F]">
+												{currentCard?.front}
+											</p>
+										</div>
+										<span className="text-center text-[11px] font-medium text-[#AEAEB2]">
+											Click the card or use the button to reveal the back.
+										</span>
+									</div>
+								),
+							}}
+							back={{
+								html: (
+									<div className="flex h-full flex-col justify-between p-5 text-left">
+										<span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#16A34A]">
+											Back
+										</span>
+										<div className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto py-4 text-center">
+											<p className="w-full max-w-[480px] whitespace-pre-wrap break-words text-[16px] leading-relaxed text-[#1D1D1F]">
+												{currentCard?.back}
+											</p>
+										</div>
+										<span className="text-center text-[11px] font-medium text-[#15803D]">
+											Click the card again to see the front.
+										</span>
+									</div>
+								),
+							}}
+						/>
+					</div>
+					{isCurrentRevealed ? (
+						<div className="mt-5 grid w-full max-w-[560px] grid-cols-2 gap-2">
+							<button
+								type="button"
+								onClick={(event) => {
+									event.stopPropagation();
+									handleNotYet();
+								}}
+								className="rounded-md border border-[#FDBA74] bg-[#FFF7ED] px-3 py-1.5 text-[12px] font-bold text-[#C2410C] transition hover:bg-[#FFEDD5]"
+							>
+								Not yet
+							</button>
+							<button
+								type="button"
+								onClick={(event) => {
+									event.stopPropagation();
+									handleLearned();
+								}}
+								className="rounded-md border border-[#16A34A] bg-[#16A34A] px-3 py-1.5 text-[12px] font-bold text-white transition hover:bg-[#15803D]"
+							>
+								Learned
+							</button>
+						</div>
+					) : (
+						<div className="mt-5 flex w-full max-w-[560px] justify-center">
+							<button
+								type="button"
+								onClick={(event) => {
+									event.stopPropagation();
+									handleReveal();
+								}}
+								className="rounded-md bg-[#1D1D1F] px-4 py-1.5 text-[12px] font-bold text-white transition hover:bg-[#1F2937]"
+							>
+								Reveal answer
+							</button>
+						</div>
+					)}
+				</div>
+			</div>
+		</div>
+	);
+	}
 
 export function LearningActivityRenderer({
 	activity,
@@ -629,7 +1017,6 @@ export function LearningActivityRenderer({
 	onRefillAttempts: (activityId: string) => Promise<void>;
 }) {
 	const [answers, setAnswers] = useState<Answers>({});
-	const [flippedCards, setFlippedCards] = useState<Set<string>>(new Set());
 	const [shortAnswerDetailTab, setShortAnswerDetailTab] = useState<"answer" | "correction">("answer");
 	const [shortAnswerProgressActivityId, setShortAnswerProgressActivityId] = useState<string | null>(null);
 	const shortAnswerSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -688,7 +1075,6 @@ export function LearningActivityRenderer({
 	};
 
 	const submitLabel = useMemo(() => {
-		if (activity.type === "flashcards") return "Mark reviewed";
 		if (
 			activity.type === "short_answer" ||
 			activity.type === "coding_practice" ||
@@ -720,7 +1106,7 @@ export function LearningActivityRenderer({
 			activity.type === "short_answer" && shortAnswerProgressActivityId !== activity.id ?
 				{}
 			:	answers;
-		const payload = activity.type === "flashcards" ? {reviewedCount: flippedCards.size} : currentAnswers;
+		const payload = currentAnswers;
 		if (activity.type === "short_answer") {
 			setShortAnswerDetailTab("correction");
 			if (shortAnswerSaveTimerRef.current) {
@@ -760,40 +1146,7 @@ export function LearningActivityRenderer({
 		}
 
 		if (activity.type === "flashcards") {
-			return (
-				<div className="grid grid-cols-2 gap-2">
-					{asArray(content.cards).map((card, index) => {
-						const id = asText(card.id) || `card${index + 1}`;
-						const flipped = flippedCards.has(id);
-						return (
-							<button
-								key={id}
-								type="button"
-								onClick={() =>
-									setFlippedCards((previous) => {
-										const next = new Set(previous);
-										next.add(id);
-										return next;
-									})
-								}
-								className={cn(
-									"min-h-24 rounded-xl border p-3 text-left text-sm transition",
-									flipped ?
-										"border-[#4ADE80] bg-[#F0FDF4]"
-									:	"border-[#E8E8EA] bg-white hover:border-[#C7C7CC]",
-								)}
-							>
-								<span className="block text-[10px] font-bold uppercase tracking-wide text-[#86868B]">
-									{flipped ? "Back" : "Front"}
-								</span>
-								<span className="mt-2 block text-[#1D1D1F]">
-									{flipped ? asText(card.back) : asText(card.front)}
-								</span>
-							</button>
-						);
-					})}
-				</div>
-			);
+			return <FlashcardsActivity activity={activity} />;
 		}
 
 		if (activity.type === "matching") {
@@ -928,7 +1281,6 @@ export function LearningActivityRenderer({
 
 	return (
 		<div className="flex h-full min-h-0 flex-col bg-white text-[#1D1D1F]">
-			{/* Header */}
 			<div className="border-b border-[#F0F0F2] pb-3">
 				<div className="flex items-center gap-2">
 					<div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#1D1D1F] text-white">
@@ -946,13 +1298,11 @@ export function LearningActivityRenderer({
 				)}
 			</div>
 
-			{/* Body */}
 			<div className="mt-3 flex min-h-0 flex-1 flex-col">
 				{renderBody()}
 			</div>
 
-			{/* Footer — only for non-multiple_choice types */}
-			{activity.type !== "multiple_choice" && (
+			{activity.type !== "multiple_choice" && activity.type !== "flashcards" && (
 				<>
 					{latestAttempt && activity.type !== "short_answer" && (
 						<div className="mt-3 rounded-[12px] border border-emerald-200 bg-emerald-50 p-3">

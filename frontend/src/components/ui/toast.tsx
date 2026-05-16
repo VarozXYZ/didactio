@@ -46,7 +46,6 @@ const Toast = React.forwardRef<
 	const startRef = React.useRef(0);
 	const remainingRef = React.useRef(duration);
 
-	// Keep a stable ref to onOpenChange so the effect doesn't need it as a dependency.
 	const onOpenChangeRef = React.useRef(onOpenChange);
 	React.useLayoutEffect(() => {
 		onOpenChangeRef.current = onOpenChange;
@@ -58,7 +57,6 @@ const Toast = React.forwardRef<
 		timerRef.current = setTimeout(() => onOpenChangeRef.current?.(false), ms);
 	}, []);
 
-	// Start the timer once when the toast opens; don't reset on unrelated re-renders.
 	React.useEffect(() => {
 		if (!open || !duration || duration === Infinity) return;
 		remainingRef.current = duration;

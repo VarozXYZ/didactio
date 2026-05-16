@@ -213,9 +213,6 @@ export function sanitizeChapterHtml(rawHtml: string): SanitizeResult {
 		},
 	});
 
-	// Wrap any top-level orphan text nodes in <p> tags. These can appear when
-	// block-level wrappers like <div> or <section> are stripped by the sanitizer,
-	// leaving their text content exposed at the root level.
 	const fragment = parse5.parseFragment(html);
 	let mutated = false;
 	for (const node of fragment.childNodes) {

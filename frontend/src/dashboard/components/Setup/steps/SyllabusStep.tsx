@@ -334,7 +334,6 @@ function SyllabusCard({
 
 	return (
 		<div className="space-y-5">
-			{/* Title */}
 			<div>
 				<div className="flex items-center gap-2">
 					<h3 className="text-[22px] font-bold tracking-tight text-[#1D1D1F]">
@@ -349,7 +348,6 @@ function SyllabusCard({
 				</div>
 			</div>
 
-			{/* Overview + Keywords — two columns, ~70/30 */}
 			{(syllabus.overview || (syllabus.keywords?.length ?? 0) > 0) && (
 				<div
 					className="grid gap-x-5 gap-y-3"
@@ -400,7 +398,6 @@ function SyllabusCard({
 				</div>
 			)}
 
-			{/* Modules */}
 			{chapters.length > 0 && (
 				<div>
 					<div className="mb-2 text-[10px] font-bold uppercase tracking-widest text-[#AEAEB2]">
@@ -467,7 +464,6 @@ export function SyllabusStep({
 
 	return (
 		<div className="space-y-4">
-			{/* Waiting state */}
 			{isWaiting && (
 				<div className="flex flex-col items-center justify-center py-12">
 					<Loader2 size={28} className="mb-4 animate-spin text-[#4ADE80]" />
@@ -488,7 +484,6 @@ export function SyllabusStep({
 				</div>
 			)}
 
-			{/* Syllabus display */}
 			{syllabusToRender && (
 				<SyllabusCard
 					syllabus={syllabusToRender}
@@ -497,13 +492,11 @@ export function SyllabusStep({
 				/>
 			)}
 
-			{/* Review controls — progressive centered flow */}
 			{hasSyllabus && (
 				<div
 					className="flex flex-col items-center gap-5 border-t pt-6"
 					style={{borderColor: "rgba(0,0,0,0.06)"}}
 				>
-					{/* Question label */}
 					<div
 						className="flex items-center gap-2 rounded-full px-4 py-1.5"
 						style={{
@@ -517,7 +510,6 @@ export function SyllabusStep({
 						</p>
 					</div>
 
-					{/* Q1 — two separate answer buttons, or committed choice + undo */}
 					{!hasChosen ?
 						<div className="flex animate-in fade-in items-center gap-3 duration-200">
 							<button
@@ -578,7 +570,6 @@ export function SyllabusStep({
 						</div>
 					}
 
-					{/* Q2 — Yes path: tier picker + action */}
 					{hasChosen && reviewDecision === "accept" && (
 						<div className="flex animate-in fade-in slide-in-from-bottom-2 flex-col items-center gap-3 duration-200">
 							<div
@@ -643,11 +634,9 @@ export function SyllabusStep({
 						</div>
 					)}
 
-					{/* Q2 — No path: context + regenerate */}
 					{hasChosen && reviewDecision === "reject" && (
 						<div className="animate-in fade-in slide-in-from-bottom-2 w-full max-w-lg duration-200">
 							<div className="flex items-stretch gap-3">
-								{/* Auto-growing input */}
 								<div className="relative min-h-[76px] flex-1">
 									{!regenerationContext && (
 										<div className="pointer-events-none absolute inset-0 flex items-center justify-center px-4 text-center text-[13px] italic leading-relaxed text-[#AEAEB2]/50">
@@ -675,7 +664,6 @@ export function SyllabusStep({
 										}}
 									/>
 								</div>
-								{/* Right column: quality + button */}
 								<div className="flex shrink-0 flex-col items-stretch gap-2">
 									<div
 										className="inline-flex self-center rounded-[10px] bg-[#F5F5F7] p-0.5"

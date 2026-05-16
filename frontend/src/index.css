@@ -119,11 +119,6 @@ option {
 	animation: generatingPulse 1.5s ease-in-out infinite;
 }
 
-/* ─── Typography CSS custom properties ────────────────────────────────────────
-   These vars are set at runtime by makeTypographyVars() / applyTypographyVars()
-   from typography.ts, on the editor wrapper and the measurement sandbox div.
-   The defaults below match the "regular" profile with Inter font.
-   ─────────────────────────────────────────────────────────────────────────── */
 :root {
 	--typo-body-family: Inter;
 	--typo-body-size: 16px;
@@ -200,13 +195,11 @@ option {
 	word-break: normal;
 }
 
-/* Indent all content elements except headings */
 .unit-page-scope > *:not(h2):not(h3):not(h4) {
 	padding-left: 0.75em;
 	padding-right: 0.75em;
 }
 
-/* Code block wrapper uses margin so border-radius stays visually correct */
 .unit-page-scope > .code-block-wrapper {
 	padding-left: 0;
 	padding-right: 0;
@@ -455,8 +448,6 @@ option {
 	margin: 1.5em 0;
 }
 
-/* ─── Decorative quote on first-page summary ─────────────────────────────── */
-
 .unit-summary-quote {
 	position: relative;
 	padding: 0.1em 0.2em 0.1em 1.6em;
@@ -484,8 +475,6 @@ option {
 	margin-left: 0.1em;
 	vertical-align: -0.25em;
 }
-
-/* ─── Code block component (CodeBlock.tsx) ────────────────────────────────── */
 
 .code-block-wrapper {
 	background: var(--unit-code-bg, #f6f8fa);
@@ -587,7 +576,6 @@ option {
 	overflow-x: auto;
 }
 
-/* Override Shiki's injected pre background to stay transparent inside our wrapper */
 .code-block-highlight pre {
 	background: transparent !important;
 }
@@ -608,8 +596,6 @@ option {
 .code-block-highlight pre::-webkit-scrollbar-thumb:hover {
 	background: #8c959f;
 }
-
-/* ─── Tiptap edit-mode hljs syntax token colors ───────────────────────────── */
 
 .tiptap-editor .hljs-keyword,
 .tiptap-editor .hljs-operator,

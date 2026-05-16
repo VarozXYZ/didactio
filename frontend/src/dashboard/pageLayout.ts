@@ -31,11 +31,8 @@ import {
 
 const MOBILE_BREAKPOINT = 768;
 const HEADER_HEIGHT = 64;
-// Must match the editor aside (`w-[280px]` in UnitEditor).
 const OPEN_SIDEBAR_WIDTH = 280;
-// Page width ÷ page height. Desktop is tuned for a balance between readable line length and card shape.
 const PAGE_WIDTH_RATIO_DESKTOP = 0.76;
-// Mobile is a rough default only; dedicated mobile layout is planned separately.
 const PAGE_WIDTH_RATIO_MOBILE = 0.72;
 const POST_MODULE_ACTION_GAP = 24;
 const FIRST_PAGE_HEADER_BOTTOM_GAP = 16;
@@ -105,9 +102,7 @@ type MeasurePageChapter = Pick<
 type AnnotatedHtmlPageBlock = HtmlPageBlock & {
 	startCharacterOffset: number;
 	endCharacterOffset: number;
-	// Present for paragraphs and h1-h3 headings.
 	blockMeasurement?: BlockMeasurement;
-	// Present for splittable_list — one entry per item.
 	itemMeasurements?: BlockMeasurement[];
 };
 
@@ -306,7 +301,6 @@ function annotateBlocks(
 			return {...block, startCharacterOffset, endCharacterOffset};
 		}
 
-		// All union members handled above; this is unreachable.
 		return {
 			...(block as object),
 			startCharacterOffset,
@@ -1137,9 +1131,6 @@ export function measurePages({
 
 	const isMobile = pageWidth < 420;
 
-	// Padding constants must exactly match the page card wrapper CSS:
-	//   mobile:   px-5 py-4 → sides 20px, top/bottom 16px
-	//   desktop:  md:px-6 md:py-5 → sides 24px, top/bottom 20px
 	const pagePaddingSide = isMobile ? 20 : 24;
 	const pagePaddingTop = isMobile ? 16 : 20;
 	const pagePaddingBottom = isMobile ? 16 : 20;
@@ -1178,8 +1169,6 @@ export function measurePages({
 	sandbox.style.zIndex = "-1";
 
 	const proseMeasure = document.createElement("div");
-	// Use unit-page-scope so measurement uses exactly the same CSS rules as
-	// the rendered ChapterRenderer, ensuring heading/paragraph sizes match.
 	proseMeasure.className = "unit-page-scope";
 	proseMeasure.style.width = `${contentWidth}px`;
 	proseMeasure.style.overflow = "hidden";

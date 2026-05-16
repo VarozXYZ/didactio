@@ -289,7 +289,9 @@ function isMeasuredContentPage(
 
 type ModuleOutlineItem = {
 	id: string;
-	level: 2 | 3;
+	kind: "section" | "activity";
+	icon?: typeof FileQuestion;
+	level: 2;
 	number: string;
 	pageIndex: number;
 	title: string;
@@ -364,36 +366,25 @@ function buildModuleOutline(
 	}
 
 	let section = 0;
-	let subsection = 0;
-
 	return chapter.htmlBlocks.flatMap((block): ModuleOutlineItem[] => {
 		if (block.type !== "heading") {
 			return [];
 		}
 
 		const heading = parseHeadingFromHtml(block.html);
-		if (!heading || heading.level === 4) {
+		if (!heading || heading.level !== 2) {
 			return [];
 		}
 
-		if (heading.level === 2) {
-			section += 1;
-			subsection = 0;
-		} else {
-			if (section === 0) {
-				section = 1;
-			}
-			subsection += 1;
-		}
-
-		const number =
-			heading.level === 2 ? `${section}` : `${section}.${subsection}`;
+		section += 1;
+		const number = `${section}.`;
 		const title = stripLeadingHeadingNumber(heading.title);
 
 		return [
 			{
 				id: block.id,
-				level: heading.level,
+				kind: "section",
+				level: 2,
 				number,
 				pageIndex: findMeasuredPageIndexForOffset(
 					pages,
@@ -403,6 +394,139 @@ function buildModuleOutline(
 			},
 		];
 	});
+}
+
+function activityTypeOutlineLabel(type: BackendLearningActivityType): string {
+	switch (type) {
+		case "multiple_choice":
+			return "Quick check";
+		case "short_answer":
+			return "Open response questions";
+		case "coding_practice":
+			return "Code practice";
+		case "flashcards":
+			return "Flashcards";
+		case "matching":
+			return "Matching";
+		case "ordering":
+			return "Ordering";
+		case "case_study":
+			return "Case study";
+		case "debate_reflection":
+			return "Debate reflection";
+		case "cloze":
+			return "Cloze";
+		case "guided_project":
+			return "Mini project";
+		case "freeform_html":
+			return "Interactive";
+	}
+}
+
+function activityTypeOutlineIcon(
+	type: BackendLearningActivityType,
+): typeof FileQuestion {
+	switch (type) {
+		case "multiple_choice":
+			return FileQuestion;
+		case "short_answer":
+			return BookOpenCheck;
+		case "coding_practice":
+			return Code2;
+		case "flashcards":
+			return Layers3;
+		case "matching":
+		case "ordering":
+		case "case_study":
+			return Edit3;
+		case "debate_reflection":
+		case "cloze":
+		case "guided_project":
+		case "freeform_html":
+			return WandSparkles;
+	}
+}
+
+function buildActivityOutlineItems(
+	pages: ReadPage[],
+): ModuleOutlineItem[] {
+	return pages.flatMap((page, pageIndex): ModuleOutlineItem[] =>
+		page.kind === "learning_activity" ?
+			[
+				{
+					id: `activity-${page.activity.id}`,
+					kind: "activity",
+					icon: activityTypeOutlineIcon(page.activity.type),
+					level: 2,
+					number: "Ex.",
+					pageIndex,
+					title: activityTypeOutlineLabel(page.activity.type),
+				},
+			]
+		:	[],
+	);
+}
+
+function findLearningActivityPageIndex(
+	pages: ReadPage[],
+	activityId: string,
+): number {
+	return pages.findIndex(
+		(page) =>
+			page.kind === "learning_activity" && page.activity.id === activityId,
+	);
+}
+
+function buildReadPages(
+	measuredPages: MeasuredModulePage[],
+	activities: BackendLearningActivity[],
+): ReadPage[] {
+	if (activities.length === 0) {
+		return measuredPages;
+	}
+
+	const activityPages = activities.map((activity) => ({
+		kind: "learning_activity" as const,
+		activity,
+	}));
+
+	const postModuleIndex = measuredPages.findIndex(
+		(page) =>
+			page.kind === "post_module_actions" ||
+			page.kind === "content_with_actions",
+	);
+
+	if (postModuleIndex !== -1) {
+		const modulePage = measuredPages[postModuleIndex];
+
+		if (modulePage.kind === "content_with_actions") {
+			const contentOnly = {
+				...modulePage,
+				kind: "content" as const,
+			};
+			const postModulePage = {
+				kind: "post_module_actions" as const,
+				startCharacterOffset: modulePage.startCharacterOffset,
+				endCharacterOffset: modulePage.endCharacterOffset,
+				hasNextModule: modulePage.hasNextModule,
+				primaryActionLabel: modulePage.primaryActionLabel,
+			};
+			return [
+				...measuredPages.slice(0, postModuleIndex),
+				contentOnly,
+				...activityPages,
+				postModulePage,
+			];
+		}
+
+		return [
+			...measuredPages.slice(0, postModuleIndex),
+			...activityPages,
+			...measuredPages.slice(postModuleIndex),
+		];
+	}
+
+	return [...measuredPages, ...activityPages];
 }
 
 function calculateUnitStudyProgressPercent(
@@ -467,7 +591,6 @@ function buildDraft(
 	};
 }
 
-// FontId (camelCase) → PresentationFont (kebab-case) for keys that differ.
 const FONT_ID_TO_PRESENTATION: Partial<
 	Record<FontId, PresentationTheme["bodyFont"]>
 > = {
@@ -751,8 +874,6 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			),
 		[workspace?.presentationTheme, user?.defaultPresentationTheme],
 	);
-	// Merge preset fonts from draft.textStyle into the resolved theme so CSS vars
-	// always reflect the current style preset rather than the raw stored fonts.
 	const effectiveTheme = useMemo(
 		() =>
 			draft ?
@@ -1070,7 +1191,6 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 
 		setIsEditMode(false);
 		setActiveHtmlEditor(null);
-		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [
 		activeChapter?.chapterIndex,
 		activeChapter?.title,
@@ -1140,7 +1260,6 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		void document.fonts.ready.then(() => setFontsReady(true));
 	}, [fontsReady]);
 
-	// When presentation preset changes, load the two preset fonts before paginating.
 	useEffect(() => {
 		const presetId = activeDraftSettings?.stylePreset ?? "classic";
 		const preset = STYLE_PRESETS[presetId];
@@ -1181,58 +1300,10 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			activeDraftSettings,
 		],
 	);
-	const readPages: ReadPage[] = useMemo(() => {
-		if (activeLearningActivities.length === 0) {
-			return measuredReadPages;
-		}
-
-		const activityPages = activeLearningActivities.map((activity) => ({
-			kind: "learning_activity" as const,
-			activity,
-		}));
-
-		const postModuleIndex = measuredReadPages.findIndex(
-			(page) =>
-				page.kind === "post_module_actions" ||
-				page.kind === "content_with_actions",
-		);
-
-		if (postModuleIndex !== -1) {
-			const modulePage = measuredReadPages[postModuleIndex];
-
-			if (modulePage.kind === "content_with_actions") {
-				// Strip the Module complete from the content page so it stays as
-				// regular content, insert activities after it, then add a standalone
-				// post_module_actions at the very end.
-				const contentOnly = {
-					...modulePage,
-					kind: "content" as const,
-				};
-				const postModulePage = {
-					kind: "post_module_actions" as const,
-					startCharacterOffset: modulePage.startCharacterOffset,
-					endCharacterOffset: modulePage.endCharacterOffset,
-					hasNextModule: modulePage.hasNextModule,
-					primaryActionLabel: modulePage.primaryActionLabel,
-				};
-				return [
-					...measuredReadPages.slice(0, postModuleIndex),
-					contentOnly,
-					...activityPages,
-					postModulePage,
-				];
-			}
-
-			// post_module_actions is already standalone — insert activities before it.
-			return [
-				...measuredReadPages.slice(0, postModuleIndex),
-				...activityPages,
-				...measuredReadPages.slice(postModuleIndex),
-			];
-		}
-
-		return [...measuredReadPages, ...activityPages];
-	}, [activeLearningActivities, measuredReadPages]);
+	const readPages: ReadPage[] = useMemo(
+		() => buildReadPages(measuredReadPages, activeLearningActivities),
+		[activeLearningActivities, measuredReadPages],
+	);
 	const paginatedContentPages = useMemo(
 		() =>
 			measuredReadPages
@@ -1240,12 +1311,19 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				.map((page) => page.html),
 		[measuredReadPages],
 	);
+
 	const moduleOutline = useMemo(
-		() =>
-			activeChapter && !isEditMode ?
-				buildModuleOutline(activeChapter, measuredReadPages)
-			:	[],
-		[activeChapter, isEditMode, measuredReadPages],
+		() => {
+			if (!activeChapter || isEditMode) {
+				return [];
+			}
+
+			return [
+				...buildModuleOutline(activeChapter, measuredReadPages),
+				...buildActivityOutlineItems(readPages),
+			];
+		},
+		[activeChapter, isEditMode, measuredReadPages, readPages],
 	);
 	const visibleEditablePages =
 		isEditMode && contentPageDrafts.length > 0 ?
@@ -1274,7 +1352,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			return;
 		}
 
-		if (!activeChapter || measuredReadPages.length === 0) {
+		if (!activeChapter || readPages.length === 0) {
 			setCurrentSpread(0);
 			return;
 		}
@@ -1293,14 +1371,14 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 
 		if (
 			savedLastVisitedPageIndex > 0 &&
-			measuredReadPages.length <= savedLastVisitedPageIndex
+			readPages.length <= savedLastVisitedPageIndex
 		) {
 			return;
 		}
 
 		const lastVisitedPageIndex = Math.max(
 			0,
-			Math.min(savedLastVisitedPageIndex, measuredReadPages.length - 1),
+			Math.min(savedLastVisitedPageIndex, readPages.length - 1),
 		);
 		setCurrentSpread(Math.floor(lastVisitedPageIndex / 2));
 		setLastRestoredActivationKey(activeChapterActivation.key);
@@ -1310,7 +1388,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		activeChapterActivation,
 		isEditMode,
 		lastRestoredActivationKey,
-		measuredReadPages,
+		readPages.length,
 	]);
 
 	const runAction = async (
@@ -2091,7 +2169,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		const didPersist = await persistReadProgress(
 			activeChapter,
 			activeChapter.htmlBlocks.at(-1)?.textEndOffset ?? 0,
-			Math.max(0, measuredReadPages.length - 1),
+			Math.max(0, readPages.length - 1),
 		);
 
 		if (!didPersist) {
@@ -2116,9 +2194,9 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	}, [
 		activeChapter,
 		isPostModuleActionPending,
-		measuredReadPages.length,
 		navigate,
 		persistReadProgress,
+		readPages.length,
 		workspace,
 	]);
 
@@ -2135,14 +2213,14 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			if (
 				isEditMode ||
 				!activeChapter ||
-				measuredReadPages.length === 0
+				readPages.length === 0
 			) {
 				return;
 			}
 
 			const lastVisitedPageIndex = Math.max(
 				0,
-				Math.min(nextSpread * 2 + 1, measuredReadPages.length - 1),
+				Math.min(nextSpread * 2 + 1, readPages.length - 1),
 			);
 			const visibleTextOffset = getReadTextOffsetForSpread(
 				measuredReadPages,
@@ -2155,7 +2233,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				lastVisitedPageIndex,
 			);
 		},
-		[activeChapter, isEditMode, measuredReadPages, persistReadProgress],
+		[activeChapter, isEditMode, measuredReadPages, persistReadProgress, readPages.length],
 	);
 
 	const goToSpreadIndex = useCallback(
@@ -2390,8 +2468,6 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 
 		setIsActivityLoading(true);
 		try {
-			const existingCount =
-				learningActivities[activeChapter.chapterIndex]?.length ?? 0;
 			const {activity} = await dashboardApi.createLearningActivity(
 				didacticUnitId,
 				activeChapter.chapterIndex,
@@ -2401,12 +2477,13 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 					quality: activityQuality,
 				},
 			);
+			const {activities} = await dashboardApi.listLearningActivities(
+				didacticUnitId,
+				activeChapter.chapterIndex,
+			);
 			setLearningActivities((previous) => ({
 				...previous,
-				[activeChapter.chapterIndex]: [
-					...(previous[activeChapter.chapterIndex] ?? []),
-					activity,
-				],
+				[activeChapter.chapterIndex]: activities,
 			}));
 			setActivityAttempts((previous) => ({
 				...previous,
@@ -2414,14 +2491,24 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			}));
 			void refreshUser();
 
-			const actionPageIndex = measuredReadPages.findIndex(
-				(page) => page.kind === "post_module_actions",
+			const refreshedReadPages = buildReadPages(
+				measuredReadPages,
+				activities,
 			);
-			const targetPageIndex =
-				actionPageIndex >= 0 ?
-					actionPageIndex + existingCount
-				:	measuredReadPages.length + existingCount;
-			setCurrentSpread(Math.floor(targetPageIndex / 2));
+			const targetPageIndex = findLearningActivityPageIndex(
+				refreshedReadPages,
+				activity.id,
+			);
+			if (targetPageIndex >= 0) {
+				const targetSpread = Math.floor(targetPageIndex / 2);
+				setCurrentSpread(targetSpread);
+				setSelectedOutlineItemId(`activity-${activity.id}`);
+				void persistReadProgress(
+					activeChapter,
+					getReadTextOffsetForSpread(measuredReadPages, targetSpread),
+					targetPageIndex,
+				);
+			}
 			setIsActivityModalOpen(false);
 		} catch (error) {
 			toastError(
@@ -2753,7 +2840,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 							<div className="grid gap-2 sm:grid-cols-2">
 								{[
 									{value: "silver" as const, label: "Silver model", cost: "1 silver", detail: "Fast practice generation"},
-									{value: "gold" as const, label: "Gold model", cost: "20 silver", detail: "Deeper activity and feedback"},
+									{value: "gold" as const, label: "Gold model", cost: "3 silver", detail: "Deeper activity and feedback"},
 								].map((option) => {
 									const selected = activityQuality === option.value;
 									return (
@@ -3595,6 +3682,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 											const isLast =
 												index ===
 												moduleOutline.length - 1;
+											const ActivityIcon = item.icon;
 
 											return (
 												<button
@@ -3608,9 +3696,10 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 													}
 													className={cn(
 														"relative grid min-w-0 items-center gap-1 rounded-[6px] text-left text-[12px] leading-[1.35] transition-colors",
-														item.level === 2 ?
-															"mt-1 ml-1.5 w-[calc(100%-0.375rem)] grid-cols-[1.25rem_minmax(0,1fr)] py-1.5 pl-1 pr-1.5 font-medium"
-														:	"ml-5 w-[calc(100%-1.25rem)] grid-cols-[1.55rem_minmax(0,1fr)] py-1.5 pl-1 pr-1.5",
+														"mt-1 ml-1.5 w-[calc(100%-0.375rem)] grid-cols-[1.6rem_minmax(0,1fr)] py-1.5 pl-1 pr-1.5",
+														item.kind === "section" ?
+															"font-medium"
+														:	"font-normal",
 														isCurrentOutlineItem ?
 															"text-[#1D1D1F]"
 														:	"text-[#86868B] hover:text-[#1D1D1F]",
@@ -3627,10 +3716,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 															aria-hidden
 															className={cn(
 																"absolute w-0.5 bg-[#DADADF]",
-																item.level ===
-																2 ?
-																	"-left-1.5"
-																:	"-left-5",
+																"-left-1.5",
 																isFirst ?
 																	"-top-2 rounded-t-full"
 																:	"top-0",
@@ -3644,9 +3730,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 														aria-hidden
 														className={cn(
 															"absolute top-1/2 h-0.5 -translate-y-1/2 rounded-full bg-[#DADADF]",
-															item.level === 2 ?
-																"-left-1.5 w-2"
-															:	"-left-5 w-6",
+															"-left-1.5 w-2",
 														)}
 													/>
 													<span
@@ -3654,17 +3738,26 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 															"flex min-h-5 shrink-0 items-center justify-end font-semibold tabular-nums",
 															isCurrentOutlineItem ?
 																"text-[#34C759]"
-															: item.level === 2 ?
+															: item.kind === "section" ?
 																"text-[#8E8E93]"
 															:	"text-[#AEAEB2]",
 														)}
 													>
-														{item.number}
+														{item.kind ===
+															"activity" &&
+														ActivityIcon ?
+															<ActivityIcon
+																size={14}
+																strokeWidth={
+																	2
+																}
+															/>
+														:	item.number}
 													</span>
 													<span
 														className={cn(
 															"min-w-0 flex-1 overflow-hidden [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]",
-															item.level === 2 ?
+															item.kind === "section" ?
 																"text-[#4B5563]"
 															:	"text-[#6E6E73]",
 															isCurrentOutlineItem &&

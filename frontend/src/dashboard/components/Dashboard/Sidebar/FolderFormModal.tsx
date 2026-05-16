@@ -17,19 +17,14 @@ const QUICK_EMOJIS = [
 ]
 
 const MORE_EMOJIS = [
-    // Science & Nature
     '🧬', '🧫', '⚗️', '🌡️', '🧲', '🔋', '🌿', '🌳',
     '🌊', '🏔️', '🌋', '🌸', '🌙', '⭐', '🦋', '🐬',
-    // Arts & Culture
     '🖌️', '🎭', '🎬', '🎶', '🎸', '🎹', '🎤', '🖼️',
     '🎺', '🥁', '👑', '🏛️', '⚔️', '🏺', '📸', '🏆',
-    // Tech & Computing
     '🖥️', '⌨️', '🖱️', '💾', '📱', '🤖', '🔌', '💿',
     '📡', '🛸', '🔐', '💎', '🔍', '🧮', '📊', '📈',
-    // Work & Learning
     '📖', '📝', '✏️', '📓', '📔', '📕', '📗', '📘',
     '📙', '📄', '💼', '📋', '🗂️', '📌', '📎', '🗒️',
-    // Sports & Lifestyle
     '⚽', '🏀', '🎾', '🏊', '🏃', '🧘', '🏋️', '🚴',
     '🍎', '🌈', '❤️', '⚡', '🔥', '💫', '🎁', '🌺',
 ]
@@ -170,7 +165,6 @@ export function FolderFormModal({
                                 Color
                             </label>
                             <div className="relative" ref={pickerRef}>
-                                {/* Swatches + custom toggle + hex — all one row */}
                                 <div className="flex items-center gap-2">
                                     {SWATCHES.map((hex) => {
                                         const isSelected = selectedColor.toLowerCase() === hex.toLowerCase()

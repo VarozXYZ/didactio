@@ -27,4 +27,6 @@
 27. Actualizar la forma el precio / coste en monedas se muestra. En vez de selectar Precio/moneda, seleccionar modelo y enseñar coste dinámicamente segun seleccion
 28. Mejorar la informacio en el onboarding
 29. Crear guias de uso para: 1. primera vez que abres el wizard de syllabus 2. Primera vez que entras en el editor
-30. Añadir las actividades creadas al indice del modulo
+30. ~~Añadir las actividades creadas al indice del modulo~~
+31. Create note system - ask AI about specific parts of the unit
+32. Hacer que los ejercicios de los módulos sean borrables

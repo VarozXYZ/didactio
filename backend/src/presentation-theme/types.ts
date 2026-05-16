@@ -11,7 +11,6 @@ export type PresentationFont =
 	| "eb-garamond"
 	| "crimson-pro"
 	| "dm-sans"
-	// Legacy values kept for backward compatibility
 	| "merriweather"
 	| "source-serif"
 	| "system-sans"

@@ -3,6 +3,11 @@ import type {
 	LearningActivityAttempt,
 	LearningActivityProgress,
 } from "./learning-activity.js";
+import {
+	isLearningActivityArchived,
+	isLearningActivityVisibleInModule,
+	sortLearningActivitiesForModule,
+} from "./learning-activity.js";
 
 export interface LearningActivityStore {
 	saveActivity(activity: LearningActivity): Promise<void>;
@@ -11,6 +16,10 @@ export interface LearningActivityStore {
 		ownerId: string;
 		didacticUnitId: string;
 		chapterIndex: number;
+	}): Promise<LearningActivity[]>;
+	listByUnit(input: {
+		ownerId: string;
+		didacticUnitId: string;
 	}): Promise<LearningActivity[]>;
 	listByUnitRange(input: {
 		ownerId: string;
@@ -45,12 +54,25 @@ export class InMemoryLearningActivityStore implements LearningActivityStore {
 		didacticUnitId: string;
 		chapterIndex: number;
 	}): Promise<LearningActivity[]> {
+		return sortLearningActivitiesForModule([...this.activitiesById.values()]
+			.filter(
+				(activity) =>
+					activity.ownerId === input.ownerId &&
+					activity.didacticUnitId === input.didacticUnitId &&
+					isLearningActivityVisibleInModule(activity, input.chapterIndex),
+			));
+	}
+
+	async listByUnit(input: {
+		ownerId: string;
+		didacticUnitId: string;
+	}): Promise<LearningActivity[]> {
 		return [...this.activitiesById.values()]
 			.filter(
 				(activity) =>
 					activity.ownerId === input.ownerId &&
 					activity.didacticUnitId === input.didacticUnitId &&
-					activity.chapterIndex === input.chapterIndex,
+					!isLearningActivityArchived(activity),
 			)
 			.sort((left, right) => left.createdAt.localeCompare(right.createdAt));
 	}
@@ -65,7 +87,8 @@ export class InMemoryLearningActivityStore implements LearningActivityStore {
 				(activity) =>
 					activity.ownerId === input.ownerId &&
 					activity.didacticUnitId === input.didacticUnitId &&
-					activity.chapterIndex <= input.maxChapterIndex,
+					activity.chapterIndex <= input.maxChapterIndex &&
+					!isLearningActivityArchived(activity),
 			)
 			.sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 	}

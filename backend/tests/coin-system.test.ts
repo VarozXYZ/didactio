@@ -91,6 +91,46 @@ describe("coin system", () => {
 		expect((await authService.getUserById("mock-user"))?.credits.silver).toBe(10);
 	});
 
+	it("does not charge admin users for generation operations", async () => {
+		const app = createTestApp();
+		const authService = app.locals.authService as AuthService;
+		await authService.updateUserRole("mock-user", "admin");
+
+		const created = await createDidacticUnit(app, {topic: "admin free generation"});
+		await advanceToQuestionnaireAnswered(app, created.id);
+		const before = await authService.getUserById("mock-user");
+
+		const syllabus = await request(app)
+			.post(`/api/didactic-unit/${created.id}/syllabus/generate/stream`)
+			.send({quality: "gold"});
+		expect(syllabus.status).toBe(200);
+		const syllabusReady = parseStreamComplete<{id: string; status: string}>(
+			syllabus.text,
+		);
+		expect(syllabusReady.status).toBe("syllabus_ready");
+
+		const approve = await request(app)
+			.post(`/api/didactic-unit/${created.id}/approve-syllabus`)
+			.send({quality: "gold"});
+		expect(approve.status).toBe(200);
+		expect(approve.body.unitGenerationPaidAt).toEqual(expect.any(String));
+		expect(approve.body.unitGenerationCreditTransactionId).toBeUndefined();
+
+		await generateDidacticUnitChapter(app, created.id, 0);
+		const activity = await request(app)
+			.post(`/api/didactic-unit/${created.id}/modules/0/activities`)
+			.send({
+				scope: "current_module",
+				type: "multiple_choice",
+				quality: "gold",
+			});
+		expect(activity.status).toBe(201);
+
+		expect((await authService.getUserById("mock-user"))?.credits).toEqual(
+			before?.credits,
+		);
+	});
+
 	it("records a failed initial module attempt once without charging extra coins", async () => {
 		const baseAiService = createMockAiService();
 		const aiService: AiService = {

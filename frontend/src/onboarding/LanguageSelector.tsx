@@ -158,7 +158,6 @@ export function LanguageSelector({value, onChange}: Props) {
 				</PopoverContent>
 			</Popover>
 
-			{/* Inline custom input — revealed when "Other…" is picked */}
 			{showCustom && (
 				<div className="flex items-center gap-2">
 					<input

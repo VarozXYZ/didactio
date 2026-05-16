@@ -124,7 +124,6 @@ export function repairLearningActivityJsonText(text: string): string | null {
 				return JSON.stringify(validation.data);
 			}
 		} catch {
-			// Continue scanning: some providers prepend partial JSON snippets.
 		}
 	}
 
@@ -143,7 +142,6 @@ export function repairLearningActivityFeedbackJsonText(text: string): string | n
 				return JSON.stringify(validation.data);
 			}
 		} catch {
-			// Continue scanning: some providers prepend partial JSON snippets.
 		}
 	}
 
@@ -152,8 +150,19 @@ export function repairLearningActivityFeedbackJsonText(text: string): string | n
 
 function normalizeLearningActivityContent(
 	type: LearningActivityType,
+	tier: AiModelTier,
 	content: Record<string, unknown>,
 ): Record<string, unknown> {
+	if (type === "flashcards") {
+		const cards = Array.isArray(content.cards) ? content.cards : [];
+		const count = tier === "gold" ? 15 : 5;
+
+		return {
+			...content,
+			cards: cards.slice(0, count),
+		};
+	}
+
 	if (type !== "short_answer") {
 		return content;
 	}
@@ -1246,6 +1255,10 @@ export class GatewayAiService implements AiService {
 			contextModules: input.contextModules,
 			previousActivities: input.previousActivities,
 			authoring: input.config.authoring,
+			flashcardCount: input.type === "flashcards" ?
+				input.tier === "gold" ? 15
+				: 5
+			:	undefined,
 		});
 		const startedAt = Date.now();
 		const maxOutputTokens = resolveStageMaxOutputTokens("activity");
@@ -1281,6 +1294,7 @@ export class GatewayAiService implements AiService {
 			});
 			const content = normalizeLearningActivityContent(
 				input.type,
+				input.tier,
 				result.object.content,
 			);
 

@@ -4,6 +4,11 @@ import type {
 	LearningActivityAttempt,
 	LearningActivityProgress,
 } from "./learning-activity.js";
+import {
+	isLearningActivityArchived,
+	isLearningActivityVisibleInModule,
+	sortLearningActivitiesForModule,
+} from "./learning-activity.js";
 import type {LearningActivityStore} from "./learning-activity-store.js";
 
 type LearningActivityDocument = LearningActivity & Document;
@@ -42,6 +47,12 @@ export class MongoLearningActivityStore implements LearningActivityStore {
 			chapterIndex: 1,
 			createdAt: 1,
 		});
+		void this.activities.createIndex({
+			ownerId: 1,
+			didacticUnitId: 1,
+			type: 1,
+			"content.visibleModuleIndexes": 1,
+		});
 		void this.attempts.createIndex({
 			ownerId: 1,
 			activityId: 1,
@@ -76,13 +87,35 @@ export class MongoLearningActivityStore implements LearningActivityStore {
 			.find({
 				ownerId: input.ownerId,
 				didacticUnitId: input.didacticUnitId,
-				chapterIndex: input.chapterIndex,
+			})
+			.sort({createdAt: 1})
+			.toArray();
+		return sortLearningActivitiesForModule(documents
+			.map((document) => stripMongoId<LearningActivity>(document))
+			.filter(
+				(activity): activity is LearningActivity =>
+					activity !== null &&
+					isLearningActivityVisibleInModule(activity, input.chapterIndex),
+			));
+	}
+
+	async listByUnit(input: {
+		ownerId: string;
+		didacticUnitId: string;
+	}): Promise<LearningActivity[]> {
+		const documents = await this.activities
+			.find({
+				ownerId: input.ownerId,
+				didacticUnitId: input.didacticUnitId,
 			})
 			.sort({createdAt: 1})
 			.toArray();
 		return documents
 			.map((document) => stripMongoId<LearningActivity>(document))
-			.filter((activity): activity is LearningActivity => activity !== null);
+			.filter(
+				(activity): activity is LearningActivity =>
+					activity !== null && !isLearningActivityArchived(activity),
+			);
 	}
 
 	async listByUnitRange(input: {
@@ -100,7 +133,10 @@ export class MongoLearningActivityStore implements LearningActivityStore {
 			.toArray();
 		return documents
 			.map((document) => stripMongoId<LearningActivity>(document))
-			.filter((activity): activity is LearningActivity => activity !== null);
+			.filter(
+				(activity): activity is LearningActivity =>
+					activity !== null && !isLearningActivityArchived(activity),
+			);
 	}
 
 	async saveAttempt(attempt: LearningActivityAttempt): Promise<void> {

@@ -54,7 +54,6 @@ function ModelCard({
 				</span>
 			)}
 
-			{/* Provider logo + model name */}
 			<div className="flex items-center gap-2 pr-12">
 				{logo ?
 					<img
@@ -125,7 +124,6 @@ export function ModelsStep({
 					Loading models…
 				</div>
 			:	<div className="grid grid-cols-2 gap-x-4 gap-y-0">
-					{/* Column headers */}
 					<div className="mb-2 flex items-center gap-1.5">
 						<CoinIcon type="silver" size={15} />
 						<span className="text-[12.5px] font-bold text-[#1D1D1F]">Silver model</span>
@@ -135,7 +133,6 @@ export function ModelsStep({
 						<span className="text-[12.5px] font-bold text-[#1D1D1F]">Gold model</span>
 					</div>
 
-					{/* Card rows — each row pair shares the same grid row height */}
 					{Array.from({length: maxCards}).map((_, i) => (
 						<>
 							<div key={`silver-${i}`} className="pb-2">

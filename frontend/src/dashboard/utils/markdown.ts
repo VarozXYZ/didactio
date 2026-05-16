@@ -20,14 +20,12 @@ export type MarkdownPageBlock =
 			markdown: string;
 			text: string;
 			continued: boolean;
-			// Inline AST nodes for rich Pretext measurement (absent on continued splits).
 			inlineChildren?: readonly PhrasingContent[];
 	  }
 	| {
 			type: "markdown";
 			markdown: string;
 			text: string;
-			// Set for h1-h3 headings; absent for code blocks, tables, hr, etc.
 			headingLevel?: 1 | 2 | 3;
 			inlineChildren?: readonly PhrasingContent[];
 	  }
@@ -38,7 +36,6 @@ export type MarkdownPageBlock =
 			items: Array<{
 				markdown: string;
 				text: string;
-				// Inline AST from the first paragraph child of this list item.
 				inlineChildren?: readonly PhrasingContent[];
 			}>;
 			markdown: string;
@@ -784,7 +781,6 @@ export function extractMarkdownBlocks(markdown: string): MarkdownPageBlock[] {
 					const itemMarkdown = normalizeTopLevelMarkdown(
 						singleItemList as unknown as RootContent,
 					);
-					// Inline children come from the first paragraph inside the list item.
 					const firstPara = listItem.children.find(
 						(c) => c.type === "paragraph",
 					);

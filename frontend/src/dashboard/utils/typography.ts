@@ -1,9 +1,3 @@
-// Typography configuration — single source of truth for all font/size/margin
-// values used in both the editor UI and the Pretext measurement engine.
-// When adding a new font or adjusting sizes, change it here only.
-// index.css prose rules reference the CSS custom properties produced by
-// makeTypographyVars() so the visual output always agrees with measurements.
-
 export const FONT_CATALOG = {
 	inter: {
 		label: "Inter",
@@ -107,8 +101,6 @@ export type StylePresetId = "modern" | "classic" | "plain";
 
 export type SizeProfile = "small" | "regular" | "large";
 
-// Classic serif fonts render optically smaller; these offsets are applied to
-// body font size everywhere (measurement + CSS vars) so both stay in sync.
 export const CLASSIC_BODY_SIZES: Record<SizeProfile, {mobile: number; desktop: number}> = {
 	small:   {mobile: 14, desktop: 15},
 	regular: {mobile: 15, desktop: 17},
@@ -309,7 +301,6 @@ export function resolveTypography(settings: {
 	};
 }
 
-// Default resolved typography for read mode (regular profile, classic preset, desktop).
 export function defaultTypography(isMobile = false): ResolvedTypography {
 	return resolveTypography({
 		sizeProfile: "regular",

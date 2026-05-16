@@ -218,7 +218,6 @@ function useToast() {
 	};
 }
 
-/** Destructive toast styled for this app; always uses a high z-index viewport. */
 function toastError(message: string) {
 	toast({
 		variant: "destructive",

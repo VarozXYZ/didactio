@@ -244,7 +244,10 @@ export function buildGatewaySystemPrompt(
 	}
 }
 
-function activityTypeContract(type: LearningActivityType): string {
+function activityTypeContract(
+	type: LearningActivityType,
+	options: {flashcardCount?: number} = {},
+): string {
 	switch (type) {
 		case "multiple_choice":
 			return 'content.questions: array of EXACTLY 10 items, each with {id, prompt, options:[{id,text}] (exactly 4 options per question), correctOptionId, explanation}. Cover a wide range of concepts from the module — do not cluster all questions around a single idea.';
@@ -253,7 +256,7 @@ function activityTypeContract(type: LearningActivityType): string {
 		case "coding_practice":
 			return "content.language, content.prompt, content.starterCode, content.expectedOutcome, content.testCases:[{input, expected}], content.rubric:string[].";
 		case "flashcards":
-			return "content.cards: array of {id, front, back}.";
+			return `content.cards: array of EXACTLY ${options.flashcardCount ?? 5} items, each with {id, front, back}. Each card must test one atomic concept, with a concise prompt on front and a precise answer on back. Treat every flashcard listed in Previous Activities as a hard exclusion list: do not reuse the same front, same answer, same fact, same example, or a paraphrased/near-duplicate card. Generate only genuinely new concepts, distinctions, pitfalls, or applications.`;
 		case "matching":
 			return "content.pairs: array of {id, left, right}.";
 		case "ordering":
@@ -291,6 +294,7 @@ export function buildLearningActivityPrompt(input: {
 		dedupeSummary: string;
 	}>;
 	authoring: AuthoringConfig;
+	flashcardCount?: number;
 }): string {
 	const previous =
 		input.previousActivities.length === 0 ?
@@ -308,7 +312,9 @@ export function buildLearningActivityPrompt(input: {
 			`Create one ${input.type} activity for "${input.moduleTitle}" in ${input.topic}.`,
 			`Scope: ${input.scope}.`,
 			"Return JSON with exactly: title, instructions, dedupeSummary, content.",
-			activityTypeContract(input.type),
+			activityTypeContract(input.type, {
+				flashcardCount: input.flashcardCount,
+			}),
 			"Keep the activity compact enough to fit in one reading page when possible.",
 		]),
 		buildSection("Authoring Profile", buildAuthoringContext(input.authoring)),
@@ -325,6 +331,9 @@ export function buildLearningActivityPrompt(input: {
 			"These previous activities are more important than the lesson content for avoiding repetition.",
 			"Do not repeat the exact format, question, example, dataset, coding challenge, case, or assessed skill.",
 			"If the same activity type is requested again, vary the angle, difficulty, example and concrete skill.",
+			input.type === "flashcards" ?
+				"For flashcards, the listed Existing cards are a strict exclusion list. Do not create semantic duplicates even if the wording changes."
+			:	"",
 		]),
 	].join("\n\n");
 }

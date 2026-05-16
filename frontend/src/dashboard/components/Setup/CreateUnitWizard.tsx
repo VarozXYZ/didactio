@@ -633,7 +633,6 @@ export function CreateUnitWizard({
 					border: "1px solid rgba(255,255,255,0.55)",
 				}}
 			>
-				{/* Stepper sidebar */}
 				<div
 					className="flex w-[232px] shrink-0 flex-col"
 					style={{
@@ -708,7 +707,6 @@ export function CreateUnitWizard({
 					</nav>
 				</div>
 
-				{/* Content area */}
 				<div className="flex min-h-0 min-w-0 flex-1 flex-col">
 					<div
 						className={`flex shrink-0 items-center px-6 pt-5 ${

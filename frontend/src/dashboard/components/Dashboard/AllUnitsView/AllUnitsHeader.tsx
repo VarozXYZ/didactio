@@ -46,12 +46,10 @@ export function CreateUnitButton({onClick, label = "New unit"}: {onClick: () => 
 					cursor: "pointer",
 					transform: pressed ? "scale(0.988)" : "none",
 					transition: "transform 0.12s ease, box-shadow 0.22s ease",
-					// Keep only subtle insets here; the outer shadow animates via a dedicated layer below.
 					boxShadow:
 						"inset 0 1px 0 rgba(255,255,255,0.10), inset 0 -2px 8px rgba(0,0,0,0.30)",
 				}}
 			>
-				{/* Animated elevation shadow layer (animates better than box-shadow interpolation). */}
 				<div
 					aria-hidden="true"
 					style={{
@@ -70,7 +68,6 @@ export function CreateUnitButton({onClick, label = "New unit"}: {onClick: () => 
 					}}
 				/>
 
-				{/* Spinning gradient — only mounted while hovering, restarts on each new hover */}
 				{hovered && (
 					<div
 						key={spinKey}
@@ -82,11 +79,6 @@ export function CreateUnitButton({onClick, label = "New unit"}: {onClick: () => 
 							top: "50%",
 							left: "50%",
 							transform: "translate(-50%, -50%)",
-							/* Arc grows from ~150° to ~355° clockwise from the top.
-                               Colors spread evenly across whatever the current arc-end is.
-                               from -10deg so the arc starts just before 12 o'clock. */
-							/* Seamless static rainbow — starts & ends with #3434c3 so 0°=360° is invisible.
-                               The mask animates the reveal; no seam possible. */
 							background:
 								"conic-gradient(from 0deg, #3434c3 0deg, #337ECF 45deg, #8DD598 90deg, #11A07D 135deg, #FADF52 180deg, #EFA047 225deg, #E01D50 270deg, #BB2081 315deg, #3434c3 360deg)",
 							WebkitMaskImage:
@@ -98,7 +90,6 @@ export function CreateUnitButton({onClick, label = "New unit"}: {onClick: () => 
 					/>
 				)}
 
-				{/* Inner face — covers the center, only the 2px gap shows the gradient as a border */}
 				<div
 					style={{
 						position: "relative",

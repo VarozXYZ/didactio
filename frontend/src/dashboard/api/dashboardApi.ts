@@ -496,7 +496,6 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
 				message = body.message ?? body.error;
 			}
 		} catch {
-			// Keep default message.
 		}
 
 		throw new DashboardApiError(message, response.status);
@@ -541,7 +540,6 @@ async function streamNdjson<T>(
 				message = body.message ?? body.error;
 			}
 		} catch {
-			// Keep default message.
 		}
 
 		throw new DashboardApiError(message, response.status);

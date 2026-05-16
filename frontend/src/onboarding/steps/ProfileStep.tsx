@@ -32,7 +32,6 @@ export function ProfileStep({
 				</p>
 			</div>
 
-			{/* Picture + name row */}
 			<div className="flex items-center gap-4 rounded-[12px] border border-black/[0.07] bg-white/60 px-4 py-3.5">
 				<div className="flex shrink-0 flex-col items-center gap-1">
 					{user.pictureUrl ?
@@ -70,7 +69,6 @@ export function ProfileStep({
 				</div>
 			</div>
 
-			{/* Language section */}
 			<div className="flex flex-col gap-2.5 rounded-[12px] border border-black/[0.07] bg-white/60 px-4 py-3.5">
 				<div>
 					<p className="text-[13.5px] font-semibold text-[#1D1D1F]">Content language</p>

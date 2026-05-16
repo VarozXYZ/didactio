@@ -52,7 +52,7 @@ export function resolveActivityGenerationCost(input: {
 }): GenerationCoinCost {
 	return {
 		coinType: "silver",
-		amount: input.quality === "gold" ? 20 : 1,
+		amount: input.quality === "gold" ? 3 : 1,
 	};
 }
 

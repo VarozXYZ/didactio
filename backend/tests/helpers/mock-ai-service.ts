@@ -346,7 +346,15 @@ export function createMockAiService(): AiService {
 							],
 						}
 					: input.type === "flashcards" ?
-						{cards: [{id: "c1", front: "Core idea", back: "Explanation"}]}
+						{
+							cards: [
+								{
+									id: `c-${input.moduleTitle}`,
+									front: `Core idea in ${input.moduleTitle}`,
+									back: "Explanation",
+								},
+							],
+						}
 					:	{
 							prompts: [
 								{
