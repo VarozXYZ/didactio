@@ -242,7 +242,7 @@ export interface LearningActivityFeedbackResult extends BaseStageResult {
 	questionFeedback: Array<{
 		id: string;
 		feedback?: string;
-		simplifiedScore?: "wrong" | "Almost there" | "Perfect";
+		simplifiedScore?: "wrong" | "Almost there" | "Good" | "Perfect";
 		expectedAnswer?: string;
 		improvementReason?: string;
 		score?: number;

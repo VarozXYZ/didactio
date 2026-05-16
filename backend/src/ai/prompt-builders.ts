@@ -262,7 +262,7 @@ function activityTypeContract(
 		case "ordering":
 			return "content.items: array of {id, text, correctOrder:number}.";
 		case "case_study":
-			return "content.scenario and content.questions:[{id, prompt, rubric:string[]}].";
+			return "content.scenario, content.problem, and content.rubric:string[]. Create ONE realistic case study, not a list of questions. scenario must be a specific, concrete context with relevant constraints, stakeholders, data, tradeoffs, or symptoms. problem must be ONE medium-length decision/problem the learner must resolve using the module concepts. Do not create multiple prompts, quiz questions, or generic discussion questions. The learner should write one structured analysis/solution. rubric should list 3-5 criteria for evaluating that single solution.";
 		case "debate_reflection":
 			return "content.prompt, content.positions:string[], content.reflectionQuestions:string[].";
 		case "cloze":
@@ -369,7 +369,8 @@ export function buildLearningActivityFeedbackPrompt(input: {
 			`Type: ${input.activityType}`,
 			`Instructions: ${input.instructions}`,
 			"Return JSON with feedback, score 0-100 when possible, strengths, improvements, and questionFeedback.",
-			'For short_answer, questionFeedback must include EXACTLY 3 items: one separate correction for each content.prompts item. Use the same id as the prompt. Do not reuse the same correction across questions. Each item must include simplifiedScore exactly one of "wrong", "Almost there", "Perfect"; expectedAnswer with the correction / expected answer for that specific prompt; improvementReason explaining why that specific score was given and how to improve that specific learner answer.',
+			"Write every learner-facing field in the same language as the activity instructions and learner answer. Do not use English section labels unless the activity itself is in English.",
+			'For short_answer, questionFeedback must include EXACTLY 3 items: one separate correction for each content.prompts item. Use the same id as the prompt. Do not reuse the same correction across questions. Each item must include simplifiedScore exactly one of "wrong", "Almost there", "Good"; expectedAnswer with the correction / expected answer for that specific prompt; improvementReason explaining why that specific score was given and how to improve that specific learner answer.',
 			"Compare each learner answer only against its matching prompt and rubric. If an answer is blank, mark that specific item as wrong and explain what should have been answered.",
 			"expectedAnswer and improvementReason may use simple sanitized HTML only: <p>, <ul>, <ol>, <li>, <strong>, <em>, <u>, <mark>, <code>, <br>. No headings, links, styles, scripts, tables, or code blocks.",
 			"Be direct, useful, and specific. Do not reveal hidden answers unless needed to explain a misconception.",

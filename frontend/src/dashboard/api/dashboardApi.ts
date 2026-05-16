@@ -114,10 +114,12 @@ export interface BackendLearningActivityAttempt {
 	answers: unknown;
 	score?: number;
 	feedback: string;
+	strengths?: string[];
+	improvements?: string[];
 	questionFeedback?: Array<{
 		id: string;
 		feedback?: string;
-		simplifiedScore?: "wrong" | "Almost there" | "Perfect";
+		simplifiedScore?: "wrong" | "Almost there" | "Good" | "Perfect";
 		expectedAnswer?: string;
 		improvementReason?: string;
 		score?: number;

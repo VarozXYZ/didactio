@@ -3422,6 +3422,8 @@ export function createApp(options: CreateAppOptions) {
 			try {
 				let score: number | undefined;
 				let feedback: string;
+				let strengths: string[] | undefined;
+				let improvements: string[] | undefined;
 				let questionFeedback: LearningActivityAttempt["questionFeedback"];
 
 				if (OBJECTIVE_ACTIVITY_TYPES.has(activity.type)) {
@@ -3451,17 +3453,9 @@ export function createApp(options: CreateAppOptions) {
 						});
 					score = result.score;
 					questionFeedback = result.questionFeedback;
-					feedback = [
-						result.feedback,
-						result.strengths.length ?
-							`Strengths: ${result.strengths.join("; ")}`
-						:	"",
-						result.improvements.length ?
-							`Improve: ${result.improvements.join("; ")}`
-						:	"",
-					]
-						.filter(Boolean)
-						.join("\n");
+					strengths = result.strengths;
+					improvements = result.improvements;
+					feedback = result.feedback;
 					await generationRunStore.save(
 						createCompletedActivityFeedbackRunRecord({
 							didacticUnitId: activity.didacticUnitId,
@@ -3492,6 +3486,8 @@ export function createApp(options: CreateAppOptions) {
 					answers,
 					score,
 					feedback,
+					strengths,
+					improvements,
 					questionFeedback,
 					completedAt: now,
 				};

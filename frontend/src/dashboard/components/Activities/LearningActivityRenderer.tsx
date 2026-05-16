@@ -1,4 +1,11 @@
-import {useEffect, useMemo, useRef, useState, type CSSProperties} from "react";
+import {
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+	type CSSProperties,
+	type MouseEvent,
+} from "react";
 import {
 	Flashcard,
 	useFlashcard,
@@ -12,6 +19,7 @@ import {
 	ChevronLeft,
 	ChevronRight,
 	Code2,
+	Copy,
 	Layers3,
 	ListChecks,
 	MessageCircleQuestionMark,
@@ -487,24 +495,34 @@ function ShortAnswerActivity({
 		latestAttempt?.questionFeedback?.[activeIndex];
 	const scoreLabel = activeFeedback?.simplifiedScore ?? (
 		activeFeedback?.score !== undefined ?
-			activeFeedback.score >= 90 ? "Perfect"
+			activeFeedback.score >= 90 ? "Good"
 			: activeFeedback.score >= 50 ? "Almost there"
 			: "wrong"
 		:	undefined
 	);
 	const scoreClass =
-		scoreLabel === "Perfect" ? "border-[#BBF7D0] bg-[#F0FDF4] text-[#166534]"
+		scoreLabel === "Perfect" || scoreLabel === "Good" ? "border-[#BBF7D0] bg-[#F0FDF4] text-[#166534]"
 		: scoreLabel === "Almost there" ? "border-[#FDE68A] bg-[#FFFBEB] text-[#92400E]"
 		:	"border-[#FECACA] bg-[#FEF2F2] text-[#991B1B]";
 	const scoreAccentClass =
-		scoreLabel === "Perfect" ? "text-[#16A34A]"
+		scoreLabel === "Perfect" || scoreLabel === "Good" ? "text-[#16A34A]"
 		: scoreLabel === "Almost there" ? "text-[#D97706]"
 		:	"text-[#DC2626]";
-	const scoreText = scoreLabel === "wrong" ? "Wrong" : scoreLabel;
+	const scoreText =
+		scoreLabel === "wrong" ? "Wrong"
+		: scoreLabel === "Perfect" ? "Good"
+		:	scoreLabel;
 	const ScoreIcon =
-		scoreLabel === "Perfect" ? CheckCircle2
+		scoreLabel === "Perfect" || scoreLabel === "Good" ? CheckCircle2
 		: scoreLabel === "Almost there" ? CircleAlert
 		:	XCircle;
+	const detailTabButtonClass = (selected: boolean) =>
+		cn(
+			"-mb-px min-w-[96px] border border-b-2 px-4 py-3 text-center text-[12px] font-bold transition",
+			selected ?
+				"border-[#E5E5E7] border-b-[#4ADE80] bg-white text-[#16A34A]"
+			:	"border-[#ECECEF] border-b-[#E5E5E7] bg-[#F5F5F7] text-[#6E6E73] hover:border-[#BBF7D0] hover:border-b-[#4ADE80] hover:bg-[#F0FDF4] hover:text-[#15803D]",
+		);
 
 	const visibleDetailTab = activeFeedback && detailTab === "correction" ? "correction" : "answer";
 
@@ -554,19 +572,14 @@ function ShortAnswerActivity({
 								key={tab}
 								type="button"
 								onClick={() => onDetailTabChange(tab)}
-								className={cn(
-									"-mb-px min-w-[96px] border-b-2 px-4 py-3 text-center text-[12px] font-bold transition",
-									selected ?
-										"border-[#4ADE80] bg-white text-[#16A34A]"
-									:	"border-transparent bg-[#F8F8F9] text-[#8A8F98] hover:bg-white hover:text-[#1D1D1F]",
-								)}
+								className={detailTabButtonClass(selected)}
 							>
-								{tab === "answer" ? "Answer" : "Correction"}
+								{tab === "answer" ? "Answer" : "Feedback"}
 							</button>
 						);
 					})}
 				</div>
-				<div className="min-h-0 flex-1 rounded-b-[8px] rounded-tr-[8px] border border-t-0 border-[#E5E5E7] bg-white p-3 shadow-[0_10px_28px_rgba(17,24,39,0.03)]">
+				<div className="min-h-0 flex-1 rounded-b-[8px] border border-t-0 border-[#E5E5E7] bg-white p-3 shadow-[0_10px_28px_rgba(17,24,39,0.03)]">
 					{visibleDetailTab === "answer" ? (
 						<textarea
 							className="h-full min-h-[180px] w-full resize-none bg-transparent p-1 text-[14px] leading-relaxed text-[#1D1D1F] outline-none placeholder:text-[#9CA3AF]"
@@ -606,7 +619,193 @@ function ShortAnswerActivity({
 						</div>
 					) : (
 						<div className="flex h-full min-h-[180px] items-center justify-center text-center text-[12px] font-medium leading-relaxed text-[#86868B]">
-							Check your answers to see the correction for this question.
+							Check your answers to see the feedback for this question.
+						</div>
+					)}
+				</div>
+			</div>
+		</div>
+	);
+}
+
+function CaseStudyActivity({
+	content,
+	answers,
+	setAnswer,
+	latestAttempt,
+	activeTab,
+	onTabChange,
+}: {
+	content: Record<string, unknown>;
+	answers: Answers;
+	setAnswer: (key: string, value: unknown) => void;
+	latestAttempt?: BackendLearningActivityAttempt;
+	activeTab: "case" | "analysis" | "feedback";
+	onTabChange: (tab: "case" | "analysis" | "feedback") => void;
+}) {
+	const scenario = asText(content.scenario) || asText(content.prompt);
+	const questions = asArray(content.questions);
+	const legacyProblem = asText(questions[0]?.prompt);
+	const problem = asText(content.problem) || legacyProblem || asText(content.brief);
+	const rubric = [
+		...(Array.isArray(content.rubric) ? content.rubric.map(asText) : []),
+		...(Array.isArray(questions[0]?.rubric) ?
+			questions[0].rubric.map(asText)
+		:	[]),
+	].filter(Boolean);
+	const response = asText(answers.response);
+	const attemptRecord =
+		latestAttempt as unknown as Record<string, unknown> | undefined;
+	const legacyFeedback = parseLegacyFeedbackSections(latestAttempt?.feedback);
+	const strengths = uniqueStrings([
+		...asStringArray(attemptRecord?.strengths),
+		...legacyFeedback.strengths,
+	]);
+	const improvements = uniqueStrings([
+		...asStringArray(attemptRecord?.improvements),
+		...legacyFeedback.improvements,
+	]);
+	const feedbackScore = latestAttempt?.score;
+	const feedbackTone =
+		feedbackScore === undefined ? "neutral"
+		: feedbackScore >= 80 ? "good"
+		: feedbackScore >= 50 ? "partial"
+		:	"bad";
+	const feedbackPanelClass =
+		feedbackTone === "good" ?
+			"border-[#BBF7D0] bg-[#F0FDF4] text-[#065F46]"
+		: feedbackTone === "partial" ?
+			"border-[#FDE68A] bg-[#FFFBEB] text-[#92400E]"
+		: feedbackTone === "bad" ?
+			"border-[#FECACA] bg-[#FEF2F2] text-[#991B1B]"
+		:	"border-[#E5E5E7] bg-[#F8F8F9] text-[#374151]";
+	const feedbackAccentClass =
+		feedbackTone === "good" ? "text-[#15803D]"
+		: feedbackTone === "partial" ? "text-[#D97706]"
+		: feedbackTone === "bad" ? "text-[#DC2626]"
+		:	"text-[#6E6E73]";
+	const FeedbackIcon =
+		feedbackTone === "good" ? CheckCircle2
+		: feedbackTone === "partial" ? CircleAlert
+		: feedbackTone === "bad" ? XCircle
+		:	MessageSquareText;
+	const tabButtonClass = (selected: boolean) =>
+		cn(
+			"-mb-px min-w-[112px] border border-b-2 px-4 py-3 text-center text-[12px] font-bold transition",
+			selected ?
+				"border-[#E5E5E7] border-b-[#4ADE80] bg-white text-[#16A34A]"
+			:	"border-[#ECECEF] border-b-[#E5E5E7] bg-[#F5F5F7] text-[#6E6E73] hover:border-[#BBF7D0] hover:border-b-[#4ADE80] hover:bg-[#F0FDF4] hover:text-[#15803D]",
+		);
+
+	return (
+		<div className="flex min-h-0 flex-1 flex-col gap-3">
+			<div className="flex min-h-0 flex-1 flex-col">
+				<div className="flex items-end border-b border-[#E5E5E7]">
+					{(["case", "analysis", ...(latestAttempt ? ["feedback" as const] : [])] as const).map((tab) => {
+						const selected = activeTab === tab;
+						return (
+							<button
+								key={tab}
+								type="button"
+								onClick={() => onTabChange(tab)}
+								className={tabButtonClass(selected)}
+							>
+								{tab === "case" ? "Case" : tab === "analysis" ? "Analysis" : "Feedback"}
+							</button>
+						);
+					})}
+				</div>
+
+				<div className="min-h-0 flex-1 rounded-b-[8px] border border-t-0 border-[#E5E5E7] bg-white p-3 shadow-[0_10px_28px_rgba(17,24,39,0.03)]">
+					{activeTab === "case" ? (
+						<div className="grid h-full min-h-[260px] gap-3 overflow-y-auto pr-1">
+							<section className="p-1">
+								<div className="mb-2 flex items-center gap-2">
+									<span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#DCFCE7] text-[#16A34A]">
+										<BookOpenCheck size={12} strokeWidth={2.25} />
+									</span>
+									<h4 className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#6E6E73]">
+										Scenario
+									</h4>
+								</div>
+								<p className="whitespace-pre-wrap text-[13px] leading-[1.6] text-[#374151]">
+									{scenario}
+								</p>
+							</section>
+
+							<section className="border-t border-[#F0F0F2] p-1 pt-3">
+								<div className="mb-2 flex items-center gap-2">
+									<span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#F0FDF4] text-[#16A34A]">
+										<MessageCircleQuestionMark size={12} strokeWidth={2.25} />
+									</span>
+									<h4 className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#6E6E73]">
+										Problem to solve
+									</h4>
+								</div>
+								<p className="text-[13px] font-semibold leading-relaxed text-[#1D1D1F]">
+									{problem || "Resolve the case using the module concepts."}
+								</p>
+								{rubric.length > 0 && (
+									<ul className="mt-2 grid gap-x-4 gap-y-1 text-[11.5px] leading-relaxed text-[#6E6E73] sm:grid-cols-2">
+										{rubric.slice(0, 4).map((item) => (
+											<li key={item} className="flex gap-1.5">
+												<span className="mt-[0.45em] h-1 w-1 shrink-0 rounded-full bg-[#34C759]" />
+												<span>{item}</span>
+											</li>
+										))}
+									</ul>
+								)}
+							</section>
+						</div>
+					) : activeTab === "analysis" ? (
+						<textarea
+							className="h-full min-h-[260px] w-full resize-none bg-transparent p-1 text-[14px] leading-relaxed text-[#1D1D1F] outline-none placeholder:text-[#9CA3AF]"
+							value={response}
+							onChange={(event) => setAnswer("response", event.target.value)}
+							placeholder="Write your analysis and proposed solution..."
+						/>
+					) : latestAttempt ? (
+						<div className={cn("max-h-[360px] overflow-y-auto rounded-[10px] border p-3", feedbackPanelClass)}>
+							<div className="flex items-center gap-2 text-[12px] font-bold">
+								<FeedbackIcon size={14} />
+								{latestAttempt.score !== undefined ?
+									`Score: ${latestAttempt.score}%`
+								:	"Feedback"}
+							</div>
+							<FeedbackHtml
+								className="mt-2 whitespace-pre-line text-[12.5px] leading-relaxed"
+								html={legacyFeedback.feedback}
+							/>
+							{strengths.length > 0 && (
+								<div className="mt-3">
+									<div className={cn("flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.12em]", feedbackAccentClass)}>
+										<Trophy size={13} />
+										<span>Puntos fuertes</span>
+									</div>
+									<ul className="mt-1 list-disc space-y-1 pl-4 text-[12px] leading-relaxed">
+										{strengths.map((strength) => (
+											<li key={strength}>{strength}</li>
+										))}
+									</ul>
+								</div>
+							)}
+							{improvements.length > 0 && (
+								<div className="mt-3">
+									<div className={cn("flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.12em]", feedbackAccentClass)}>
+										<CircleAlert size={13} />
+										<span>Como mejorar</span>
+									</div>
+									<ul className="mt-1 list-disc space-y-1 pl-4 text-[12px] leading-relaxed">
+										{improvements.map((improvement) => (
+											<li key={improvement}>{improvement}</li>
+										))}
+									</ul>
+								</div>
+							)}
+						</div>
+					) : (
+						<div className="flex h-full min-h-[260px] items-center justify-center text-center text-[12px] font-medium leading-relaxed text-[#86868B]">
+							Check your answer to see feedback.
 						</div>
 					)}
 				</div>
@@ -632,6 +831,64 @@ function asStringArray(value: unknown): string[] {
 				)
 				.filter(Boolean)
 		:	[];
+}
+
+function uniqueStrings(values: string[]): string[] {
+	return Array.from(
+		new Set(values.map((value) => value.trim()).filter(Boolean)),
+	);
+}
+
+function cleanLegacyFeedbackItem(value: string): string {
+	return value
+		.replace(/\s+/g, " ")
+		.replace(/\.;/g, ".")
+		.replace(/;$/g, "")
+		.trim();
+}
+
+function parseLegacyFeedbackSections(feedback: string | undefined): {
+	feedback: string;
+	strengths: string[];
+	improvements: string[];
+} {
+	if (!feedback) {
+		return {feedback: "", strengths: [], improvements: []};
+	}
+
+	const markers = [...feedback.matchAll(/(?:^|\n)\s*(Strengths|Improve):\s*/g)];
+	if (markers.length === 0) {
+		return {feedback, strengths: [], improvements: []};
+	}
+
+	const mainFeedback = feedback.slice(0, markers[0].index).trim();
+	const sections = markers.map((marker, index) => {
+		const start = (marker.index ?? 0) + marker[0].length;
+		const end =
+			index + 1 < markers.length ?
+				markers[index + 1].index ?? feedback.length
+			:	feedback.length;
+		return {
+			label: marker[1],
+			text: feedback.slice(start, end).trim(),
+		};
+	});
+
+	const splitItems = (text: string) =>
+		text
+			.split(/;\s*/)
+			.map(cleanLegacyFeedbackItem)
+			.filter(Boolean);
+
+	return {
+		feedback: mainFeedback || feedback.replace(/(?:^|\n)\s*(Strengths|Improve):[\s\S]*$/g, "").trim(),
+		strengths: sections
+			.filter((section) => section.label === "Strengths")
+			.flatMap((section) => splitItems(section.text)),
+		improvements: sections
+			.filter((section) => section.label === "Improve")
+			.flatMap((section) => splitItems(section.text)),
+	};
 }
 
 function getSavedFlashcardProgress(
@@ -693,6 +950,7 @@ function FlashcardsActivity({activity}: {activity: BackendLearningActivity}) {
 	const [revealedCardId, setRevealedCardId] = useState<string | undefined>();
 	const [revealed, setRevealed] = useState(false);
 	const [loadedActivityId, setLoadedActivityId] = useState<string | null>(null);
+	const [copiedSide, setCopiedSide] = useState<"front" | "back" | null>(null);
 	const flashcardFlip = useFlashcard({
 		manualFlip: true,
 		flipDirection: "rtl",
@@ -846,6 +1104,25 @@ function FlashcardsActivity({activity}: {activity: BackendLearningActivity}) {
 		});
 	};
 
+	const handleCopyCardText = (
+		event: MouseEvent<HTMLButtonElement>,
+		side: "front" | "back",
+		text: string | undefined,
+	) => {
+		event.preventDefault();
+		event.stopPropagation();
+
+		const value = text?.trim();
+		if (!value) return;
+
+		void navigator.clipboard.writeText(value).then(() => {
+			setCopiedSide(side);
+			window.setTimeout(() => {
+				setCopiedSide((current) => (current === side ? null : current));
+			}, 1200);
+		});
+	};
+
 	if (cards.length === 0) {
 		return (
 			<div className="flex min-h-[220px] items-center justify-center rounded-lg border border-[#E8E8EA] bg-[#F9F9FB] text-sm font-medium text-[#6B7280]">
@@ -927,9 +1204,23 @@ function FlashcardsActivity({activity}: {activity: BackendLearningActivity}) {
 							front={{
 								html: (
 									<div className="flex h-full flex-col justify-between p-5 text-left">
-										<span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#A1A1AA]">
-											Front
-										</span>
+										<div className="flex items-center justify-between gap-3">
+											<span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#A1A1AA]">
+												Front
+											</span>
+											<button
+												type="button"
+												onMouseDown={(event) => event.stopPropagation()}
+												onClick={(event) =>
+													handleCopyCardText(event, "front", currentCard?.front)
+												}
+												className="inline-flex items-center gap-1 rounded-md border border-[#E5E5E7] bg-white px-2 py-1 text-[10px] font-bold text-[#6E6E73] transition hover:border-[#BBF7D0] hover:text-[#16A34A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#86EFAC]"
+												aria-label="Copy front text"
+											>
+												<Copy size={12} />
+												{copiedSide === "front" ? "Copied" : "Copy"}
+											</button>
+										</div>
 										<div className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto py-4 text-center">
 											<p className="w-full max-w-[480px] whitespace-pre-wrap break-words text-[18px] font-semibold leading-relaxed text-[#1D1D1F]">
 												{currentCard?.front}
@@ -944,9 +1235,23 @@ function FlashcardsActivity({activity}: {activity: BackendLearningActivity}) {
 							back={{
 								html: (
 									<div className="flex h-full flex-col justify-between p-5 text-left">
-										<span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#16A34A]">
-											Back
-										</span>
+										<div className="flex items-center justify-between gap-3">
+											<span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#16A34A]">
+												Back
+											</span>
+											<button
+												type="button"
+												onMouseDown={(event) => event.stopPropagation()}
+												onClick={(event) =>
+													handleCopyCardText(event, "back", currentCard?.back)
+												}
+												className="inline-flex items-center gap-1 rounded-md border border-[#BBF7D0] bg-[#F8FFF9] px-2 py-1 text-[10px] font-bold text-[#15803D] transition hover:bg-[#F0FDF4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#86EFAC]"
+												aria-label="Copy back text"
+											>
+												<Copy size={12} />
+												{copiedSide === "back" ? "Copied" : "Copy"}
+											</button>
+										</div>
 										<div className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto py-4 text-center">
 											<p className="w-full max-w-[480px] whitespace-pre-wrap break-words text-[16px] leading-relaxed text-[#1D1D1F]">
 												{currentCard?.back}
@@ -1018,9 +1323,13 @@ export function LearningActivityRenderer({
 }) {
 	const [answers, setAnswers] = useState<Answers>({});
 	const [shortAnswerDetailTab, setShortAnswerDetailTab] = useState<"answer" | "correction">("answer");
+	const [caseStudyTab, setCaseStudyTab] = useState<"case" | "analysis" | "feedback">("case");
 	const [shortAnswerProgressActivityId, setShortAnswerProgressActivityId] = useState<string | null>(null);
 	const shortAnswerSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const shortAnswerHasLocalChangesRef = useRef(false);
+	const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const draftHasLocalChangesRef = useRef(false);
+	const [draftProgressActivityId, setDraftProgressActivityId] = useState<string | null>(null);
 	const [outOfAttemptsOpen, setOutOfAttemptsOpen] = useState(false);
 	const [isRefilling, setIsRefilling] = useState(false);
 	const latestAttempt = attempts.at(-1);
@@ -1059,6 +1368,35 @@ export function LearningActivityRenderer({
 		};
 	}, [activity.id, activity.type]);
 
+	useEffect(() => {
+		if (draftSaveTimerRef.current) {
+			clearTimeout(draftSaveTimerRef.current);
+			draftSaveTimerRef.current = null;
+		}
+
+		if (activity.type !== "case_study") {
+			return;
+		}
+
+		let mounted = true;
+		draftHasLocalChangesRef.current = false;
+
+		void dashboardApi.getActivityProgress(activity.id).then(({progress}) => {
+			if (!mounted) return;
+			if (draftHasLocalChangesRef.current) return;
+			setAnswers(progress?.answers ?? {});
+			setDraftProgressActivityId(activity.id);
+		});
+
+		return () => {
+			mounted = false;
+			if (draftSaveTimerRef.current) {
+				clearTimeout(draftSaveTimerRef.current);
+				draftSaveTimerRef.current = null;
+			}
+		};
+	}, [activity.id, activity.type]);
+
 	const scheduleShortAnswerProgressSave = (nextAnswers: Answers, completed = false) => {
 		if (activity.type !== "short_answer") return;
 		if (shortAnswerSaveTimerRef.current) {
@@ -1071,6 +1409,21 @@ export function LearningActivityRenderer({
 				completed,
 			});
 			shortAnswerSaveTimerRef.current = null;
+		}, 500);
+	};
+
+	const scheduleDraftProgressSave = (nextAnswers: Answers, completed = false) => {
+		if (activity.type !== "case_study") return;
+		if (draftSaveTimerRef.current) {
+			clearTimeout(draftSaveTimerRef.current);
+		}
+		draftSaveTimerRef.current = setTimeout(() => {
+			void dashboardApi.saveActivityProgress(activity.id, {
+				confirmedAnswers: {},
+				answers: nextAnswers,
+				completed,
+			});
+			draftSaveTimerRef.current = null;
 		}, 500);
 	};
 
@@ -1090,13 +1443,20 @@ export function LearningActivityRenderer({
 			shortAnswerHasLocalChangesRef.current = true;
 			setShortAnswerProgressActivityId(activity.id);
 		}
+		if (activity.type === "case_study") {
+			draftHasLocalChangesRef.current = true;
+			setDraftProgressActivityId(activity.id);
+		}
 		setAnswers((previous) => {
 			const base =
 				activity.type === "short_answer" && shortAnswerProgressActivityId !== activity.id ?
 					{}
+				: activity.type === "case_study" && draftProgressActivityId !== activity.id ?
+					{}
 				:	previous;
 			const next = {...base, [key]: value};
 			scheduleShortAnswerProgressSave(next);
+			scheduleDraftProgressSave(next);
 			return next;
 		});
 	};
@@ -1104,6 +1464,8 @@ export function LearningActivityRenderer({
 	const submitCurrentAnswers = () => {
 		const currentAnswers =
 			activity.type === "short_answer" && shortAnswerProgressActivityId !== activity.id ?
+				{}
+			: activity.type === "case_study" && draftProgressActivityId !== activity.id ?
 				{}
 			:	answers;
 		const payload = currentAnswers;
@@ -1119,6 +1481,18 @@ export function LearningActivityRenderer({
 				completed: true,
 			});
 		}
+		if (activity.type === "case_study") {
+			if (draftSaveTimerRef.current) {
+				clearTimeout(draftSaveTimerRef.current);
+				draftSaveTimerRef.current = null;
+			}
+			void dashboardApi.saveActivityProgress(activity.id, {
+				confirmedAnswers: {},
+				answers: currentAnswers,
+				completed: true,
+			});
+			setCaseStudyTab("feedback");
+		}
 		void onSubmitAttempt(activity.id, payload);
 	};
 
@@ -1132,6 +1506,8 @@ export function LearningActivityRenderer({
 
 	const visibleAnswers =
 		activity.type === "short_answer" && shortAnswerProgressActivityId !== activity.id ?
+			{}
+		: activity.type === "case_study" && draftProgressActivityId !== activity.id ?
 			{}
 		:	answers;
 
@@ -1247,6 +1623,19 @@ export function LearningActivityRenderer({
 			);
 		}
 
+		if (activity.type === "case_study") {
+			return (
+				<CaseStudyActivity
+					content={content}
+					answers={visibleAnswers}
+					setAnswer={setAnswer}
+					latestAttempt={latestAttempt}
+					activeTab={caseStudyTab}
+					onTabChange={setCaseStudyTab}
+				/>
+			);
+		}
+
 		if (activity.type === "guided_project") {
 			return (
 				<div className="space-y-3">
@@ -1304,7 +1693,7 @@ export function LearningActivityRenderer({
 
 			{activity.type !== "multiple_choice" && activity.type !== "flashcards" && (
 				<>
-					{latestAttempt && activity.type !== "short_answer" && (
+					{latestAttempt && activity.type !== "short_answer" && activity.type !== "case_study" && (
 						<div className="mt-3 rounded-[12px] border border-emerald-200 bg-emerald-50 p-3">
 							<div className="flex items-center gap-2 text-xs font-bold text-emerald-800">
 								<CheckCircle2 size={13} />
@@ -1323,7 +1712,7 @@ export function LearningActivityRenderer({
 									type="button"
 									className="flex h-4 w-4 cursor-help items-center justify-center text-[#16A34A] outline-none transition hover:text-[#15803D] focus-visible:ring-2 focus-visible:ring-[#86EFAC]"
 									aria-describedby={`activity-attempts-tooltip-${activity.id}`}
-									aria-label="AI correction attempts"
+									aria-label="AI feedback attempts"
 								>
 									<BadgeQuestionMark size={14} strokeWidth={2.25} />
 								</button>
@@ -1335,7 +1724,7 @@ export function LearningActivityRenderer({
 									role="tooltip"
 									className="pointer-events-none absolute bottom-full left-0 z-20 mb-2 w-[220px] rounded-[6px] border border-[#BBF7D0] bg-[#F0FDF4] px-3 py-2 text-[11px] font-medium leading-snug text-[#166534] opacity-0 shadow-[0_8px_20px_rgba(22,163,74,0.14)] transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
 								>
-									AI feedback uses 1 attempt. You get 3 attempts per paid correction.
+									AI feedback uses 1 attempt. You get 3 attempts per paid feedback refill.
 								</span>
 							</span>
 						)}
@@ -1360,7 +1749,7 @@ export function LearningActivityRenderer({
 							<AlertDialogHeader>
 								<AlertDialogTitle>No attempts remaining</AlertDialogTitle>
 								<AlertDialogDescription>
-									You&apos;ve used all your correction attempts for this activity. Use a coin to get 3 more attempts and keep practicing.
+									You&apos;ve used all your feedback attempts for this activity. Use a coin to get 3 more attempts and keep practicing.
 								</AlertDialogDescription>
 							</AlertDialogHeader>
 							<AlertDialogFooter>

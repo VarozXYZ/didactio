@@ -246,6 +246,7 @@ const learningActivityContentSchema = z.object({
 	pairs: z.array(z.any()).optional(),
 	items: z.array(z.any()).optional(),
 	scenario: z.string().optional(),
+	problem: z.string().optional(),
 	positions: z.array(z.string()).optional(),
 	reflectionQuestions: z.array(z.string()).optional(),
 	textWithBlanks: z.string().optional(),
@@ -273,7 +274,7 @@ export const learningActivityFeedbackSchema = z.object({
 			z.object({
 				id: z.union([z.string(), z.number()]).transform(String),
 				simplifiedScore: z
-					.enum(["wrong", "Almost there", "Perfect"]),
+					.enum(["wrong", "Almost there", "Good", "Perfect"]),
 				expectedAnswer: z.string().min(1),
 				improvementReason: z.string().min(1),
 				score: z.number().min(0).max(100).optional(),

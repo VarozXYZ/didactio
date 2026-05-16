@@ -2,6 +2,7 @@ import {describe, expect, it} from "vitest";
 import {
 	buildChapterHtmlPrompt,
 	buildGatewaySystemPrompt,
+	buildLearningActivityPrompt,
 	buildModerationPrompt,
 	resolveTargetChapterCount,
 	buildSyllabusMarkdownPrompt,
@@ -18,6 +19,30 @@ const authoring = {
 };
 
 describe("prompt quality helpers", () => {
+	it("builds case study prompts around one concrete problem", () => {
+		const prompt = buildLearningActivityPrompt({
+			topic: "TypeScript in React",
+			moduleTitle: "Component props",
+			scope: "current_module",
+			type: "case_study",
+			contextModules: [
+				{
+					index: 0,
+					title: "Component props",
+					overview: "Typing props for React components.",
+					html: "<p>Interfaces, optional props, and event handlers.</p>",
+				},
+			],
+			previousActivities: [],
+			authoring,
+		});
+
+		expect(prompt).toContain("content.scenario, content.problem");
+		expect(prompt).toContain("Create ONE realistic case study");
+		expect(prompt).toContain("not a list of questions");
+		expect(prompt).toContain("Do not create multiple prompts");
+	});
+
 	it("builds a moderation prompt with the improved brief contract", () => {
 		const prompt = buildModerationPrompt({
 			topic: "Python programming",
