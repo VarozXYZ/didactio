@@ -300,9 +300,10 @@ type ModuleOutlineItem = {
 	id: string;
 	kind: "section" | "activity";
 	icon?: typeof FileQuestion;
-	level: 2;
+	level: 2 | 3;
 	number: string;
 	pageIndex: number;
+	parentId?: string;
 	title: string;
 };
 
@@ -375,30 +376,45 @@ function buildModuleOutline(
 	}
 
 	let section = 0;
+	let subsection = 0;
+	let currentSectionId: string | null = null;
+
 	return chapter.htmlBlocks.flatMap((block): ModuleOutlineItem[] => {
 		if (block.type !== "heading") {
 			return [];
 		}
 
 		const heading = parseHeadingFromHtml(block.html);
-		if (!heading || heading.level !== 2) {
+		if (!heading || heading.level === 4) {
 			return [];
 		}
 
-		section += 1;
-		const number = `${section}.`;
+		if (heading.level === 2) {
+			section += 1;
+			subsection = 0;
+			currentSectionId = block.id;
+		} else {
+			if (section === 0) {
+				section = 1;
+			}
+			subsection += 1;
+		}
+
+		const number =
+			heading.level === 2 ? `${section}` : `${section}.${subsection}`;
 		const title = stripLeadingHeadingNumber(heading.title);
 
 		return [
 			{
 				id: block.id,
 				kind: "section",
-				level: 2,
+				level: heading.level,
 				number,
 				pageIndex: findMeasuredPageIndexForOffset(
 					pages,
 					block.textStartOffset,
 				),
+				parentId: heading.level === 3 ? currentSectionId ?? undefined : undefined,
 				title: title || heading.title,
 			},
 		];
@@ -867,6 +883,9 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	const [isPagePickerOpen, setIsPagePickerOpen] = useState(false);
 	const [collapsedOutlineChapterIndex, setCollapsedOutlineChapterIndex] =
 		useState<number | null>(null);
+	const [expandedOutlineSectionIds, setExpandedOutlineSectionIds] = useState<
+		string[]
+	>([]);
 	const [openChapterActionsIndex, setOpenChapterActionsIndex] = useState<
 		number | null
 	>(null);
@@ -2801,7 +2820,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 					</span>
 				</button>
 				<button
-					className="group flex min-h-[164px] w-full flex-col rounded-[20px] border border-[#E5E5E7] bg-white p-5 text-left text-[#111827] transition-all hover:-translate-y-0.5 hover:border-[#111827] disabled:cursor-not-allowed disabled:opacity-60"
+					className="group flex min-h-[164px] w-full flex-col rounded-[20px] border border-[#E5E5E7] bg-white p-5 text-left text-[#0F0F12] transition-all hover:-translate-y-0.5 hover:border-[#0F0F12] disabled:cursor-not-allowed disabled:opacity-60"
 					disabled={isSubmitting || isPostModuleActionPending}
 					onClick={() => {
 						void handlePostModulePrimaryAction();
@@ -2899,7 +2918,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 												"flex items-center justify-center gap-2 rounded-[14px] px-4 py-2.5 text-sm font-bold transition",
 												selected ?
 													"bg-white text-[#16A34A] shadow-sm ring-1 ring-[#4ADE80]"
-												:	"text-[#6B7280] hover:text-[#111827]",
+												:	"text-[#6B7280] hover:text-[#0F0F12]",
 											)}
 										>
 											<TabIcon size={15} />
@@ -2928,8 +2947,8 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 											className={cn(
 												"relative flex items-start gap-3 rounded-2xl border p-3 text-left transition",
 												selected ?
-													"border-[#4ADE80] bg-[#F0FDF4] text-[#111827]"
-												:	"border-[#E5E5E7] bg-white text-[#111827] hover:border-[#D1D5DB]",
+													"border-[#4ADE80] bg-[#F0FDF4] text-[#0F0F12]"
+												:	"border-[#E5E5E7] bg-white text-[#0F0F12] hover:border-[#D1D5DB]",
 											)}
 										>
 											{selected && (
@@ -2944,7 +2963,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 													"flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
 													selected ?
 														"bg-[#DCFCE7] text-[#16A34A]"
-													:	"bg-[#F3F4F6] text-[#111827]",
+													:	"bg-[#F3F4F6] text-[#0F0F12]",
 												)}
 											>
 												<Icon size={17} />
@@ -2992,11 +3011,11 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 													fill="white"
 												/>
 											)}
-											<span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#111827] text-white">
+											<span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#0F0F12] text-white">
 												<Brain size={17} />
 											</span>
 											<span className="min-w-0">
-												<span className="block text-sm font-bold text-[#111827]">{option.label}</span>
+												<span className="block text-sm font-bold text-[#0F0F12]">{option.label}</span>
 												<span className="block text-xs text-[#6B7280]">{option.detail}</span>
 											</span>
 											<span className="ml-auto whitespace-nowrap rounded-full bg-[#F3F4F6] px-2.5 py-1 text-xs font-bold text-[#374151]">
@@ -3024,7 +3043,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 							onClick={() => {
 								void handleCreateLearningActivity();
 							}}
-							className="gap-2 bg-[#4ADE80] text-[#111827] hover:bg-[#3BCD6F]"
+							className="gap-2 bg-[#4ADE80] text-[#0F0F12] hover:bg-[#3BCD6F]"
 						>
 							{isActivityLoading ?
 								<Loader2 size={16} className="animate-spin" />
@@ -3849,31 +3868,65 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 											ease: [0.22, 1, 0.36, 1],
 										}}
 									>
-										{moduleOutline.map((item, index) => {
+										{moduleOutline
+											.filter(
+												(item) =>
+													item.level === 2 ||
+													(item.parentId &&
+														expandedOutlineSectionIds.includes(
+															item.parentId,
+														)),
+											)
+											.map((item, index, visibleItems) => {
 											const isCurrentOutlineItem =
 												item.id === activeOutlineItemId;
 											const isFirst = index === 0;
 											const isLast =
 												index ===
-												moduleOutline.length - 1;
+												visibleItems.length - 1;
 											const ActivityIcon = item.icon;
+											const hasSubsections =
+												item.kind === "section" &&
+												item.level === 2 &&
+												moduleOutline.some(
+													(child) =>
+														child.parentId ===
+														item.id,
+												);
 
 											return (
 												<button
 													key={item.id}
 													type="button"
-													onClick={() =>
+													onClick={() => {
+														if (hasSubsections) {
+															setExpandedOutlineSectionIds(
+																(previous) =>
+																	previous.includes(
+																		item.id,
+																	) ?
+																		previous.filter(
+																			(id) =>
+																				id !==
+																				item.id,
+																		)
+																	:	[
+																			...previous,
+																			item.id,
+																		],
+															);
+														}
+
 														goToPageIndex(
 															item.pageIndex,
 															item.id,
-														)
-													}
+														);
+													}}
 													className={cn(
-														"relative grid min-w-0 items-center gap-1 rounded-[6px] text-left text-[12px] leading-[1.35] transition-colors",
-														"mt-1 ml-1.5 w-[calc(100%-0.375rem)] grid-cols-[1.6rem_minmax(0,1fr)] py-1.5 pl-1 pr-1.5",
-														item.kind === "section" ?
-															"font-medium"
-														:	"font-normal",
+														"relative grid min-w-0 items-center gap-2 rounded-[6px] text-left text-[12px] leading-[1.35] transition-colors",
+														item.level === 2 ?
+															"mt-1 ml-1.5 w-[calc(100%-0.375rem)] grid-cols-[1.6rem_minmax(0,1fr)] py-1.5 pl-1 pr-1.5 font-medium"
+														:	"ml-4 w-[calc(100%-1rem)] grid-cols-[1.55rem_minmax(0,1fr)] py-1.5 pl-1 pr-1.5 font-normal",
 														isCurrentOutlineItem ?
 															"text-[#1D1D1F]"
 														:	"text-[#86868B] hover:text-[#1D1D1F]",
@@ -3884,13 +3937,15 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 														:	undefined
 													}
 												>
-													{moduleOutline.length >
+													{visibleItems.length >
 														1 && (
 														<span
 															aria-hidden
 															className={cn(
 																"absolute w-0.5 bg-[#DADADF]",
-																"-left-1.5",
+																item.level === 2 ?
+																	"-left-1.5"
+																:	"-left-4",
 																isFirst ?
 																	"-top-2 rounded-t-full"
 																:	"top-0",
@@ -3904,7 +3959,9 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 														aria-hidden
 														className={cn(
 															"absolute top-1/2 h-0.5 -translate-y-1/2 rounded-full bg-[#DADADF]",
-															"-left-1.5 w-2",
+															item.level === 2 ?
+																"-left-1.5 w-2"
+															:	"-left-4 w-5",
 														)}
 													/>
 													<span
@@ -3912,7 +3969,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 															"flex min-h-5 shrink-0 items-center justify-end font-semibold tabular-nums",
 															isCurrentOutlineItem ?
 																"text-[#34C759]"
-															: item.kind === "section" ?
+															: item.level === 2 ?
 																"text-[#8E8E93]"
 															:	"text-[#AEAEB2]",
 														)}
@@ -3931,11 +3988,11 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 													<span
 														className={cn(
 															"min-w-0 flex-1 overflow-hidden [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]",
-															item.kind === "section" ?
+															item.level === 2 ?
 																"text-[#4B5563]"
 															:	"text-[#6E6E73]",
 															isCurrentOutlineItem &&
-																"font-medium text-[#1D1D1F]",
+																"font-medium text-[#34C759]",
 														)}
 													>
 														{item.title}

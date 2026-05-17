@@ -135,7 +135,7 @@ function resolveActivityColorTheme(stylePreset?: string): ActivityColorTheme {
 			surfaceAlt: "#F8FAFC",
 			border: "#D0D7DE",
 			borderStrong: "#93C5FD",
-			text: "#111827",
+			text: "#0F0F12",
 			muted: "#4B5563",
 			primary: "#2563EB",
 			primaryHover: "#1D4ED8",

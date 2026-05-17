@@ -938,9 +938,9 @@ function createPostModuleActionMeasurementMarkup(input: {
 				accent: "#2563EB",
 				accentSoft: "#EFF6FF",
 				accentText: "#1D4ED8",
-				heading: "#111827",
+				heading: "#0F0F12",
 				body: "#4B5563",
-				primary: "#111827",
+				primary: "#0F0F12",
 				tipBorder: "#DBEAFE",
 			}
 		:	{
@@ -950,9 +950,9 @@ function createPostModuleActionMeasurementMarkup(input: {
 				accent: "#16A34A",
 				accentSoft: "#DCFCE7",
 				accentText: "#15803D",
-				heading: "#111827",
+				heading: "#0F0F12",
 				body: "#4B5563",
-				primary: "#111827",
+				primary: "#0F0F12",
 				tipBorder: "#DCFCE7",
 			};
 	const continueBody =
@@ -978,7 +978,7 @@ function createPostModuleActionMeasurementMarkup(input: {
                     <div style="margin-top:8px;font-size:14px;font-weight:500;line-height:1.45;color:rgba(255,255,255,.75);">Apply what you learned with guided exercises.</div>
                     <div style="margin-top:auto;border-top:1px solid rgba(255,255,255,.15);padding-top:16px;font-size:12px;font-weight:600;color:rgba(255,255,255,.8);">Custom activity · AI feedback</div>
                 </div>
-                <div style="min-height:164px;border-radius:20px;border:1px solid #E5E5E7;background:white;color:#111827;padding:20px;display:flex;flex-direction:column;">
+                <div style="min-height:164px;border-radius:20px;border:1px solid #E5E5E7;background:white;color:#0F0F12;padding:20px;display:flex;flex-direction:column;">
                     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
                         <div style="width:44px;height:44px;border-radius:12px;background:${palette.accentSoft};color:${palette.accent};display:flex;align-items:center;justify-content:center;">□</div>
                         <div style="border-radius:999px;background:${palette.accentSoft};color:${palette.accentText};font-size:11px;font-weight:700;padding:4px 12px;">Continue</div>
@@ -1007,7 +1007,7 @@ function createPostModuleActionMeasurementMarkup(input: {
                 <button type="button" disabled class="w-full rounded-2xl border border-[#E5E5E7] bg-[#F8F8F9] px-4 py-3 text-left text-sm font-semibold text-[#A1A1AA]">
                     Applied Practice · Coming soon
                 </button>
-                <button type="button" class="w-full rounded-2xl bg-[#111827] px-4 py-3 text-sm font-semibold text-white">
+                <button type="button" class="w-full rounded-2xl bg-[#0F0F12] px-4 py-3 text-sm font-semibold text-white">
                     ${escapeHtml(input.primaryActionLabel)}
                 </button>
             </div>

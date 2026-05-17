@@ -87,6 +87,17 @@ option {
 	font-family: inherit;
 }
 
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]) {
+	cursor: pointer;
+}
+
+button:disabled,
+button[aria-disabled="true"],
+[role="button"][aria-disabled="true"] {
+	cursor: not-allowed;
+}
+
 .line-clamp-2 {
 	display: -webkit-box;
 	overflow: hidden;
@@ -390,7 +401,7 @@ option {
 .unit-page-scope h2,
 .unit-page-scope h3,
 .unit-page-scope h4 {
-	color: var(--unit-heading-color, #111827);
+	color: var(--unit-heading-color, #0F0F12);
 	font-family: var(--unit-heading-font, Inter, system-ui, sans-serif);
 }
 

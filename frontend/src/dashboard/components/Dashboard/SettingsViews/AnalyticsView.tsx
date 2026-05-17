@@ -117,7 +117,7 @@ function MetricCard({
 					>
 						{icon}
 					</div>
-					<p className="line-clamp-2 text-right text-[34px] font-bold leading-none tracking-tight text-[#111827]">
+					<p className="line-clamp-2 text-right text-[34px] font-bold leading-none tracking-tight text-[#0F0F12]">
 						{value}
 					</p>
 				</div>
@@ -160,7 +160,7 @@ function HighlightCard({
 				<div className="text-[12px] font-bold text-[#15803D]">
 					{label}
 				</div>
-				<div className="mt-0.5 truncate text-[17px] font-bold text-[#111827]">
+				<div className="mt-0.5 truncate text-[17px] font-bold text-[#0F0F12]">
 					{value}
 				</div>
 			</div>
@@ -210,7 +210,7 @@ function ActivityChart({
 						<Sparkles size={18} />
 					</div>
 					<div>
-						<h2 className="text-[18px] font-bold tracking-tight text-[#111827]">
+						<h2 className="text-[18px] font-bold tracking-tight text-[#0F0F12]">
 							AI Generations Over Time
 						</h2>
 						<p className="mt-0.5 text-[13px] text-[#667085]">
@@ -227,7 +227,7 @@ function ActivityChart({
 							className={`rounded-[7px] px-4 py-1.5 text-[12px] font-bold transition ${
 								analytics.period === option.value ?
 									"bg-[#15803D] text-white shadow-[0_6px_16px_rgba(21,128,61,0.22)]"
-								:	"text-[#667085] hover:text-[#111827]"
+								:	"text-[#667085] hover:text-[#0F0F12]"
 							}`}
 						>
 							{option.label}
@@ -366,7 +366,7 @@ export function AnalyticsView() {
 							<div className="grid gap-5 xl:grid-cols-[1.8fr_1fr]">
 								<section className="rounded-[14px] border border-[#E5E5E7] bg-white p-5 shadow-[0_12px_30px_rgba(17,24,39,0.05)]">
 									<div className="mb-6">
-										<h2 className="text-[20px] font-bold tracking-tight text-[#111827]">
+										<h2 className="text-[20px] font-bold tracking-tight text-[#0F0F12]">
 											Overview
 										</h2>
 										<p className="mt-1 text-[13px] text-[#667085]">
@@ -406,7 +406,7 @@ export function AnalyticsView() {
 
 								<section className="rounded-[14px] border border-[#E5E5E7] bg-white p-5 shadow-[0_12px_30px_rgba(17,24,39,0.05)]">
 									<div className="mb-6">
-										<h2 className="text-[20px] font-bold tracking-tight text-[#111827]">
+										<h2 className="text-[20px] font-bold tracking-tight text-[#0F0F12]">
 											Highlights
 										</h2>
 										<p className="mt-1 text-[13px] text-[#667085]">

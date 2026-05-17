@@ -87,7 +87,7 @@ export const STYLE_PRESETS: Record<string, StylePreset> = {
 		body: "dmSans",
 		pageBackground: "#FFFFFF",
 		accentColor: "#2563EB",
-		headingColor: "#111827",
+		headingColor: "#0F0F12",
 		numberColor: "#C8C8C8",
 		codeBackground: "#F6F8FA",
 		codeBorderColor: "#D0D7DE",
