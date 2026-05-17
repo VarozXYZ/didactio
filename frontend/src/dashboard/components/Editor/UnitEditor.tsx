@@ -15,6 +15,7 @@ import {
 	ChevronRight,
 	CirclePlus,
 	Code2,
+	Download,
 	Dumbbell,
 	Edit3,
 	FileQuestion,
@@ -23,6 +24,7 @@ import {
 	Loader2,
 	MoreHorizontal,
 	Brain,
+	Printer,
 	Undo2,
 	RotateCcw,
 	Settings,
@@ -117,6 +119,13 @@ import {
 	resolvePresentationTheme,
 	themeVars,
 } from "../../utils/themeVars";
+import {
+	buildActivitiesHtmlDocument,
+	buildUnitExportSnapshot,
+	downloadTextFile,
+	sanitizeExportFilename,
+	type UnitExportSnapshot,
+} from "../../export/unitExport";
 import type {PresentationTheme} from "../../../types/presentationTheme";
 import {
 	FONT_CATALOG,
@@ -124,6 +133,7 @@ import {
 	resolveBodyLineHeight,
 	type FontId,
 } from "../../utils/typography";
+import {UnitExportPrintView} from "./UnitExportPrintView";
 
 function ChapterStatusIcon({
 	status,
@@ -805,6 +815,13 @@ function resolvePostModuleCompletionStyle(presetId: string | undefined) {
 	};
 }
 
+function resolveActivityPageSurface(presetId: string | undefined) {
+	if (presetId === "classic") {
+		return "#FFFDF8";
+	}
+	return "#FFFFFF";
+}
+
 export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	const navigate = useNavigate();
 	const [workspace, setWorkspace] =
@@ -828,6 +845,12 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	const [activityAttempts, setActivityAttempts] = useState<
 		Record<string, BackendLearningActivityAttempt[]>
 	>({});
+	const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+	const [printSnapshot, setPrintSnapshot] =
+		useState<UnitExportSnapshot | null>(null);
+	const [isPrintingTheory, setIsPrintingTheory] = useState(false);
+	const [isDownloadingActivities, setIsDownloadingActivities] =
+		useState(false);
 	const [activityScope, setActivityScope] =
 		useState<BackendLearningActivityScope>("current_module");
 	const [activityType, setActivityType] =
@@ -916,10 +939,29 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		lastVisitedPageIndex?: number;
 		resolve: (didPersist: boolean) => void;
 	} | null>(null);
+	const requestPrint = useCallback(() => {
+		window.requestAnimationFrame(() => {
+			window.setTimeout(() => {
+				const previousTitle = document.title;
+				const restoreTitle = () => {
+					document.title = previousTitle;
+					window.removeEventListener("afterprint", restoreTitle);
+				};
+				document.title = " ";
+				window.addEventListener("afterprint", restoreTitle);
+				window.print();
+				window.setTimeout(restoreTitle, 1000);
+			}, 80);
+		});
+	}, []);
 	const lastReadingProgressPayloadRef = useRef<string | null>(null);
 	const streamingHtmlBufferRef = useRef("");
 	const streamingHtmlFlushTimeoutRef = useRef<number | null>(null);
 	const isCancellingGenerationRef = useRef(false);
+	const measuredReadPagesCacheRef = useRef<{
+		chapterIndex: number;
+		pages: MeasuredModulePage[];
+	} | null>(null);
 
 	const activeChapter = useMemo(
 		() =>
@@ -1278,7 +1320,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			}),
 		[viewport.height, viewport.width],
 	);
-	const measuredReadPages = useMemo(
+	const rawMeasuredReadPages = useMemo(
 		() =>
 			fontsReady && activeChapterLayoutSnapshot && activeDraftContent ?
 				measurePages({
@@ -1301,6 +1343,27 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			activeDraftSettings,
 		],
 	);
+	useEffect(() => {
+		if (!activeChapter) {
+			measuredReadPagesCacheRef.current = null;
+			return;
+		}
+		if (rawMeasuredReadPages.length > 0) {
+			measuredReadPagesCacheRef.current = {
+				chapterIndex: activeChapter.chapterIndex,
+				pages: rawMeasuredReadPages,
+			};
+		}
+	}, [activeChapter?.chapterIndex, rawMeasuredReadPages]);
+	const measuredReadPages = useMemo(() => {
+		if (rawMeasuredReadPages.length > 0 || !activeChapter) {
+			return rawMeasuredReadPages;
+		}
+		const cached = measuredReadPagesCacheRef.current;
+		return cached?.chapterIndex === activeChapter.chapterIndex ?
+				cached.pages
+			:	rawMeasuredReadPages;
+	}, [activeChapter, rawMeasuredReadPages]);
 	const readPages: ReadPage[] = useMemo(
 		() => buildReadPages(measuredReadPages, activeLearningActivities),
 		[activeLearningActivities, measuredReadPages],
@@ -2462,6 +2525,53 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		});
 	};
 
+	const handlePrintTheoryExport = async () => {
+		if (isPrintingTheory) {
+			return;
+		}
+
+		setIsPrintingTheory(true);
+		try {
+			const snapshot = await buildUnitExportSnapshot(didacticUnitId);
+			setPrintSnapshot(snapshot);
+			setIsExportDialogOpen(false);
+			requestPrint();
+		} catch (error) {
+			toastError(
+				error instanceof Error ?
+					error.message
+				:	"Could not prepare the PDF export.",
+			);
+		} finally {
+			setIsPrintingTheory(false);
+		}
+	};
+
+	const handleDownloadActivitiesExport = async () => {
+		if (isDownloadingActivities) {
+			return;
+		}
+
+		setIsDownloadingActivities(true);
+		try {
+			const snapshot = await buildUnitExportSnapshot(didacticUnitId);
+			const html = buildActivitiesHtmlDocument(snapshot);
+			downloadTextFile(
+				sanitizeExportFilename(snapshot.unit.title),
+				html,
+			);
+			setIsExportDialogOpen(false);
+		} catch (error) {
+			toastError(
+				error instanceof Error ?
+					error.message
+				:	"Could not export the activities HTML.",
+			);
+		} finally {
+			setIsDownloadingActivities(false);
+		}
+	};
+
 	const handleCreateLearningActivity = async () => {
 		if (!activeChapter || isActivityLoading) {
 			return;
@@ -2578,8 +2688,9 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				return next;
 			});
 			setActivityAttempts((previous) => {
-				const {[activityId]: _deleted, ...rest} = previous;
-				return rest;
+				const next = {...previous};
+				delete next[activityId];
+				return next;
 			});
 		} catch (error) {
 			toastError(
@@ -3168,7 +3279,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 					style={{
 						height: `${spreadMetrics.pageHeight}px`,
 						width: `${spreadMetrics.pageWidth}px`,
-						background: activityTheme.panelBackground,
+						background: resolveActivityPageSurface(draft.textStyle.stylePreset),
 						borderColor: activityTheme.panelBorder,
 					}}
 				>
@@ -3850,6 +3961,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 					</button>
 					<button
 						className="flex w-full items-center gap-2 rounded-[10px] px-2 py-1.5 text-[13px] text-[#86868B] transition-all hover:bg-[#F5F5F7] hover:text-[#1D1D1F]"
+						onClick={() => setIsExportDialogOpen(true)}
 						type="button"
 					>
 						<Share2 size={16} />
@@ -4276,6 +4388,94 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 					)}
 				</AnimatePresence>
 			</main>
+
+			<Dialog
+				open={isExportDialogOpen}
+				onOpenChange={setIsExportDialogOpen}
+			>
+				<DialogContent className="overflow-hidden p-0 sm:max-w-[430px]">
+					<DialogHeader className="border-0 px-6 pt-6 pb-3">
+						<DialogTitle className="text-[16px] font-bold">
+							Export unit
+						</DialogTitle>
+						<DialogDescription className="mt-1 max-w-[340px] text-[13px] leading-relaxed text-[#6E6E73]">
+							Choose the format you need for this unit.
+						</DialogDescription>
+					</DialogHeader>
+					<div className="px-3 pb-3">
+						<button
+							className="group flex w-full items-center gap-3 rounded-[10px] px-3 py-3 text-left transition hover:bg-[#F5F5F7] disabled:cursor-not-allowed disabled:opacity-60"
+							disabled={isPrintingTheory}
+							onClick={() => void handlePrintTheoryExport()}
+							type="button"
+						>
+							<span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] border border-[#CFEFDB] bg-[#F0FDF4] text-[#15803D]">
+								<Printer size={17} />
+							</span>
+							<span className="min-w-0 flex-1">
+								<span className="block text-[14px] font-semibold text-[#1D1D1F]">
+									{isPrintingTheory ?
+										"Preparing theory..."
+									:	"Print theory PDF"}
+								</span>
+								<span className="mt-0.5 block text-[12px] leading-snug text-[#6E6E73]">
+									Clean A4 print view with generated modules.
+								</span>
+							</span>
+							<ChevronRight
+								className="shrink-0 text-[#C7C7CC] transition group-hover:translate-x-0.5 group-hover:text-[#86868B]"
+								size={16}
+							/>
+						</button>
+
+						<div className="mx-3 h-px bg-[#F0F0F2]" />
+
+						<button
+							className="group flex w-full items-center gap-3 rounded-[10px] px-3 py-3 text-left transition hover:bg-[#F5F5F7] disabled:cursor-not-allowed disabled:opacity-60"
+							disabled={isDownloadingActivities}
+							onClick={() =>
+								void handleDownloadActivitiesExport()
+							}
+							type="button"
+						>
+							<span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] border border-[#D5E4FF] bg-[#EFF6FF] text-[#2563EB]">
+								<Download size={17} />
+							</span>
+							<span className="min-w-0 flex-1">
+								<span className="block text-[14px] font-semibold text-[#1D1D1F]">
+									{isDownloadingActivities ?
+										"Preparing activities..."
+									:	"Download activities HTML"}
+								</span>
+								<span className="mt-0.5 block text-[12px] leading-snug text-[#6E6E73]">
+									Offline activities with local checks and keys.
+								</span>
+							</span>
+							<ChevronRight
+								className="shrink-0 text-[#C7C7CC] transition group-hover:translate-x-0.5 group-hover:text-[#86868B]"
+								size={16}
+							/>
+						</button>
+					</div>
+					<DialogFooter className="border-0 bg-[#FAFAFB] px-6 py-3">
+						<button
+							className="rounded-full border border-[#D4D7DD] bg-white px-4 py-2 text-[13px] font-semibold text-[#374151] transition hover:border-[#C7C7CC] hover:bg-[#F5F5F7]"
+							onClick={() => setIsExportDialogOpen(false)}
+							type="button"
+						>
+							Cancel
+						</button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+
+			{printSnapshot && (
+				<UnitExportPrintView
+					onClose={() => setPrintSnapshot(null)}
+					onPrint={requestPrint}
+					snapshot={printSnapshot}
+				/>
+			)}
 
 			<AlertDialog
 				open={regenerateConfirmOpen}
