@@ -829,6 +829,12 @@ export const dashboardApi = {
 			},
 		);
 	},
+	deleteLearningActivity(activityId: string) {
+		return requestJson<void>(
+			`/api/activities/${activityId}`,
+			{method: "DELETE"},
+		);
+	},
 	listLearningActivityAttempts(activityId: string) {
 		return requestJson<{attempts: BackendLearningActivityAttempt[]}>(
 			`/api/activities/${activityId}/attempts`,

@@ -12,6 +12,7 @@ import {
 export interface LearningActivityStore {
 	saveActivity(activity: LearningActivity): Promise<void>;
 	getActivity(ownerId: string, activityId: string): Promise<LearningActivity | null>;
+	deleteActivity(ownerId: string, activityId: string): Promise<boolean>;
 	listByModule(input: {
 		ownerId: string;
 		didacticUnitId: string;
@@ -49,18 +50,38 @@ export class InMemoryLearningActivityStore implements LearningActivityStore {
 		return activity?.ownerId === ownerId ? activity : null;
 	}
 
+	async deleteActivity(ownerId: string, activityId: string): Promise<boolean> {
+		const activity = this.activitiesById.get(activityId);
+		if (activity?.ownerId !== ownerId) {
+			return false;
+		}
+		this.activitiesById.delete(activityId);
+		for (const [attemptId, attempt] of this.attemptsById) {
+			if (attempt.ownerId === ownerId && attempt.activityId === activityId) {
+				this.attemptsById.delete(attemptId);
+			}
+		}
+		const progress = this.progressByActivityId.get(activityId);
+		if (progress?.ownerId === ownerId) {
+			this.progressByActivityId.delete(activityId);
+		}
+		return true;
+	}
+
 	async listByModule(input: {
 		ownerId: string;
 		didacticUnitId: string;
 		chapterIndex: number;
 	}): Promise<LearningActivity[]> {
-		return sortLearningActivitiesForModule([...this.activitiesById.values()]
-			.filter(
+		return sortLearningActivitiesForModule(
+			[...this.activitiesById.values()].filter(
 				(activity) =>
 					activity.ownerId === input.ownerId &&
 					activity.didacticUnitId === input.didacticUnitId &&
 					isLearningActivityVisibleInModule(activity, input.chapterIndex),
-			));
+			),
+			input.chapterIndex,
+		);
 	}
 
 	async listByUnit(input: {

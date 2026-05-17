@@ -107,16 +107,35 @@ export function isLearningActivityVisibleInModule(
 
 export function sortLearningActivitiesForModule(
 	activities: LearningActivity[],
+	chapterIndex: number,
 ): LearningActivity[] {
 	return [...activities].sort((left, right) => {
-		if (left.type === "flashcards" && right.type !== "flashcards") {
-			return 1;
-		}
-		if (left.type !== "flashcards" && right.type === "flashcards") {
-			return -1;
-		}
-		return left.createdAt.localeCompare(right.createdAt);
+		const leftTimestamp = getLearningActivityModuleSortTimestamp(
+			left,
+			chapterIndex,
+		);
+		const rightTimestamp = getLearningActivityModuleSortTimestamp(
+			right,
+			chapterIndex,
+		);
+		return leftTimestamp.localeCompare(rightTimestamp);
 	});
+}
+
+function getLearningActivityModuleSortTimestamp(
+	activity: LearningActivity,
+	chapterIndex: number,
+): string {
+	if (activity.type !== "flashcards") {
+		return activity.createdAt;
+	}
+
+	const content = normalizeRecord(activity.content);
+	const sortTimestamps = normalizeRecord(content.visibleModuleSortTimestamps);
+	const moduleTimestamp = sortTimestamps[String(chapterIndex)];
+	return typeof moduleTimestamp === "string" && moduleTimestamp.trim() ?
+			moduleTimestamp
+		:	activity.createdAt;
 }
 
 export interface LearningActivityCreateInput {

@@ -845,6 +845,9 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	const [isPagePickerOpen, setIsPagePickerOpen] = useState(false);
 	const [collapsedOutlineChapterIndex, setCollapsedOutlineChapterIndex] =
 		useState<number | null>(null);
+	const [openChapterActionsIndex, setOpenChapterActionsIndex] = useState<
+		number | null
+	>(null);
 	const [selectedOutlineItemId, setSelectedOutlineItemId] = useState<
 		string | null
 	>(null);
@@ -2563,6 +2566,32 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		void refreshUser();
 	};
 
+	const handleDeleteLearningActivity = async (activityId: string) => {
+		try {
+			await dashboardApi.deleteLearningActivity(activityId);
+			setLearningActivities((previous) => {
+				const next: Record<number, BackendLearningActivity[]> = {};
+				for (const [chapterIndex, activities] of Object.entries(previous)) {
+					next[Number(chapterIndex)] = activities.filter(
+						(activity) => activity.id !== activityId,
+					);
+				}
+				return next;
+			});
+			setActivityAttempts((previous) => {
+				const {[activityId]: _deleted, ...rest} = previous;
+				return rest;
+			});
+		} catch (error) {
+			toastError(
+				error instanceof Error ?
+					error.message
+				:	"Could not delete this activity.",
+			);
+			throw error;
+		}
+	};
+
 	const postModuleCompletionStyle = resolvePostModuleCompletionStyle(
 		draft.textStyle.stylePreset,
 	);
@@ -3146,6 +3175,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 							isSubmitting={isActivityAttemptSubmitting}
 							onSubmitAttempt={handleLearningActivityAttempt}
 							onRefillAttempts={handleRefillActivityAttempts}
+							onDeleteActivity={handleDeleteLearningActivity}
 						/>
 						<div className="pointer-events-none absolute bottom-4 right-6 text-[10px] font-medium text-[#86868B] md:bottom-6 md:right-10">
 							{pageNumber}
@@ -3497,6 +3527,12 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 						return (
 							<div
 								key={chapter.chapterIndex}
+								onContextMenu={(event) => {
+									event.preventDefault();
+									setOpenChapterActionsIndex(
+										chapter.chapterIndex,
+									);
+								}}
 								className={cn(
 									"group relative flex w-full flex-col items-stretch gap-2 rounded-[14px] transition-all duration-200",
 									"px-2 py-2.5",
@@ -3550,7 +3586,19 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 										<div className="flex shrink-0">
 											{getStatusIcon(chapter)}
 										</div>
-										<DropdownMenu>
+										<DropdownMenu
+											open={
+												openChapterActionsIndex ===
+												chapter.chapterIndex
+											}
+											onOpenChange={(open) => {
+												setOpenChapterActionsIndex(
+													open ?
+														chapter.chapterIndex
+													:	null,
+												);
+											}}
+										>
 											<DropdownMenuTrigger asChild>
 												<button
 													aria-label={`Module ${index + 1} actions`}

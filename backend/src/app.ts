@@ -1095,6 +1095,20 @@ function normalizeFlashcardCards(value: unknown): Array<Record<string, unknown>>
 		:	[];
 }
 
+function normalizeFlashcardModuleSortTimestamps(
+	value: unknown,
+): Record<string, string> {
+	const record = normalizeActivityRecord(value);
+	return Object.fromEntries(
+		Object.entries(record).filter(
+			([key, timestamp]) =>
+				Number.isInteger(Number(key)) &&
+				typeof timestamp === "string" &&
+				timestamp.trim().length > 0,
+		),
+	) as Record<string, string>;
+}
+
 function prepareGeneratedFlashcardCards(input: {
 	cards: unknown;
 	existingCards: Array<Record<string, unknown>>;
@@ -1172,6 +1186,21 @@ async function resolveCanonicalFlashcardActivity(input: {
 	];
 
 	if (canonical) {
+		const visibleModuleSortTimestamps = {
+			...normalizeFlashcardModuleSortTimestamps(
+				canonical.content.visibleModuleSortTimestamps,
+			),
+			...Object.fromEntries(
+				duplicateActivities.flatMap((activity) =>
+					Object.entries(
+						normalizeFlashcardModuleSortTimestamps(
+							activity.content.visibleModuleSortTimestamps,
+						),
+					),
+				),
+			),
+			[String(input.chapterIndex)]: input.now,
+		};
 		const visibleModuleIndexes = Array.from(
 			new Set([
 				...getFlashcardVisibleModuleIndexes(canonical),
@@ -1189,6 +1218,7 @@ async function resolveCanonicalFlashcardActivity(input: {
 				...input.result.content,
 				cards: mergedCards,
 				visibleModuleIndexes,
+				visibleModuleSortTimestamps,
 			},
 			dedupeSummary: [
 				canonical.dedupeSummary,
@@ -1229,6 +1259,9 @@ async function resolveCanonicalFlashcardActivity(input: {
 			...input.result.content,
 			cards: generatedCards,
 			visibleModuleIndexes: [input.chapterIndex],
+			visibleModuleSortTimestamps: {
+				[String(input.chapterIndex)]: input.now,
+			},
 		},
 		dedupeSummary: input.result.dedupeSummary,
 		sourceModuleIndexes: input.sourceModuleIndexes,
@@ -3308,6 +3341,22 @@ export function createApp(options: CreateAppOptions) {
 			activity,
 			attempts: await learningActivityStore.listAttempts(ownerId, activity.id),
 		});
+	});
+
+	app.delete("/api/activities/:activityId", async (request, response) => {
+		const requestWithMockOwner = asRequestWithMockOwner(request);
+		const ownerId = requestWithMockOwner.mockOwner.id;
+		const deleted = await learningActivityStore.deleteActivity(
+			ownerId,
+			String(request.params.activityId),
+		);
+
+		if (!deleted) {
+			response.status(404).json({error: "Learning activity not found."});
+			return;
+		}
+
+		response.status(204).send();
 	});
 
 	app.get(

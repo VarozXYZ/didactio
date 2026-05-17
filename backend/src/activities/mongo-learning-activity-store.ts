@@ -78,6 +78,18 @@ export class MongoLearningActivityStore implements LearningActivityStore {
 		);
 	}
 
+	async deleteActivity(ownerId: string, activityId: string): Promise<boolean> {
+		const result = await this.activities.deleteOne({id: activityId, ownerId});
+		if (result.deletedCount !== 1) {
+			return false;
+		}
+		await Promise.all([
+			this.attempts.deleteMany({ownerId, activityId}),
+			this.progress.deleteOne({ownerId, activityId}),
+		]);
+		return true;
+	}
+
 	async listByModule(input: {
 		ownerId: string;
 		didacticUnitId: string;
@@ -90,13 +102,16 @@ export class MongoLearningActivityStore implements LearningActivityStore {
 			})
 			.sort({createdAt: 1})
 			.toArray();
-		return sortLearningActivitiesForModule(documents
-			.map((document) => stripMongoId<LearningActivity>(document))
-			.filter(
-				(activity): activity is LearningActivity =>
-					activity !== null &&
-					isLearningActivityVisibleInModule(activity, input.chapterIndex),
-			));
+		return sortLearningActivitiesForModule(
+			documents
+				.map((document) => stripMongoId<LearningActivity>(document))
+				.filter(
+					(activity): activity is LearningActivity =>
+						activity !== null &&
+						isLearningActivityVisibleInModule(activity, input.chapterIndex),
+				),
+			input.chapterIndex,
+		);
 	}
 
 	async listByUnit(input: {

@@ -20,12 +20,16 @@ import {
 	ChevronRight,
 	Code2,
 	Copy,
+	FileText,
 	Layers3,
 	ListChecks,
 	MessageCircleQuestionMark,
 	MessageSquareText,
+	Pencil,
+	Plus,
 	RotateCcw,
 	Send,
+	Trash2,
 	Trophy,
 	XCircle,
 } from "lucide-react";
@@ -37,17 +41,147 @@ import type {
 } from "../../api/dashboardApi";
 import {
 	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
 	AlertDialogContent,
 	AlertDialogDescription,
 	AlertDialogFooter,
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
+import {
+	HoverCard,
+	HoverCardContent,
+	HoverCardTrigger,
+} from "@/components/ui/hover-card";
 import {CoinAmount} from "@/components/Coin";
 import {getActivityFeedbackRefillCost} from "../../utils/coinPricing";
 
 type Answers = Record<string, unknown>;
+type VirtualFileFormatCategory =
+	| "Document"
+	| "Code"
+	| "Data"
+	| "Config"
+	| "Academic"
+	| "Business"
+	| "Product"
+	| "QA"
+	| "Education"
+	| "Design"
+	| "Math"
+	| "Science"
+	| "Media"
+	| "Other";
+type VirtualFileFormat = {
+	value: string;
+	label: string;
+	category: VirtualFileFormatCategory;
+	aliases?: string[];
+};
+type VirtualFile = {
+	id: string;
+	name: string;
+	format: string;
+	content: string;
+};
 
+const VIRTUAL_FILE_MAX_FILES = 12;
+const VIRTUAL_FILE_MAX_CHARS = 12_000;
+const VIRTUAL_FILE_TOTAL_MAX_CHARS = 30_000;
+const VIRTUAL_FILE_FORMATS: VirtualFileFormat[] = [
+	{value: "txt", label: "Plain text", category: "Document"},
+	{value: "md", label: "Markdown", category: "Document"},
+	{value: "pdf_text", label: "PDF text", category: "Document", aliases: ["pdf"]},
+	{value: "doc_text", label: "Document text", category: "Document", aliases: ["doc", "docx", "odt"]},
+	{value: "slides", label: "Slide deck text", category: "Document", aliases: ["ppt", "pptx", "key"]},
+	{value: "notes", label: "Notes", category: "Document"},
+	{value: "outline", label: "Outline", category: "Document"},
+	{value: "html", label: "HTML", category: "Code"},
+	{value: "css", label: "CSS", category: "Code"},
+	{value: "scss", label: "SCSS", category: "Code"},
+	{value: "js", label: "JavaScript", category: "Code"},
+	{value: "jsx", label: "JSX", category: "Code"},
+	{value: "ts", label: "TypeScript", category: "Code"},
+	{value: "tsx", label: "TSX", category: "Code"},
+	{value: "vue", label: "Vue", category: "Code"},
+	{value: "svelte", label: "Svelte", category: "Code"},
+	{value: "astro", label: "Astro", category: "Code"},
+	{value: "py", label: "Python", category: "Code"},
+	{value: "ipynb", label: "Jupyter Notebook text", category: "Code"},
+	{value: "java", label: "Java", category: "Code"},
+	{value: "c", label: "C", category: "Code"},
+	{value: "cpp", label: "C++", category: "Code", aliases: ["cc", "cxx", "hpp"]},
+	{value: "cs", label: "C#", category: "Code"},
+	{value: "go", label: "Go", category: "Code"},
+	{value: "rs", label: "Rust", category: "Code"},
+	{value: "php", label: "PHP", category: "Code"},
+	{value: "rb", label: "Ruby", category: "Code"},
+	{value: "swift", label: "Swift", category: "Code"},
+	{value: "kt", label: "Kotlin", category: "Code", aliases: ["kts"]},
+	{value: "dart", label: "Dart", category: "Code"},
+	{value: "r", label: "R", category: "Code"},
+	{value: "scala", label: "Scala", category: "Code"},
+	{value: "lua", label: "Lua", category: "Code"},
+	{value: "sh", label: "Shell", category: "Code", aliases: ["bash", "zsh"]},
+	{value: "ps1", label: "PowerShell", category: "Code"},
+	{value: "matlab", label: "MATLAB", category: "Code", aliases: ["m"]},
+	{value: "jl", label: "Julia", category: "Code"},
+	{value: "sol", label: "Solidity", category: "Code"},
+	{value: "json", label: "JSON", category: "Data"},
+	{value: "yaml", label: "YAML", category: "Data", aliases: ["yml"]},
+	{value: "toml", label: "TOML", category: "Data"},
+	{value: "xml", label: "XML", category: "Data"},
+	{value: "csv", label: "CSV", category: "Data"},
+	{value: "tsv", label: "TSV", category: "Data"},
+	{value: "sql", label: "SQL", category: "Data"},
+	{value: "graphql", label: "GraphQL", category: "Data", aliases: ["gql"]},
+	{value: "prisma", label: "Prisma schema", category: "Data"},
+	{value: "env", label: "Environment file", category: "Config"},
+	{value: "dockerfile", label: "Dockerfile", category: "Config"},
+	{value: "nginx", label: "Nginx config", category: "Config"},
+	{value: "ini", label: "INI config", category: "Config"},
+	{value: "report", label: "Report", category: "Academic"},
+	{value: "essay", label: "Essay", category: "Academic"},
+	{value: "case_analysis", label: "Case analysis", category: "Academic"},
+	{value: "lab_report", label: "Lab report", category: "Academic"},
+	{value: "research_notes", label: "Research notes", category: "Academic"},
+	{value: "bibliography", label: "Bibliography", category: "Academic"},
+	{value: "latex", label: "LaTeX", category: "Academic", aliases: ["tex"]},
+	{value: "proposal", label: "Proposal", category: "Business"},
+	{value: "business_plan", label: "Business plan", category: "Business"},
+	{value: "marketing_plan", label: "Marketing plan", category: "Business"},
+	{value: "financial_model", label: "Financial model notes", category: "Business"},
+	{value: "requirements", label: "Requirements", category: "Product"},
+	{value: "user_story", label: "User stories", category: "Product"},
+	{value: "prd", label: "Product requirements doc", category: "Product"},
+	{value: "test_plan", label: "Test plan", category: "QA"},
+	{value: "bug_report", label: "Bug report", category: "QA"},
+	{value: "lesson_plan", label: "Lesson plan", category: "Education"},
+	{value: "rubric", label: "Rubric", category: "Education"},
+	{value: "quiz", label: "Quiz content", category: "Education"},
+	{value: "wireframe_notes", label: "Wireframe notes", category: "Design"},
+	{value: "diagram", label: "Diagram description", category: "Design"},
+	{value: "mermaid", label: "Mermaid diagram", category: "Design"},
+	{value: "plantuml", label: "PlantUML", category: "Design"},
+	{value: "svg", label: "SVG", category: "Design"},
+	{value: "proof", label: "Math proof", category: "Math"},
+	{value: "equations", label: "Equations", category: "Math"},
+	{value: "experiment_plan", label: "Experiment plan", category: "Science"},
+	{value: "data_analysis", label: "Data analysis", category: "Science"},
+	{value: "script", label: "Script", category: "Media"},
+	{value: "storyboard", label: "Storyboard", category: "Media"},
+	{value: "transcript", label: "Transcript", category: "Media"},
+	{value: "other", label: "Other", category: "Other"},
+];
 const OBJECTIVE_TYPES = new Set([
 	"multiple_choice",
 	"flashcards",
@@ -73,6 +207,63 @@ function asId(value: unknown, fallback: string): string {
 	return typeof value === "string" || typeof value === "number" ?
 			String(value)
 		:	fallback;
+}
+
+function asVirtualFiles(value: unknown): VirtualFile[] {
+	return Array.isArray(value) ?
+			value
+				.map((item) =>
+					item && typeof item === "object" && !Array.isArray(item) ?
+						item as Record<string, unknown>
+					:	null,
+				)
+				.filter((item): item is Record<string, unknown> => item !== null)
+				.map((item, index) => ({
+					id: asId(item.id, `virtual-file-${index + 1}`),
+					name: asText(item.name),
+					format: asText(item.format) || "txt",
+					content: asText(item.content),
+				}))
+				.filter((file) => file.name.trim() && file.content.trim())
+		:	[];
+}
+
+function getVirtualFileFormat(format: string): VirtualFileFormat {
+	return (
+		VIRTUAL_FILE_FORMATS.find((item) => item.value === format) ??
+		VIRTUAL_FILE_FORMATS[VIRTUAL_FILE_FORMATS.length - 1]
+	);
+}
+
+function inferVirtualFileFormat(name: string): string {
+	const normalized = name.trim().toLowerCase();
+	if (!normalized) return "txt";
+	if (normalized === "dockerfile" || normalized.endsWith("/dockerfile")) {
+		return "dockerfile";
+	}
+	const extension = normalized.split(".").pop() ?? "";
+	const match = VIRTUAL_FILE_FORMATS.find(
+		(format) =>
+			format.value === extension ||
+			format.aliases?.includes(extension),
+	);
+	return match?.value ?? "other";
+}
+
+function getVirtualFileTotalChars(files: VirtualFile[]): number {
+	return files.reduce((total, file) => total + file.content.length, 0);
+}
+
+function createEmptyVirtualFile(): VirtualFile {
+	return {
+		id:
+			typeof crypto !== "undefined" && "randomUUID" in crypto ?
+				crypto.randomUUID()
+			:	`virtual-file-${Date.now()}`,
+		name: "",
+		format: "txt",
+		content: "",
+	};
 }
 
 function looksLikeHtml(value: string): boolean {
@@ -125,6 +316,33 @@ function activityTypeLabel(type: BackendLearningActivity["type"]): string {
 			return "Mini project";
 		case "freeform_html":
 			return "Interactive";
+	}
+}
+
+function activityTypeDescription(type: BackendLearningActivity["type"]): string {
+	switch (type) {
+		case "multiple_choice":
+			return "A quick check is a short objective question designed to verify one concrete concept immediately. Choose the best answer and review the explanation after submitting.";
+		case "short_answer":
+			return "Open response questions ask you to explain concepts in your own words. They are evaluated by AI against the expected reasoning, not by exact wording.";
+		case "coding_practice":
+			return "Code practice focuses on writing or completing code. Submit a technical answer and get feedback about correctness, structure, and edge cases.";
+		case "flashcards":
+			return "Flashcards are an Anki-style review deck. Reveal each card, then mark it as learned or not yet so weaker cards keep appearing first.";
+		case "matching":
+			return "Matching asks you to connect related concepts, terms, or examples. It checks whether you can recognize relationships between items.";
+		case "ordering":
+			return "Ordering asks you to arrange items into the correct sequence. It is useful for workflows, processes, timelines, and dependency chains.";
+		case "case_study":
+			return "A case study gives you a specific scenario and a problem to solve. Analyze the situation, propose a solution, and receive AI feedback against the rubric.";
+		case "debate_reflection":
+			return "Debate reflection asks you to reason through a position, tradeoff, or argument. The goal is structured critical thinking, not one fixed answer.";
+		case "cloze":
+			return "Cloze exercises ask you to fill missing parts in a text. They test recall of precise terms, syntax, or concepts in context.";
+		case "guided_project":
+			return "A mini project asks you to produce a small deliverable. Add files as pasted text, then submit them for AI feedback against the project goal and rubric.";
+		case "freeform_html":
+			return "An interactive activity is a custom exercise rendered as structured interactive content for the current lesson.";
 	}
 }
 
@@ -814,6 +1032,498 @@ function CaseStudyActivity({
 	);
 }
 
+function VirtualFileFormatIcon({format}: {format: string}) {
+	const resolved = getVirtualFileFormat(format);
+	const isCode = resolved.category === "Code";
+	const isData = resolved.category === "Data" || resolved.category === "Config";
+	const Icon =
+		isCode ? Code2
+		: isData ? FileText
+		: resolved.category === "Design" ? Layers3
+		:	FileText;
+
+	return (
+		<span
+			className={cn(
+				"flex h-7 w-7 shrink-0 items-center justify-center rounded-md border text-[10px] font-bold uppercase",
+				isCode ? "border-[#BBF7D0] bg-[#F0FDF4] text-[#16A34A]"
+				: isData ? "border-[#BFDBFE] bg-[#EFF6FF] text-[#2563EB]"
+				:	"border-[#E5E5E7] bg-[#F5F5F7] text-[#6E6E73]",
+			)}
+			title={resolved.label}
+		>
+			<Icon size={13} />
+		</span>
+	);
+}
+
+function VirtualFileDialog({
+	open,
+	file,
+	existingFiles,
+	onOpenChange,
+	onSave,
+}: {
+	open: boolean;
+	file: VirtualFile | null;
+	existingFiles: VirtualFile[];
+	onOpenChange: (open: boolean) => void;
+	onSave: (file: VirtualFile) => void;
+}) {
+	const [draft, setDraft] = useState<VirtualFile>(createEmptyVirtualFile);
+
+	useEffect(() => {
+		setDraft(file ?? createEmptyVirtualFile());
+	}, [file, open]);
+
+	const otherFiles = existingFiles.filter((item) => item.id !== draft.id);
+	const totalCharsWithDraft =
+		getVirtualFileTotalChars(otherFiles) + draft.content.length;
+	const name = draft.name.trim();
+	const content = draft.content.trim();
+	const isOverFileLimit = draft.content.length > VIRTUAL_FILE_MAX_CHARS;
+	const isOverTotalLimit = totalCharsWithDraft > VIRTUAL_FILE_TOTAL_MAX_CHARS;
+	const canSave = !!name && !!content && !isOverFileLimit && !isOverTotalLimit;
+
+	return (
+		<Dialog open={open} onOpenChange={onOpenChange}>
+			<DialogContent className="max-h-[88vh] overflow-y-auto sm:max-w-[720px]">
+				<DialogHeader>
+					<DialogTitle>{file ? "Edit file" : "Add file"}</DialogTitle>
+					<DialogDescription>
+						Paste the content as text. It will be sent to the AI as part of the mini project submission.
+					</DialogDescription>
+				</DialogHeader>
+
+				<div className="grid gap-4 px-6 py-5">
+					<div className="grid gap-3">
+						<label className="grid gap-1.5">
+							<span className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#6E6E73]">
+								File name
+							</span>
+							<input
+								className="h-10 rounded-[10px] border border-[#D1D5DB] bg-white px-3 text-[13px] text-[#1D1D1F] outline-none transition focus:border-[#1D1D1F] focus:ring-2 focus:ring-[#E5E5E7]"
+								value={draft.name}
+								onChange={(event) => {
+									const nextName = event.target.value;
+									setDraft((current) => ({
+										...current,
+										name: nextName,
+										format: inferVirtualFileFormat(nextName),
+									}));
+								}}
+								placeholder="DataList.tsx, report.md, analysis.csv..."
+							/>
+						</label>
+					</div>
+
+					<label className="grid gap-1.5">
+						<span className="flex items-center justify-between gap-3 text-[11px] font-bold uppercase tracking-[0.12em] text-[#6E6E73]">
+							<span>Content</span>
+							<span
+								className={cn(
+									"font-semibold tracking-normal",
+									isOverFileLimit || isOverTotalLimit ?
+										"text-[#DC2626]"
+									:	"text-[#86868B]",
+								)}
+							>
+								{draft.content.length.toLocaleString()} / {VIRTUAL_FILE_MAX_CHARS.toLocaleString()} chars
+							</span>
+						</span>
+						<textarea
+							className="min-h-[280px] resize-y rounded-[10px] border border-[#D1D5DB] bg-white p-3 font-mono text-[12px] leading-relaxed text-[#1D1D1F] outline-none transition placeholder:font-sans placeholder:text-[#9CA3AF] focus:border-[#1D1D1F] focus:ring-2 focus:ring-[#E5E5E7]"
+							value={draft.content}
+							onChange={(event) =>
+								setDraft((current) => ({
+									...current,
+									content: event.target.value,
+								}))
+							}
+							placeholder="Paste the file contents here..."
+						/>
+					</label>
+
+					<div className="flex items-center justify-between gap-3 rounded-[10px] bg-[#F5F5F7] px-3 py-2 text-[12px] text-[#6E6E73]">
+						<span>Total submission size</span>
+						<span className={isOverTotalLimit ? "font-bold text-[#DC2626]" : "font-semibold"}>
+							{totalCharsWithDraft.toLocaleString()} / {VIRTUAL_FILE_TOTAL_MAX_CHARS.toLocaleString()} chars
+						</span>
+					</div>
+				</div>
+
+				<DialogFooter>
+					<button
+						type="button"
+						onClick={() => onOpenChange(false)}
+						className="rounded-full border border-[#D1D5DB] bg-white px-4 py-2 text-[13px] font-semibold text-[#1D1D1F] transition hover:bg-[#F5F5F7]"
+					>
+						Cancel
+					</button>
+					<button
+						type="button"
+						disabled={!canSave}
+						onClick={() => {
+							if (!canSave) return;
+							onSave({
+								...draft,
+								name,
+								content,
+							});
+							onOpenChange(false);
+						}}
+						className="rounded-full bg-[#1D1D1F] px-4 py-2 text-[13px] font-semibold text-white transition hover:bg-[#1D1D1F] disabled:cursor-not-allowed disabled:opacity-50"
+					>
+						Save file
+					</button>
+				</DialogFooter>
+			</DialogContent>
+		</Dialog>
+	);
+}
+
+function ActivityFeedbackPanel({
+	attempt,
+	className,
+}: {
+	attempt: BackendLearningActivityAttempt;
+	className?: string;
+}) {
+	const legacyFeedback = parseLegacyFeedbackSections(attempt.feedback);
+	const strengths = [
+		...(attempt.strengths ?? []),
+		...legacyFeedback.strengths,
+	].map(cleanLegacyFeedbackItem).filter(Boolean);
+	const improvements = [
+		...(attempt.improvements ?? []),
+		...legacyFeedback.improvements,
+	].map(cleanLegacyFeedbackItem).filter(Boolean);
+	const feedbackScore = attempt.score;
+	const feedbackTone =
+		feedbackScore === undefined ? "neutral"
+		: feedbackScore >= 80 ? "good"
+		: feedbackScore >= 50 ? "partial"
+		:	"bad";
+	const feedbackPanelClass =
+		feedbackTone === "good" ?
+			"border-[#86EFAC] bg-[#F0FDF4] text-[#166534]"
+		: feedbackTone === "partial" ?
+			"border-[#FDE68A] bg-[#FFFBEB] text-[#92400E]"
+		: feedbackTone === "bad" ?
+			"border-[#FCA5A5] bg-[#FEF2F2] text-[#B91C1C]"
+		:	"border-[#E5E5E7] bg-[#FCFCFD] text-[#374151]";
+	const feedbackAccentClass =
+		feedbackTone === "good" ? "text-[#15803D]"
+		: feedbackTone === "partial" ? "text-[#D97706]"
+		: feedbackTone === "bad" ? "text-[#DC2626]"
+		:	"text-[#6E6E73]";
+	const FeedbackIcon =
+		feedbackTone === "good" ? CheckCircle2
+		: feedbackTone === "partial" ? CircleAlert
+		: feedbackTone === "bad" ? XCircle
+		:	MessageCircleQuestionMark;
+
+	return (
+		<div className={cn("rounded-[10px] border p-3", feedbackPanelClass, className)}>
+			<div className="flex items-center gap-2 text-[12px] font-bold">
+				<FeedbackIcon size={14} />
+				{attempt.score !== undefined ? `Score: ${attempt.score}%` : "Feedback"}
+			</div>
+			<FeedbackHtml
+				className="mt-2 whitespace-pre-line text-[12.5px] leading-relaxed"
+				html={legacyFeedback.feedback}
+			/>
+			{strengths.length > 0 && (
+				<div className="mt-3">
+					<div className={cn("flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.12em]", feedbackAccentClass)}>
+						<Trophy size={13} />
+						<span>Puntos fuertes</span>
+					</div>
+					<ul className="mt-1 list-disc space-y-1 pl-4 text-[12px] leading-relaxed">
+						{strengths.map((strength) => (
+							<li key={strength}>{strength}</li>
+						))}
+					</ul>
+				</div>
+			)}
+			{improvements.length > 0 && (
+				<div className="mt-3">
+					<div className={cn("flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.12em]", feedbackAccentClass)}>
+						<CircleAlert size={13} />
+						<span>Como mejorar</span>
+					</div>
+					<ul className="mt-1 list-disc space-y-1 pl-4 text-[12px] leading-relaxed">
+						{improvements.map((improvement) => (
+							<li key={improvement}>{improvement}</li>
+						))}
+					</ul>
+				</div>
+			)}
+		</div>
+	);
+}
+
+function GuidedProjectActivity({
+	content,
+	answers,
+	setAnswer,
+	latestAttempt,
+}: {
+	content: Record<string, unknown>;
+	answers: Answers;
+	setAnswer: (key: string, value: unknown) => void;
+	latestAttempt?: BackendLearningActivityAttempt;
+}) {
+	const goal =
+		asText(content.goal) ||
+		asText(content.expectedOutcome) ||
+		"Build a small deliverable that applies the module concepts.";
+	const brief = asText(content.brief) || asText(content.prompt);
+	const steps = asStringArray(content.steps).map(stripLeadingListNumber);
+	const deliverable =
+		asText(content.deliverable) ||
+		"Describe what you built, the main decisions you made, and anything you would improve.";
+	const rubric = asStringArray(content.rubric);
+	const virtualFiles = asVirtualFiles(answers.virtualFiles);
+	const [fileDialogOpen, setFileDialogOpen] = useState(false);
+	const [editingFile, setEditingFile] = useState<VirtualFile | null>(null);
+	const [activeTab, setActiveTab] = useState<"project" | "files" | "feedback">("project");
+	const latestAttemptId = latestAttempt?.id;
+	const totalFileChars = getVirtualFileTotalChars(virtualFiles);
+	const canAddFile =
+		virtualFiles.length < VIRTUAL_FILE_MAX_FILES &&
+		totalFileChars < VIRTUAL_FILE_TOTAL_MAX_CHARS;
+	const updateVirtualFiles = (files: VirtualFile[]) => {
+		setAnswer("virtualFiles", files);
+	};
+	const openNewFileDialog = () => {
+		setEditingFile(null);
+		setFileDialogOpen(true);
+	};
+	useEffect(() => {
+		if (latestAttemptId) {
+			setActiveTab("feedback");
+		}
+	}, [latestAttemptId]);
+	const visibleTab = activeTab === "feedback" && !latestAttempt ? "files" : activeTab;
+	const tabButtonClass = (selected: boolean) =>
+		cn(
+			"-mb-px border-b-2 px-4 py-2.5 text-[12px] font-bold transition",
+			selected ?
+				"border-[#4ADE80] bg-white text-[#16A34A]"
+			:	"border-transparent bg-[#F8F8F9] text-[#6E6E73] hover:bg-[#F3F4F6] hover:text-[#1D1D1F]",
+		);
+
+	return (
+		<div className="flex min-h-0 flex-1 flex-col gap-3">
+			<div className="flex shrink-0 border-b border-[#E5E5E7]">
+				<button
+					type="button"
+					onClick={() => setActiveTab("project")}
+					className={tabButtonClass(visibleTab === "project")}
+				>
+					Project
+				</button>
+				<button
+					type="button"
+					onClick={() => setActiveTab("files")}
+					className={tabButtonClass(visibleTab === "files")}
+				>
+					Files
+				</button>
+				{latestAttempt && (
+					<button
+						type="button"
+						onClick={() => setActiveTab("feedback")}
+						className={tabButtonClass(visibleTab === "feedback")}
+					>
+						Feedback
+					</button>
+				)}
+			</div>
+
+			{visibleTab === "project" && (
+			<div className="min-h-0 overflow-y-auto pr-1">
+				<div className="grid gap-3">
+					<section className="rounded-[10px] border border-[#E5E5E7] bg-[#FCFCFD] p-3">
+						<div className="mb-2 flex items-center gap-2">
+							<span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#DCFCE7] text-[#16A34A]">
+								<Trophy size={12} strokeWidth={2.25} />
+							</span>
+							<h4 className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#6E6E73]">
+								Goal
+							</h4>
+						</div>
+						<p className="text-[13px] font-semibold leading-relaxed text-[#1D1D1F]">
+							{goal}
+						</p>
+						{brief && (
+							<p className="mt-2 text-[12.5px] leading-[1.55] text-[#4B5563]">
+								{brief}
+							</p>
+						)}
+					</section>
+
+					{steps.length > 0 && (
+						<section>
+							<div className="mb-2 flex items-center gap-2">
+								<span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#F0FDF4] text-[#16A34A]">
+									<ListChecks size={12} strokeWidth={2.25} />
+								</span>
+								<h4 className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#6E6E73]">
+									Steps
+								</h4>
+							</div>
+							<ol className="space-y-2">
+								{steps.map((step, index) => (
+									<li key={`${index}-${step}`} className="flex gap-2.5 text-[12.5px] leading-relaxed text-[#374151]">
+										<span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[#BBF7D0] bg-white text-[10px] font-bold text-[#16A34A]">
+											{index + 1}
+										</span>
+										<span>{step}</span>
+									</li>
+								))}
+							</ol>
+						</section>
+					)}
+
+					<section className="border-t border-[#F0F0F2] pt-3">
+						<div className="mb-2 flex items-center gap-2">
+							<span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#F0FDF4] text-[#16A34A]">
+								<CheckCircle2 size={12} strokeWidth={2.25} />
+							</span>
+							<h4 className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#6E6E73]">
+								Deliverable
+							</h4>
+						</div>
+						<p className="text-[12.5px] leading-[1.55] text-[#374151]">
+							{deliverable}
+						</p>
+						{rubric.length > 0 && (
+							<ul className="mt-2 grid gap-x-4 gap-y-1 text-[11.5px] leading-relaxed text-[#6E6E73] sm:grid-cols-2">
+								{rubric.slice(0, 4).map((item) => (
+									<li key={item} className="flex gap-1.5">
+										<span className="mt-[0.45em] h-1 w-1 shrink-0 rounded-full bg-[#34C759]" />
+										<span>{item}</span>
+									</li>
+								))}
+							</ul>
+						)}
+					</section>
+				</div>
+			</div>
+			)}
+
+			{visibleTab === "files" && (
+			<div className="rounded-[10px] border border-[#E5E5E7] bg-[#FCFCFD] p-3">
+				<div className="flex items-center justify-between gap-3">
+					<div>
+						<h4 className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#6E6E73]">
+							Files
+						</h4>
+						<p className="mt-1 text-[12px] text-[#86868B]">
+							Paste source, documents, reports, diagrams, or notes as text.
+						</p>
+					</div>
+					<button
+						type="button"
+						disabled={!canAddFile}
+						onClick={openNewFileDialog}
+						className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#1D1D1F] px-3 py-1.5 text-[12px] font-bold text-white transition hover:bg-[#1D1D1F] disabled:cursor-not-allowed disabled:opacity-50"
+					>
+						<Plus size={13} />
+						Add file
+					</button>
+				</div>
+
+				{virtualFiles.length > 0 ? (
+					<div className="mt-3 grid gap-2">
+						{virtualFiles.map((file) => {
+							const format = getVirtualFileFormat(file.format);
+							return (
+								<div
+									key={file.id}
+									className="flex min-h-12 items-center gap-3 rounded-[10px] border border-[#E5E5E7] bg-white px-3 py-2.5 transition hover:border-[#D1D5DB]"
+								>
+									<VirtualFileFormatIcon format={file.format} />
+									<div className="min-w-0 flex-1">
+										<div className="truncate text-[13px] font-bold text-[#1D1D1F]">
+											{file.name}
+										</div>
+										<div className="mt-0.5 text-[11px] text-[#86868B]">
+											{format.label} - {file.content.length.toLocaleString()} chars
+										</div>
+									</div>
+									<div className="flex shrink-0 items-center gap-1">
+										<button
+											type="button"
+											onClick={() => {
+												setEditingFile(file);
+												setFileDialogOpen(true);
+											}}
+											className="flex h-7 w-7 items-center justify-center rounded-md text-[#6E6E73] transition hover:bg-[#F5F5F7] hover:text-[#1D1D1F]"
+											aria-label={`Edit ${file.name}`}
+										>
+											<Pencil size={13} />
+										</button>
+										<button
+											type="button"
+											onClick={() =>
+												updateVirtualFiles(
+													virtualFiles.filter((item) => item.id !== file.id),
+												)
+											}
+											className="flex h-7 w-7 items-center justify-center rounded-md text-[#6E6E73] transition hover:bg-[#FEF2F2] hover:text-[#DC2626]"
+											aria-label={`Remove ${file.name}`}
+										>
+											<Trash2 size={13} />
+										</button>
+									</div>
+								</div>
+							);
+						})}
+					</div>
+				) : (
+					<div className="mt-3 rounded-[10px] border border-dashed border-[#D1D5DB] bg-white px-3 py-4 text-center text-[12px] text-[#86868B]">
+						No files yet.
+					</div>
+				)}
+
+				<div className="mt-2 flex justify-between gap-3 text-[11px] text-[#86868B]">
+					<span>
+						{virtualFiles.length} / {VIRTUAL_FILE_MAX_FILES} files
+					</span>
+					<span>
+						{totalFileChars.toLocaleString()} / {VIRTUAL_FILE_TOTAL_MAX_CHARS.toLocaleString()} chars
+					</span>
+				</div>
+			</div>
+			)}
+
+			{visibleTab === "feedback" && latestAttempt && (
+				<div className="min-h-0 overflow-y-auto pr-1">
+					<ActivityFeedbackPanel attempt={latestAttempt} />
+				</div>
+			)}
+
+			<VirtualFileDialog
+				open={fileDialogOpen}
+				file={editingFile}
+				existingFiles={virtualFiles}
+				onOpenChange={setFileDialogOpen}
+				onSave={(file) => {
+					const exists = virtualFiles.some((item) => item.id === file.id);
+					updateVirtualFiles(
+						exists ?
+							virtualFiles.map((item) => item.id === file.id ? file : item)
+						:	[...virtualFiles, file],
+					);
+				}}
+			/>
+		</div>
+	);
+}
+
 type FlashcardProgress = {
 	learnedIds: string[];
 	queueIds: string[];
@@ -837,6 +1547,10 @@ function uniqueStrings(values: string[]): string[] {
 	return Array.from(
 		new Set(values.map((value) => value.trim()).filter(Boolean)),
 	);
+}
+
+function stripLeadingListNumber(value: string): string {
+	return value.replace(/^\s*\d+[\).]\s+/, "").trim();
 }
 
 function cleanLegacyFeedbackItem(value: string): string {
@@ -1314,16 +2028,20 @@ export function LearningActivityRenderer({
 	isSubmitting,
 	onSubmitAttempt,
 	onRefillAttempts,
+	onDeleteActivity,
 }: {
 	activity: BackendLearningActivity;
 	attempts: BackendLearningActivityAttempt[];
 	isSubmitting: boolean;
 	onSubmitAttempt: (activityId: string, answers: unknown) => Promise<void>;
 	onRefillAttempts: (activityId: string) => Promise<void>;
+	onDeleteActivity?: (activityId: string) => Promise<void>;
 }) {
 	const [answers, setAnswers] = useState<Answers>({});
 	const [shortAnswerDetailTab, setShortAnswerDetailTab] = useState<"answer" | "correction">("answer");
 	const [caseStudyTab, setCaseStudyTab] = useState<"case" | "analysis" | "feedback">("case");
+	const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+	const [isDeletingActivity, setIsDeletingActivity] = useState(false);
 	const [shortAnswerProgressActivityId, setShortAnswerProgressActivityId] = useState<string | null>(null);
 	const shortAnswerSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const shortAnswerHasLocalChangesRef = useRef(false);
@@ -1374,7 +2092,7 @@ export function LearningActivityRenderer({
 			draftSaveTimerRef.current = null;
 		}
 
-		if (activity.type !== "case_study") {
+		if (activity.type !== "case_study" && activity.type !== "guided_project") {
 			return;
 		}
 
@@ -1413,7 +2131,7 @@ export function LearningActivityRenderer({
 	};
 
 	const scheduleDraftProgressSave = (nextAnswers: Answers, completed = false) => {
-		if (activity.type !== "case_study") return;
+		if (activity.type !== "case_study" && activity.type !== "guided_project") return;
 		if (draftSaveTimerRef.current) {
 			clearTimeout(draftSaveTimerRef.current);
 		}
@@ -1443,7 +2161,7 @@ export function LearningActivityRenderer({
 			shortAnswerHasLocalChangesRef.current = true;
 			setShortAnswerProgressActivityId(activity.id);
 		}
-		if (activity.type === "case_study") {
+		if (activity.type === "case_study" || activity.type === "guided_project") {
 			draftHasLocalChangesRef.current = true;
 			setDraftProgressActivityId(activity.id);
 		}
@@ -1451,7 +2169,7 @@ export function LearningActivityRenderer({
 			const base =
 				activity.type === "short_answer" && shortAnswerProgressActivityId !== activity.id ?
 					{}
-				: activity.type === "case_study" && draftProgressActivityId !== activity.id ?
+				: (activity.type === "case_study" || activity.type === "guided_project") && draftProgressActivityId !== activity.id ?
 					{}
 				:	previous;
 			const next = {...base, [key]: value};
@@ -1465,7 +2183,7 @@ export function LearningActivityRenderer({
 		const currentAnswers =
 			activity.type === "short_answer" && shortAnswerProgressActivityId !== activity.id ?
 				{}
-			: activity.type === "case_study" && draftProgressActivityId !== activity.id ?
+			: (activity.type === "case_study" || activity.type === "guided_project") && draftProgressActivityId !== activity.id ?
 				{}
 			:	answers;
 		const payload = currentAnswers;
@@ -1481,7 +2199,7 @@ export function LearningActivityRenderer({
 				completed: true,
 			});
 		}
-		if (activity.type === "case_study") {
+		if (activity.type === "case_study" || activity.type === "guided_project") {
 			if (draftSaveTimerRef.current) {
 				clearTimeout(draftSaveTimerRef.current);
 				draftSaveTimerRef.current = null;
@@ -1491,7 +2209,9 @@ export function LearningActivityRenderer({
 				answers: currentAnswers,
 				completed: true,
 			});
-			setCaseStudyTab("feedback");
+			if (activity.type === "case_study") {
+				setCaseStudyTab("feedback");
+			}
 		}
 		void onSubmitAttempt(activity.id, payload);
 	};
@@ -1504,10 +2224,23 @@ export function LearningActivityRenderer({
 		submitCurrentAnswers();
 	};
 
+	const handleDeleteActivity = async () => {
+		if (!onDeleteActivity || isDeletingActivity) {
+			return;
+		}
+		setIsDeletingActivity(true);
+		try {
+			await onDeleteActivity(activity.id);
+			setDeleteDialogOpen(false);
+		} finally {
+			setIsDeletingActivity(false);
+		}
+	};
+
 	const visibleAnswers =
 		activity.type === "short_answer" && shortAnswerProgressActivityId !== activity.id ?
 			{}
-		: activity.type === "case_study" && draftProgressActivityId !== activity.id ?
+		: (activity.type === "case_study" || activity.type === "guided_project") && draftProgressActivityId !== activity.id ?
 			{}
 		:	answers;
 
@@ -1638,19 +2371,12 @@ export function LearningActivityRenderer({
 
 		if (activity.type === "guided_project") {
 			return (
-				<div className="space-y-3">
-					<p className="text-[13.5px] leading-relaxed text-[#374151]">{asText(content.brief)}</p>
-					<ol className="list-decimal space-y-1 pl-5 text-[13.5px] text-[#374151]">
-						{(Array.isArray(content.steps) ? content.steps : []).map((step, index) => (
-							<li key={index}>{asText(step)}</li>
-						))}
-					</ol>
-					<textarea
-						className="h-28 w-full resize-none rounded-xl border border-[#E8E8EA] bg-white p-3 text-sm outline-none transition focus:border-[#1D1D1F]"
-						onChange={(event) => setAnswer("response", event.target.value)}
-						placeholder="Describe your deliverable..."
-					/>
-				</div>
+				<GuidedProjectActivity
+					content={content}
+					answers={visibleAnswers}
+					setAnswer={setAnswer}
+					latestAttempt={latestAttempt}
+				/>
 			);
 		}
 
@@ -1669,22 +2395,62 @@ export function LearningActivityRenderer({
 	};
 
 	return (
-		<div className="flex h-full min-h-0 flex-col bg-white text-[#1D1D1F]">
+		<div className="group/activity flex h-full min-h-0 flex-col bg-white text-[#1D1D1F]">
 			<div className="border-b border-[#F0F0F2] pb-3">
-				<div className="flex items-center gap-2">
-					<div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#1D1D1F] text-white">
-						<ActivityIcon type={activity.type} />
+				<div className="flex items-start justify-between gap-3">
+					<div className="min-w-0">
+						<div className="flex flex-wrap items-center gap-2">
+							<div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#1D1D1F] text-white">
+								<ActivityIcon type={activity.type} />
+							</div>
+							<span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#AEAEB2]">
+								{activityTypeLabel(activity.type)}
+							</span>
+							<HoverCard openDelay={150} closeDelay={100}>
+								<HoverCardTrigger asChild>
+									<button
+										type="button"
+										className="inline-flex items-center gap-1.5 rounded-full border border-[#D1FAE5] bg-[#F0FDF4] px-2.5 py-1 text-[11px] font-bold text-[#15803D] transition hover:border-[#86EFAC] hover:bg-[#DCFCE7] focus-visible:ring-2 focus-visible:ring-[#86EFAC]"
+									>
+										<MessageCircleQuestionMark size={12} />
+										About
+									</button>
+								</HoverCardTrigger>
+								<HoverCardContent align="start" side="bottom" sideOffset={8} className="w-[260px]">
+									<div className="flex items-start gap-2.5">
+										<div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[#F0FDF4] text-[#16A34A]">
+											<ActivityIcon type={activity.type} />
+										</div>
+										<div className="min-w-0">
+											<h4 className="text-[12.5px] font-bold text-[#1D1D1F]">
+												{activityTypeLabel(activity.type)}
+											</h4>
+											<p className="mt-1 text-[11.5px] leading-[1.55] text-[#6E6E73]">
+												{activityTypeDescription(activity.type)}
+											</p>
+										</div>
+									</div>
+								</HoverCardContent>
+							</HoverCard>
+						</div>
+						<h3 className="mt-2 text-[15.5px] font-bold leading-snug text-[#1D1D1F]">
+							{activity.title}
+						</h3>
+						{activity.type !== "short_answer" && (
+							<p className="mt-1 text-[12px] leading-relaxed text-[#6B7280]">{activity.instructions}</p>
+						)}
 					</div>
-					<span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#AEAEB2]">
-						{activityTypeLabel(activity.type)}
-					</span>
+					{onDeleteActivity && (
+						<button
+							type="button"
+							onClick={() => setDeleteDialogOpen(true)}
+							className="grid h-7 w-7 shrink-0 place-items-center rounded-full p-0 text-[#A1A1AA] opacity-0 transition hover:bg-[#FEF2F2] hover:text-[#DC2626] focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-[#FCA5A5] group-hover/activity:opacity-100 group-focus-within/activity:opacity-100"
+							aria-label={`Delete ${activity.title}`}
+						>
+							<Trash2 size={13} className="block" />
+						</button>
+					)}
 				</div>
-				<h3 className="mt-2 text-[15.5px] font-bold leading-snug text-[#1D1D1F]">
-					{activity.title}
-				</h3>
-				{activity.type !== "short_answer" && (
-					<p className="mt-1 text-[12px] leading-relaxed text-[#6B7280]">{activity.instructions}</p>
-				)}
 			</div>
 
 			<div className="mt-3 flex min-h-0 flex-1 flex-col">
@@ -1693,16 +2459,11 @@ export function LearningActivityRenderer({
 
 			{activity.type !== "multiple_choice" && activity.type !== "flashcards" && (
 				<>
-					{latestAttempt && activity.type !== "short_answer" && activity.type !== "case_study" && (
-						<div className="mt-3 rounded-[12px] border border-emerald-200 bg-emerald-50 p-3">
-							<div className="flex items-center gap-2 text-xs font-bold text-emerald-800">
-								<CheckCircle2 size={13} />
-								{latestAttempt.score !== undefined ? `Score: ${latestAttempt.score}%` : "Feedback"}
-							</div>
-							<p className="mt-1.5 text-xs leading-relaxed text-emerald-900 whitespace-pre-line">
-								{latestAttempt.feedback}
-							</p>
-						</div>
+					{latestAttempt && activity.type !== "short_answer" && activity.type !== "case_study" && activity.type !== "guided_project" && (
+						<ActivityFeedbackPanel
+							attempt={latestAttempt}
+							className="mt-3"
+						/>
 					)}
 
 					<div className="mt-3 flex items-center justify-between gap-3 border-t border-[#F0F0F2] pt-3">
@@ -1782,6 +2543,32 @@ export function LearningActivityRenderer({
 					</AlertDialog>
 				);
 			})()}
+
+			<AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Delete activity?</AlertDialogTitle>
+						<AlertDialogDescription>
+							This will permanently delete this activity, its attempts, feedback, and saved progress. This action cannot be undone.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel disabled={isDeletingActivity}>
+							Cancel
+						</AlertDialogCancel>
+						<AlertDialogAction
+							disabled={isDeletingActivity}
+							onClick={(event) => {
+								event.preventDefault();
+								void handleDeleteActivity();
+							}}
+							className="bg-[#DC2626] text-white hover:bg-[#B91C1C]"
+						>
+							{isDeletingActivity ? "Deleting..." : "Delete forever"}
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
 		</div>
 	);
 }

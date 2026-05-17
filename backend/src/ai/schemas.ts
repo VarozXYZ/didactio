@@ -251,6 +251,7 @@ const learningActivityContentSchema = z.object({
 	reflectionQuestions: z.array(z.string()).optional(),
 	textWithBlanks: z.string().optional(),
 	blanks: z.array(z.any()).optional(),
+	goal: z.string().optional(),
 	brief: z.string().optional(),
 	steps: z.array(z.string()).optional(),
 	deliverable: z.string().optional(),

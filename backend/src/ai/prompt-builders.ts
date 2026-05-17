@@ -268,7 +268,7 @@ function activityTypeContract(
 		case "cloze":
 			return "content.textWithBlanks using {{blank_id}} markers and content.blanks:[{id, answer, hint}].";
 		case "guided_project":
-			return "content.brief, content.steps:string[], content.deliverable, content.rubric:string[].";
+			return "content.goal, content.brief, content.steps:string[], content.deliverable, content.rubric:string[]. Create one compact guided mini project. goal is one sentence stating the outcome. brief is 2-4 sentences with the scenario and constraints. steps must contain 4-6 actionable implementation steps, each concise and specific. deliverable must describe exactly what the learner should submit or describe for feedback. rubric should list 3-5 evaluation criteria. Avoid dumping long code instructions into one paragraph.";
 		case "freeform_html":
 			return "content.html with sanitized compact HTML only: no scripts, event handlers, forms, iframes, inline styles, or external assets.";
 	}
@@ -362,6 +362,13 @@ export function buildLearningActivityFeedbackPrompt(input: {
 				})
 				.join("\n")
 		:	"";
+	const guidedProjectSubmission =
+		input.activityType === "guided_project" &&
+		input.answers &&
+		typeof input.answers === "object" &&
+		!Array.isArray(input.answers) ?
+			formatGuidedProjectSubmission(input.answers as Record<string, unknown>)
+		:	"";
 
 	return [
 		buildSection("Assessment Contract", [
@@ -371,6 +378,7 @@ export function buildLearningActivityFeedbackPrompt(input: {
 			"Return JSON with feedback, score 0-100 when possible, strengths, improvements, and questionFeedback.",
 			"Write every learner-facing field in the same language as the activity instructions and learner answer. Do not use English section labels unless the activity itself is in English.",
 			'For short_answer, questionFeedback must include EXACTLY 3 items: one separate correction for each content.prompts item. Use the same id as the prompt. Do not reuse the same correction across questions. Each item must include simplifiedScore exactly one of "wrong", "Almost there", "Good"; expectedAnswer with the correction / expected answer for that specific prompt; improvementReason explaining why that specific score was given and how to improve that specific learner answer.',
+			"For guided_project, evaluate the submitted files in virtualFiles as the deliverable. Treat each file as pasted source/content, not as a real uploaded file. Reference file names in feedback when useful, and evaluate whether the files satisfy the deliverable and rubric.",
 			"Compare each learner answer only against its matching prompt and rubric. If an answer is blank, mark that specific item as wrong and explain what should have been answered.",
 			"expectedAnswer and improvementReason may use simple sanitized HTML only: <p>, <ul>, <ol>, <li>, <strong>, <em>, <u>, <mark>, <code>, <br>. No headings, links, styles, scripts, tables, or code blocks.",
 			"Be direct, useful, and specific. Do not reveal hidden answers unless needed to explain a misconception.",
@@ -382,8 +390,55 @@ export function buildLearningActivityFeedbackPrompt(input: {
 			])
 		:	"",
 		buildSection("Activity Content", [JSON.stringify(input.content).slice(0, 6000)]),
-		buildSection("Learner Answers", [JSON.stringify(input.answers).slice(0, 4000)]),
+		buildSection("Learner Answers", [
+			input.activityType === "guided_project" && guidedProjectSubmission ?
+				guidedProjectSubmission
+			:	JSON.stringify(input.answers).slice(0, 4000),
+		]),
 	].join("\n\n");
+}
+
+function formatGuidedProjectSubmission(answers: Record<string, unknown>): string {
+	const response =
+		typeof answers.response === "string" ? answers.response.trim() : "";
+	const files = Array.isArray(answers.virtualFiles) ?
+		answers.virtualFiles
+			.map((item) =>
+				item && typeof item === "object" && !Array.isArray(item) ?
+					item as Record<string, unknown>
+				:	null,
+			)
+			.filter((item): item is Record<string, unknown> => item !== null)
+			.slice(0, 8)
+	:	[];
+
+	const virtualFilesText = files
+		.map((file, index) => {
+			const name =
+				typeof file.name === "string" && file.name.trim() ?
+					file.name.trim()
+				:	`virtual-file-${index + 1}`;
+			const format =
+				typeof file.format === "string" && file.format.trim() ?
+					file.format.trim()
+				:	"unknown";
+			const content =
+				typeof file.content === "string" ? file.content.slice(0, 12000) : "";
+			return [
+				`--- file: ${name} (${format}) ---`,
+				content,
+				"--- end file ---",
+			].join("\n");
+		})
+		.join("\n\n");
+
+	return [
+		"Learner notes:",
+		response || "(none)",
+		"",
+		"Submitted files:",
+		virtualFilesText || "(none)",
+	].join("\n").slice(0, 30000);
 }
 
 export function buildModerationPrompt(input: {
