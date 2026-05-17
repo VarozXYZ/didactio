@@ -66,6 +66,22 @@ import {CoinAmount} from "@/components/Coin";
 import {getActivityFeedbackRefillCost} from "../../utils/coinPricing";
 
 type Answers = Record<string, unknown>;
+type ActivityStylePresetId = "modern" | "classic" | "plain";
+type ActivityColorTheme = {
+	surface: string;
+	surfaceAlt: string;
+	border: string;
+	borderStrong: string;
+	text: string;
+	muted: string;
+	primary: string;
+	primaryHover: string;
+	accent: string;
+	accentText: string;
+	accentSoft: string;
+	accentSofter: string;
+	focus: string;
+};
 type VirtualFileFormatCategory =
 	| "Document"
 	| "Code"
@@ -93,6 +109,60 @@ type VirtualFile = {
 	format: string;
 	content: string;
 };
+
+function resolveActivityColorTheme(stylePreset?: string): ActivityColorTheme {
+	if (stylePreset === "classic") {
+		return {
+			surface: "#FFFDF8",
+			surfaceAlt: "#FBF2E7",
+			border: "#E4D0BC",
+			borderStrong: "#D8B98F",
+			text: "#2A1A0A",
+			muted: "#6F5940",
+			primary: "#2A1A0A",
+			primaryHover: "#3A2410",
+			accent: "#996633",
+			accentText: "#7A4E28",
+			accentSoft: "#F7EEE4",
+			accentSofter: "#FFF8EF",
+			focus: "#D8B98F",
+		};
+	}
+
+	if (stylePreset === "plain") {
+		return {
+			surface: "#FFFFFF",
+			surfaceAlt: "#F8FAFC",
+			border: "#D0D7DE",
+			borderStrong: "#93C5FD",
+			text: "#111827",
+			muted: "#4B5563",
+			primary: "#2563EB",
+			primaryHover: "#1D4ED8",
+			accent: "#2563EB",
+			accentText: "#1D4ED8",
+			accentSoft: "#EFF6FF",
+			accentSofter: "#F8FBFF",
+			focus: "#93C5FD",
+		};
+	}
+
+	return {
+		surface: "#FFFFFF",
+		surfaceAlt: "#FCFCFD",
+		border: "#E5E5E7",
+		borderStrong: "#86EFAC",
+		text: "#1D1D1F",
+		muted: "#6B7280",
+		primary: "#1D1D1F",
+		primaryHover: "#333333",
+		accent: "#16A34A",
+		accentText: "#15803D",
+		accentSoft: "#DCFCE7",
+		accentSofter: "#F0FDF4",
+		focus: "#86EFAC",
+	};
+}
 
 const VIRTUAL_FILE_MAX_FILES = 12;
 const VIRTUAL_FILE_MAX_CHARS = 12_000;
@@ -738,8 +808,8 @@ function ShortAnswerActivity({
 		cn(
 			"-mb-px min-w-[96px] border border-b-2 px-4 py-3 text-center text-[12px] font-bold transition",
 			selected ?
-				"border-[#E5E5E7] border-b-[#4ADE80] bg-white text-[#16A34A]"
-			:	"border-[#ECECEF] border-b-[#E5E5E7] bg-[#F5F5F7] text-[#6E6E73] hover:border-[#BBF7D0] hover:border-b-[#4ADE80] hover:bg-[#F0FDF4] hover:text-[#15803D]",
+				"border-[var(--activity-border)] border-b-[var(--activity-border-strong)] bg-[var(--activity-surface)] text-[var(--activity-accent)]"
+			:	"border-[var(--activity-border)] border-b-[var(--activity-border)] bg-[var(--activity-surface-alt)] text-[var(--activity-muted)] hover:border-[var(--activity-border-strong)] hover:border-b-[var(--activity-border-strong)] hover:bg-[var(--activity-accent-softer)] hover:text-[var(--activity-accent-text)]",
 		);
 
 	const visibleDetailTab = activeFeedback && detailTab === "correction" ? "correction" : "answer";
@@ -750,7 +820,7 @@ function ShortAnswerActivity({
 
 	return (
 		<div className="flex min-h-0 flex-1 flex-col gap-3">
-			<div className="flex rounded-lg bg-[#F5F5F7] p-1">
+			<div className="flex rounded-lg bg-[var(--activity-surface-alt)] p-1">
 				{items.map((prompt, index) => {
 					const id = asId(prompt.id, `prompt${index + 1}`);
 					const hasFeedback = !!latestAttempt && (
@@ -765,24 +835,24 @@ function ShortAnswerActivity({
 							className={cn(
 								"flex-1 rounded-md px-2 py-1.5 text-[11px] font-bold transition",
 								index === activeIndex ?
-									"bg-white text-[#1D1D1F] shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
-								:	"text-[#6B7280] hover:text-[#1D1D1F]",
+									"bg-[var(--activity-surface)] text-[var(--activity-text)] shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
+								:	"text-[var(--activity-muted)] hover:text-[var(--activity-text)]",
 							)}
 						>
 							Question {index + 1}
-							{hasFeedback ? <span className="ml-1 text-[#16A34A]">✓</span> : null}
+							{hasFeedback ? <span className="ml-1 text-[var(--activity-accent)]">✓</span> : null}
 						</button>
 					);
 				})}
 			</div>
-			<div className="flex items-start gap-2.5 text-[14px] font-medium leading-relaxed text-[#1D1D1F]">
-				<span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#F0FDF4] text-[#16A34A]">
+			<div className="flex items-start gap-2.5 text-[14px] font-medium leading-relaxed text-[var(--activity-text)]">
+				<span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--activity-accent-softer)] text-[var(--activity-accent)]">
 					<MessageCircleQuestionMark size={13} strokeWidth={2.25} />
 				</span>
 				<p>{asText(activePrompt?.prompt)}</p>
 			</div>
 			<div className="flex min-h-0 flex-1 flex-col">
-				<div className="flex items-end border-b border-[#E5E5E7]">
+				<div className="flex items-end border-b border-[var(--activity-border)]">
 					{(["answer", ...(activeFeedback ? ["correction" as const] : [])] as const).map((tab) => {
 						const selected = visibleDetailTab === tab;
 						return (
@@ -797,16 +867,16 @@ function ShortAnswerActivity({
 						);
 					})}
 				</div>
-				<div className="min-h-0 flex-1 rounded-b-[8px] border border-t-0 border-[#E5E5E7] bg-white p-3 shadow-[0_10px_28px_rgba(17,24,39,0.03)]">
+				<div className="min-h-0 flex-1 rounded-b-[8px] border border-t-0 border-[var(--activity-border)] bg-[var(--activity-surface)] p-3 shadow-[0_10px_28px_rgba(17,24,39,0.03)]">
 					{visibleDetailTab === "answer" ? (
 						<textarea
-							className="h-full min-h-[180px] w-full resize-none bg-transparent p-1 text-[14px] leading-relaxed text-[#1D1D1F] outline-none placeholder:text-[#9CA3AF]"
+							className="h-full min-h-[180px] w-full resize-none bg-transparent p-1 text-[14px] leading-relaxed text-[var(--activity-text)] outline-none placeholder:text-[#9CA3AF]"
 							value={value}
 							onChange={(event) => setAnswer(activeId, event.target.value)}
 							placeholder="Write your answer..."
 						/>
 					) : activeFeedback ? (
-						<div className="space-y-3 text-[12px] leading-relaxed text-[#374151]">
+						<div className="space-y-3 text-[12px] leading-relaxed text-[var(--activity-muted)]">
 							{scoreLabel ? (
 								<span className={cn("inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold", scoreClass)}>
 									<ScoreIcon size={12} />
@@ -818,7 +888,7 @@ function ShortAnswerActivity({
 									Expected answer
 								</div>
 								<FeedbackHtml
-									className="mt-1 text-[#1D1D1F]"
+									className="mt-1 text-[var(--activity-text)]"
 									html={activeFeedback.expectedAnswer || activeFeedback.feedback || ""}
 								/>
 							</div>
@@ -827,7 +897,7 @@ function ShortAnswerActivity({
 									Why and how to improve
 								</div>
 								<FeedbackHtml
-									className="mt-1 text-[#374151]"
+									className="mt-1 text-[var(--activity-muted)]"
 									html={activeFeedback.improvementReason ||
 										activeFeedback.improvements.join("; ") ||
 										activeFeedback.feedback ||
@@ -836,7 +906,7 @@ function ShortAnswerActivity({
 							</div>
 						</div>
 					) : (
-						<div className="flex h-full min-h-[180px] items-center justify-center text-center text-[12px] font-medium leading-relaxed text-[#86868B]">
+						<div className="flex h-full min-h-[180px] items-center justify-center text-center text-[12px] font-medium leading-relaxed text-[var(--activity-muted)]">
 							Check your answers to see the feedback for this question.
 						</div>
 					)}
@@ -911,14 +981,14 @@ function CaseStudyActivity({
 		cn(
 			"-mb-px min-w-[112px] border border-b-2 px-4 py-3 text-center text-[12px] font-bold transition",
 			selected ?
-				"border-[#E5E5E7] border-b-[#4ADE80] bg-white text-[#16A34A]"
-			:	"border-[#ECECEF] border-b-[#E5E5E7] bg-[#F5F5F7] text-[#6E6E73] hover:border-[#BBF7D0] hover:border-b-[#4ADE80] hover:bg-[#F0FDF4] hover:text-[#15803D]",
+				"border-[var(--activity-border)] border-b-[var(--activity-border-strong)] bg-[var(--activity-surface)] text-[var(--activity-accent)]"
+			:	"border-[var(--activity-border)] border-b-[var(--activity-border)] bg-[var(--activity-surface-alt)] text-[var(--activity-muted)] hover:border-[var(--activity-border-strong)] hover:border-b-[var(--activity-border-strong)] hover:bg-[var(--activity-accent-softer)] hover:text-[var(--activity-accent-text)]",
 		);
 
 	return (
 		<div className="flex min-h-0 flex-1 flex-col gap-3">
 			<div className="flex min-h-0 flex-1 flex-col">
-				<div className="flex items-end border-b border-[#E5E5E7]">
+				<div className="flex items-end border-b border-[var(--activity-border)]">
 					{(["case", "analysis", ...(latestAttempt ? ["feedback" as const] : [])] as const).map((tab) => {
 						const selected = activeTab === tab;
 						return (
@@ -934,40 +1004,40 @@ function CaseStudyActivity({
 					})}
 				</div>
 
-				<div className="min-h-0 flex-1 rounded-b-[8px] border border-t-0 border-[#E5E5E7] bg-white p-3 shadow-[0_10px_28px_rgba(17,24,39,0.03)]">
+				<div className="min-h-0 flex-1 rounded-b-[8px] border border-t-0 border-[var(--activity-border)] bg-[var(--activity-surface)] p-3 shadow-[0_10px_28px_rgba(17,24,39,0.03)]">
 					{activeTab === "case" ? (
 						<div className="grid h-full min-h-[260px] gap-3 overflow-y-auto pr-1">
 							<section className="p-1">
 								<div className="mb-2 flex items-center gap-2">
-									<span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#DCFCE7] text-[#16A34A]">
+									<span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--activity-accent-soft)] text-[var(--activity-accent)]">
 										<BookOpenCheck size={12} strokeWidth={2.25} />
 									</span>
-									<h4 className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#6E6E73]">
+									<h4 className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--activity-muted)]">
 										Scenario
 									</h4>
 								</div>
-								<p className="whitespace-pre-wrap text-[13px] leading-[1.6] text-[#374151]">
+								<p className="whitespace-pre-wrap text-[13px] leading-[1.6] text-[var(--activity-muted)]">
 									{scenario}
 								</p>
 							</section>
 
-							<section className="border-t border-[#F0F0F2] p-1 pt-3">
+							<section className="border-t border-[var(--activity-border)] p-1 pt-3">
 								<div className="mb-2 flex items-center gap-2">
-									<span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#F0FDF4] text-[#16A34A]">
+									<span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--activity-accent-softer)] text-[var(--activity-accent)]">
 										<MessageCircleQuestionMark size={12} strokeWidth={2.25} />
 									</span>
-									<h4 className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#6E6E73]">
+									<h4 className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--activity-muted)]">
 										Problem to solve
 									</h4>
 								</div>
-								<p className="text-[13px] font-semibold leading-relaxed text-[#1D1D1F]">
+								<p className="text-[13px] font-semibold leading-relaxed text-[var(--activity-text)]">
 									{problem || "Resolve the case using the module concepts."}
 								</p>
 								{rubric.length > 0 && (
-									<ul className="mt-2 grid gap-x-4 gap-y-1 text-[11.5px] leading-relaxed text-[#6E6E73] sm:grid-cols-2">
+									<ul className="mt-2 grid gap-x-4 gap-y-1 text-[11.5px] leading-relaxed text-[var(--activity-muted)] sm:grid-cols-2">
 										{rubric.slice(0, 4).map((item) => (
 											<li key={item} className="flex gap-1.5">
-												<span className="mt-[0.45em] h-1 w-1 shrink-0 rounded-full bg-[#34C759]" />
+												<span className="mt-[0.45em] h-1 w-1 shrink-0 rounded-full bg-[var(--activity-accent)]" />
 												<span>{item}</span>
 											</li>
 										))}
@@ -977,7 +1047,7 @@ function CaseStudyActivity({
 						</div>
 					) : activeTab === "analysis" ? (
 						<textarea
-							className="h-full min-h-[260px] w-full resize-none bg-transparent p-1 text-[14px] leading-relaxed text-[#1D1D1F] outline-none placeholder:text-[#9CA3AF]"
+							className="h-full min-h-[260px] w-full resize-none bg-transparent p-1 text-[14px] leading-relaxed text-[var(--activity-text)] outline-none placeholder:text-[#9CA3AF]"
 							value={response}
 							onChange={(event) => setAnswer("response", event.target.value)}
 							placeholder="Write your analysis and proposed solution..."
@@ -1022,7 +1092,7 @@ function CaseStudyActivity({
 							)}
 						</div>
 					) : (
-						<div className="flex h-full min-h-[260px] items-center justify-center text-center text-[12px] font-medium leading-relaxed text-[#86868B]">
+						<div className="flex h-full min-h-[260px] items-center justify-center text-center text-[12px] font-medium leading-relaxed text-[var(--activity-muted)]">
 							Check your answer to see feedback.
 						</div>
 					)}
@@ -1310,8 +1380,8 @@ function GuidedProjectActivity({
 		cn(
 			"-mb-px border-b-2 px-4 py-2.5 text-[12px] font-bold transition",
 			selected ?
-				"border-[#4ADE80] bg-white text-[#16A34A]"
-			:	"border-transparent bg-[#F8F8F9] text-[#6E6E73] hover:bg-[#F3F4F6] hover:text-[#1D1D1F]",
+				"border-[var(--activity-border-strong)] bg-[var(--activity-surface)] text-[var(--activity-accent)]"
+			:	"border-transparent bg-[var(--activity-surface-alt)] text-[var(--activity-muted)] hover:bg-[var(--activity-accent-softer)] hover:text-[var(--activity-text)]",
 		);
 
 	return (
@@ -1345,20 +1415,20 @@ function GuidedProjectActivity({
 			{visibleTab === "project" && (
 			<div className="min-h-0 overflow-y-auto pr-1">
 				<div className="grid gap-3">
-					<section className="rounded-[10px] border border-[#E5E5E7] bg-[#FCFCFD] p-3">
+					<section className="rounded-[10px] border border-[var(--activity-border)] bg-[var(--activity-surface-alt)] p-3">
 						<div className="mb-2 flex items-center gap-2">
-							<span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#DCFCE7] text-[#16A34A]">
+							<span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--activity-accent-soft)] text-[var(--activity-accent)]">
 								<Trophy size={12} strokeWidth={2.25} />
 							</span>
-							<h4 className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#6E6E73]">
+							<h4 className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--activity-muted)]">
 								Goal
 							</h4>
 						</div>
-						<p className="text-[13px] font-semibold leading-relaxed text-[#1D1D1F]">
+						<p className="text-[13px] font-semibold leading-relaxed text-[var(--activity-text)]">
 							{goal}
 						</p>
 						{brief && (
-							<p className="mt-2 text-[12.5px] leading-[1.55] text-[#4B5563]">
+							<p className="mt-2 text-[12.5px] leading-[1.55] text-[var(--activity-muted)]">
 								{brief}
 							</p>
 						)}
@@ -1367,17 +1437,17 @@ function GuidedProjectActivity({
 					{steps.length > 0 && (
 						<section>
 							<div className="mb-2 flex items-center gap-2">
-								<span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#F0FDF4] text-[#16A34A]">
+								<span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--activity-accent-softer)] text-[var(--activity-accent)]">
 									<ListChecks size={12} strokeWidth={2.25} />
 								</span>
-								<h4 className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#6E6E73]">
+								<h4 className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--activity-muted)]">
 									Steps
 								</h4>
 							</div>
 							<ol className="space-y-2">
 								{steps.map((step, index) => (
-									<li key={`${index}-${step}`} className="flex gap-2.5 text-[12.5px] leading-relaxed text-[#374151]">
-										<span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[#BBF7D0] bg-white text-[10px] font-bold text-[#16A34A]">
+									<li key={`${index}-${step}`} className="flex gap-2.5 text-[12.5px] leading-relaxed text-[var(--activity-muted)]">
+										<span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[var(--activity-border-strong)] bg-[var(--activity-surface)] text-[10px] font-bold text-[var(--activity-accent)]">
 											{index + 1}
 										</span>
 										<span>{step}</span>
@@ -1387,23 +1457,23 @@ function GuidedProjectActivity({
 						</section>
 					)}
 
-					<section className="border-t border-[#F0F0F2] pt-3">
+					<section className="border-t border-[var(--activity-border)] pt-3">
 						<div className="mb-2 flex items-center gap-2">
-							<span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#F0FDF4] text-[#16A34A]">
+							<span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--activity-accent-softer)] text-[var(--activity-accent)]">
 								<CheckCircle2 size={12} strokeWidth={2.25} />
 							</span>
-							<h4 className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#6E6E73]">
+							<h4 className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--activity-muted)]">
 								Deliverable
 							</h4>
 						</div>
-						<p className="text-[12.5px] leading-[1.55] text-[#374151]">
+						<p className="text-[12.5px] leading-[1.55] text-[var(--activity-muted)]">
 							{deliverable}
 						</p>
 						{rubric.length > 0 && (
-							<ul className="mt-2 grid gap-x-4 gap-y-1 text-[11.5px] leading-relaxed text-[#6E6E73] sm:grid-cols-2">
+							<ul className="mt-2 grid gap-x-4 gap-y-1 text-[11.5px] leading-relaxed text-[var(--activity-muted)] sm:grid-cols-2">
 								{rubric.slice(0, 4).map((item) => (
 									<li key={item} className="flex gap-1.5">
-										<span className="mt-[0.45em] h-1 w-1 shrink-0 rounded-full bg-[#34C759]" />
+										<span className="mt-[0.45em] h-1 w-1 shrink-0 rounded-full bg-[var(--activity-accent)]" />
 										<span>{item}</span>
 									</li>
 								))}
@@ -1415,13 +1485,13 @@ function GuidedProjectActivity({
 			)}
 
 			{visibleTab === "files" && (
-			<div className="rounded-[10px] border border-[#E5E5E7] bg-[#FCFCFD] p-3">
+			<div className="rounded-[10px] border border-[var(--activity-border)] bg-[var(--activity-surface-alt)] p-3">
 				<div className="flex items-center justify-between gap-3">
 					<div>
-						<h4 className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#6E6E73]">
+						<h4 className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--activity-muted)]">
 							Files
 						</h4>
-						<p className="mt-1 text-[12px] text-[#86868B]">
+						<p className="mt-1 text-[12px] text-[var(--activity-muted)]">
 							Paste source, documents, reports, diagrams, or notes as text.
 						</p>
 					</div>
@@ -1429,7 +1499,7 @@ function GuidedProjectActivity({
 						type="button"
 						disabled={!canAddFile}
 						onClick={openNewFileDialog}
-						className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#1D1D1F] px-3 py-1.5 text-[12px] font-bold text-white transition hover:bg-[#1D1D1F] disabled:cursor-not-allowed disabled:opacity-50"
+						className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--activity-primary)] px-3 py-1.5 text-[12px] font-bold text-white transition hover:bg-[var(--activity-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
 					>
 						<Plus size={13} />
 						Add file
@@ -1443,14 +1513,14 @@ function GuidedProjectActivity({
 							return (
 								<div
 									key={file.id}
-									className="flex min-h-12 items-center gap-3 rounded-[10px] border border-[#E5E5E7] bg-white px-3 py-2.5 transition hover:border-[#D1D5DB]"
+									className="flex min-h-12 items-center gap-3 rounded-[10px] border border-[var(--activity-border)] bg-[var(--activity-surface)] px-3 py-2.5 transition hover:border-[var(--activity-border-strong)]"
 								>
 									<VirtualFileFormatIcon format={file.format} />
 									<div className="min-w-0 flex-1">
-										<div className="truncate text-[13px] font-bold text-[#1D1D1F]">
+										<div className="truncate text-[13px] font-bold text-[var(--activity-text)]">
 											{file.name}
 										</div>
-										<div className="mt-0.5 text-[11px] text-[#86868B]">
+										<div className="mt-0.5 text-[11px] text-[var(--activity-muted)]">
 											{format.label} - {file.content.length.toLocaleString()} chars
 										</div>
 									</div>
@@ -1461,7 +1531,7 @@ function GuidedProjectActivity({
 												setEditingFile(file);
 												setFileDialogOpen(true);
 											}}
-											className="flex h-7 w-7 items-center justify-center rounded-md text-[#6E6E73] transition hover:bg-[#F5F5F7] hover:text-[#1D1D1F]"
+											className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--activity-muted)] transition hover:bg-[var(--activity-accent-softer)] hover:text-[var(--activity-text)]"
 											aria-label={`Edit ${file.name}`}
 										>
 											<Pencil size={13} />
@@ -1484,12 +1554,12 @@ function GuidedProjectActivity({
 						})}
 					</div>
 				) : (
-					<div className="mt-3 rounded-[10px] border border-dashed border-[#D1D5DB] bg-white px-3 py-4 text-center text-[12px] text-[#86868B]">
+					<div className="mt-3 rounded-[10px] border border-dashed border-[var(--activity-border)] bg-[var(--activity-surface)] px-3 py-4 text-center text-[12px] text-[var(--activity-muted)]">
 						No files yet.
 					</div>
 				)}
 
-				<div className="mt-2 flex justify-between gap-3 text-[11px] text-[#86868B]">
+				<div className="mt-2 flex justify-between gap-3 text-[11px] text-[var(--activity-muted)]">
 					<span>
 						{virtualFiles.length} / {VIRTUAL_FILE_MAX_FILES} files
 					</span>
@@ -2029,6 +2099,7 @@ export function LearningActivityRenderer({
 	onSubmitAttempt,
 	onRefillAttempts,
 	onDeleteActivity,
+	stylePreset = "modern",
 }: {
 	activity: BackendLearningActivity;
 	attempts: BackendLearningActivityAttempt[];
@@ -2036,7 +2107,9 @@ export function LearningActivityRenderer({
 	onSubmitAttempt: (activityId: string, answers: unknown) => Promise<void>;
 	onRefillAttempts: (activityId: string) => Promise<void>;
 	onDeleteActivity?: (activityId: string) => Promise<void>;
+	stylePreset?: ActivityStylePresetId | string;
 }) {
+	const activityTheme = resolveActivityColorTheme(stylePreset);
 	const [answers, setAnswers] = useState<Answers>({});
 	const [shortAnswerDetailTab, setShortAnswerDetailTab] = useState<"answer" | "correction">("answer");
 	const [caseStudyTab, setCaseStudyTab] = useState<"case" | "analysis" | "feedback">("case");
@@ -2395,22 +2468,41 @@ export function LearningActivityRenderer({
 	};
 
 	return (
-		<div className="group/activity flex h-full min-h-0 flex-col bg-white text-[#1D1D1F]">
-			<div className="border-b border-[#F0F0F2] pb-3">
+		<div
+			className="group/activity flex h-full min-h-0 flex-col font-[Inter] text-[var(--activity-text)]"
+			style={{
+				backgroundColor: activityTheme.surface,
+				color: activityTheme.text,
+				"--activity-surface": activityTheme.surface,
+				"--activity-surface-alt": activityTheme.surfaceAlt,
+				"--activity-border": activityTheme.border,
+				"--activity-border-strong": activityTheme.borderStrong,
+				"--activity-text": activityTheme.text,
+				"--activity-muted": activityTheme.muted,
+				"--activity-primary": activityTheme.primary,
+				"--activity-primary-hover": activityTheme.primaryHover,
+				"--activity-accent": activityTheme.accent,
+				"--activity-accent-text": activityTheme.accentText,
+				"--activity-accent-soft": activityTheme.accentSoft,
+				"--activity-accent-softer": activityTheme.accentSofter,
+				"--activity-focus": activityTheme.focus,
+			} as CSSProperties}
+		>
+			<div className="border-b border-[var(--activity-border)] pb-3">
 				<div className="flex items-start justify-between gap-3">
 					<div className="min-w-0">
 						<div className="flex flex-wrap items-center gap-2">
-							<div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#1D1D1F] text-white">
+							<div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--activity-primary)] text-white">
 								<ActivityIcon type={activity.type} />
 							</div>
-							<span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#AEAEB2]">
+							<span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--activity-muted)] opacity-70">
 								{activityTypeLabel(activity.type)}
 							</span>
 							<HoverCard openDelay={150} closeDelay={100}>
 								<HoverCardTrigger asChild>
 									<button
 										type="button"
-										className="inline-flex items-center gap-1.5 rounded-full border border-[#D1FAE5] bg-[#F0FDF4] px-2.5 py-1 text-[11px] font-bold text-[#15803D] transition hover:border-[#86EFAC] hover:bg-[#DCFCE7] focus-visible:ring-2 focus-visible:ring-[#86EFAC]"
+										className="inline-flex items-center gap-1.5 rounded-full border border-[var(--activity-border-strong)] bg-[var(--activity-accent-softer)] px-2.5 py-1 text-[11px] font-bold text-[var(--activity-accent-text)] transition hover:bg-[var(--activity-accent-soft)] focus-visible:ring-2 focus-visible:ring-[var(--activity-focus)]"
 									>
 										<MessageCircleQuestionMark size={12} />
 										About
@@ -2418,14 +2510,14 @@ export function LearningActivityRenderer({
 								</HoverCardTrigger>
 								<HoverCardContent align="start" side="bottom" sideOffset={8} className="w-[260px]">
 									<div className="flex items-start gap-2.5">
-										<div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[#F0FDF4] text-[#16A34A]">
+										<div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[var(--activity-accent-softer)] text-[var(--activity-accent)]">
 											<ActivityIcon type={activity.type} />
 										</div>
 										<div className="min-w-0">
-											<h4 className="text-[12.5px] font-bold text-[#1D1D1F]">
+											<h4 className="font-[Sora] text-[12.5px] font-bold text-[var(--activity-text)]">
 												{activityTypeLabel(activity.type)}
 											</h4>
-											<p className="mt-1 text-[11.5px] leading-[1.55] text-[#6E6E73]">
+											<p className="mt-1 text-[11.5px] leading-[1.55] text-[var(--activity-muted)]">
 												{activityTypeDescription(activity.type)}
 											</p>
 										</div>
@@ -2433,11 +2525,11 @@ export function LearningActivityRenderer({
 								</HoverCardContent>
 							</HoverCard>
 						</div>
-						<h3 className="mt-2 text-[15.5px] font-bold leading-snug text-[#1D1D1F]">
+						<h3 className="mt-2 font-[Sora] text-[15.5px] font-bold leading-snug text-[var(--activity-text)]">
 							{activity.title}
 						</h3>
 						{activity.type !== "short_answer" && (
-							<p className="mt-1 text-[12px] leading-relaxed text-[#6B7280]">{activity.instructions}</p>
+							<p className="mt-1 text-[12px] leading-relaxed text-[var(--activity-muted)]">{activity.instructions}</p>
 						)}
 					</div>
 					{onDeleteActivity && (
@@ -2471,7 +2563,7 @@ export function LearningActivityRenderer({
 							<span className="group relative inline-flex items-center gap-1.5 text-[11px] text-[#AEAEB2]">
 								<button
 									type="button"
-									className="flex h-4 w-4 cursor-help items-center justify-center text-[#16A34A] outline-none transition hover:text-[#15803D] focus-visible:ring-2 focus-visible:ring-[#86EFAC]"
+									className="flex h-4 w-4 cursor-help items-center justify-center text-[var(--activity-accent)] outline-none transition hover:text-[var(--activity-accent-text)] focus-visible:ring-2 focus-visible:ring-[var(--activity-focus)]"
 									aria-describedby={`activity-attempts-tooltip-${activity.id}`}
 									aria-label="AI feedback attempts"
 								>
@@ -2483,7 +2575,7 @@ export function LearningActivityRenderer({
 								<span
 									id={`activity-attempts-tooltip-${activity.id}`}
 									role="tooltip"
-									className="pointer-events-none absolute bottom-full left-0 z-20 mb-2 w-[220px] rounded-[6px] border border-[#BBF7D0] bg-[#F0FDF4] px-3 py-2 text-[11px] font-medium leading-snug text-[#166534] opacity-0 shadow-[0_8px_20px_rgba(22,163,74,0.14)] transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+									className="pointer-events-none absolute bottom-full left-0 z-20 mb-2 w-[220px] rounded-[6px] border border-[var(--activity-border-strong)] bg-[var(--activity-accent-softer)] px-3 py-2 text-[11px] font-medium leading-snug text-[var(--activity-accent-text)] opacity-0 shadow-[0_8px_20px_rgba(0,0,0,0.10)] transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
 								>
 									AI feedback uses 1 attempt. You get 3 attempts per paid feedback refill.
 								</span>
@@ -2493,7 +2585,7 @@ export function LearningActivityRenderer({
 							type="button"
 							disabled={!canSubmit}
 							onClick={handleSubmit}
-							className="ml-auto mr-8 inline-flex items-center gap-2 rounded-xl bg-[#1D1D1F] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#1F2937] disabled:cursor-not-allowed disabled:opacity-40"
+							className="ml-auto mr-8 inline-flex items-center gap-2 rounded-xl bg-[var(--activity-primary)] px-4 py-2 text-xs font-bold text-white transition hover:bg-[var(--activity-primary-hover)] disabled:cursor-not-allowed disabled:opacity-40"
 						>
 							{isSubmitting ? "Checking..." : submitLabel}
 							<Send size={12} />
@@ -2534,7 +2626,7 @@ export function LearningActivityRenderer({
 											setIsRefilling(false);
 										}
 									}}
-									className="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-[#1D1D1F] px-4 text-[13px] font-semibold text-white transition hover:bg-[#1F2937] disabled:cursor-not-allowed disabled:opacity-40"
+									className="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-[var(--activity-primary)] px-4 text-[13px] font-semibold text-white transition hover:bg-[var(--activity-primary-hover)] disabled:cursor-not-allowed disabled:opacity-40"
 								>
 									{isRefilling ? "Processing..." : <>Use <CoinAmount type={cost.coinType} amount={cost.amount} /></>}
 								</button>

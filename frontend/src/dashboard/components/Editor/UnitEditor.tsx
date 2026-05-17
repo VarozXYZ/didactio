@@ -734,9 +734,8 @@ const ACTIVITY_OPTIONS: Array<{
 
 function resolvePostModuleCompletionStyle(presetId: string | undefined) {
 	const resolvedPresetId = presetId ?? "classic";
-	const preset = STYLE_PRESETS[resolvedPresetId] ?? STYLE_PRESETS.classic;
-	const headingFamily = FONT_CATALOG[preset.heading].family;
-	const bodyFamily = FONT_CATALOG[preset.body].family;
+	const headingFamily = "Sora";
+	const bodyFamily = "Inter";
 
 	if (resolvedPresetId === "classic") {
 		return {
@@ -3160,12 +3159,17 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		}
 
 		if (page.kind === "learning_activity") {
+			const activityTheme = resolvePostModuleCompletionStyle(
+				draft.textStyle.stylePreset,
+			);
 			return (
 				<div
-					className="relative overflow-hidden rounded-[16px] border border-[#E5E5E7] bg-white shadow-[0_8px_60px_rgba(0,0,0,0.08)] md:rounded-[24px]"
+					className="relative overflow-hidden rounded-[16px] border shadow-[0_8px_60px_rgba(0,0,0,0.08)] md:rounded-[24px]"
 					style={{
 						height: `${spreadMetrics.pageHeight}px`,
 						width: `${spreadMetrics.pageWidth}px`,
+						background: activityTheme.panelBackground,
+						borderColor: activityTheme.panelBorder,
 					}}
 				>
 					<div className="flex h-full flex-col overflow-hidden px-5 py-4 md:px-6 md:py-5">
@@ -3176,6 +3180,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 							onSubmitAttempt={handleLearningActivityAttempt}
 							onRefillAttempts={handleRefillActivityAttempts}
 							onDeleteActivity={handleDeleteLearningActivity}
+							stylePreset={draft.textStyle.stylePreset ?? "modern"}
 						/>
 						<div className="pointer-events-none absolute bottom-4 right-6 text-[10px] font-medium text-[#86868B] md:bottom-6 md:right-10">
 							{pageNumber}
