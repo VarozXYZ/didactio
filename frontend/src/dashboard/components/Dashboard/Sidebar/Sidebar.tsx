@@ -6,7 +6,6 @@ import {
 	FolderInput,
 	FolderPen,
 	LayoutGrid,
-	Lock,
 	MoreHorizontal,
 	MoreVertical,
 	Palette,
@@ -127,8 +126,7 @@ export function Sidebar({
 		icon: typeof CreditCard;
 	}> = [
 		{id: "subscription", icon: CreditCard, label: "Subscription & Credits"},
-		{id: "profile", icon: User, label: "Profile"},
-		{id: "security", icon: Lock, label: "Security"},
+		{id: "profile-security", icon: User, label: "Profile & Security"},
 		{id: "preferences", icon: Palette, label: "Preferences"},
 		{id: "analytics", icon: BarChart3, label: "Usage & Analytics"},
 	];

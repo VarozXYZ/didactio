@@ -1,5 +1,5 @@
 import {type ReactNode, useEffect, useState} from "react";
-import {AlertCircle, Loader2, Sparkles} from "lucide-react";
+import {AlertCircle, Loader2, PieChart, Sparkles} from "lucide-react";
 import {
 	Area,
 	AreaChart,
@@ -16,6 +16,8 @@ import {
 } from "../../../api/dashboardApi";
 import {getFolderEmoji, getFolderVisuals} from "../../../utils/folderDisplay";
 
+const ACCENT = "#15803D";
+
 const PERIOD_OPTIONS: Array<{
 	label: string;
 	value: BackendUsageAnalyticsPeriod;
@@ -26,16 +28,16 @@ const PERIOD_OPTIONS: Array<{
 	{label: "12M", value: "12m"},
 ];
 
-function formatNumber(value: number): string {
-	return new Intl.NumberFormat("en").format(value);
-}
-
 const PROVIDER_LOGOS: Record<string, string> = {
 	anthropic: "/assets/brands/claude-reduced.svg",
 	deepseek: "/assets/brands/deepseek-reduced.svg",
 	google: "/assets/brands/gemini.png",
 	openai: "/assets/brands/chatgpt.png",
 };
+
+function formatNumber(value: number): string {
+	return new Intl.NumberFormat("en").format(value);
+}
 
 function AssetIcon({src, alt}: {src: string; alt: string}) {
 	return <img src={src} alt={alt} className="h-5 w-5 object-contain" />;
@@ -51,10 +53,43 @@ function ProviderIcon({
 	const logo = provider ? PROVIDER_LOGOS[provider] : undefined;
 
 	if (!logo) {
-		return <Sparkles size={18} />;
+		return <Sparkles size={20} />;
 	}
 
-	return <img src={logo} alt={label} className="h-5 w-5 object-contain" />;
+	return <img src={logo} alt={label} className="h-6 w-6 object-contain" />;
+}
+
+function TinyTrend({color = ACCENT}: {color?: string}) {
+	return (
+		<svg
+			viewBox="0 0 180 28"
+			className="h-8 w-full"
+			aria-hidden="true"
+			focusable="false"
+		>
+			<path
+				d="M1 22 C22 22 27 20 42 20 C55 20 61 17 75 18 C91 19 93 14 108 15 C121 16 126 11 141 13 C154 15 159 11 179 11"
+				fill="none"
+				stroke={color}
+				strokeLinecap="round"
+				strokeWidth="2"
+			/>
+			<circle cx="179" cy="11" r="3" fill={color} />
+		</svg>
+	);
+}
+
+function ProgressBar({value}: {value: number}) {
+	const safeValue = Math.max(0, Math.min(100, value));
+
+	return (
+		<div className="h-2 overflow-hidden rounded-full bg-[#E5E5E7]">
+			<div
+				className="h-full rounded-full bg-[#15803D]"
+				style={{width: `${safeValue}%`}}
+			/>
+		</div>
+	);
 }
 
 function MetricCard({
@@ -62,54 +97,99 @@ function MetricCard({
 	label,
 	value,
 	description,
-	iconBg,
+	iconBg = "#DCFCE7",
+	children,
 }: {
 	icon: ReactNode;
 	label: string;
 	value: string;
 	description: string;
 	iconBg?: string;
+	children?: ReactNode;
 }) {
 	return (
-		<div className="flex h-[130px] flex-col justify-between rounded-[14px] border border-black/[0.07] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.025)]">
-			<div className="flex items-center justify-between gap-2">
-				<p className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-[#AEAEB2]">
+		<div className="flex min-h-[170px] flex-col justify-between rounded-[12px] border border-[#E5E5E7] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.025)]">
+			<div>
+				<div className="mb-4 flex items-start justify-between gap-3">
+					<div
+						className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] border border-black/[0.05] text-[#15803D]"
+						style={{backgroundColor: iconBg}}
+					>
+						{icon}
+					</div>
+					<p className="line-clamp-2 text-right text-[34px] font-bold leading-none tracking-tight text-[#111827]">
+						{value}
+					</p>
+				</div>
+				<p className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-[#667085]">
 					{label}
 				</p>
-				<div
-					className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[9px] border border-black/[0.05] text-[#1D1D1F]"
-					style={{backgroundColor: iconBg ?? "#F5F5F7"}}
-				>
-					{icon}
-				</div>
-			</div>
-			<div>
-				<p className="line-clamp-2 text-[21px] font-bold leading-tight tracking-tight text-[#1D1D1F]">
-					{value}
-				</p>
-				<p className="mt-1 line-clamp-1 text-[11.5px] text-[#86868B]">
+				<p className="mt-2 min-h-[34px] text-[13px] leading-snug text-[#667085]">
 					{description}
 				</p>
+			</div>
+			{children ?? <TinyTrend />}
+		</div>
+	);
+}
+
+function HighlightCard({
+	icon,
+	label,
+	value,
+	meta,
+	count,
+	iconBg = "#DCFCE7",
+}: {
+	icon: ReactNode;
+	label: string;
+	value: string;
+	meta: string;
+	count: string;
+	iconBg?: string;
+}) {
+	return (
+		<div className="flex items-center gap-4 rounded-[12px] border border-[#E5E5E7] bg-white px-4 py-3">
+			<div
+				className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[12px] text-[#15803D]"
+				style={{backgroundColor: iconBg}}
+			>
+				{icon}
+			</div>
+			<div className="min-w-0 flex-1">
+				<div className="text-[12px] font-bold text-[#15803D]">
+					{label}
+				</div>
+				<div className="mt-0.5 truncate text-[17px] font-bold text-[#111827]">
+					{value}
+				</div>
+			</div>
+			<div className="shrink-0 text-right">
+				<div className="text-[12px] text-[#667085]">{meta}</div>
+				<div className="mt-1 text-[13px] font-bold text-[#15803D]">
+					{count}
+				</div>
 			</div>
 		</div>
 	);
 }
 
-function FavoriteTopicMetric({analytics}: {analytics: BackendUsageAnalytics}) {
+function FavoriteTopicHighlight({analytics}: {analytics: BackendUsageAnalytics}) {
 	const topic = analytics.favoriteTopic;
 	const folderVisuals = topic ? getFolderVisuals(topic) : null;
 	const emoji = topic ? getFolderEmoji(topic.icon) : "📁";
 
 	return (
-		<MetricCard
-			icon={<span className="text-[15px] leading-none">{emoji}</span>}
-			iconBg={folderVisuals?.bgColor ?? "#F5F5F7"}
+		<HighlightCard
+			icon={<span className="text-[20px] leading-none">{emoji}</span>}
+			iconBg={folderVisuals?.bgColor ?? "#DCFCE7"}
 			label="Favorite Topic"
 			value={topic ? topic.name : "None yet"}
-			description={
+			meta="Most active folder"
+			count={
 				topic ?
-					`Most active folder · ${topic.unitCount} unit${topic.unitCount === 1 ? "" : "s"}`
-				:	"Create units inside folders to discover it"
+					`${topic.unitCount} unit${topic.unitCount === 1 ? "" : "s"}`
+				:	"No units"
 			}
 		/>
 	);
@@ -123,26 +203,31 @@ function ActivityChart({
 	onPeriodChange: (period: BackendUsageAnalyticsPeriod) => void;
 }) {
 	return (
-		<div className="rounded-[14px] border border-[#E5E5E7] bg-white p-6">
+		<div className="rounded-[14px] border border-[#E5E5E7] bg-white p-6 shadow-[0_12px_30px_rgba(17,24,39,0.05)]">
 			<div className="mb-5 flex flex-wrap items-start justify-between gap-4">
-				<div>
-					<h2 className="text-[17px] font-bold tracking-tight text-[#1D1D1F]">
-						AI Generations Over Time
-					</h2>
-					<p className="mt-0.5 text-[13px] text-[#AEAEB2]">
-						Completed syllabus and module generations
-					</p>
+				<div className="flex items-start gap-4">
+					<div className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-[#15803D] text-white shadow-[0_8px_18px_rgba(21,128,61,0.22)]">
+						<Sparkles size={18} />
+					</div>
+					<div>
+						<h2 className="text-[18px] font-bold tracking-tight text-[#111827]">
+							AI Generations Over Time
+						</h2>
+						<p className="mt-0.5 text-[13px] text-[#667085]">
+							Completed syllabus and module generations
+						</p>
+					</div>
 				</div>
-				<div className="flex items-center gap-1 rounded-[10px] bg-[#F5F5F7] p-1">
+				<div className="flex items-center overflow-hidden rounded-[10px] border border-[#E5E5E7] bg-white p-1">
 					{PERIOD_OPTIONS.map((option) => (
 						<button
 							key={option.value}
 							type="button"
 							onClick={() => onPeriodChange(option.value)}
-							className={`rounded-[7px] px-3 py-1.5 text-[12px] font-bold transition ${
+							className={`rounded-[7px] px-4 py-1.5 text-[12px] font-bold transition ${
 								analytics.period === option.value ?
-									"bg-white text-[#1D1D1F] shadow-sm"
-								:	"text-[#AEAEB2] hover:text-[#6E6E73]"
+									"bg-[#15803D] text-white shadow-[0_6px_16px_rgba(21,128,61,0.22)]"
+								:	"text-[#667085] hover:text-[#111827]"
 							}`}
 						>
 							{option.label}
@@ -151,31 +236,31 @@ function ActivityChart({
 				</div>
 			</div>
 
-			<ResponsiveContainer width="100%" height={220}>
+			<ResponsiveContainer width="100%" height={250}>
 				<AreaChart
 					data={analytics.chart}
 					margin={{top: 4, right: 4, left: -16, bottom: 0}}
 				>
 					<defs>
 						<linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
-							<stop offset="0%" stopColor="#3B82F6" stopOpacity={0.15} />
-							<stop offset="100%" stopColor="#3B82F6" stopOpacity={0} />
+							<stop offset="0%" stopColor="#15803D" stopOpacity={0.14} />
+							<stop offset="100%" stopColor="#15803D" stopOpacity={0} />
 						</linearGradient>
 					</defs>
 					<CartesianGrid
 						strokeDasharray="3 6"
-						stroke="#F0F0F2"
+						stroke="#E4E7EC"
 						vertical={false}
 					/>
 					<XAxis
 						dataKey="label"
-						tick={{fontSize: 11, fill: "#AEAEB2", fontWeight: 600}}
+						tick={{fontSize: 11, fill: "#667085", fontWeight: 600}}
 						tickLine={false}
 						axisLine={false}
 						interval="preserveStartEnd"
 					/>
 					<YAxis
-						tick={{fontSize: 11, fill: "#AEAEB2", fontWeight: 600}}
+						tick={{fontSize: 11, fill: "#667085", fontWeight: 600}}
 						tickLine={false}
 						axisLine={false}
 						allowDecimals={false}
@@ -196,11 +281,11 @@ function ActivityChart({
 					<Area
 						type="monotone"
 						dataKey="count"
-						stroke="#3B82F6"
+						stroke="#15803D"
 						strokeWidth={2}
 						fill="url(#areaGradient)"
 						dot={false}
-						activeDot={{r: 4, fill: "#3B82F6", strokeWidth: 0}}
+						activeDot={{r: 4, fill: "#15803D", strokeWidth: 0}}
 					/>
 				</AreaChart>
 			</ResponsiveContainer>
@@ -249,7 +334,7 @@ export function AnalyticsView() {
 			<header className="flex h-[80px] shrink-0 items-center border-b border-[#E5E5E7] bg-white/80 px-8 backdrop-blur-md">
 				<div>
 					<h1 className="text-[28px] font-bold tracking-tight text-[#1D1D1F]">
-						Usage & Metrics
+						Usage & Analytics
 					</h1>
 					<p className="mt-0.5 text-[13px] text-[#86868B]">
 						Track real unit progress and AI generation activity.
@@ -257,8 +342,8 @@ export function AnalyticsView() {
 				</div>
 			</header>
 
-			<div className="min-h-0 flex-1 overflow-y-auto p-8">
-				<div className="mx-auto max-w-[960px] space-y-5">
+			<div className="min-h-0 flex-1 overflow-y-auto bg-[#F7F8FA] p-8">
+				<div className="mx-auto max-w-[1260px] space-y-5">
 					{error ? (
 						<div className="flex items-center gap-3 rounded-[16px] border border-red-200 bg-red-50 px-4 py-3 text-[13px] font-medium text-red-700">
 							<AlertCircle size={16} />
@@ -270,7 +355,7 @@ export function AnalyticsView() {
 						<div className="flex min-h-[360px] items-center justify-center rounded-[18px] border border-black/[0.07] bg-white text-[13px] text-[#86868B]">
 							<Loader2
 								size={18}
-								className="mr-2 animate-spin text-[#3B82F6]"
+								className="mr-2 animate-spin text-[#15803D]"
 							/>
 							Loading usage metrics...
 						</div>
@@ -278,55 +363,81 @@ export function AnalyticsView() {
 
 					{analytics ? (
 						<div className={isLoading ? "opacity-60 transition" : "transition"}>
-							<div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-								<MetricCard
-									icon={
-										<AssetIcon
-											src="/assets/icons/project.png"
-											alt="Units created"
+							<div className="grid gap-5 xl:grid-cols-[1.8fr_1fr]">
+								<section className="rounded-[14px] border border-[#E5E5E7] bg-white p-5 shadow-[0_12px_30px_rgba(17,24,39,0.05)]">
+									<div className="mb-6">
+										<h2 className="text-[20px] font-bold tracking-tight text-[#111827]">
+											Overview
+										</h2>
+										<p className="mt-1 text-[13px] text-[#667085]">
+											Key performance metrics at a glance
+										</p>
+									</div>
+									<div className="grid gap-5 md:grid-cols-3">
+										<MetricCard
+											icon={
+												<AssetIcon
+													src="/assets/icons/project.png"
+													alt="Units created"
+												/>
+											}
+											label="Units Created"
+											value={formatNumber(analytics.unitsCreated)}
+											description="Total units across all your folders"
 										/>
-									}
-									label="Units Created"
-									value={formatNumber(analytics.unitsCreated)}
-									description="Total units across all your folders"
-								/>
-								<MetricCard
-									icon={<Sparkles size={15} />}
-									label="AI Generations"
-									value={formatNumber(analytics.aiGenerations)}
-									description="Syllabuses and modules generated"
-								/>
-								<MetricCard
-									icon={
-										<AssetIcon
-											src="/assets/icons/check-mark.png"
-											alt="Completion rate"
+										<MetricCard
+											icon={<Sparkles size={19} />}
+											iconBg="#DCFCE7"
+											label="AI Generations"
+											value={formatNumber(analytics.aiGenerations)}
+											description="Syllabuses and modules generated"
 										/>
-									}
-									label="Completion Rate"
-									value={`${analytics.completionRate}%`}
-									description={`${formatNumber(analytics.readBlockCount)} of ${formatNumber(
-										analytics.totalBlockCount,
-									)} blocks read`}
-								/>
-								<MetricCard
-									icon={
-										<ProviderIcon
-											provider={analytics.favoriteModel?.provider}
-											label={analytics.favoriteModel?.label ?? "Favorite model"}
+										<MetricCard
+											icon={<PieChart size={19} />}
+											iconBg="#ECFDF3"
+											label="Completion Rate"
+											value={`${analytics.completionRate}%`}
+											description="Percentage of unit content read"
+										>
+											<ProgressBar value={analytics.completionRate} />
+										</MetricCard>
+									</div>
+								</section>
+
+								<section className="rounded-[14px] border border-[#E5E5E7] bg-white p-5 shadow-[0_12px_30px_rgba(17,24,39,0.05)]">
+									<div className="mb-6">
+										<h2 className="text-[20px] font-bold tracking-tight text-[#111827]">
+											Highlights
+										</h2>
+										<p className="mt-1 text-[13px] text-[#667085]">
+											Your most used model and topic
+										</p>
+									</div>
+									<div className="space-y-5">
+										<HighlightCard
+											icon={
+												<ProviderIcon
+													provider={analytics.favoriteModel?.provider}
+													label={
+														analytics.favoriteModel?.label ??
+														"Favorite model"
+													}
+												/>
+											}
+											label="Favorite Model"
+											value={analytics.favoriteModel?.label ?? "None yet"}
+											meta="Most-used AI"
+											count={
+												analytics.favoriteModel ?
+													`${analytics.favoriteModel.count} run${
+														analytics.favoriteModel.count === 1 ? "" : "s"
+													}`
+												:	"No runs"
+											}
 										/>
-									}
-									label="Favorite Model"
-									value={analytics.favoriteModel?.label ?? "None yet"}
-									description={
-										analytics.favoriteModel ?
-											`Most-used AI · ${analytics.favoriteModel.count} run${
-												analytics.favoriteModel.count === 1 ? "" : "s"
-											}`
-										:	"Complete AI generations to discover it"
-									}
-								/>
-								<FavoriteTopicMetric analytics={analytics} />
+										<FavoriteTopicHighlight analytics={analytics} />
+									</div>
+								</section>
 							</div>
 
 							<div className="mt-5">

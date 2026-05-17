@@ -4,8 +4,7 @@ import type {StylePresetId} from "./utils/typography";
 export type DashboardSection =
 	| "all-units"
 	| "subscription"
-	| "profile"
-	| "security"
+	| "profile-security"
 	| "preferences"
 	| "analytics";
 

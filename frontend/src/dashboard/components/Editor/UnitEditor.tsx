@@ -3969,6 +3969,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 					</button>
 					<button
 						className="flex w-full items-center gap-2 rounded-[10px] px-2 py-1.5 text-[13px] text-[#86868B] transition-all hover:bg-[#F5F5F7] hover:text-[#1D1D1F]"
+						onClick={() => navigate("/dashboard?section=preferences")}
 						type="button"
 					>
 						<Settings size={16} />

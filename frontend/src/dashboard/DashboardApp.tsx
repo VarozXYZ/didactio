@@ -22,7 +22,6 @@ import {CreateUnitButton} from "./components/Dashboard/AllUnitsView/AllUnitsHead
 import {AnalyticsView} from "./components/Dashboard/SettingsViews/AnalyticsView";
 import {PreferencesView} from "./components/Dashboard/SettingsViews/PreferencesView";
 import {ProfileView} from "./components/Dashboard/SettingsViews/ProfileView";
-import {SecurityView} from "./components/Dashboard/SettingsViews/SecurityView";
 import {SubscriptionView} from "./components/Dashboard/SettingsViews/SubscriptionView";
 import {Sidebar} from "./components/Dashboard/Sidebar/Sidebar";
 import {UnitEditor} from "./components/Editor/UnitEditor";
@@ -34,10 +33,8 @@ function renderSettingsView(section: DashboardSection) {
 	switch (section) {
 		case "subscription":
 			return <SubscriptionView />;
-		case "profile":
+		case "profile-security":
 			return <ProfileView />;
-		case "security":
-			return <SecurityView />;
 		case "preferences":
 			return <PreferencesView />;
 		case "analytics":
@@ -45,6 +42,24 @@ function renderSettingsView(section: DashboardSection) {
 		case "all-units":
 			return null;
 	}
+}
+
+function isDashboardSection(value: string | null): value is DashboardSection {
+	return (
+		value === "all-units" ||
+		value === "subscription" ||
+		value === "profile-security" ||
+		value === "preferences" ||
+		value === "analytics"
+	);
+}
+
+function normalizeDashboardSection(value: string | null): DashboardSection | null {
+	if (value === "profile" || value === "security") {
+		return "profile-security";
+	}
+
+	return isDashboardSection(value) ? value : null;
 }
 
 function DidacticUnitRoute({onDataChanged}: {onDataChanged: () => void}) {
@@ -99,6 +114,19 @@ export default function DashboardApp() {
 			setActiveSection("all-units");
 		}
 	}, [activeSection, location.pathname]);
+
+	useEffect(() => {
+		if (location.pathname !== "/dashboard") {
+			return;
+		}
+
+		const section = normalizeDashboardSection(
+			new URLSearchParams(location.search).get("section"),
+		);
+		if (section && section !== activeSection) {
+			setActiveSection(section);
+		}
+	}, [activeSection, location.pathname, location.search]);
 
 	useEffect(() => {
 		const loadDashboardIndex = async () => {
@@ -282,7 +310,11 @@ export default function DashboardApp() {
 		const nextSection =
 			typeof value === "function" ? value(activeSection) : value;
 		setActiveSection(nextSection);
-		navigate("/dashboard");
+		navigate(
+			nextSection === "all-units" ?
+				"/dashboard"
+			:	`/dashboard?section=${nextSection}`,
+		);
 	};
 
 	const indexView =
