@@ -224,7 +224,8 @@ export function buildGatewaySystemPrompt(
 		| "summary"
 		| "chapter"
 		| "activity"
-		| "activity_feedback",
+		| "activity_feedback"
+		| "note",
 ): string {
 	switch (stage) {
 		case "folder_classification":
@@ -241,7 +242,51 @@ export function buildGatewaySystemPrompt(
 			return "You design structured learning activities. Return only the requested JSON object; never generate UI HTML except for the explicitly allowed freeform_html type.";
 		case "activity_feedback":
 			return "You assess a learner's activity attempt against a rubric. Return only concise structured feedback.";
+		case "note":
+			return "You write concise study notes for selected lesson text. Return only the note content.";
 	}
+}
+
+export function buildDidacticUnitNotePrompt(input: {
+	unitTitle: string;
+	unitTopic: string;
+	unitOutline: Array<{index: number; title: string; overview: string}>;
+	moduleTitle: string;
+	moduleHtml: string;
+	selectedText: string;
+	question?: string;
+}): string {
+	return [
+		buildSection("Task", [
+			"The learner wants to take a concise note about the selected text, probably because it needs clarification or is worth remembering.",
+			"Write a compact note focused on the selected text and its immediate lesson context.",
+			input.question ?
+				"Use the optional learner instruction to shape the note."
+			:	"No optional learner instruction was provided, so infer the most useful clarification from context.",
+			"Write 3-5 compact sentences at most.",
+			"Prefer dense, useful phrasing over broad explanation.",
+			"Do not include markdown headings, tables, citations, or generic encouragement.",
+		]),
+		buildSection("Unit", [
+			`Title: ${input.unitTitle}`,
+			`Topic: ${input.unitTopic}`,
+		]),
+		buildSection(
+			"Unit outline",
+			input.unitOutline.map(
+				(module) =>
+					`${module.index + 1}. ${module.title}: ${module.overview}`,
+			),
+		),
+		buildSection("Current module", [
+			`Title: ${input.moduleTitle}`,
+			`Content HTML: ${input.moduleHtml.slice(0, 12000)}`,
+		]),
+		buildSection("Selected text", [input.selectedText]),
+		buildSection("Optional learner instruction", [
+			input.question ?? "not provided",
+		]),
+	].join("\n\n");
 }
 
 function activityTypeContract(

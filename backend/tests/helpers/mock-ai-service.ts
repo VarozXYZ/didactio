@@ -1,6 +1,7 @@
 import type {
 	AiService,
 	ChapterResult,
+	DidacticUnitNoteResult,
 	FolderClassificationResult,
 	LearningActivityFeedbackResult,
 	LearningActivityResult,
@@ -405,6 +406,15 @@ export function createMockAiService(): AiService {
 						improvements: ["Add a concrete example"],
 					},
 				],
+			};
+		},
+		async generateDidacticUnitNote(input): Promise<DidacticUnitNoteResult> {
+			return {
+				provider,
+				model,
+				prompt: `Note for ${input.moduleTitle}: ${input.question}`,
+				telemetry,
+				content: `Mock note about ${input.selectedText}.`,
 			};
 		},
 	};

@@ -127,6 +127,7 @@ import {
 	resolveModuleRegenerationCost,
 	resolveActivityGenerationCost,
 	resolveActivityFeedbackRefillCost,
+	resolveNoteGenerationCost,
 	resolveSyllabusGenerationCost,
 	resolveUnitGenerationCost,
 	type GenerationCoinCost,
@@ -147,11 +148,24 @@ import {
 	InMemoryLearningActivityStore,
 	type LearningActivityStore,
 } from "./activities/learning-activity-store.js";
+import {
+	createDidacticUnitNote,
+	parseCreateManualDidacticUnitNoteInput,
+	parseGenerateDidacticUnitNoteInput,
+	parseUpdateDidacticUnitNoteInput,
+	type DidacticUnitNote,
+	type DidacticUnitNoteAnchor,
+} from "./didactic-unit-notes/didactic-unit-note.js";
+import {
+	InMemoryDidacticUnitNoteStore,
+	type DidacticUnitNoteStore,
+} from "./didactic-unit-notes/didactic-unit-note-store.js";
 
 export interface CreateAppOptions {
 	didacticUnitStore: DidacticUnitStore;
 	generationRunStore: GenerationRunStore;
 	learningActivityStore?: LearningActivityStore;
+	didacticUnitNoteStore?: DidacticUnitNoteStore;
 	folderStore: FolderStore;
 	aiConfigStore?: AiConfigStore;
 	aiService?: AiService;
@@ -991,6 +1005,53 @@ function getGeneratedChapterOrThrow(
 	return generatedChapter;
 }
 
+function validateNoteAnchorForChapter(input: {
+	anchor: DidacticUnitNoteAnchor;
+	selectedText: string;
+	chapter: ReturnType<typeof getGeneratedChapterOrThrow>;
+}): void {
+	const startBlock = input.chapter.htmlBlocks.find(
+		(block) => block.id === input.anchor.startBlockId,
+	);
+	const endBlock = input.chapter.htmlBlocks.find(
+		(block) => block.id === input.anchor.endBlockId,
+	);
+
+	if (!startBlock || !endBlock) {
+		throw new Error("Note anchor block was not found in the generated module.");
+	}
+	if (input.anchor.htmlHash && input.anchor.htmlHash !== input.chapter.htmlHash) {
+		throw new Error("Note anchor does not match the current module content.");
+	}
+	if (input.anchor.htmlBlocksVersion !== input.chapter.htmlBlocksVersion) {
+		throw new Error("Note anchor does not match the current module block version.");
+	}
+	if (
+		input.anchor.startOffset > startBlock.textLength ||
+		input.anchor.endOffset > endBlock.textLength
+	) {
+		throw new Error("Note anchor offset is outside the selected module text.");
+	}
+	if (input.selectedText.trim().length === 0) {
+		throw new Error("selectedText is required.");
+	}
+}
+
+function updateDidacticUnitNote(
+	note: DidacticUnitNote,
+	patch: {question?: string; content?: string},
+): DidacticUnitNote {
+	return {
+		...note,
+		question:
+			patch.question !== undefined ?
+				patch.question.trim() || undefined
+			:	note.question,
+		content: patch.content?.trim() ?? note.content,
+		updatedAt: new Date().toISOString(),
+	};
+}
+
 function resolveActivitySourceModuleIndexes(input: {
 	scope: "current_module" | "cumulative_until_module";
 	chapterIndex: number;
@@ -1509,6 +1570,8 @@ export function createApp(options: CreateAppOptions) {
 	const generationRunStore = options.generationRunStore;
 	const learningActivityStore =
 		options.learningActivityStore ?? new InMemoryLearningActivityStore();
+	const didacticUnitNoteStore =
+		options.didacticUnitNoteStore ?? new InMemoryDidacticUnitNoteStore();
 	const folderStore = options.folderStore;
 	const aiConfigStore = options.aiConfigStore ?? new InMemoryAiConfigStore();
 	const authConfig = options.authConfig;
@@ -2135,6 +2198,10 @@ export function createApp(options: CreateAppOptions) {
 			return;
 		}
 
+		await didacticUnitNoteStore.deleteByUnit(
+			requestWithMockOwner.mockOwner.id,
+			request.params.id,
+		);
 		response.status(204).end();
 	});
 
@@ -3341,6 +3408,238 @@ export function createApp(options: CreateAppOptions) {
 			activity,
 			attempts: await learningActivityStore.listAttempts(ownerId, activity.id),
 		});
+	});
+
+	app.get("/api/didactic-unit/:id/notes", async (request, response) => {
+		const ownerId = asRequestWithMockOwner(request).mockOwner.id;
+		const didacticUnit = await didacticUnitStore.getById(
+			ownerId,
+			String(request.params.id),
+		);
+
+		if (!didacticUnit) {
+			response.status(404).json({error: "Didactic unit not found."});
+			return;
+		}
+
+		response.json({
+			notes: await didacticUnitNoteStore.listByUnit(ownerId, didacticUnit.id),
+		});
+	});
+
+	app.post("/api/didactic-unit/:id/notes", async (request, response) => {
+		const ownerId = asRequestWithMockOwner(request).mockOwner.id;
+		const didacticUnit = await didacticUnitStore.getById(
+			ownerId,
+			String(request.params.id),
+		);
+
+		if (!didacticUnit) {
+			response.status(404).json({error: "Didactic unit not found."});
+			return;
+		}
+
+		try {
+			const input = parseCreateManualDidacticUnitNoteInput(request.body);
+			const chapter = getGeneratedChapterOrThrow(
+				didacticUnit,
+				input.chapterIndex,
+			);
+			validateNoteAnchorForChapter({
+				anchor: input.anchor,
+				selectedText: input.selectedText,
+				chapter,
+			});
+			const note = createDidacticUnitNote({
+				ownerId,
+				didacticUnitId: didacticUnit.id,
+				chapterIndex: input.chapterIndex,
+				source: "manual",
+				selectedText: input.selectedText,
+				content: input.content,
+				anchor: input.anchor,
+			});
+			await didacticUnitNoteStore.save(note);
+			response.status(201).json({note});
+		} catch (error) {
+			response.status(400).json({
+				error:
+					error instanceof Error ?
+						error.message
+					:	"Invalid didactic unit note request.",
+			});
+		}
+	});
+
+	app.post("/api/didactic-unit/:id/notes/generate", async (request, response) => {
+		const ownerId = asRequestWithMockOwner(request).mockOwner.id;
+		const didacticUnit = await didacticUnitStore.getById(
+			ownerId,
+			String(request.params.id),
+		);
+
+		if (!didacticUnit) {
+			response.status(404).json({error: "Didactic unit not found."});
+			return;
+		}
+
+		let input;
+		let chapter;
+		try {
+			input = parseGenerateDidacticUnitNoteInput(request.body);
+			chapter = getGeneratedChapterOrThrow(didacticUnit, input.chapterIndex);
+			validateNoteAnchorForChapter({
+				anchor: input.anchor,
+				selectedText: input.selectedText,
+				chapter,
+			});
+		} catch (error) {
+			response.status(400).json({
+				error:
+					error instanceof Error ?
+						error.message
+					:	"Invalid didactic unit note generation request.",
+			});
+			return;
+		}
+
+		const config = await aiConfigStore.get(ownerId);
+		let reservation: CreditReservation | null = null;
+
+		try {
+			reservation = await reserveGenerationCredits({
+				authService,
+				ownerId,
+				cost: resolveNoteGenerationCost({quality: input.quality}),
+				reason: "note_generation",
+				metadata: {
+					operation: "note_generation",
+					didacticUnitId: didacticUnit.id,
+					chapterIndex: input.chapterIndex,
+					quality: input.quality,
+				},
+			});
+		} catch (error) {
+			if (error instanceof AuthError) {
+				sendAuthErrorResponse(response, error);
+				return;
+			}
+			throw error;
+		}
+
+		try {
+			const result = await aiService.generateDidacticUnitNote({
+				unitTitle: didacticUnit.title,
+				unitTopic: didacticUnit.topic,
+				unitOutline: didacticUnit.chapters.map((module, index) => ({
+					index,
+					title: module.title,
+					overview: module.overview,
+				})),
+				moduleTitle: chapter.title,
+				moduleHtml: chapter.html,
+				selectedText: input.selectedText,
+				question: input.question,
+				config,
+				tier: input.quality,
+				abortSignal: createAbortSignal(request),
+			});
+			const note = createDidacticUnitNote({
+				ownerId,
+				didacticUnitId: didacticUnit.id,
+				chapterIndex: input.chapterIndex,
+				source: "ai",
+				selectedText: input.selectedText,
+				question: input.question,
+				content: result.content,
+				quality: input.quality,
+				anchor: input.anchor,
+			});
+			await didacticUnitNoteStore.save(note);
+			response.status(201).json({note});
+		} catch (error) {
+			await refundGenerationCredits({
+				authService,
+				reservation,
+				reason: "note_generation_refund",
+				metadata: {
+					operation: "note_generation",
+					didacticUnitId: didacticUnit.id,
+					chapterIndex: input.chapterIndex,
+					quality: input.quality,
+					error:
+						error instanceof Error ?
+							error.message
+						:	"Didactic unit note generation failed.",
+				},
+			});
+			const resolved = resolveStageConfigError(
+				error,
+				"Didactic unit note generation failed.",
+			);
+			response.status(resolved.status).json({error: resolved.message});
+		}
+	});
+
+	app.patch("/api/didactic-unit/:id/notes/:noteId", async (request, response) => {
+		const ownerId = asRequestWithMockOwner(request).mockOwner.id;
+		const didacticUnit = await didacticUnitStore.getById(
+			ownerId,
+			String(request.params.id),
+		);
+
+		if (!didacticUnit) {
+			response.status(404).json({error: "Didactic unit not found."});
+			return;
+		}
+
+		const note = await didacticUnitNoteStore.getById(
+			ownerId,
+			String(request.params.noteId),
+		);
+		if (!note || note.didacticUnitId !== didacticUnit.id) {
+			response.status(404).json({error: "Didactic unit note not found."});
+			return;
+		}
+
+		try {
+			const patch = parseUpdateDidacticUnitNoteInput(request.body);
+			const updated = updateDidacticUnitNote(note, patch);
+			await didacticUnitNoteStore.save(updated);
+			response.json({note: updated});
+		} catch (error) {
+			response.status(400).json({
+				error:
+					error instanceof Error ?
+						error.message
+					:	"Invalid didactic unit note update request.",
+			});
+		}
+	});
+
+	app.delete("/api/didactic-unit/:id/notes/:noteId", async (request, response) => {
+		const ownerId = asRequestWithMockOwner(request).mockOwner.id;
+		const didacticUnit = await didacticUnitStore.getById(
+			ownerId,
+			String(request.params.id),
+		);
+
+		if (!didacticUnit) {
+			response.status(404).json({error: "Didactic unit not found."});
+			return;
+		}
+
+		const note = await didacticUnitNoteStore.getById(
+			ownerId,
+			String(request.params.noteId),
+		);
+		if (!note || note.didacticUnitId !== didacticUnit.id) {
+			response.status(404).json({error: "Didactic unit note not found."});
+			return;
+		}
+
+		await didacticUnitNoteStore.deleteById(ownerId, note.id);
+		response.status(204).send();
 	});
 
 	app.delete("/api/activities/:activityId", async (request, response) => {

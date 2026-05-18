@@ -1,4 +1,4 @@
-import {createGateway, generateObject, streamObject, streamText} from "ai";
+import {createGateway, generateObject, generateText, streamObject, streamText} from "ai";
 import {z} from "zod";
 import {getAppEnv} from "../config/env.js";
 import type {DidacticUnitGeneratedChapter} from "../didactic-unit/didactic-unit-chapter.js";
@@ -18,6 +18,7 @@ import {
 	buildGatewaySystemPrompt,
 	buildLearningActivityFeedbackPrompt,
 	buildLearningActivityPrompt,
+	buildDidacticUnitNotePrompt,
 	buildLearnerSummaryPrompt,
 	buildModerationPrompt,
 	resolveTargetChapterCount,
@@ -251,6 +252,10 @@ export interface LearningActivityFeedbackResult extends BaseStageResult {
 	}>;
 }
 
+export interface DidacticUnitNoteResult extends BaseStageResult {
+	content: string;
+}
+
 type AiStageName =
 	| "folder_classification"
 	| "moderation"
@@ -258,7 +263,8 @@ type AiStageName =
 	| "summary"
 	| "module"
 	| "activity"
-	| "activity_feedback";
+	| "activity_feedback"
+	| "note";
 
 interface GatewayAiServiceOptions {
 	logger?: Logger;
@@ -430,6 +436,18 @@ export interface AiService {
 		tier: AiModelTier;
 		abortSignal?: AbortSignal;
 	}): Promise<LearningActivityFeedbackResult>;
+	generateDidacticUnitNote(input: {
+		unitTitle: string;
+		unitTopic: string;
+		unitOutline: Array<{index: number; title: string; overview: string}>;
+		moduleTitle: string;
+		moduleHtml: string;
+		selectedText: string;
+		question?: string;
+		config: AiConfig;
+		tier: AiModelTier;
+		abortSignal?: AbortSignal;
+	}): Promise<DidacticUnitNoteResult>;
 }
 
 const CONTENT_LENGTH_TOKENS: Record<DidacticUnitLength, number> = {
@@ -447,7 +465,8 @@ function resolveStageMaxOutputTokens(
 		| "summary"
 		| "chapter"
 		| "activity"
-		| "activity_feedback",
+		| "activity_feedback"
+		| "note",
 	length?: DidacticUnitLength,
 ): number {
 	switch (stage) {
@@ -458,6 +477,8 @@ function resolveStageMaxOutputTokens(
 			return 1000;
 		case "activity_feedback":
 			return 4500;
+		case "note":
+			return 1200;
 		case "activity":
 			return 4500;
 		case "syllabus":
@@ -1381,6 +1402,61 @@ export class GatewayAiService implements AiService {
 			this.logAiCallFailed("activity_feedback", selection, {
 				tier: input.tier,
 				activityType: input.activityType,
+				durationMs: Date.now() - startedAt,
+				error,
+			});
+			throw error;
+		}
+	}
+
+	async generateDidacticUnitNote(input: {
+		unitTitle: string;
+		unitTopic: string;
+		unitOutline: Array<{index: number; title: string; overview: string}>;
+		moduleTitle: string;
+		moduleHtml: string;
+		selectedText: string;
+		question?: string;
+		config: AiConfig;
+		tier: AiModelTier;
+		abortSignal?: AbortSignal;
+	}): Promise<DidacticUnitNoteResult> {
+		const selection = this.selectModel(input.tier, input.config);
+		const prompt = buildDidacticUnitNotePrompt(input);
+		const startedAt = Date.now();
+		const maxOutputTokens = resolveStageMaxOutputTokens("note");
+
+		this.logAiCallStarted("note", selection, {
+			tier: input.tier,
+			promptLength: prompt.length,
+			maxOutputTokens,
+		});
+
+		try {
+			const result = await generateText({
+				model: this.gateway(selection.modelId),
+				system: buildGatewaySystemPrompt("note"),
+				prompt,
+				maxOutputTokens,
+				abortSignal: input.abortSignal,
+			});
+			const telemetry = await this.enrichAiCallTelemetry(
+				await collectAiCallTelemetry(result, Date.now() - startedAt),
+			);
+			this.logAiCallCompleted("note", selection, telemetry, {
+				tier: input.tier,
+			});
+
+			return {
+				provider: selection.provider,
+				model: selection.model,
+				prompt,
+				telemetry,
+				content: sanitizeSimpleFeedbackHtml(result.text).trim(),
+			};
+		} catch (error) {
+			this.logAiCallFailed("note", selection, {
+				tier: input.tier,
 				durationMs: Date.now() - startedAt,
 				error,
 			});

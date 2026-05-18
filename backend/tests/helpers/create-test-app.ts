@@ -15,6 +15,10 @@ import {
 	type DidacticUnitStore,
 } from "../../src/didactic-unit/didactic-unit-store.js";
 import {
+	InMemoryDidacticUnitNoteStore,
+	type DidacticUnitNoteStore,
+} from "../../src/didactic-unit-notes/didactic-unit-note-store.js";
+import {
 	InMemoryGenerationRunStore,
 	type GenerationRunStore,
 } from "../../src/generation-runs/generation-run-store.js";
@@ -62,6 +66,7 @@ export function buildTestAuthConfig(): AuthConfig {
 
 interface CreateTestAppOptions {
 	didacticUnitStore?: DidacticUnitStore;
+	didacticUnitNoteStore?: DidacticUnitNoteStore;
 	generationRunStore?: GenerationRunStore;
 	learningActivityStore?: LearningActivityStore;
 	folderStore?: FolderStore;
@@ -102,6 +107,8 @@ export function createTestApp(options: CreateTestAppOptions = {}) {
 			options.generationRunStore ?? new InMemoryGenerationRunStore(),
 		learningActivityStore:
 			options.learningActivityStore ?? new InMemoryLearningActivityStore(),
+		didacticUnitNoteStore:
+			options.didacticUnitNoteStore ?? new InMemoryDidacticUnitNoteStore(),
 		folderStore: options.folderStore ?? new InMemoryFolderStore(),
 		aiConfigStore: options.aiConfigStore ?? new InMemoryAiConfigStore(),
 		aiService: options.aiService ?? createMockAiService(),

@@ -7,7 +7,8 @@ export type GenerationChargeOperation =
 	| "unit_generation"
 	| "module_regeneration"
 	| "activity_generation"
-	| "activity_feedback_refill";
+	| "activity_feedback_refill"
+	| "note_generation";
 
 export interface GenerationCoinCost {
 	coinType: CreditCoinType;
@@ -61,6 +62,15 @@ export function resolveActivityFeedbackRefillCost(input: {
 }): GenerationCoinCost {
 	return {
 		coinType: input.quality,
+		amount: 1,
+	};
+}
+
+export function resolveNoteGenerationCost(input: {
+	quality: GenerationQuality;
+}): GenerationCoinCost {
+	return {
+		coinType: input.quality === "gold" ? "silver" : "bronze",
 		amount: 1,
 	};
 }

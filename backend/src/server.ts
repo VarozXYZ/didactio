@@ -7,6 +7,7 @@ import {MongoBillingEventStore} from "./billing/billing-event-store.js";
 import {createApp} from "./app.js";
 import {MongoAiConfigStore} from "./ai/config.js";
 import {MongoDidacticUnitStore} from "./didactic-unit/mongo-didactic-unit-store.js";
+import {MongoDidacticUnitNoteStore} from "./didactic-unit-notes/mongo-didactic-unit-note-store.js";
 import {MongoFolderStore} from "./folders/mongo-folder-store.js";
 import {MongoGenerationRunStore} from "./generation-runs/mongo-generation-run-store.js";
 import {MongoLearningActivityStore} from "./activities/mongo-learning-activity-store.js";
@@ -31,6 +32,9 @@ const generationRunStore = new MongoGenerationRunStore(
 const learningActivityStore = new MongoLearningActivityStore(
 	mongoConnection.database,
 );
+const didacticUnitNoteStore = new MongoDidacticUnitNoteStore(
+	mongoConnection.database,
+);
 const folderStore = new MongoFolderStore(mongoConnection.database);
 const userStore = new MongoUserStore(mongoConnection.database);
 const sessionStore = new MongoSessionStore(mongoConnection.database);
@@ -43,6 +47,7 @@ const app = createApp({
 	didacticUnitStore,
 	generationRunStore,
 	learningActivityStore,
+	didacticUnitNoteStore,
 	folderStore,
 	aiConfigStore,
 	authConfig,

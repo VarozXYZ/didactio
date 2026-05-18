@@ -429,6 +429,45 @@ button[aria-disabled="true"],
 	padding: 0 0.1em;
 }
 
+.unit-page-scope mark.didactio-note-mark {
+	background: transparent;
+	border-radius: 0;
+	box-shadow: none;
+	color: inherit;
+	cursor: pointer;
+	padding: 0;
+	position: relative;
+	text-decoration: none;
+	transition: color 160ms ease;
+}
+
+.unit-page-scope mark.didactio-note-mark::after {
+	background: #34c759;
+	border: 1px solid #ffffff;
+	border-radius: 999px;
+	box-shadow: 0 1px 4px rgba(52, 199, 89, 0.45);
+	content: "";
+	height: 0.46em;
+	position: absolute;
+	right: -0.34em;
+	top: 0.02em;
+	transform: scale(0.9);
+	transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
+	width: 0.46em;
+}
+
+.unit-page-scope mark.didactio-note-mark:hover {
+	background: transparent;
+	box-shadow: none;
+	color: inherit;
+}
+
+.unit-page-scope mark.didactio-note-mark:hover::after {
+	background: #22a848;
+	box-shadow: 0 1px 6px rgba(52, 199, 89, 0.65);
+	transform: scale(1.18);
+}
+
 .unit-page-scope blockquote {
 	border-left: 4px solid var(--unit-blockquote-accent, #cbd5e1);
 	font-style: italic;

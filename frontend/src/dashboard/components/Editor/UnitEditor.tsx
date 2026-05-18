@@ -29,6 +29,8 @@ import {
 	RotateCcw,
 	Settings,
 	Share2,
+	StickyNote,
+	Trash2,
 	WandSparkles,
 	X,
 } from "lucide-react";
@@ -75,6 +77,8 @@ import {useNavigate} from "react-router-dom";
 import {
 	type BackendDidacticUnitReadingProgressResponse,
 	type BackendGenerationQuality,
+	type BackendDidacticUnitNote,
+	type BackendDidacticUnitNoteAnchor,
 	type BackendDidacticUnitChapterDetail,
 	type BackendGenerationRun,
 	type BackendLearningActivity,
@@ -134,6 +138,11 @@ import {
 	type FontId,
 } from "../../utils/typography";
 import {UnitExportPrintView} from "./UnitExportPrintView";
+import {
+	applyNoteMarksToPageHtml,
+	buildNoteAnchorFromSelection,
+	getValidUnitNotesForChapter,
+} from "../../utils/unitNotes";
 
 function ChapterStatusIcon({
 	status,
@@ -279,6 +288,14 @@ type ChapterDraft = {
 	title: string;
 	htmlDraft: string;
 	textStyle: EditorTextStyle;
+};
+
+type PendingNoteSelection = {
+	chapterIndex: number;
+	selectedText: string;
+	anchor: BackendDidacticUnitNoteAnchor;
+	x: number;
+	y: number;
 };
 
 function cn(...inputs: Array<string | false | null | undefined>) {
@@ -867,6 +884,23 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	const [isPrintingTheory, setIsPrintingTheory] = useState(false);
 	const [isDownloadingActivities, setIsDownloadingActivities] =
 		useState(false);
+	const [unitNotes, setUnitNotes] = useState<BackendDidacticUnitNote[]>([]);
+	const [isNotesPanelOpen, setIsNotesPanelOpen] = useState(false);
+	const [pendingNoteSelection, setPendingNoteSelection] =
+		useState<PendingNoteSelection | null>(null);
+	const [isNoteDialogOpen, setIsNoteDialogOpen] = useState(false);
+	const [noteDraftContent, setNoteDraftContent] = useState("");
+	const [noteQuestionDraft, setNoteQuestionDraft] = useState("");
+	const [isNoteAiPromptOpen, setIsNoteAiPromptOpen] = useState(false);
+	const [noteQuality, setNoteQuality] =
+		useState<BackendGenerationQuality>("silver");
+	const [isNoteSaving, setIsNoteSaving] = useState(false);
+	const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
+	const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+	const [deleteNoteId, setDeleteNoteId] = useState<string | null>(null);
+	const [noteEditContent, setNoteEditContent] = useState("");
+	const [noteEditQuestion, setNoteEditQuestion] = useState("");
+	const noteAutoSaveRequestRef = useRef(0);
 	const [activityScope, setActivityScope] =
 		useState<BackendLearningActivityScope>("current_module");
 	const [activityType, setActivityType] =
@@ -993,6 +1027,30 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	);
 	const activeChapterDetail =
 		activeChapter ? chapterDetails[activeChapter.chapterIndex] : undefined;
+	const validUnitNotes = useMemo(
+		() =>
+			workspace ?
+				workspace.chapters.flatMap((chapter) =>
+					getValidUnitNotesForChapter(unitNotes, chapter),
+				)
+			:	[],
+		[unitNotes, workspace],
+	);
+	const activeChapterNotes = useMemo(
+		() =>
+			activeChapter ?
+				getValidUnitNotesForChapter(unitNotes, activeChapter)
+			:	[],
+		[activeChapter, unitNotes],
+	);
+	const activeNote =
+		activeNoteId ?
+			validUnitNotes.find((note) => note.id === activeNoteId) ?? null
+		:	null;
+	const deleteNote =
+		deleteNoteId ?
+			unitNotes.find((note) => note.id === deleteNoteId) ?? null
+		:	null;
 	const isActiveChapterStreaming =
 		isStreamingGeneration &&
 		activeChapter !== null &&
@@ -1117,9 +1175,10 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			}
 
 			try {
-				const [unit, chaptersResponse] = await Promise.all([
+				const [unit, chaptersResponse, notesResponse] = await Promise.all([
 					dashboardApi.getDidacticUnit(didacticUnitId),
 					dashboardApi.listDidacticUnitChapters(didacticUnitId),
+					dashboardApi.listDidacticUnitNotes(didacticUnitId),
 				]);
 
 				const detailResponses = await Promise.all(
@@ -1173,6 +1232,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 						null,
 				);
 				setChapterDetails(detailsRecord);
+				setUnitNotes(notesResponse.notes);
 				setActiveChapterIndex(nextActiveChapter?.chapterIndex ?? 0);
 				preserveViewOnNextWorkspaceRef.current = Boolean(
 					options.preserveSpread,
@@ -1226,6 +1286,318 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	useEffect(() => {
 		isEditModeRef.current = isEditMode;
 	}, [isEditMode]);
+
+	useEffect(() => {
+		setNoteQuality(unitGenerationTier ?? "silver");
+	}, [unitGenerationTier]);
+
+	const captureNoteSelection = useCallback(
+		(event?: {clientX: number; clientY: number; preventDefault?: () => void}) => {
+			if (isEditMode || !activeChapter || activeChapter.status !== "ready") {
+				setPendingNoteSelection(null);
+				return false;
+			}
+			const selection = window.getSelection();
+			if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+				setPendingNoteSelection(null);
+				return false;
+			}
+			const range = selection.getRangeAt(0);
+			const pageRoot =
+				(range.commonAncestorContainer instanceof Element ?
+					range.commonAncestorContainer
+				:	range.commonAncestorContainer.parentElement
+				)?.closest<HTMLElement>("[data-unit-note-page='true']");
+			if (!pageRoot) {
+				setPendingNoteSelection(null);
+				return false;
+			}
+			const pageStartOffset = Number(pageRoot.dataset.pageStartOffset ?? "0");
+			const selectionAnchor = buildNoteAnchorFromSelection({
+				range,
+				pageRoot,
+				pageStartOffset,
+				chapter: activeChapter,
+			});
+			if (!selectionAnchor) {
+				setPendingNoteSelection(null);
+				return false;
+			}
+			const rect = range.getBoundingClientRect();
+			setPendingNoteSelection({
+				chapterIndex: activeChapter.chapterIndex,
+				selectedText: selectionAnchor.selectedText,
+				anchor: selectionAnchor.anchor,
+				x: event?.clientX ?? rect.left + rect.width / 2,
+				y: event?.clientY ?? rect.top,
+			});
+			return true;
+		},
+		[activeChapter, isEditMode],
+	);
+
+	const openNoteDialog = useCallback(() => {
+		if (!pendingNoteSelection) {
+			return;
+		}
+		setNoteDraftContent("");
+		setNoteQuestionDraft("");
+		setIsNoteAiPromptOpen(false);
+		setActiveNoteId(null);
+		setEditingNoteId(null);
+		setIsNoteDialogOpen(true);
+	}, [pendingNoteSelection]);
+
+	const handleNoteMouseUp = useCallback(() => {
+		window.setTimeout(() => {
+			captureNoteSelection();
+		}, 0);
+	}, [captureNoteSelection]);
+
+	const handleNoteContextMenu = useCallback(
+		(event: React.MouseEvent) => {
+			if (captureNoteSelection(event)) {
+				event.preventDefault();
+			}
+		},
+		[captureNoteSelection],
+	);
+
+	const handleNoteContentClick = useCallback((event: React.MouseEvent) => {
+		const target = event.target;
+		if (!(target instanceof Element)) {
+			return;
+		}
+		const mark = target.closest<HTMLElement>("[data-note-id]");
+		if (!mark?.dataset.noteId) {
+			return;
+		}
+		const note = validUnitNotes.find((item) => item.id === mark.dataset.noteId);
+		if (!note) {
+			return;
+		}
+		setPendingNoteSelection(null);
+		setActiveNoteId(note.id);
+		setEditingNoteId(note.id);
+		setNoteDraftContent(note.content);
+		setNoteQuestionDraft(note.question ?? "");
+		setIsNoteAiPromptOpen(Boolean(note.question));
+		setNoteQuality(note.quality ?? unitGenerationTier ?? "silver");
+		setIsNoteDialogOpen(true);
+	}, [unitGenerationTier, validUnitNotes]);
+
+	const handleSaveCurrentNote = useCallback(async () => {
+		if (!noteDraftContent.trim()) {
+			return;
+		}
+		setIsNoteSaving(true);
+		try {
+			if (activeNote) {
+				const {note} = await dashboardApi.updateDidacticUnitNote(
+					didacticUnitId,
+					activeNote.id,
+					{
+						content: noteDraftContent,
+						question: noteQuestionDraft,
+					},
+				);
+				setUnitNotes((previous) =>
+					previous.map((item) => (item.id === note.id ? note : item)),
+				);
+			} else if (pendingNoteSelection) {
+				const {note} = await dashboardApi.createDidacticUnitNote(didacticUnitId, {
+					chapterIndex: pendingNoteSelection.chapterIndex,
+					selectedText: pendingNoteSelection.selectedText,
+					content: noteDraftContent,
+					anchor: pendingNoteSelection.anchor,
+				});
+				setUnitNotes((previous) => [...previous, note]);
+				setActiveNoteId(note.id);
+			}
+			setIsNoteDialogOpen(false);
+			setPendingNoteSelection(null);
+			setEditingNoteId(null);
+			window.getSelection()?.removeAllRanges();
+		} catch (error) {
+			toastError(
+				error instanceof Error ? error.message : "Failed to save note.",
+			);
+		} finally {
+			setIsNoteSaving(false);
+		}
+	}, [
+		activeNote,
+		didacticUnitId,
+		noteDraftContent,
+		noteQuestionDraft,
+		pendingNoteSelection,
+	]);
+
+	useEffect(() => {
+		if (!isNoteDialogOpen || !activeNote || !noteDraftContent.trim()) {
+			return;
+		}
+
+		const nextQuestion = noteQuestionDraft;
+		const hasChanges =
+			noteDraftContent !== activeNote.content ||
+			nextQuestion !== (activeNote.question ?? "");
+		if (!hasChanges) {
+			return;
+		}
+
+		const requestId = noteAutoSaveRequestRef.current + 1;
+		noteAutoSaveRequestRef.current = requestId;
+		const timeoutId = window.setTimeout(() => {
+			setIsNoteSaving(true);
+			void dashboardApi
+				.updateDidacticUnitNote(didacticUnitId, activeNote.id, {
+					content: noteDraftContent,
+					question: nextQuestion,
+				})
+				.then(({note}) => {
+					if (noteAutoSaveRequestRef.current !== requestId) {
+						return;
+					}
+					setUnitNotes((previous) =>
+						previous.map((item) => (item.id === note.id ? note : item)),
+					);
+				})
+				.catch((error) => {
+					if (noteAutoSaveRequestRef.current !== requestId) {
+						return;
+					}
+					toastError(
+						error instanceof Error ?
+							error.message
+						:	"Failed to auto-save note.",
+					);
+				})
+				.finally(() => {
+					if (noteAutoSaveRequestRef.current === requestId) {
+						setIsNoteSaving(false);
+					}
+				});
+		}, 650);
+
+		return () => window.clearTimeout(timeoutId);
+	}, [
+		activeNote,
+		didacticUnitId,
+		isNoteDialogOpen,
+		noteDraftContent,
+		noteQuestionDraft,
+	]);
+
+	const handleGenerateNote = useCallback(async () => {
+		const sourceSelection =
+			pendingNoteSelection ??
+			(activeNote ?
+				{
+					chapterIndex: activeNote.chapterIndex,
+					selectedText: activeNote.selectedText,
+					anchor: activeNote.anchor,
+				}
+			:	null);
+		if (!sourceSelection) {
+			return;
+		}
+		setIsNoteSaving(true);
+		try {
+			const {note} = await dashboardApi.generateDidacticUnitNote(didacticUnitId, {
+				chapterIndex: sourceSelection.chapterIndex,
+				selectedText: sourceSelection.selectedText,
+				question: noteQuestionDraft.trim() || undefined,
+				quality: noteQuality,
+				anchor: sourceSelection.anchor,
+			});
+			if (activeNote) {
+				await dashboardApi.deleteDidacticUnitNote(didacticUnitId, activeNote.id);
+				setUnitNotes((previous) => [
+					...previous.filter((item) => item.id !== activeNote.id),
+					note,
+				]);
+			} else {
+				setUnitNotes((previous) => [...previous, note]);
+			}
+			setActiveNoteId(note.id);
+			setEditingNoteId(note.id);
+			setNoteDraftContent(note.content);
+			setNoteQuestionDraft(note.question ?? "");
+			setPendingNoteSelection(null);
+			window.getSelection()?.removeAllRanges();
+			await refreshUser();
+		} catch (error) {
+			toastError(
+				error instanceof Error ? error.message : "Failed to generate note.",
+			);
+		} finally {
+			setIsNoteSaving(false);
+		}
+	}, [
+		didacticUnitId,
+		activeNote,
+		noteQuality,
+		noteQuestionDraft,
+		pendingNoteSelection,
+		refreshUser,
+	]);
+
+	const startEditingNote = useCallback((note: BackendDidacticUnitNote) => {
+		setEditingNoteId(note.id);
+		setNoteEditContent(note.content);
+		setNoteEditQuestion(note.question ?? "");
+	}, []);
+
+	const handleSaveNoteEdit = useCallback(async () => {
+		if (!editingNoteId || !noteEditContent.trim()) {
+			return;
+		}
+		setIsNoteSaving(true);
+		try {
+			const {note} = await dashboardApi.updateDidacticUnitNote(
+				didacticUnitId,
+				editingNoteId,
+				{
+					content: noteEditContent,
+					question: noteEditQuestion,
+				},
+			);
+			setUnitNotes((previous) =>
+				previous.map((item) => (item.id === note.id ? note : item)),
+			);
+			setEditingNoteId(null);
+		} catch (error) {
+			toastError(
+				error instanceof Error ? error.message : "Failed to update note.",
+			);
+		} finally {
+			setIsNoteSaving(false);
+		}
+	}, [didacticUnitId, editingNoteId, noteEditContent, noteEditQuestion]);
+
+	const handleDeleteNote = useCallback(async () => {
+		if (!deleteNoteId) {
+			return;
+		}
+		try {
+			await dashboardApi.deleteDidacticUnitNote(didacticUnitId, deleteNoteId);
+			setUnitNotes((previous) =>
+				previous.filter((note) => note.id !== deleteNoteId),
+			);
+			if (activeNoteId === deleteNoteId) {
+				setActiveNoteId(null);
+			}
+			if (editingNoteId === deleteNoteId) {
+				setEditingNoteId(null);
+			}
+			setDeleteNoteId(null);
+		} catch (error) {
+			toastError(
+				error instanceof Error ? error.message : "Failed to delete note.",
+			);
+		}
+	}, [activeNoteId, deleteNoteId, didacticUnitId, editingNoteId]);
 
 	useEffect(() => {
 		if (!activeChapter) {
@@ -3067,13 +3439,27 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		extraContent,
 		pageIndex,
 		pageNumber,
+		pageStartOffset = 0,
+		pageEndOffset = 0,
 	}: {
 		editable: boolean;
 		html: string | undefined;
 		extraContent?: ReactNode;
 		pageIndex: number;
 		pageNumber: number;
+		pageStartOffset?: number;
+		pageEndOffset?: number;
 	}) => {
+		const renderedHtml =
+			!editable && activeChapter && pageEndOffset > pageStartOffset ?
+				applyNoteMarksToPageHtml({
+					html: html ?? "",
+					pageStartOffset,
+					pageEndOffset,
+					chapter: activeChapter,
+					notes: activeChapterNotes,
+				})
+			:	html ?? "";
 		return (
 			<div
 				className={cn("relative overflow-hidden rounded-[16px] border border-[#E5E5E7] md:rounded-[24px]", !extraContent && "shadow-[0_8px_60px_rgba(0,0,0,0.08)]")}
@@ -3091,6 +3477,12 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 								"overflow-hidden"
 							),
 						)}
+						data-unit-note-page={!editable ? "true" : undefined}
+						data-page-start-offset={!editable ? pageStartOffset : undefined}
+						data-page-end-offset={!editable ? pageEndOffset : undefined}
+						onClick={!editable ? handleNoteContentClick : undefined}
+						onContextMenu={!editable ? handleNoteContextMenu : undefined}
+						onMouseUp={!editable ? handleNoteMouseUp : undefined}
 						style={resolvedThemeVars}
 					>
 						{editable ?
@@ -3116,7 +3508,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 								placeholder="Write the module content here..."
 							/>
 						:	<ChapterRenderer
-								html={html ?? ""}
+								html={renderedHtml}
 								className={cn(
 									"unit-page-scope leading-[1.9] text-[#1D1D1F]",
 									extraContent ?
@@ -3149,16 +3541,30 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		html,
 		extraContent,
 		pageNumber,
+		pageStartOffset = 0,
+		pageEndOffset = 0,
 	}: {
 		editable: boolean;
 		html: string | undefined;
 		extraContent?: ReactNode;
 		pageNumber: number;
+		pageStartOffset?: number;
+		pageEndOffset?: number;
 	}) => {
 		const titlePreset =
 			STYLE_PRESETS[draft.textStyle.stylePreset ?? "classic"];
 		const titleHeadingFamily = FONT_CATALOG[titlePreset.heading].family;
 		const titleBodyFamily = FONT_CATALOG[titlePreset.body].family;
+		const renderedHtml =
+			!editable && activeChapter && pageEndOffset > pageStartOffset ?
+				applyNoteMarksToPageHtml({
+					html: html ?? "",
+					pageStartOffset,
+					pageEndOffset,
+					chapter: activeChapter,
+					notes: activeChapterNotes,
+				})
+			:	html ?? "";
 
 		return (
 		<div
@@ -3230,6 +3636,12 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 						"relative flex min-h-0 flex-1 flex-col",
 						"overflow-hidden",
 					)}
+					data-unit-note-page={!editable ? "true" : undefined}
+					data-page-start-offset={!editable ? pageStartOffset : undefined}
+					data-page-end-offset={!editable ? pageEndOffset : undefined}
+					onClick={!editable ? handleNoteContentClick : undefined}
+					onContextMenu={!editable ? handleNoteContextMenu : undefined}
+					onMouseUp={!editable ? handleNoteMouseUp : undefined}
 				>
 					{editable ?
 						<TiptapHtmlEditor
@@ -3251,7 +3663,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 							placeholder="Write the module content here..."
 						/>
 					:	<ChapterRenderer
-							html={html ?? ""}
+							html={renderedHtml}
 							className={cn(
 								"unit-page-scope leading-[1.9] text-[#1D1D1F]",
 								extraContent ?
@@ -3360,6 +3772,8 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				:	undefined,
 			pageIndex: pageNumber - 1,
 			pageNumber,
+			pageStartOffset: page.startCharacterOffset,
+			pageEndOffset: page.endCharacterOffset,
 		});
 	};
 
@@ -3409,8 +3823,10 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 												primaryActionLabel:
 													leftReadPage.primaryActionLabel,
 											})
-										:	undefined,
+									:	undefined,
 									pageNumber: 1,
+									pageStartOffset: leftReadPage.startCharacterOffset,
+									pageEndOffset: leftReadPage.endCharacterOffset,
 								})
 							:	renderReadPage({
 									page: leftReadPage,
@@ -4069,6 +4485,26 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 
 						<div className="flex items-center gap-1.5">
 							<button
+								className={cn(
+									"flex items-center gap-2 rounded-full border px-3 py-1.5 text-[13px] font-medium transition-all",
+									isNotesPanelOpen ?
+										"border-[#34C759] bg-[#34C759]/10 text-[#1D1D1F]"
+									:	"border-[#D4D7DD] bg-white text-[#1D1D1F] hover:bg-[#F5F5F7]",
+								)}
+								onClick={() =>
+									setIsNotesPanelOpen((value) => !value)
+								}
+								type="button"
+							>
+								<StickyNote size={16} className="text-[#34C759]" />
+								<span>Notes</span>
+								{validUnitNotes.length > 0 && (
+									<span className="rounded-full bg-[#34C759] px-1.5 py-0.5 text-[10px] font-bold text-white">
+										{validUnitNotes.length}
+									</span>
+								)}
+							</button>
+							<button
 								className="flex items-center gap-2 rounded-full border border-[#D4D7DD] bg-white px-3 py-1.5 text-[13px] font-medium text-[#1D1D1F] transition-all hover:bg-[#F5F5F7]"
 								onClick={() =>
 									setIsHistoryOpen((value) => !value)
@@ -4172,7 +4608,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 									type="button"
 								>
 									<Edit3 size={16} />
-									<span>Edit Mode</span>
+									<span>Edit</span>
 								</Button>
 							}
 						</div>
@@ -4180,6 +4616,21 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				</header>
 
 				<div className="relative flex flex-1 flex-col items-center justify-center bg-[#F5F5F7] px-3 py-4 md:px-6 md:py-6">
+					{pendingNoteSelection && !isNoteDialogOpen && (
+						<button
+							className="fixed z-50 flex items-center gap-2 rounded-full border border-[#34C759]/40 bg-white px-3 py-2 text-[13px] font-semibold text-[#1D1D1F] shadow-[0_12px_36px_rgba(0,0,0,0.16)] transition hover:bg-[#F7FFF9]"
+							style={{
+								left: pendingNoteSelection.x,
+								top: Math.max(72, pendingNoteSelection.y - 44),
+								transform: "translateX(-50%)",
+							}}
+							onClick={openNoteDialog}
+							type="button"
+						>
+							<StickyNote size={15} className="text-[#34C759]" />
+							Notes · AI
+						</button>
+					)}
 					{(
 						activeChapter.status === "ready" ||
 						isActiveChapterStreaming
@@ -4445,7 +4896,333 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 						</Motion.div>
 					)}
 				</AnimatePresence>
+				<AnimatePresence>
+					{isNotesPanelOpen && (
+						<Motion.aside
+							animate={{x: 0, opacity: 1}}
+							className="absolute right-4 top-[80px] bottom-4 z-20 flex w-[340px] flex-col overflow-hidden rounded-[18px] border border-[#E5E5E7] bg-white shadow-[0_18px_60px_rgba(0,0,0,0.14)]"
+							exit={{x: 24, opacity: 0}}
+							initial={{x: 24, opacity: 0}}
+							transition={{duration: 0.2, ease: [0.22, 1, 0.36, 1]}}
+						>
+							<div className="flex items-center justify-between border-b border-[#E5E5E7] px-4 py-3">
+								<div>
+									<div className="text-[15px] font-bold text-[#1D1D1F]">
+										Notes
+									</div>
+									<div className="text-[12px] text-[#86868B]">
+										{validUnitNotes.length} saved in this unit
+									</div>
+								</div>
+								<button
+									aria-label="Close notes"
+									className="flex h-8 w-8 items-center justify-center rounded-full text-[#86868B] hover:bg-[#F5F5F7] hover:text-[#1D1D1F]"
+									onClick={() => setIsNotesPanelOpen(false)}
+									type="button"
+								>
+									<X size={16} />
+								</button>
+							</div>
+							<div className="flex-1 space-y-3 overflow-y-auto p-4">
+								{validUnitNotes.length === 0 ? (
+									<div className="rounded-[14px] border border-dashed border-[#D4D7DD] p-5 text-center">
+										<StickyNote
+											size={24}
+											className="mx-auto mb-2 text-[#34C759]"
+										/>
+										<div className="text-[13px] font-semibold text-[#1D1D1F]">
+											No notes yet
+										</div>
+										<div className="mt-1 text-[12px] leading-relaxed text-[#86868B]">
+											Select text in a generated module to create one.
+										</div>
+									</div>
+								) : (
+									validUnitNotes.map((note) => {
+										const chapter = workspace.chapters.find(
+											(item) =>
+												item.chapterIndex === note.chapterIndex,
+										);
+										const isEditing = editingNoteId === note.id;
+										return (
+											<div
+												key={note.id}
+												className="rounded-[14px] border border-[#E5E5E7] bg-[#FAFAFA] p-3"
+											>
+												<div className="mb-2 flex items-start justify-between gap-2">
+													<div className="min-w-0">
+														<div className="text-[11px] font-bold uppercase tracking-wide text-[#34C759]">
+															Module {note.chapterIndex + 1}
+														</div>
+														<div className="truncate text-[12px] font-semibold text-[#1D1D1F]">
+															{chapter?.title ?? "Module"}
+														</div>
+													</div>
+													<div className="flex shrink-0 gap-1">
+														<button
+															className="rounded-full px-2 py-1 text-[11px] font-medium text-[#6E6E73] hover:bg-white hover:text-[#1D1D1F]"
+															onClick={() => startEditingNote(note)}
+															type="button"
+														>
+															Edit
+														</button>
+														<button
+															aria-label="Delete note"
+															className="flex h-7 w-7 items-center justify-center rounded-full text-[#86868B] hover:bg-white hover:text-red-600"
+															onClick={() => setDeleteNoteId(note.id)}
+															type="button"
+														>
+															<Trash2 size={14} />
+														</button>
+													</div>
+												</div>
+												<div className="mb-2 rounded-[10px] bg-white px-3 py-2 text-[12px] italic leading-relaxed text-[#5A5A60]">
+													"{note.selectedText}"
+												</div>
+												{isEditing ? (
+													<div className="space-y-2">
+														<textarea
+															className="min-h-[54px] w-full resize-none rounded-[10px] border border-[#D4D7DD] bg-white px-3 py-2 text-[12px] outline-none focus:border-[#34C759]"
+															value={noteEditQuestion}
+															onChange={(event) =>
+																setNoteEditQuestion(event.target.value)
+															}
+															placeholder="Question"
+														/>
+														<textarea
+															className="min-h-[96px] w-full resize-none rounded-[10px] border border-[#D4D7DD] bg-white px-3 py-2 text-[13px] outline-none focus:border-[#34C759]"
+															value={noteEditContent}
+															onChange={(event) =>
+																setNoteEditContent(event.target.value)
+															}
+														/>
+														<div className="flex justify-end gap-2">
+															<button
+																className="rounded-full px-3 py-1.5 text-[12px] font-medium text-[#6E6E73] hover:bg-white"
+																onClick={() => setEditingNoteId(null)}
+																type="button"
+															>
+																Cancel
+															</button>
+															<button
+																className="rounded-full bg-[#1D1D1F] px-3 py-1.5 text-[12px] font-semibold text-white disabled:opacity-50"
+																disabled={isNoteSaving}
+																onClick={() => void handleSaveNoteEdit()}
+																type="button"
+															>
+																Save
+															</button>
+														</div>
+													</div>
+												) : (
+													<>
+														{note.question && (
+															<div className="mb-1 text-[12px] font-semibold text-[#1D1D1F]">
+																{note.question}
+															</div>
+														)}
+														<div className="whitespace-pre-wrap text-[13px] leading-relaxed text-[#3A3A3C]">
+															{note.content}
+														</div>
+													</>
+												)}
+											</div>
+										);
+									})
+								)}
+							</div>
+						</Motion.aside>
+					)}
+				</AnimatePresence>
 			</main>
+
+			<Dialog
+				open={isNoteDialogOpen}
+				onOpenChange={(open) => {
+					setIsNoteDialogOpen(open);
+					if (!open) {
+						setActiveNoteId(null);
+						setPendingNoteSelection(null);
+						setEditingNoteId(null);
+					}
+				}}
+			>
+				<DialogContent
+					className="overflow-hidden p-0 sm:max-w-[560px]"
+					overlayClassName="bg-transparent backdrop-blur-0"
+				>
+					<DialogHeader className="border-b border-[#E5E5E7] px-6 pt-5 pb-4">
+						<div className="flex items-center gap-3">
+							<span className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-[#34C759]/10 text-[#34C759]">
+								<StickyNote size={18} />
+							</span>
+							<div>
+								<DialogTitle className="text-[17px] font-bold text-[#0F0F12]">
+									{activeNote ? "Note" : "Create note"}
+								</DialogTitle>
+								<DialogDescription className="mt-0.5 text-[13px] text-[#6E6E73]">
+									Write directly, or ask AI to fill the note field.
+								</DialogDescription>
+							</div>
+						</div>
+					</DialogHeader>
+					{(pendingNoteSelection || activeNote) && (
+						<div className="space-y-3 bg-white px-6 py-4">
+							<div className="relative rounded-[12px] border border-[#DDEFE3] bg-[#FBFFFC] px-4 py-2.5">
+								<div className="absolute left-0 top-3 bottom-3 w-[3px] rounded-r-full bg-[#34C759]" />
+								<div className="mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[#34C759]">
+									Selected text
+								</div>
+								<div className="line-clamp-3 text-[13px] italic leading-relaxed text-[#3A3A3C]">
+									"{pendingNoteSelection?.selectedText ?? activeNote?.selectedText}"
+								</div>
+							</div>
+							<div>
+								<label className="mb-2 flex items-center gap-2 text-[12px] font-bold text-[#0F0F12]">
+									<Edit3 size={14} className="text-[#34C759]" />
+									<span>Note</span>
+								</label>
+								<textarea
+									className="min-h-[230px] w-full resize-y rounded-[14px] border border-[#E5E5E7] bg-[#FAFAFA] px-4 py-3 text-[14px] leading-relaxed text-[#0F0F12] outline-none transition focus:border-[#34C759] focus:bg-white focus:ring-3 focus:ring-[#34C759]/10"
+									value={noteDraftContent}
+									onChange={(event) =>
+										setNoteDraftContent(event.target.value)
+									}
+									placeholder="Write your note..."
+								/>
+							</div>
+							<div className="rounded-[14px] border border-[#DDEFE3] bg-[#FBFFFC] p-3">
+								<div className="flex items-center justify-between gap-3">
+									<label className="flex items-center gap-2 text-[12px] font-bold text-[#0F0F12]">
+										<Brain size={14} className="text-[#34C759]" />
+										<span>Ask AI</span>
+										<span className="text-[11px] font-medium text-[#86868B]">
+											Optional prompt
+										</span>
+									</label>
+									<button
+										aria-label="Toggle optional AI prompt"
+										className={cn(
+											"flex h-8 w-8 items-center justify-center rounded-full border text-[#34C759] transition",
+											isNoteAiPromptOpen ?
+												"border-[#34C759] bg-white"
+											:	"border-[#DDEFE3] bg-white hover:bg-[#F0FDF4]",
+										)}
+										onClick={() =>
+											setIsNoteAiPromptOpen((value) => !value)
+										}
+										type="button"
+									>
+										{isNoteAiPromptOpen ?
+											<X size={14} />
+										:	<CirclePlus size={16} />}
+									</button>
+								</div>
+								{isNoteAiPromptOpen && (
+									<textarea
+										className="mt-3 min-h-[70px] w-full resize-none rounded-[12px] border border-[#E5E5E7] bg-[#FAFAFA] px-3 py-2.5 text-[13px] leading-relaxed text-[#0F0F12] outline-none transition focus:border-[#34C759] focus:bg-white focus:ring-3 focus:ring-[#34C759]/10"
+										value={noteQuestionDraft}
+										onChange={(event) =>
+											setNoteQuestionDraft(event.target.value)
+										}
+										placeholder="What do you want to clarify?"
+									/>
+								)}
+								<div className="mt-3 grid grid-cols-2 gap-2">
+										{(["silver", "gold"] as const).map((quality) => (
+											<button
+												key={quality}
+												className={cn(
+													"rounded-[12px] border px-3 py-2 text-left transition",
+													noteQuality === quality ?
+														"border-[#34C759] bg-[#F0FDF4] text-[#0F0F12] shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
+													:	"border-[#E5E5E7] bg-[#FAFAFA] text-[#6E6E73] hover:bg-white",
+												)}
+												onClick={() => setNoteQuality(quality)}
+												type="button"
+											>
+												<span className="block text-[12px] font-bold capitalize">
+													{quality}
+												</span>
+												<span className="mt-0.5 block text-[11px] font-medium">
+													{quality === "silver" ?
+														"Costs 1 bronze"
+													:	"Costs 1 silver"}
+												</span>
+											</button>
+										))}
+									</div>
+								</div>
+						</div>
+					)}
+					<DialogFooter className="border-t border-[#E5E5E7] bg-white px-6 py-4">
+						{activeNote && (
+							<Button
+								variant="outline"
+								className="mr-auto rounded-full text-red-600 hover:text-red-700"
+								onClick={() => setDeleteNoteId(activeNote.id)}
+								type="button"
+							>
+								Delete
+							</Button>
+						)}
+						<Button
+							variant="outline"
+							className="rounded-full"
+							onClick={() => setIsNoteDialogOpen(false)}
+							type="button"
+						>
+							{activeNote ? "Close" : "Cancel"}
+						</Button>
+						{!activeNote && (
+							<Button
+								variant="outline"
+								className="rounded-full"
+								disabled={isNoteSaving || !noteDraftContent.trim()}
+								onClick={() => void handleSaveCurrentNote()}
+								type="button"
+							>
+								Save note
+							</Button>
+						)}
+						<Button
+							className="rounded-full bg-[#0F0F12] px-5 hover:bg-[#2A2A2D]"
+							disabled={isNoteSaving}
+							onClick={() => void handleGenerateNote()}
+							type="button"
+						>
+							{isNoteSaving ? "Working..." : "Ask AI"}
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+
+			<AlertDialog
+				open={deleteNote !== null}
+				onOpenChange={(open) => {
+					if (!open) {
+						setDeleteNoteId(null);
+					}
+				}}
+			>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Delete note?</AlertDialogTitle>
+						<AlertDialogDescription>
+							This will remove the note from this unit.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel>Cancel</AlertDialogCancel>
+						<AlertDialogAction
+							className="bg-red-600 text-white hover:bg-red-700"
+							onClick={() => void handleDeleteNote()}
+						>
+							Delete
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
 
 			<Dialog
 				open={isExportDialogOpen}

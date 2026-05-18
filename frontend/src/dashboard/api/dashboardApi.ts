@@ -336,6 +336,32 @@ export interface BackendDidacticUnitChapterRevision {
 	};
 }
 
+export interface BackendDidacticUnitNoteAnchor {
+	startBlockId: string;
+	startOffset: number;
+	endBlockId: string;
+	endOffset: number;
+	htmlHash?: string;
+	htmlBlocksVersion: number;
+	contextBefore?: string;
+	contextAfter?: string;
+}
+
+export interface BackendDidacticUnitNote {
+	id: string;
+	ownerId: string;
+	didacticUnitId: string;
+	chapterIndex: number;
+	source: "manual" | "ai";
+	selectedText: string;
+	question?: string;
+	content: string;
+	quality?: BackendGenerationQuality;
+	anchor: BackendDidacticUnitNoteAnchor;
+	createdAt: string;
+	updatedAt: string;
+}
+
 export interface BackendGenerationRun {
 	id: string;
 	stage: "syllabus" | "chapter";
@@ -805,6 +831,65 @@ export const dashboardApi = {
 	getDidacticUnitChapter(id: string, chapterIndex: number) {
 		return requestJson<BackendDidacticUnitChapterDetail>(
 			`/api/didactic-unit/${id}/modules/${chapterIndex}`,
+		);
+	},
+	listDidacticUnitNotes(id: string) {
+		return requestJson<{notes: BackendDidacticUnitNote[]}>(
+			`/api/didactic-unit/${id}/notes`,
+		);
+	},
+	createDidacticUnitNote(
+		id: string,
+		input: {
+			chapterIndex: number;
+			selectedText: string;
+			content: string;
+			anchor: BackendDidacticUnitNoteAnchor;
+		},
+	) {
+		return requestJson<{note: BackendDidacticUnitNote}>(
+			`/api/didactic-unit/${id}/notes`,
+			{
+				method: "POST",
+				body: JSON.stringify(input),
+			},
+		);
+	},
+	generateDidacticUnitNote(
+		id: string,
+		input: {
+			chapterIndex: number;
+			selectedText: string;
+			question?: string;
+			quality: BackendGenerationQuality;
+			anchor: BackendDidacticUnitNoteAnchor;
+		},
+	) {
+		return requestJson<{note: BackendDidacticUnitNote}>(
+			`/api/didactic-unit/${id}/notes/generate`,
+			{
+				method: "POST",
+				body: JSON.stringify(input),
+			},
+		);
+	},
+	updateDidacticUnitNote(
+		id: string,
+		noteId: string,
+		patch: {question?: string; content?: string},
+	) {
+		return requestJson<{note: BackendDidacticUnitNote}>(
+			`/api/didactic-unit/${id}/notes/${noteId}`,
+			{
+				method: "PATCH",
+				body: JSON.stringify(patch),
+			},
+		);
+	},
+	deleteDidacticUnitNote(id: string, noteId: string) {
+		return requestJson<void>(
+			`/api/didactic-unit/${id}/notes/${noteId}`,
+			{method: "DELETE"},
 		);
 	},
 	listLearningActivities(id: string, chapterIndex: number) {
