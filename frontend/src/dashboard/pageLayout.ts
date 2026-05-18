@@ -34,7 +34,7 @@ const HEADER_HEIGHT = 64;
 const OPEN_SIDEBAR_WIDTH = 280;
 const PAGE_WIDTH_RATIO_DESKTOP = 0.76;
 const PAGE_WIDTH_RATIO_MOBILE = 0.72;
-const POST_MODULE_ACTION_GAP = 24;
+const POST_MODULE_ACTION_GAP = 40;
 const FIRST_PAGE_HEADER_BOTTOM_GAP = 16;
 const DOM_BLOCK_HEIGHT_CACHE_LIMIT = 2000;
 
@@ -968,7 +968,7 @@ function createPostModuleActionMeasurementMarkup(input: {
                 <div style="margin-top:4px;font-size:24px;line-height:1.15;font-weight:700;color:${palette.heading};">Module complete</div>
                 <div style="max-width:460px;margin:8px auto 0;font-size:14px;line-height:1.45;color:${palette.body};">You have finished the theory part. Practice now or continue to the next topic.</div>
             </div>
-            <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:24px;">
+            <div style="display:grid;grid-template-columns:1fr;gap:16px;margin-top:24px;">
                 <div style="min-height:164px;border-radius:20px;background:${palette.primary};color:white;padding:20px;display:flex;flex-direction:column;">
                     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
                         <div style="width:44px;height:44px;border-radius:12px;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;">◇</div>
@@ -988,7 +988,7 @@ function createPostModuleActionMeasurementMarkup(input: {
                     <div style="margin-top:auto;border-top:1px solid #E5E5E7;padding-top:16px;font-size:12px;font-weight:600;color:#4B5563;">${escapeHtml(footerLabel)}</div>
                 </div>
             </div>
-            <div style="margin-top:20px;border:1px solid ${palette.tipBorder};background:rgba(255,255,255,.82);border-radius:16px;padding:12px 16px;text-align:center;font-size:14px;line-height:1.35;color:${palette.body};"><strong style="color:${palette.accentText};">Tip:</strong> Practicing now helps retain the concepts before moving on.</div>
+            <div style="width:fit-content;margin:20px auto 0;border:1px solid ${palette.tipBorder};background:rgba(255,255,255,.82);border-radius:16px;padding:12px 16px;text-align:center;font-size:14px;line-height:1.35;color:${palette.body};"><strong style="color:${palette.accentText};">Tip:</strong> Practicing now helps retain the concepts before moving on.</div>
         </div>
     `;
 
@@ -1029,7 +1029,7 @@ function canMergeTerminalActionPage({
 	const proseHeight = measureRenderedHtmlHeight(lastPage.html, proseMeasure);
 	const actionHeight = actionMeasure.scrollHeight;
 
-	return proseHeight + POST_MODULE_ACTION_GAP + actionHeight <= pageLimit + 1;
+	return proseHeight + POST_MODULE_ACTION_GAP + actionHeight <= pageLimit;
 }
 
 export function getReadTextOffsetForSpread(

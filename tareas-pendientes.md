@@ -18,7 +18,7 @@
 18. En unidades "gold", la regeneracion de una unidad cuesta 5 Silver
 19. Cambiar la "longitud" de las unidades por un badge que tenga la misma forma que cuando se selecciona en el wizard
 20. Crear una "guía" interactiva para 1. La primera vez que se genera una unidad 2. La primera vez que se entra en el editor
-21. En EditMode (cambiar nombre), la estructura de los bullet points y numeraciones se rompe
+21. ~~En EditMode (cambiar nombre), la estructura de los bullet points y numeraciones se rompe~~
 22. Los enlaces no se pueden romper de página a página
 23. Marcar desde el principio el tipo de generacion (gold/silver) y el coste según longitud
 24. Mejorar botones y centralizar componentes de botones
@@ -28,5 +28,5 @@
 28. Mejorar la informacio en el onboarding
 29. Crear guias de uso para: 1. primera vez que abres el wizard de syllabus 2. Primera vez que entras en el editor
 30. ~~Añadir las actividades creadas al indice del modulo~~
-31. Create note system - ask AI about specific parts of the unit
-32. Hacer que los ejercicios de los módulos sean borrables
+31. ~~Create note system - ask AI about specific parts of the unit~~
+32. ~~Hacer que los ejercicios de los módulos sean borrables~~

@@ -2360,6 +2360,10 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	]);
 
 	const enterEditMode = () => {
+		if (isExerciseOnlySpread) {
+			return;
+		}
+
 		setActiveHtmlEditor(null);
 		setIsEditMode(true);
 	};
@@ -2847,6 +2851,13 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	const contentPageOffset = currentSpread * 2;
 	const leftReadPage = readPages[contentPageOffset];
 	const rightReadPage = readPages[contentPageOffset + 1];
+	const visibleReadPages = [leftReadPage, rightReadPage].filter(
+		(page): page is ReadPage => page !== undefined,
+	);
+	const isExerciseOnlySpread =
+		!isEditMode &&
+		visibleReadPages.length > 0 &&
+		visibleReadPages.every((page) => page.kind === "learning_activity");
 	const leftEditablePage = visibleEditablePages[contentPageOffset];
 	const rightEditablePage = visibleEditablePages[contentPageOffset + 1];
 	const spreadStartPage = contentPageOffset + 1;
@@ -4602,14 +4613,22 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 										<X size={16} />
 									</Button>
 								</div>
-							: 	<Button
-									className="h-8 w-[117px] gap-2 rounded-full bg-[#1D1D1F] px-4 py-1.5 text-[13px] font-medium text-white hover:bg-[#333333]"
-									onClick={enterEditMode}
-									type="button"
-								>
-									<Edit3 size={16} />
-									<span>Edit</span>
-								</Button>
+							: 	<div className="group relative">
+									<Button
+										className="h-8 w-[117px] gap-2 rounded-full bg-[#1D1D1F] px-4 py-1.5 text-[13px] font-medium text-white hover:bg-[#333333] disabled:cursor-not-allowed disabled:bg-[#D1D1D6] disabled:text-white"
+										disabled={isExerciseOnlySpread}
+										onClick={enterEditMode}
+										type="button"
+									>
+										<Edit3 size={16} />
+										<span>Edit</span>
+									</Button>
+									{isExerciseOnlySpread && (
+										<div className="pointer-events-none absolute right-0 top-[calc(100%+8px)] z-50 w-64 rounded-[12px] border border-[#E5E5E7] bg-white px-3 py-2 text-[12px] leading-relaxed text-[#3A3A3C] opacity-0 shadow-[0_12px_36px_rgba(0,0,0,0.14)] transition-opacity group-hover:opacity-100">
+											Edit mode is not available on exercise pages. Move to a content page to edit the unit.
+										</div>
+									)}
+								</div>
 							}
 						</div>
 					</div>
