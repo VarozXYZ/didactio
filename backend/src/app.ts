@@ -39,6 +39,7 @@ import {
 import {listDidacticUnitChapters} from "./didactic-unit/list-didactic-unit-chapters.js";
 import {
 	getModuleReadProgressRecord,
+	resetDidacticUnitModuleReadProgress,
 	updateDidacticUnitModuleReadProgress,
 } from "./didactic-unit/module-reading-progress.js";
 import {
@@ -59,6 +60,7 @@ import {
 	parseQuestionnaireAnswersInput,
 	parseUpdateDidacticUnitFolderInput,
 	parseUpdateDidacticUnitSyllabusInput,
+	resolveLearningProfile,
 } from "./didactic-unit/planning.js";
 import {
 	summarizeDidacticUnit,
@@ -72,6 +74,7 @@ import {
 	CUSTOM_FOLDER_ICON,
 	ensureDefaultFolders,
 	getGeneralFolder,
+	MAX_FOLDER_NAME_LENGTH,
 	normalizeFolderName,
 	slugifyFolderName,
 } from "./folders/folder-defaults.js";
@@ -444,6 +447,12 @@ function buildDidacticUnitResponseFromFolders(
 		depth: didacticUnit.depth,
 		length: didacticUnit.length,
 		level: didacticUnit.level,
+		learningProfile:
+			didacticUnit.learningProfile ??
+			resolveLearningProfile({
+				level: didacticUnit.level,
+				depth: didacticUnit.depth,
+			}).learningProfile,
 		generationTier: didacticUnit.generationTier,
 		generationQuality:
 			didacticUnit.generationQuality ??
@@ -498,18 +507,64 @@ async function buildDidacticUnitSummaryResponses(
 	didacticUnits: DidacticUnit[],
 	folderStore: FolderStore,
 	ownerId: string,
+	generationRuns: GenerationRun[] = [],
 ) {
 	const foldersById = await loadFoldersById(folderStore, ownerId);
+	const runsByUnitId = generationRuns.reduce<Map<string, GenerationRun[]>>(
+		(map, run) => {
+			const runs = map.get(run.didacticUnitId) ?? [];
+			runs.push(run);
+			map.set(run.didacticUnitId, runs);
+			return map;
+		},
+		new Map(),
+	);
 
 	return didacticUnits.map((didacticUnit) => {
 		const summary = summarizeDidacticUnit(didacticUnit);
 		const folder = resolveFolderOrFallback(didacticUnit, foldersById);
+		const modelRun = resolveDidacticUnitModelRun(
+			runsByUnitId.get(didacticUnit.id) ?? [],
+		);
 
 		return {
 			...summary,
 			folder: buildFolderResponse(folder),
+			modelUsed:
+				modelRun ?
+					{
+						provider: modelRun.provider,
+						model: modelRun.model,
+						label: getModelDisplayName(
+							modelRun.provider,
+							modelRun.model,
+						),
+					}
+				:	null,
 		};
 	});
+}
+
+function resolveDidacticUnitModelRun(
+	runs: GenerationRun[],
+): GenerationRun | null {
+	const relevantRuns = runs
+		.filter(
+			(run) =>
+				run.status === "completed" &&
+				(run.stage === "chapter" || run.stage === "syllabus"),
+		)
+		.sort((left, right) => {
+			const leftTime = left.updatedAt ?? left.createdAt;
+			const rightTime = right.updatedAt ?? right.createdAt;
+			return rightTime.localeCompare(leftTime);
+		});
+
+	return (
+		relevantRuns.find((run) => run.stage === "chapter") ??
+		relevantRuns.find((run) => run.stage === "syllabus") ??
+		null
+	);
 }
 
 async function listFoldersWithUnitCounts(
@@ -1954,6 +2009,11 @@ export function createApp(options: CreateAppOptions) {
 			if (!name) {
 				throw new Error("Folder name is required.");
 			}
+			if (name.length > MAX_FOLDER_NAME_LENGTH) {
+				throw new Error(
+					`Folder name must be ${MAX_FOLDER_NAME_LENGTH} characters or fewer.`,
+				);
+			}
 
 			const slug = slugifyFolderName(name);
 
@@ -2017,6 +2077,11 @@ export function createApp(options: CreateAppOptions) {
 
 			if (typeof payload.name === "string" && payload.name.trim()) {
 				patch.name = normalizeFolderName(payload.name);
+				if (patch.name.length > MAX_FOLDER_NAME_LENGTH) {
+					throw new Error(
+						`Folder name must be ${MAX_FOLDER_NAME_LENGTH} characters or fewer.`,
+					);
+				}
 			}
 			if (
 				typeof payload.icon === "string" &&
@@ -2165,6 +2230,9 @@ export function createApp(options: CreateAppOptions) {
 				didacticUnits,
 				folderStore,
 				requestWithMockOwner.mockOwner.id,
+				await generationRunStore.listByOwner(
+					requestWithMockOwner.mockOwner.id,
+				),
 			),
 		});
 	});
@@ -2675,18 +2743,7 @@ export function createApp(options: CreateAppOptions) {
 				return;
 			}
 
-			let tier: AiModelTier;
-			try {
-				tier = parseAiModelTier(request.body);
-			} catch (error) {
-				response.status(400).json({
-					error:
-						error instanceof Error ?
-							error.message
-						:	"Invalid didactic unit syllabus generation request.",
-				});
-				return;
-			}
+			const tier: AiModelTier = "silver";
 
 			const config = await aiConfigStore.get(
 				requestWithMockOwner.mockOwner.id,
@@ -3510,13 +3567,13 @@ export function createApp(options: CreateAppOptions) {
 			reservation = await reserveGenerationCredits({
 				authService,
 				ownerId,
-				cost: resolveNoteGenerationCost({quality: input.quality}),
+				cost: resolveNoteGenerationCost(),
 				reason: "note_generation",
 				metadata: {
 					operation: "note_generation",
 					didacticUnitId: didacticUnit.id,
 					chapterIndex: input.chapterIndex,
-					quality: input.quality,
+					quality: "silver",
 				},
 			});
 		} catch (error) {
@@ -3541,7 +3598,7 @@ export function createApp(options: CreateAppOptions) {
 				selectedText: input.selectedText,
 				question: input.question,
 				config,
-				tier: input.quality,
+				tier: "silver",
 				abortSignal: createAbortSignal(request),
 			});
 			const note = createDidacticUnitNote({
@@ -3552,7 +3609,7 @@ export function createApp(options: CreateAppOptions) {
 				selectedText: input.selectedText,
 				question: input.question,
 				content: result.content,
-				quality: input.quality,
+				quality: "silver",
 				anchor: input.anchor,
 			});
 			await didacticUnitNoteStore.save(note);
@@ -3566,7 +3623,7 @@ export function createApp(options: CreateAppOptions) {
 					operation: "note_generation",
 					didacticUnitId: didacticUnit.id,
 					chapterIndex: input.chapterIndex,
-					quality: input.quality,
+					quality: "silver",
 					error:
 						error instanceof Error ?
 							error.message
@@ -3985,6 +4042,49 @@ export function createApp(options: CreateAppOptions) {
 		},
 	);
 
+	app.post(
+		[
+			"/api/didactic-unit/:id/chapters/:chapterIndex/unread",
+			"/api/didactic-unit/:id/modules/:chapterIndex/unread",
+		],
+		async (request, response) => {
+			const requestWithMockOwner = asRequestWithMockOwner(request);
+			const didacticUnit = await didacticUnitStore.getById(
+				requestWithMockOwner.mockOwner.id,
+				String(request.params.id),
+			);
+
+			if (!didacticUnit) {
+				response.status(404).json({error: "Didactic unit not found."});
+				return;
+			}
+
+			let chapterIndex;
+			try {
+				chapterIndex = parseChapterIndex(
+					String(request.params.chapterIndex),
+				);
+			} catch (error) {
+				response.status(400).json({
+					error:
+						error instanceof Error ?
+							error.message
+						:	"Invalid didactic unit module unread request.",
+				});
+				return;
+			}
+
+			const updatedDidacticUnit = resetDidacticUnitModuleReadProgress(
+				didacticUnit,
+				chapterIndex,
+			);
+			await didacticUnitStore.save(updatedDidacticUnit);
+			response.json(
+				await buildDidacticUnitResponse(updatedDidacticUnit, folderStore),
+			);
+		},
+	);
+
 	app.put(
 		[
 			"/api/didactic-unit/:id/chapters/:chapterIndex/reading-progress",
@@ -4201,7 +4301,10 @@ export function createApp(options: CreateAppOptions) {
 					reservation = await reserveGenerationCredits({
 						authService,
 						ownerId,
-						cost: resolveModuleRegenerationCost({quality}),
+					cost: resolveModuleRegenerationCost({
+						quality,
+						length: didacticUnit.length,
+					}),
 						reason: "module_regeneration",
 						metadata: {
 							operation: "module_regeneration",

@@ -4,6 +4,7 @@ import type {AuthService} from "../auth/core/service.js";
 import type {
 	AuthUser,
 	CreditBalances,
+	PublicCreditBalances,
 	UserBillingProfile,
 	UserStore,
 } from "../auth/core/types.js";
@@ -46,12 +47,26 @@ export type StripeClientLike = {
 	};
 };
 
-export interface PublicBillingProduct extends BillingProduct {
+export interface PublicBillingProduct extends Omit<BillingProduct, "credits"> {
+	credits: PublicCreditBalances;
 	stripeConfigured: boolean;
 }
 
 function hasAnyCredits(credits: CreditBalances): boolean {
-	return credits.bronze > 0 || credits.silver > 0 || credits.gold > 0;
+	return (
+		credits.bronze > 0 ||
+		credits.silver > 0 ||
+		credits.gold > 0 ||
+		credits.dark > 0
+	);
+}
+
+function toPublicCredits(credits: CreditBalances): PublicCreditBalances {
+	return {
+		bronze: credits.bronze,
+		silver: credits.silver,
+		gold: credits.gold,
+	};
 }
 
 function unixToDate(value: unknown): Date | undefined {
@@ -102,6 +117,7 @@ export class BillingService {
 		return {
 			products: BILLING_PRODUCTS.map((product) => ({
 				...product,
+				credits: toPublicCredits(product.credits),
 				stripeConfigured:
 					Boolean(this.config.stripeSecretKey) &&
 					Boolean(this.config.stripePriceIds[product.stripePriceEnvKey]),
@@ -359,7 +375,7 @@ export class BillingService {
 			return;
 		}
 
-		for (const coinType of ["bronze", "silver", "gold"] as const) {
+		for (const coinType of ["bronze", "silver", "gold", "dark"] as const) {
 			const amount = credits[coinType];
 			if (amount <= 0) {
 				continue;

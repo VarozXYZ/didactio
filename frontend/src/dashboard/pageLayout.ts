@@ -1332,7 +1332,7 @@ export function paginateHtmlContent({
 
 	const proseMeasure = document.createElement("div");
 	proseMeasure.className =
-		"unit-page-scope leading-[1.9] text-[#1D1D1F]";
+		"unit-page-scope text-[#1D1D1F]";
 	proseMeasure.style.width = `${contentWidth}px`;
 	proseMeasure.style.overflow = "hidden";
 

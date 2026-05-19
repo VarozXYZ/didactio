@@ -148,6 +148,8 @@ export function adaptDidacticUnitSummaryToDashboardItem(
 		title: summary.title,
 		subtitle: summary.topic,
 		folder: adaptFolderSummary(summary.folder),
+		modelUsed: summary.modelUsed ?? null,
+		length: summary.length,
 		status: resolveDisplayStatus(summary.status),
 		primaryProgressPercent:
 			canOpenEditor ?
@@ -228,6 +230,7 @@ export function adaptDidacticUnitPlanning(
 		moderationAttempts: detail.moderationAttempts,
 		level: detail.level,
 		depth: detail.depth,
+		learningProfile: detail.learningProfile ?? detail.level,
 		length: detail.length,
 		generationQuality: detail.generationQuality,
 		questionnaireEnabled: detail.questionnaireEnabled,
@@ -298,6 +301,7 @@ export function adaptDidacticUnitEditor(input: {
 		overview: input.unit.overview,
 		provider: input.unit.provider,
 		generationQuality: input.unit.generationQuality,
+		length: input.unit.length,
 		presentationTheme: input.unit.presentationTheme ?? null,
 		chapters: input.chapterSummaries.map((summary) =>
 			buildEditorChapter(

@@ -59,6 +59,12 @@ const MODERATION_MODEL_SELECTION: ModelSelection = {
 	modelId: "openai/gpt-oss-20b",
 };
 
+const SYLLABUS_MODEL_SELECTION: ModelSelection = {
+	provider: "deepseek",
+	model: "deepseek-v4-flash",
+	modelId: "deepseek/deepseek-v4-flash",
+};
+
 interface BaseStageResult {
 	provider: string;
 	model: string;
@@ -138,6 +144,117 @@ export function repairLearningActivityFeedbackJsonText(text: string): string | n
 		try {
 			const parsed = JSON.parse(candidate);
 			const validation = learningActivityFeedbackSchema.safeParse(parsed);
+
+			if (validation.success) {
+				return JSON.stringify(validation.data);
+			}
+		} catch {
+		}
+	}
+
+	return null;
+}
+
+function completeJsonObjectPrefix(text: string): string | null {
+	const start = text.indexOf("{");
+	if (start === -1) {
+		return null;
+	}
+
+	const stack: string[] = [];
+	let inString = false;
+	let escaped = false;
+	let output = "";
+
+	for (let index = start; index < text.length; index += 1) {
+		const char = text[index];
+
+		if (inString) {
+			if (escaped) {
+				output += char;
+				escaped = false;
+				continue;
+			}
+
+			if (char === "\\") {
+				output += char;
+				escaped = true;
+				continue;
+			}
+
+			if (char === "\"") {
+				output += char;
+				inString = false;
+				continue;
+			}
+
+			output += char === "\n" || char === "\r" ? " " : char;
+			continue;
+		}
+
+		if (char === "\"") {
+			output += char;
+			inString = true;
+			continue;
+		}
+
+		if (char === "{") {
+			stack.push("}");
+			output += char;
+			continue;
+		}
+
+		if (char === "[") {
+			stack.push("]");
+			output += char;
+			continue;
+		}
+
+		if (char === "}" || char === "]") {
+			if (stack.at(-1) !== char) {
+				break;
+			}
+
+			stack.pop();
+			output += char;
+			if (stack.length === 0) {
+				return output;
+			}
+			continue;
+		}
+
+		output += char;
+	}
+
+	if (!output || stack.length === 0) {
+		return null;
+	}
+
+	return `${output}${inString ? "\"" : ""}${stack.reverse().join("")}`;
+}
+
+export function repairModerationJsonText(text: string): string | null {
+	const normalized = text.replace(/<ï½œendâ–ofâ–thinkingï½œ>/g, "");
+	const candidates = [
+		...extractBalancedJsonObjects(normalized),
+		completeJsonObjectPrefix(normalized),
+	].filter((candidate): candidate is string => Boolean(candidate));
+
+	for (const candidate of candidates) {
+		try {
+			const parsed = JSON.parse(candidate) as Record<string, unknown>;
+			for (const key of [
+				"notes",
+				"folderName",
+				"folderReasoning",
+				"normalizedTopic",
+				"normalizedTopicTitle",
+			]) {
+				if (typeof parsed[key] === "string" && !parsed[key].trim()) {
+					delete parsed[key];
+				}
+			}
+			const validation = moderationSchema.safeParse(parsed);
 
 			if (validation.success) {
 				return JSON.stringify(validation.data);
@@ -451,7 +568,7 @@ export interface AiService {
 }
 
 const CONTENT_LENGTH_TOKENS: Record<DidacticUnitLength, number> = {
-	intro: 5000,
+	intro: 7500,
 	short: 7500,
 	long: 15000,
 	textbook: 32000,
@@ -471,8 +588,9 @@ function resolveStageMaxOutputTokens(
 ): number {
 	switch (stage) {
 		case "folder_classification":
-		case "moderation":
 			return 1200;
+		case "moderation":
+			return 2500;
 		case "summary":
 			return 1000;
 		case "activity_feedback":
@@ -559,6 +677,10 @@ export class GatewayAiService implements AiService {
 
 	private selectModerationModel(): ModelSelection {
 		return MODERATION_MODEL_SELECTION;
+	}
+
+	private selectSyllabusModel(): ModelSelection {
+		return SYLLABUS_MODEL_SELECTION;
 	}
 
 	private requireTierConfig(
@@ -754,6 +876,8 @@ export class GatewayAiService implements AiService {
 				schema: moderationSchema,
 				maxOutputTokens: resolveStageMaxOutputTokens("moderation"),
 				abortSignal: input.abortSignal,
+				experimental_repairText: async ({text}) =>
+					repairModerationJsonText(text),
 			});
 			const telemetry = await this.enrichAiCallTelemetry(
 				await collectAiCallTelemetry(result, Date.now() - startedAt),
@@ -835,6 +959,8 @@ export class GatewayAiService implements AiService {
 				schema: moderationSchema,
 				maxOutputTokens: resolveStageMaxOutputTokens("moderation"),
 				abortSignal: input.abortSignal,
+				experimental_repairText: async ({text}) =>
+					repairModerationJsonText(text),
 			});
 
 			for await (const partial of result.partialObjectStream) {
@@ -923,7 +1049,7 @@ export class GatewayAiService implements AiService {
 		},
 		callbacks: StructuredStreamCallbacks<SyllabusResult>,
 	): Promise<SyllabusResult> {
-		const selection = this.selectModel(input.tier, input.config);
+		const selection = this.selectSyllabusModel();
 		const prompt = buildSyllabusMarkdownPrompt({
 			topic: input.topic,
 			level: input.level,

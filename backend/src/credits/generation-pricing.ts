@@ -22,6 +22,13 @@ const UNIT_LENGTH_COSTS: Record<DidacticUnitLength, number> = {
 	textbook: 3,
 };
 
+const MODULE_REGENERATION_LENGTH_COSTS: Record<DidacticUnitLength, number> = {
+	intro: 1,
+	short: 1,
+	long: 3,
+	textbook: 5,
+};
+
 export function resolveUnitGenerationCost(input: {
 	quality: GenerationQuality;
 	length: DidacticUnitLength;
@@ -34,17 +41,18 @@ export function resolveUnitGenerationCost(input: {
 
 export function resolveSyllabusGenerationCost(): GenerationCoinCost {
 	return {
-		coinType: "bronze",
+		coinType: "dark",
 		amount: 1,
 	};
 }
 
 export function resolveModuleRegenerationCost(input: {
 	quality: GenerationQuality;
+	length: DidacticUnitLength;
 }): GenerationCoinCost {
 	return {
 		coinType: input.quality === "gold" ? "silver" : "bronze",
-		amount: input.quality === "gold" ? 5 : 1,
+		amount: MODULE_REGENERATION_LENGTH_COSTS[input.length],
 	};
 }
 
@@ -52,8 +60,8 @@ export function resolveActivityGenerationCost(input: {
 	quality: GenerationQuality;
 }): GenerationCoinCost {
 	return {
-		coinType: "silver",
-		amount: input.quality === "gold" ? 3 : 1,
+		coinType: input.quality === "gold" ? "silver" : "bronze",
+		amount: 1,
 	};
 }
 
@@ -61,16 +69,14 @@ export function resolveActivityFeedbackRefillCost(input: {
 	quality: GenerationQuality;
 }): GenerationCoinCost {
 	return {
-		coinType: input.quality,
+		coinType: input.quality === "gold" ? "silver" : "bronze",
 		amount: 1,
 	};
 }
 
-export function resolveNoteGenerationCost(input: {
-	quality: GenerationQuality;
-}): GenerationCoinCost {
+export function resolveNoteGenerationCost(): GenerationCoinCost {
 	return {
-		coinType: input.quality === "gold" ? "silver" : "bronze",
+		coinType: "dark",
 		amount: 1,
 	};
 }

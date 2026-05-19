@@ -148,8 +148,7 @@ describe("prompt quality helpers", () => {
 
 		expect(prompt).toContain("[Learner / Profile Context]");
 		expect(prompt).toContain("Improved topic brief");
-		expect(prompt).toContain("Declared learner level: beginner");
-		expect(prompt).toContain("Requested depth: intermediate");
+		expect(prompt).toContain("Learning profile: beginner");
 		expect(prompt).toContain("Requested length: long");
 		expect(prompt).toContain("Target module count: 9");
 		expect(prompt).toContain("Return a strict structured syllabus object.");
@@ -163,7 +162,7 @@ describe("prompt quality helpers", () => {
 	});
 
 	it("maps unit length to different syllabus chapter counts", () => {
-		expect(resolveTargetChapterCount("intro")).toBe(3);
+		expect(resolveTargetChapterCount("intro")).toBe(6);
 		expect(resolveTargetChapterCount("short")).toBe(6);
 		expect(resolveTargetChapterCount("long")).toBe(9);
 		expect(resolveTargetChapterCount("textbook")).toBe(12);
@@ -244,7 +243,7 @@ describe("prompt quality helpers", () => {
 		expect(prompt).toContain("### Module 1 Concepts:");
 		expect(prompt).toContain("Regeneration instruction from the user");
 		expect(prompt).toContain("The learner prefers script-based examples.");
-		expect(prompt).toContain("Requested depth: technical");
+		expect(prompt).toContain("Learning profile: beginner");
 		expect(prompt).toContain("Requested length: textbook");
 		expect(prompt).toContain("1. Conditionals");
 		expect(prompt).toContain(

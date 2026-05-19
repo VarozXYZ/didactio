@@ -150,11 +150,11 @@ import type {
 } from "../../../api/dashboardApi";
 import type {PlanningDetailViewModel, PlanningSyllabus} from "../../../types";
 import {Progress} from "@/components/ui/progress";
-import {CoinAmount, CoinIcon} from "@/components/Coin";
-import {
-	getSyllabusGenerationCost,
-	getUnitGenerationCost,
-} from "../../../utils/coinPricing";
+import {CoinAmount} from "@/components/Coin";
+import {getUnitGenerationCost} from "../../../utils/coinPricing";
+import type {GenerationModelOption} from "../../../utils/modelOptions";
+
+const VISIBLE_COIN_TYPES = ["bronze", "silver", "gold"] as const;
 
 type PartialPlanningSyllabus = {
 	title?: string;
@@ -188,8 +188,8 @@ type SyllabusStepProps = {
 	onGenerateSyllabus: (tier: BackendGenerationQuality) => Promise<void>;
 	onStartGeneration: (tier: BackendGenerationQuality) => Promise<void>;
 	credits: Record<BackendCoinType, number>;
-	canPaySyllabus: boolean;
 	canPaySelectedUnit: boolean;
+	modelOptions: GenerationModelOption[];
 };
 
 function ChapterAccordion({
@@ -437,30 +437,22 @@ export function SyllabusStep({
 	onGenerateSyllabus,
 	onStartGeneration,
 	credits,
-	canPaySyllabus,
 	canPaySelectedUnit,
+	modelOptions,
 }: SyllabusStepProps) {
 	const isWaiting = !hasSyllabus && !syllabusToRender;
 	const [hasChosen, setHasChosen] = useState(false);
-	const syllabusCost = getSyllabusGenerationCost();
 	const unitCost = getUnitGenerationCost({
 		quality: selectedGenerationTier,
 		length: planning?.length ?? "short",
 	});
-
 	const choose = (decision: "accept" | "reject") => {
 		setReviewDecision(decision);
 		setHasChosen(true);
 	};
 
 	const undoChoice = () => setHasChosen(false);
-	const qualityOptions: Array<{
-		quality: BackendGenerationQuality;
-		label: string;
-	}> = [
-		{quality: "silver", label: "Silver"},
-		{quality: "gold", label: "Gold"},
-	];
+	const qualityOptions = modelOptions;
 
 	return (
 		<div className="space-y-4">
@@ -476,11 +468,6 @@ export function SyllabusStep({
 							className="h-1.5 animate-pulse"
 						/>
 					</div>
-					<p className="mt-3 text-[12px] text-[#86868B]">
-						{isStreamingSyllabus ?
-							"Drafting your syllabus…"
-						:	"Almost there…"}
-					</p>
 				</div>
 			)}
 
@@ -573,7 +560,7 @@ export function SyllabusStep({
 					{hasChosen && reviewDecision === "accept" && (
 						<div className="flex animate-in fade-in slide-in-from-bottom-2 flex-col items-center gap-3 duration-200">
 							<div
-								className="inline-flex rounded-[10px] bg-[#F5F5F7] p-0.5"
+								className="inline-flex max-w-full items-center rounded-[10px] bg-[#F5F5F7] p-0.5"
 								style={{border: "1px solid rgba(0,0,0,0.06)"}}
 							>
 								{qualityOptions.map((option) => (
@@ -585,37 +572,47 @@ export function SyllabusStep({
 												option.quality,
 											)
 										}
-										className={`inline-flex items-center gap-1.5 rounded-[8px] px-4 py-1.5 text-[12px] font-medium transition-all ${
+										className={`inline-flex h-9 min-w-0 items-center justify-center gap-1.5 rounded-[8px] px-4 text-[12px] font-semibold transition-all ${
 											selectedGenerationTier ===
 											option.quality ?
 												"bg-white text-[#1D1D1F] shadow-[0_1px_3px_rgba(0,0,0,0.08)]"
 											:	"text-[#6E6E73] hover:text-[#1D1D1F]"
 										}`}
 									>
-										<CoinIcon
-											type={option.quality}
-											size={16}
-										/>
-										{option.label}
+										{option.icon ? (
+											<img
+												src={option.icon}
+												alt=""
+												className="h-4 w-4 rounded-full object-contain"
+											/>
+										) : null}
+										<span className="max-w-[160px] truncate">
+											{option.label}
+										</span>
 									</button>
 								))}
 							</div>
-							<div className="flex items-center gap-3 text-[12px] text-[#6E6E73]">
-								<span>
-									Unit cost:{" "}
+							<div className="flex w-full max-w-[430px] items-center justify-between gap-5 text-[12px] font-bold text-[#1D1D1F]">
+								<span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+									Cost:
 									<CoinAmount
 										type={unitCost.coinType}
 										amount={unitCost.amount}
 										size={16}
 									/>
 								</span>
-								<span>
-									Balance:{" "}
-									<CoinAmount
-										type={unitCost.coinType}
-										amount={credits[unitCost.coinType]}
-										size={16}
-									/>
+								<span className="inline-flex min-w-0 items-center justify-end gap-1.5 whitespace-nowrap">
+									Current balance:
+									<span className="inline-flex items-center gap-2">
+										{VISIBLE_COIN_TYPES.map((coinType) => (
+											<CoinAmount
+												key={coinType}
+												type={coinType}
+												amount={credits[coinType]}
+												size={16}
+											/>
+										))}
+									</span>
 								</span>
 							</div>
 							<StartGenerationButton
@@ -635,14 +632,9 @@ export function SyllabusStep({
 					)}
 
 					{hasChosen && reviewDecision === "reject" && (
-						<div className="animate-in fade-in slide-in-from-bottom-2 w-full max-w-lg duration-200">
-							<div className="flex items-stretch gap-3">
-								<div className="relative min-h-[76px] flex-1">
-									{!regenerationContext && (
-										<div className="pointer-events-none absolute inset-0 flex items-center justify-center px-4 text-center text-[13px] italic leading-relaxed text-[#AEAEB2]/50">
-											What would you like changed?
-										</div>
-									)}
+						<div className="animate-in fade-in slide-in-from-bottom-2 w-full max-w-2xl duration-200">
+							<div className="flex items-center gap-3">
+								<div className="relative flex-1">
 									<textarea
 										rows={1}
 										value={regenerationContext}
@@ -653,8 +645,8 @@ export function SyllabusStep({
 											e.target.style.height = "auto";
 											e.target.style.height = `${e.target.scrollHeight}px`;
 										}}
-										placeholder=""
-										className="min-h-[76px] w-full resize-none overflow-hidden rounded-[14px] px-4 py-2.5 text-[13px] leading-relaxed text-[#1D1D1F] focus:outline-none"
+										placeholder="Context for regeneration"
+										className="min-h-[44px] w-full resize-none overflow-hidden rounded-[14px] px-4 py-[11px] text-[13px] font-medium leading-[20px] text-[#1D1D1F] placeholder:text-[#8E8E93] focus:outline-none"
 										style={{
 											background: "rgba(255,255,255,0.7)",
 											border: "1px solid rgba(0,0,0,0.07)",
@@ -664,68 +656,17 @@ export function SyllabusStep({
 										}}
 									/>
 								</div>
-								<div className="flex shrink-0 flex-col items-stretch gap-2">
-									<div
-										className="inline-flex self-center rounded-[10px] bg-[#F5F5F7] p-0.5"
-										style={{
-											border: "1px solid rgba(0,0,0,0.06)",
-										}}
-									>
-										{qualityOptions.map((option) => (
-											<button
-												key={option.quality}
-												type="button"
-												onClick={() =>
-													setSelectedGenerationTier(
-														option.quality,
-													)
-												}
-												className={`inline-flex items-center gap-1 rounded-[8px] px-3 py-1 text-[12px] font-medium transition-all ${
-													selectedGenerationTier ===
-													option.quality ?
-														"bg-white text-[#1D1D1F] shadow-[0_1px_3px_rgba(0,0,0,0.08)]"
-													:	"text-[#6E6E73] hover:text-[#1D1D1F]"
-												}`}
-											>
-												<CoinIcon
-													type={option.quality}
-													size={15}
-												/>
-												{option.label}
-											</button>
-										))}
-									</div>
-									<div className="self-center text-[11px] text-[#6E6E73]">
-										Syllabus:{" "}
-										<CoinAmount
-											type={syllabusCost.coinType}
-											amount={syllabusCost.amount}
-											size={15}
-										/>{" "}
-										/ balance{" "}
-										<CoinAmount
-											type={syllabusCost.coinType}
-											amount={
-												credits[
-													syllabusCost.coinType
-												]
-											}
-											size={15}
-										/>
-									</div>
+								<div className="flex shrink-0 items-center">
 									<button
 										type="button"
 										disabled={
 											isSubmitting ||
-											!regenerationContext.trim() ||
-											!canPaySyllabus
+											!regenerationContext.trim()
 										}
 										onClick={() =>
-											void onGenerateSyllabus(
-												selectedGenerationTier,
-											)
+											void onGenerateSyllabus("silver")
 										}
-										className="rounded-[12px] bg-[#1D1D1F] px-4 py-2 text-[13px] font-medium text-white transition-colors hover:bg-[#2C2C2E] disabled:opacity-40"
+										className="h-[44px] rounded-[12px] bg-[#1D1D1F] px-5 text-[13px] font-bold text-white transition-colors hover:bg-[#2C2C2E] disabled:opacity-40"
 									>
 										{isStreamingSyllabus ?
 											"Regenerating…"

@@ -6,6 +6,7 @@ import {
 	useRef,
 	useState,
 } from "react";
+import confetti from "canvas-confetti";
 import {
 	AlertCircle,
 	BookOpenCheck,
@@ -25,6 +26,7 @@ import {
 	MoreHorizontal,
 	Brain,
 	Printer,
+	PartyPopper,
 	Undo2,
 	RotateCcw,
 	Settings,
@@ -87,6 +89,7 @@ import {
 	type BackendLearningActivityType,
 	DashboardApiError,
 	dashboardApi,
+	getDashboardErrorMessage,
 } from "../../api/dashboardApi";
 import {
 	adaptDidacticUnitEditor,
@@ -118,7 +121,14 @@ import {
 import {getFolderEmoji} from "../../utils/folderDisplay";
 import {useAuth} from "../../../auth/AuthProvider";
 import {CoinAmount} from "@/components/Coin";
-import {getModuleRegenerationCost} from "../../utils/coinPricing";
+import {
+	getActivityGenerationCost,
+	getModuleRegenerationCost,
+} from "../../utils/coinPricing";
+import {
+	buildGenerationModelOptions,
+	type GenerationModelOption,
+} from "../../utils/modelOptions";
 import {
 	resolvePresentationTheme,
 	themeVars,
@@ -144,14 +154,18 @@ import {
 	getValidUnitNotesForChapter,
 } from "../../utils/unitNotes";
 
+const VISIBLE_COIN_TYPES = ["bronze", "silver", "gold"] as const;
+
 function ChapterStatusIcon({
 	status,
 	isCompleted,
 	isGenerating,
+	progress,
 }: {
 	status: "pending" | "ready" | "failed";
 	isCompleted: boolean;
 	isGenerating: boolean;
+	progress: number;
 }) {
 	const S = 14;
 	const SW = 1.5;
@@ -274,6 +288,19 @@ function ChapterStatusIcon({
 				stroke="#C7C7CC"
 				strokeWidth={SW}
 			/>
+			{progress > 0 && (
+				<circle
+					cx={cx}
+					cy={cy}
+					r={r}
+					fill="none"
+					stroke="#4ADE80"
+					strokeWidth={SW}
+					strokeDasharray={`${circ * Math.min(progress, 1)} ${circ}`}
+					strokeLinecap="round"
+					transform={`rotate(-90 ${cx} ${cy})`}
+				/>
+			)}
 		</svg>
 	);
 }
@@ -571,6 +598,17 @@ function buildReadPages(
 	return [...measuredPages, ...activityPages];
 }
 
+function getLastModuleContentPageIndex(pages: ReadPage[]): number {
+	for (let index = pages.length - 1; index >= 0; index -= 1) {
+		const page = pages[index];
+		if (page.kind === "content" || page.kind === "content_with_actions") {
+			return index;
+		}
+	}
+
+	return Math.max(0, pages.length - 1);
+}
+
 function calculateUnitStudyProgressPercent(
 	chapters: DidacticUnitEditorChapter[],
 	input: {
@@ -631,6 +669,27 @@ function buildDraft(
 		),
 		textStyle: chapter.textStyle,
 	};
+}
+
+function getInitialEditorChapterIndex(
+	workspace: DidacticUnitEditorViewModel,
+): number {
+	const chapters = workspace.chapters;
+	if (chapters.length === 0) {
+		return 0;
+	}
+
+	const firstIncompleteReady = chapters.find(
+		(chapter) => chapter.status === "ready" && !chapter.isCompleted,
+	);
+	if (firstIncompleteReady) {
+		return firstIncompleteReady.chapterIndex;
+	}
+
+	const lastReady = [...chapters]
+		.reverse()
+		.find((chapter) => chapter.status === "ready");
+	return lastReady?.chapterIndex ?? chapters[0].chapterIndex;
 }
 
 const FONT_ID_TO_PRESENTATION: Partial<
@@ -872,6 +931,8 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	const [isPostModuleActionPending, setIsPostModuleActionPending] =
 		useState(false);
 	const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
+	const [isUnitCompleteModalOpen, setIsUnitCompleteModalOpen] =
+		useState(false);
 	const [learningActivities, setLearningActivities] = useState<
 		Record<number, BackendLearningActivity[]>
 	>({});
@@ -892,8 +953,6 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	const [noteDraftContent, setNoteDraftContent] = useState("");
 	const [noteQuestionDraft, setNoteQuestionDraft] = useState("");
 	const [isNoteAiPromptOpen, setIsNoteAiPromptOpen] = useState(false);
-	const [noteQuality, setNoteQuality] =
-		useState<BackendGenerationQuality>("silver");
 	const [isNoteSaving, setIsNoteSaving] = useState(false);
 	const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
 	const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
@@ -907,6 +966,9 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		useState<BackendLearningActivityType>("multiple_choice");
 	const [activityQuality, setActivityQuality] =
 		useState<BackendGenerationQuality>("silver");
+	const [generationModelOptions, setGenerationModelOptions] = useState<
+		GenerationModelOption[]
+	>(() => buildGenerationModelOptions(null, null));
 	const [isActivityLoading, setIsActivityLoading] = useState(false);
 	const [isActivityAttemptSubmitting, setIsActivityAttemptSubmitting] =
 		useState(false);
@@ -920,6 +982,21 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	const [expandedOutlineSectionIds, setExpandedOutlineSectionIds] = useState<
 		string[]
 	>([]);
+
+	useEffect(() => {
+		void Promise.all([
+			dashboardApi.getAiConfig(),
+			dashboardApi.getAiConfigCatalog(),
+		])
+			.then(([config, catalog]) => {
+				setGenerationModelOptions(
+					buildGenerationModelOptions(config, catalog),
+				);
+			})
+			.catch(() => {
+				setGenerationModelOptions(buildGenerationModelOptions(null, null));
+			});
+	}, []);
 	const [openChapterActionsIndex, setOpenChapterActionsIndex] = useState<
 		number | null
 	>(null);
@@ -1218,7 +1295,14 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 					nextWorkspace.chapters.find(
 						(chapter) =>
 							chapter.chapterIndex ===
-							(preferredChapterIndex ?? activeChapterIndexRef.current),
+							(
+								preferredChapterIndex ??
+								(
+									options.silent ?
+										activeChapterIndexRef.current
+									:	getInitialEditorChapterIndex(nextWorkspace)
+								)
+							),
 					) ??
 					nextWorkspace.chapters[0] ??
 					null;
@@ -1284,12 +1368,51 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	}, [activeChapterIndex]);
 
 	useEffect(() => {
-		isEditModeRef.current = isEditMode;
-	}, [isEditMode]);
+		if (!isUnitCompleteModalOpen) {
+			return;
+		}
+
+		const duration = 2400;
+		const animationEnd = Date.now() + duration;
+		const colors = ["#4ADE80", "#22C55E", "#FACC15", "#60A5FA", "#F472B6"];
+		const randomInRange = (min: number, max: number) =>
+			Math.random() * (max - min) + min;
+
+		const frame = () => {
+			if (Date.now() > animationEnd) {
+				return;
+			}
+
+			confetti({
+				particleCount: 3,
+				angle: 60,
+				spread: 55,
+				startVelocity: 48,
+				origin: {x: 0, y: randomInRange(0.45, 0.7)},
+				colors,
+				zIndex: 70,
+				disableForReducedMotion: true,
+			});
+			confetti({
+				particleCount: 3,
+				angle: 120,
+				spread: 55,
+				startVelocity: 48,
+				origin: {x: 1, y: randomInRange(0.45, 0.7)},
+				colors,
+				zIndex: 70,
+				disableForReducedMotion: true,
+			});
+
+			window.requestAnimationFrame(frame);
+		};
+
+		frame();
+	}, [isUnitCompleteModalOpen]);
 
 	useEffect(() => {
-		setNoteQuality(unitGenerationTier ?? "silver");
-	}, [unitGenerationTier]);
+		isEditModeRef.current = isEditMode;
+	}, [isEditMode]);
 
 	const captureNoteSelection = useCallback(
 		(event?: {clientX: number; clientY: number; preventDefault?: () => void}) => {
@@ -1382,9 +1505,8 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		setNoteDraftContent(note.content);
 		setNoteQuestionDraft(note.question ?? "");
 		setIsNoteAiPromptOpen(Boolean(note.question));
-		setNoteQuality(note.quality ?? unitGenerationTier ?? "silver");
 		setIsNoteDialogOpen(true);
-	}, [unitGenerationTier, validUnitNotes]);
+	}, [validUnitNotes]);
 
 	const handleSaveCurrentNote = useCallback(async () => {
 		if (!noteDraftContent.trim()) {
@@ -1508,7 +1630,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				chapterIndex: sourceSelection.chapterIndex,
 				selectedText: sourceSelection.selectedText,
 				question: noteQuestionDraft.trim() || undefined,
-				quality: noteQuality,
+				quality: "silver",
 				anchor: sourceSelection.anchor,
 			});
 			if (activeNote) {
@@ -1529,7 +1651,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			await refreshUser();
 		} catch (error) {
 			toastError(
-				error instanceof Error ? error.message : "Failed to generate note.",
+				getDashboardErrorMessage(error, "Failed to generate note."),
 			);
 		} finally {
 			setIsNoteSaving(false);
@@ -1537,7 +1659,6 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	}, [
 		didacticUnitId,
 		activeNote,
-		noteQuality,
 		noteQuestionDraft,
 		pendingNoteSelection,
 		refreshUser,
@@ -2152,9 +2273,10 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			} catch (actionError) {
 				if (!isCancellingGenerationRef.current) {
 					toastError(
-						actionError instanceof Error ?
-							actionError.message
-						:	"Didactic unit action failed.",
+						getDashboardErrorMessage(
+							actionError,
+							"Didactic unit action failed.",
+						),
 					);
 				}
 				setIsSaving(false);
@@ -2636,24 +2758,44 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			return;
 		}
 
+		try {
+			await dashboardApi.completeDidacticUnitChapter(
+				didacticUnitId,
+				activeChapter.chapterIndex,
+			);
+			onDataChanged();
+		} catch (error) {
+			setIsPostModuleActionPending(false);
+			toastError(
+				error instanceof Error ?
+					error.message
+				:	"Could not save module completion.",
+			);
+			return;
+		}
+
 		const nextChapter =
 			workspace.chapters.find(
 				(chapter) =>
 					chapter.chapterIndex === activeChapter.chapterIndex + 1,
 			) ?? null;
 
-		setIsPostModuleActionPending(false);
-
 		if (nextChapter) {
-			setActiveChapterIndex(nextChapter.chapterIndex);
+			await loadWorkspace(nextChapter.chapterIndex, {
+				silent: true,
+			});
+			setIsPostModuleActionPending(false);
 			return;
 		}
 
-		navigate("/dashboard");
+		setIsPostModuleActionPending(false);
+		setIsUnitCompleteModalOpen(true);
 	}, [
 		activeChapter,
+		didacticUnitId,
 		isPostModuleActionPending,
-		navigate,
+		loadWorkspace,
+		onDataChanged,
 		persistReadProgress,
 		readPages.length,
 		workspace,
@@ -2666,6 +2808,54 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	const totalSpreads = Math.max(1, Math.ceil(totalVisiblePages / 2));
 	const canGoPrev = currentSpread > 0;
 	const canGoNext = currentSpread < totalSpreads - 1;
+
+	const completeChapterFromReading = useCallback(
+		(chapter: DidacticUnitEditorChapter) => {
+			if (chapter.isCompleted || chapter.status !== "ready") {
+				return;
+			}
+
+			applyReadingProgressLocally({
+				chapterIndex: chapter.chapterIndex,
+				readBlockIndex: Math.max(0, chapter.totalBlocks - 1),
+				readBlockOffset: chapter.htmlBlocks.at(-1)?.textLength ?? 0,
+				readBlocksVersion: chapter.htmlBlocksVersion,
+				totalBlocks: chapter.totalBlocks,
+				lastVisitedPageIndex: Math.max(0, readPages.length - 1),
+				isCompleted: true,
+				completedAt: new Date().toISOString(),
+			});
+
+			void dashboardApi
+				.completeDidacticUnitChapter(
+					didacticUnitId,
+					chapter.chapterIndex,
+				)
+				.then(() => {
+					onDataChanged();
+					const hasNextModule = workspace?.chapters.some(
+						(item) => item.chapterIndex > chapter.chapterIndex,
+					);
+					if (!hasNextModule) {
+						setIsUnitCompleteModalOpen(true);
+					}
+				})
+				.catch((error) => {
+					toastError(
+						error instanceof Error ?
+							error.message
+						:	"Could not save module completion.",
+					);
+				});
+		},
+		[
+			applyReadingProgressLocally,
+			didacticUnitId,
+			onDataChanged,
+			readPages.length,
+			workspace?.chapters,
+		],
+	);
 
 	const persistVisitedSpread = useCallback(
 		(nextSpread: number) => {
@@ -2681,6 +2871,8 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				0,
 				Math.min(nextSpread * 2 + 1, readPages.length - 1),
 			);
+			const lastModuleContentPageIndex =
+				getLastModuleContentPageIndex(readPages);
 			const visibleTextOffset = getReadTextOffsetForSpread(
 				measuredReadPages,
 				nextSpread,
@@ -2691,8 +2883,19 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				visibleTextOffset,
 				lastVisitedPageIndex,
 			);
+
+			if (lastVisitedPageIndex >= lastModuleContentPageIndex) {
+				completeChapterFromReading(activeChapter);
+			}
 		},
-		[activeChapter, isEditMode, measuredReadPages, persistReadProgress, readPages.length],
+		[
+			activeChapter,
+			completeChapterFromReading,
+			isEditMode,
+			measuredReadPages,
+			persistReadProgress,
+			readPages.length,
+		],
 	);
 
 	const goToSpreadIndex = useCallback(
@@ -2828,11 +3031,19 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			isStreamingGeneration &&
 			activeGeneratingChapterIndex !== null &&
 			activeGeneratingChapterIndex === chapter.chapterIndex;
+		const readProgress =
+			chapter.totalBlocks > 0 ?
+				Math.min(
+					1,
+					Math.max(0, (chapter.readBlockIndex + 1) / chapter.totalBlocks),
+				)
+			:	0;
 		return (
 			<ChapterStatusIcon
 				status={chapter.status}
 				isCompleted={chapter.isCompleted}
 				isGenerating={isGenerating}
+				progress={readProgress}
 			/>
 		);
 	};
@@ -2842,7 +3053,10 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	const hasConfiguredGenerationTier = unitGenerationTier !== null;
 	const regenerationCost =
 		unitGenerationTier ?
-			getModuleRegenerationCost({quality: unitGenerationTier})
+			getModuleRegenerationCost({
+				quality: unitGenerationTier,
+				length: workspace?.length ?? "short",
+			})
 		:	null;
 	const canPayRegeneration =
 		!regenerationCost ||
@@ -3025,9 +3239,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			setIsActivityModalOpen(false);
 		} catch (error) {
 			toastError(
-				error instanceof Error ?
-					error.message
-				:	"Could not create the activity.",
+				getDashboardErrorMessage(error, "Could not create the activity."),
 			);
 		} finally {
 			setIsActivityLoading(false);
@@ -3064,17 +3276,24 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	};
 
 	const handleRefillActivityAttempts = async (activityId: string) => {
-		const {activity} = await dashboardApi.refillActivityAttempts(activityId);
-		setLearningActivities((previous) => {
-			const chapterActivities = previous[activity.chapterIndex] ?? [];
-			return {
-				...previous,
-				[activity.chapterIndex]: chapterActivities.map((a) =>
-					a.id === activity.id ? activity : a,
-				),
-			};
-		});
-		void refreshUser();
+		try {
+			const {activity} = await dashboardApi.refillActivityAttempts(activityId);
+			setLearningActivities((previous) => {
+				const chapterActivities = previous[activity.chapterIndex] ?? [];
+				return {
+					...previous,
+					[activity.chapterIndex]: chapterActivities.map((a) =>
+						a.id === activity.id ? activity : a,
+					),
+				};
+			});
+			void refreshUser();
+		} catch (error) {
+			toastError(
+				getDashboardErrorMessage(error, "Could not refill attempts."),
+			);
+			throw error;
+		}
 	};
 
 	const handleDeleteLearningActivity = async (activityId: string) => {
@@ -3204,7 +3423,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				</button>
 				<button
 					className="group flex min-h-[164px] w-full flex-col rounded-[20px] border border-[#E5E5E7] bg-white p-5 text-left text-[#0F0F12] transition-all hover:-translate-y-0.5 hover:border-[#0F0F12] disabled:cursor-not-allowed disabled:opacity-60"
-					disabled={isSubmitting || isPostModuleActionPending}
+					disabled={isPostModuleActionPending}
 					onClick={() => {
 						void handlePostModulePrimaryAction();
 					}}
@@ -3370,18 +3589,15 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 								Model
 							</div>
 							<div className="grid gap-2 sm:grid-cols-2">
-								{[
-									{value: "silver" as const, label: "Silver model", cost: "1 silver", detail: "Fast practice generation"},
-									{value: "gold" as const, label: "Gold model", cost: "3 silver", detail: "Deeper activity and feedback"},
-								].map((option) => {
-									const selected = activityQuality === option.value;
+								{generationModelOptions.map((option) => {
+									const selected = activityQuality === option.quality;
 									return (
 										<button
-											key={option.value}
+											key={option.quality}
 											type="button"
-											onClick={() => setActivityQuality(option.value)}
+											onClick={() => setActivityQuality(option.quality)}
 											className={cn(
-												"relative flex items-center gap-3 rounded-2xl border p-3 text-left transition",
+												"relative flex h-[58px] items-center gap-3 rounded-2xl border px-3 text-left transition",
 												selected ?
 													"border-[#4ADE80] bg-white"
 												:	"border-[#E5E5E7] bg-[#F8F8F9] hover:border-[#D1D5DB]",
@@ -3394,19 +3610,56 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 													fill="white"
 												/>
 											)}
-											<span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#0F0F12] text-white">
-												<Brain size={17} />
+											<span className="flex h-9 w-9 shrink-0 items-center justify-center">
+												{option.icon ? (
+													<img
+														src={option.icon}
+														alt=""
+														className="h-6 w-6 object-contain"
+													/>
+												) : (
+													<Brain size={18} className="text-[#0F0F12]" />
+												)}
 											</span>
 											<span className="min-w-0">
-												<span className="block text-sm font-bold text-[#0F0F12]">{option.label}</span>
-												<span className="block text-xs text-[#6B7280]">{option.detail}</span>
-											</span>
-											<span className="ml-auto whitespace-nowrap rounded-full bg-[#F3F4F6] px-2.5 py-1 text-xs font-bold text-[#374151]">
-												{option.cost}
+												<span className="block truncate text-sm font-bold text-[#0F0F12]">
+													{option.label}
+												</span>
 											</span>
 										</button>
 									);
 								})}
+							</div>
+							<div className="mt-3 flex items-center justify-between gap-5 text-xs font-bold text-[#0F0F12]">
+								<span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+									Cost:
+									<CoinAmount
+										type={
+											getActivityGenerationCost({
+												quality: activityQuality,
+											}).coinType
+										}
+										amount={
+											getActivityGenerationCost({
+												quality: activityQuality,
+											}).amount
+										}
+										size={16}
+									/>
+								</span>
+								<span className="inline-flex min-w-0 items-center justify-end gap-1.5 whitespace-nowrap">
+									Current balance:
+									<span className="inline-flex items-center gap-2">
+										{VISIBLE_COIN_TYPES.map((coinType) => (
+											<CoinAmount
+												key={coinType}
+												type={coinType}
+												amount={user?.credits[coinType] ?? 0}
+												size={16}
+											/>
+										))}
+									</span>
+								</span>
 							</div>
 						</div>
 
@@ -3500,7 +3753,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 							<TiptapHtmlEditor
 								key={`content-${didacticUnitId}-${activeChapter.chapterIndex}-${pageIndex}-edit`}
 								contentClassName={cn(
-									"leading-[1.9] text-[#1D1D1F] outline-none",
+									"text-[#1D1D1F] outline-none",
 									extraContent ?
 										"min-h-0 w-full shrink-0 overflow-visible pb-1"
 									:	"h-full min-h-full overflow-auto",
@@ -3521,7 +3774,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 						:	<ChapterRenderer
 								html={renderedHtml}
 								className={cn(
-									"unit-page-scope leading-[1.9] text-[#1D1D1F]",
+									"unit-page-scope text-[#1D1D1F]",
 									extraContent ?
 										"min-h-0 w-full shrink-0 overflow-visible pb-1"
 									:	"h-full min-h-full overflow-auto",
@@ -3658,7 +3911,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 						<TiptapHtmlEditor
 							key={`content-${didacticUnitId}-${activeChapter.chapterIndex}-0-edit`}
 							contentClassName={cn(
-								"leading-[1.9] text-[#1D1D1F] outline-none",
+								"text-[#1D1D1F] outline-none",
 								extraContent ?
 									"min-h-0 w-full shrink-0 overflow-visible pb-1"
 								:	"h-full min-h-full overflow-auto",
@@ -3676,7 +3929,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 					:	<ChapterRenderer
 							html={renderedHtml}
 							className={cn(
-								"unit-page-scope leading-[1.9] text-[#1D1D1F]",
+								"unit-page-scope text-[#1D1D1F]",
 								extraContent ?
 									"min-h-0 w-full shrink-0 overflow-visible pb-1"
 								:	"h-full min-h-full overflow-auto",
@@ -4079,6 +4332,8 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 							canPayRegeneration;
 						const canMarkRead =
 							chapter.status === "ready" && !chapter.isCompleted;
+						const canMarkUnread =
+							chapter.status === "ready" && chapter.isCompleted;
 						const canCreateActivity = chapter.status === "ready";
 						const showModuleOutline =
 							isActive &&
@@ -4279,6 +4534,32 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 														className="text-[#86868B]"
 													/>
 													Mark as read
+												</DropdownMenuItem>
+											:	null}
+											{canMarkUnread ?
+												<DropdownMenuItem
+													disabled={isSubmitting}
+													onSelect={() => {
+														void runAction(
+															() =>
+																dashboardApi.markDidacticUnitChapterUnread(
+																	didacticUnitId,
+																	chapter.chapterIndex,
+																),
+															{
+																chapterIndex:
+																	activeChapterIndexRef.current,
+																preserveSpread: true,
+																silentRefresh: true,
+															},
+														);
+													}}
+												>
+													<Undo2
+														size={14}
+														className="text-[#86868B]"
+													/>
+													Mark as unread
 												</DropdownMenuItem>
 											:	null}
 										</DropdownMenuContent>
@@ -4569,6 +4850,12 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 												{
 													...previous,
 													presentationTheme,
+													chapters: previous.chapters.map(
+														(chapter) => ({
+															...chapter,
+															textStyle,
+														}),
+													),
 												}
 											:	previous,
 										);
@@ -5056,6 +5343,48 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			</main>
 
 			<Dialog
+				open={isUnitCompleteModalOpen}
+				onOpenChange={setIsUnitCompleteModalOpen}
+			>
+				<DialogContent className="overflow-hidden p-0 text-center sm:max-w-[460px]">
+					<div className="relative px-7 pt-8 pb-6">
+						<div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#DCFCE7] text-[#16A34A] shadow-[0_14px_40px_rgba(34,197,94,0.22)]">
+							<PartyPopper size={30} />
+						</div>
+						<DialogHeader className="border-0 px-0 pb-0 pt-5 text-center">
+							<DialogTitle className="text-[24px] font-bold tracking-tight text-[#0F0F12]">
+								Congratulations
+							</DialogTitle>
+							<DialogDescription className="mx-auto mt-2 max-w-[330px] text-[14px] leading-relaxed text-[#6B7280]">
+								You have finished every module in this unit. Keep practicing to reinforce the material, or return to your dashboard.
+							</DialogDescription>
+						</DialogHeader>
+					</div>
+					<DialogFooter className="grid grid-cols-1 gap-2 border-t border-[#F0F0F2] bg-[#FAFAFB] px-5 py-4 sm:grid-cols-2">
+						<Button
+							type="button"
+							variant="outline"
+							className="h-10 rounded-full font-semibold"
+							onClick={() => {
+								setIsUnitCompleteModalOpen(false);
+								setActivityScope("current_module");
+								setIsActivityModalOpen(true);
+							}}
+						>
+							Keep practicing
+						</Button>
+						<Button
+							type="button"
+							className="h-10 rounded-full bg-[#0F0F12] font-semibold text-white hover:bg-[#2A2A2D]"
+							onClick={() => navigate("/dashboard")}
+						>
+							Go to dashboard
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+
+			<Dialog
 				open={isNoteDialogOpen}
 				onOpenChange={(open) => {
 					setIsNoteDialogOpen(open);
@@ -5147,30 +5476,6 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 										placeholder="What do you want to clarify?"
 									/>
 								)}
-								<div className="mt-3 grid grid-cols-2 gap-2">
-										{(["silver", "gold"] as const).map((quality) => (
-											<button
-												key={quality}
-												className={cn(
-													"rounded-[12px] border px-3 py-2 text-left transition",
-													noteQuality === quality ?
-														"border-[#34C759] bg-[#F0FDF4] text-[#0F0F12] shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
-													:	"border-[#E5E5E7] bg-[#FAFAFA] text-[#6E6E73] hover:bg-white",
-												)}
-												onClick={() => setNoteQuality(quality)}
-												type="button"
-											>
-												<span className="block text-[12px] font-bold capitalize">
-													{quality}
-												</span>
-												<span className="mt-0.5 block text-[11px] font-medium">
-													{quality === "silver" ?
-														"Costs 1 bronze"
-													:	"Costs 1 silver"}
-												</span>
-											</button>
-										))}
-									</div>
 								</div>
 						</div>
 					)}
@@ -5365,10 +5670,15 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 										in the header.
 									</>
 								}
-								<div className="flex items-center gap-2">
-									<span>This action will cost</span>
-									<CoinAmount type="bronze" amount={1} />
-								</div>
+								{regenerationCost && (
+									<div className="flex items-center gap-2">
+										<span>This action will cost</span>
+										<CoinAmount
+											type={regenerationCost.coinType}
+											amount={regenerationCost.amount}
+										/>
+									</div>
+								)}
 							</div>
 						</AlertDialogDescription>
 					</AlertDialogHeader>

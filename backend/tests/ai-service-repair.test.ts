@@ -2,6 +2,7 @@ import {describe, expect, it} from "vitest";
 import {
 	repairLearningActivityFeedbackJsonText,
 	repairLearningActivityJsonText,
+	repairModerationJsonText,
 } from "../src/ai/service.js";
 
 describe("learning activity JSON repair", () => {
@@ -71,6 +72,20 @@ I will grade each answer briefly.<｜end▁of▁thinking｜>{
 					simplifiedScore: "Almost there",
 				},
 			],
+		});
+	});
+});
+
+describe("moderation JSON repair", () => {
+	it("closes and validates a moderation object truncated inside a string", () => {
+		const repaired = repairModerationJsonText(`{"approved": true, "notes": "", "normalizedTopic": "Nutrición deportiva", "improvedTopicBrief": "Curso para principiantes en Nutrición Deportiva: introducción a los fundamentos científicos de la alimentación atlética.", "reasoningNotes": "El tema es educativo y no contiene ninguna instrucción prohibida.", "folderName": "General", "folderReasoning": "El tema abarca información de nutrición general aplicada al deporte, sin enfocarse en un área.
+`);
+
+		expect(repaired).not.toBeNull();
+		expect(JSON.parse(repaired ?? "{}")).toMatchObject({
+			approved: true,
+			normalizedTopic: "Nutrición deportiva",
+			folderName: "General",
 		});
 	});
 });

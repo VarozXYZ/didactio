@@ -5,6 +5,7 @@ import type {
 	DidacticUnitDepth,
 	DidacticUnitLength,
 	DidacticUnitLevel,
+	DidacticUnitLearningProfile,
 	DidacticUnitFolderAssignmentMode,
 	DidacticUnitModule,
 	DidacticUnitNextAction,
@@ -51,6 +52,7 @@ export interface DidacticUnit {
 	learningGoals: string[];
 	keywords: string[];
 	level: DidacticUnitLevel;
+	learningProfile?: DidacticUnitLearningProfile;
 	modules: DidacticUnitModule[];
 	chapters: DidacticUnitSyllabusChapter[];
 	additionalContext?: string;
@@ -117,6 +119,7 @@ export function createDidacticUnit(
 		learningGoals: [],
 		keywords: [],
 		level: input.level,
+		learningProfile: input.learningProfile,
 		modules: [],
 		chapters: [],
 		additionalContext: input.additionalContext,

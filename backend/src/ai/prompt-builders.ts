@@ -20,7 +20,7 @@ export const TARGET_CHAPTER_COUNT_BY_LENGTH: Record<
 	DidacticUnitLength,
 	number
 > = {
-	intro: 3,
+	intro: 6,
 	short: 6,
 	long: 9,
 	textbook: 12,
@@ -245,6 +245,17 @@ export function buildGatewaySystemPrompt(
 		case "note":
 			return "You write concise study notes for selected lesson text. Return only the note content.";
 	}
+}
+
+function learningProfileInstruction(input: {
+	level: DidacticUnitLevel;
+	depth: DidacticUnitDepth;
+}): string {
+	return [
+		`Learning profile: ${input.level}`,
+		learnerLevelInstruction(input.level),
+		depthInstruction(input.depth),
+	].join(" ");
 }
 
 export function buildDidacticUnitNotePrompt(input: {
@@ -626,13 +637,14 @@ export function buildSyllabusMarkdownPrompt(input: {
 			"The syllabus must use modules that progress from conceptual understanding to practical application to independent creation.",
 		]),
 		buildSection("Learner / Profile Context", [
-			`Declared learner level: ${input.level}`,
+			learningProfileInstruction({
+				level: input.level,
+				depth: input.depth,
+			}),
 			"Learner questionnaire context:",
 			formatQuestionnaireContext(input.questionnaireAnswers),
-			`Requested depth: ${input.depth}`,
 			`Requested length: ${input.length}`,
 			`Target module count: ${targetModuleCount}`,
-			depthInstruction(input.depth),
 			contentLengthInstruction(input.length),
 		]),
 		buildSection(
@@ -685,11 +697,12 @@ export function buildChapterHtmlPrompt(input: {
 	return [
 		buildSection("Course Overview", [
 			`Main Topic: ${input.syllabus.topic}`,
-			`Student Level: ${input.level}`,
+			learningProfileInstruction({
+				level: input.level,
+				depth: input.depth,
+			}),
 			`Course Description: ${input.syllabus.description}`,
-			`Requested depth: ${input.depth}`,
 			`Requested length: ${input.length}`,
-			depthInstruction(input.depth),
 			contentLengthInstruction(input.length),
 			"Learner questionnaire context:",
 			formatQuestionnaireContext(input.questionnaireAnswers),

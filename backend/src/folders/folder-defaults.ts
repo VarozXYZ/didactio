@@ -42,6 +42,7 @@ const DEFAULT_FOLDER_DEFINITIONS: DefaultFolderDefinition[] = [
 export const CUSTOM_FOLDER_ICON = "folder";
 export const CUSTOM_FOLDER_COLOR = "#6B7280";
 export const GENERAL_FOLDER_SLUG = "general";
+export const MAX_FOLDER_NAME_LENGTH = 24;
 const defaultFolderSeedsInFlight = new Map<string, Promise<Folder[]>>();
 
 export function normalizeFolderName(name: string): string {

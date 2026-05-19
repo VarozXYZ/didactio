@@ -76,7 +76,7 @@ describe("didactic unit notes", () => {
 		expect(empty.body.notes).toHaveLength(0);
 	});
 
-	it("generates silver and gold AI notes with the configured coin costs", async () => {
+	it("generates AI notes with standard model and hidden dark coin costs", async () => {
 		const {app, unit, anchor} = await createGeneratedUnitWithAnchor();
 		const authService = app.locals.authService as AuthService;
 		await authService.adjustUserCredits({
@@ -117,12 +117,13 @@ describe("didactic unit notes", () => {
 		expect(gold.status).toBe(201);
 		expect(gold.body.note).toMatchObject({
 			source: "ai",
-			quality: "gold",
+			quality: "silver",
 		});
 
 		const after = await authService.getUserById("mock-user");
-		expect(after?.credits.bronze).toBe((before?.credits.bronze ?? 0) - 1);
-		expect(after?.credits.silver).toBe((before?.credits.silver ?? 0) - 1);
+		expect(after?.credits.dark).toBe((before?.credits.dark ?? 0) - 2);
+		expect(after?.credits.bronze).toBe(before?.credits.bronze);
+		expect(after?.credits.silver).toBe(before?.credits.silver);
 	});
 
 	it("refunds credits when AI note generation fails", async () => {

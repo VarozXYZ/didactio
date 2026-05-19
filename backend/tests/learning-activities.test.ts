@@ -10,7 +10,7 @@ import {
 import {createMockAiService} from "./helpers/mock-ai-service.js";
 
 describe("learning activities", () => {
-	it("creates a structured activity for a generated module and charges silver once", async () => {
+	it("creates a structured activity for a generated module and charges bronze once", async () => {
 		const app = createTestApp();
 		const unit = await createApprovedDidacticUnit(app);
 		await generateDidacticUnitChapter(app, unit.id, 0);
@@ -35,8 +35,8 @@ describe("learning activities", () => {
 			quality: "silver",
 			feedbackAttemptLimit: 3,
 		});
-		expect((await authService.getUserById("mock-user"))?.credits.silver).toBe(
-			(before?.credits.silver ?? 0) - 1,
+		expect((await authService.getUserById("mock-user"))?.credits.bronze).toBe(
+			(before?.credits.bronze ?? 0) - 1,
 		);
 
 		const listed = await request(app).get(
@@ -120,9 +120,11 @@ describe("learning activities", () => {
 		const moduleOneWithPractice = await request(app).get(
 			`/api/didactic-unit/${unit.id}/modules/0/activities`,
 		);
-		expect(moduleOneWithPractice.body.activities.at(-1).id).toBe(
-			first.body.activity.id,
-		);
+		expect(
+			moduleOneWithPractice.body.activities.map(
+				(activity: {id: string}) => activity.id,
+			),
+		).toContain(first.body.activity.id);
 	});
 
 	it("passes existing unit flashcards to the prompt when adding cards from a new module", async () => {
@@ -170,7 +172,7 @@ describe("learning activities", () => {
 		);
 	});
 
-	it("charges three silver coins for the advanced activity option", async () => {
+	it("charges one silver coin for the pro activity option", async () => {
 		const app = createTestApp();
 		const unit = await createApprovedDidacticUnit(app);
 		await generateDidacticUnitChapter(app, unit.id, 0);
@@ -188,7 +190,7 @@ describe("learning activities", () => {
 
 		expect(response.status).toBe(201);
 		expect((await authService.getUserById("mock-user"))?.credits.silver).toBe(
-			(before?.credits.silver ?? 0) - 3,
+			(before?.credits.silver ?? 0) - 1,
 		);
 	});
 });

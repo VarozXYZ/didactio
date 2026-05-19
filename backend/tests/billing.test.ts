@@ -132,7 +132,12 @@ describe("billing", () => {
 
 		const authService = app.locals.authService as AuthService;
 		const user = await authService.getUserById("mock-user");
-		expect(user?.credits).toEqual({bronze: 80, silver: 40, gold: 6});
+		expect(user?.credits).toEqual({
+			bronze: 80,
+			silver: 40,
+			gold: 6,
+			dark: 100,
+		});
 	});
 
 	it("grants subscription renewal credits once per invoice event", async () => {
@@ -165,7 +170,12 @@ describe("billing", () => {
 
 		const authService = app.locals.authService as AuthService;
 		const user = await authService.getUserById("mock-user");
-		expect(user?.credits).toEqual({bronze: 30, silver: 115, gold: 21});
+		expect(user?.credits).toEqual({
+			bronze: 30,
+			silver: 115,
+			gold: 21,
+			dark: 50,
+		});
 		expect(user?.billing).toMatchObject({
 			stripeSubscriptionId: "sub_test",
 			subscriptionStatus: "active",

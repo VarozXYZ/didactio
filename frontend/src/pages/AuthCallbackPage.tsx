@@ -23,15 +23,18 @@ function AuthCallbackPage() {
 					return;
 				}
 
-				setMessage(
-					error instanceof Error ?
-						error.message
-					:	"Google sign-in failed.",
-				);
+				const errorMessage =
+					error instanceof Error ? error.message : "Google sign-in failed.";
+				if (!errorMessage) {
+					navigate("/login", {replace: true});
+					return;
+				}
+
+				setMessage(errorMessage);
 				window.setTimeout(() => {
 					navigate("/login", {
 						replace: true,
-						state: {authError: error instanceof Error ? error.message : undefined},
+						state: {authError: errorMessage},
 					});
 				}, 900);
 			});

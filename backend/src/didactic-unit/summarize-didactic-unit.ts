@@ -13,6 +13,7 @@ export interface DidacticUnitSummary {
 	status: DidacticUnit["status"];
 	nextAction: DidacticUnit["nextAction"];
 	overview: string;
+	length: DidacticUnit["length"];
 	moduleCount: number;
 	generatedChapterCount: number;
 	readBlockCount: number;
@@ -122,6 +123,7 @@ export function summarizeDidacticUnit(
 		status: didacticUnit.status,
 		nextAction: didacticUnit.nextAction,
 		overview: didacticUnit.overview,
+		length: didacticUnit.length,
 		moduleCount,
 		generatedChapterCount,
 		readBlockCount,

@@ -32,20 +32,35 @@ import {
 } from "../../billing/pricing.js";
 
 const REFRESH_REUSE_GRACE_MS = 30_000;
-
-function emptyCredits(): CreditBalances {
-	return {
-		bronze: 0,
-		silver: 0,
-		gold: 0,
-	};
-}
+const INITIAL_DARK_CREDITS = 50;
+const INTERNAL_COIN_TYPES = ["bronze", "silver", "gold", "dark"] as const;
 
 const LAUNCH_GIFT_CREDITS: CreditBalances = {
 	bronze: 30,
 	silver: 15,
 	gold: 1,
+	dark: INITIAL_DARK_CREDITS,
 };
+
+function normalizeCredits(
+	credits: Partial<CreditBalances> | undefined,
+	options: {defaultDark: number},
+): CreditBalances {
+	return {
+		bronze: credits?.bronze ?? 0,
+		silver: credits?.silver ?? 0,
+		gold: credits?.gold ?? 0,
+		dark: credits?.dark ?? options.defaultDark,
+	};
+}
+
+function publicCredits(credits: CreditBalances) {
+	return {
+		bronze: credits.bronze,
+		silver: credits.silver,
+		gold: credits.gold,
+	};
+}
 
 export class AuthService {
 	constructor(
@@ -78,7 +93,7 @@ export class AuthService {
 		}
 
 		const role = this.resolveRoleForEmail(profile.email);
-		const user = await this.ensureLaunchGift(
+		const user = await this.ensureUserCredits(
 			await this.userStore.upsertFromGoogleProfile(profile, role),
 		);
 		if (user.status !== "active") {
@@ -169,7 +184,7 @@ export class AuthService {
 		}
 
 		const foundUser = await this.userStore.findById(session.userId);
-		const user = foundUser ? await this.ensureLaunchGift(foundUser) : null;
+		const user = foundUser ? await this.ensureUserCredits(foundUser) : null;
 		if (!user || user.status !== "active") {
 			await this.sessionStore.revokeAllForUser(session.userId);
 			throw new AuthError(
@@ -241,7 +256,7 @@ export class AuthService {
 
 	async getUserById(id: string): Promise<AuthUser | null> {
 		const user = await this.userStore.findById(id);
-		return user ? this.ensureLaunchGift(user) : null;
+		return user ? this.ensureUserCredits(user) : null;
 	}
 
 	async listUsers(): Promise<AuthUser[]> {
@@ -275,7 +290,7 @@ export class AuthService {
 		}
 
 		const foundUser = await this.userStore.findById(input.userId);
-		const user = foundUser ? await this.ensureLaunchGift(foundUser) : null;
+		const user = foundUser ? await this.ensureUserCredits(foundUser) : null;
 		if (!user) {
 			throw new AuthError("user_not_found", 404, "User not found.");
 		}
@@ -320,13 +335,13 @@ export class AuthService {
 	}): Promise<{user: AuthUser; transaction: CreditTransaction}> {
 		this.assertPositiveAmount(input.amount);
 		const foundUser = await this.userStore.findById(input.userId);
-		const user = foundUser ? await this.ensureLaunchGift(foundUser) : null;
+		const user = foundUser ? await this.ensureUserCredits(foundUser) : null;
 		if (!user) {
 			throw new AuthError("user_not_found", 404, "User not found.");
 		}
 
 		if (
-			input.coinType === "bronze" &&
+			(input.coinType === "bronze" || input.coinType === "dark") &&
 			isActiveBillingStatus(user.billing?.subscriptionStatus) &&
 			user.billing?.subscriptionTier === "teacher_pro"
 		) {
@@ -334,10 +349,11 @@ export class AuthService {
 			const periodStart = new Date();
 			periodStart.setUTCDate(1);
 			periodStart.setUTCHours(0, 0, 0, 0);
-			const coveredBronzeThisMonth = transactions
+			const coveredFreeUsageThisMonth = transactions
 				.filter(
 					(transaction) =>
-						transaction.coinType === "bronze" &&
+						(transaction.coinType === "bronze" ||
+							transaction.coinType === "dark") &&
 						transaction.direction === "debit" &&
 						transaction.createdAt >= periodStart &&
 						typeof transaction.metadata === "object" &&
@@ -347,7 +363,10 @@ export class AuthService {
 				)
 				.reduce((sum, transaction) => sum + transaction.amount, 0);
 
-			if (coveredBronzeThisMonth + input.amount <= BRONZE_FAIR_USE_MONTHLY_LIMIT) {
+			if (
+				coveredFreeUsageThisMonth + input.amount <=
+				BRONZE_FAIR_USE_MONTHLY_LIMIT
+			) {
 				const transaction = await this.createCreditTransaction({
 					userId: user.id,
 					coinType: input.coinType,
@@ -375,6 +394,13 @@ export class AuthService {
 		});
 
 		if (!updatedUser) {
+			if (input.coinType === "dark") {
+				throw new AuthError(
+					"free_generation_limit_reached",
+					402,
+					"You have reached the fair use limit for free AI generations. Please contact support.",
+				);
+			}
 			throw new AuthError(
 				"insufficient_credits",
 				402,
@@ -384,7 +410,11 @@ export class AuthService {
 						coinType: input.coinType,
 						amount: input.amount,
 					},
-					credits: user.credits ?? emptyCredits(),
+					credits: publicCredits(
+						normalizeCredits(user.credits, {
+							defaultDark: INITIAL_DARK_CREDITS,
+						}),
+					),
 				},
 			);
 		}
@@ -434,7 +464,9 @@ export class AuthService {
 	}
 
 	async listUserCreditTransactions(userId: string): Promise<CreditTransaction[]> {
-		return this.creditTransactionStore.listByUserId(userId);
+		return (await this.creditTransactionStore.listByUserId(userId)).filter(
+			(transaction) => transaction.coinType !== "dark",
+		);
 	}
 
 	async updateDefaultPresentationTheme(
@@ -488,7 +520,9 @@ export class AuthService {
 			locale: user.locale,
 			role: user.role,
 			status: user.status,
-			credits: user.credits ?? emptyCredits(),
+			credits: publicCredits(
+				normalizeCredits(user.credits, {defaultDark: INITIAL_DARK_CREDITS}),
+			),
 			billing: user.billing ?
 				{
 					stripeCustomerId: user.billing.stripeCustomerId,
@@ -519,9 +553,22 @@ export class AuthService {
 		}
 	}
 
-	private async ensureLaunchGift(user: AuthUser): Promise<AuthUser> {
+	private async ensureUserCredits(user: AuthUser): Promise<AuthUser> {
 		if (user.launchGiftGrantedAt) {
-			return user;
+			const normalizedCredits = normalizeCredits(user.credits, {
+				defaultDark: INITIAL_DARK_CREDITS,
+			});
+			if (user.credits?.dark === normalizedCredits.dark) {
+				return user;
+			}
+			const updatedUser = await this.userStore.updateCredits(
+				user.id,
+				normalizedCredits,
+			);
+			if (!updatedUser) {
+				throw new AuthError("user_not_found", 404, "User not found.");
+			}
+			return updatedUser;
 		}
 
 		const grantedAt = new Date();
@@ -538,7 +585,7 @@ export class AuthService {
 			updatedUser.launchGiftGrantedAt?.getTime() === grantedAt.getTime()
 		) {
 			await Promise.all(
-				(["bronze", "silver", "gold"] as const).map((coinType) =>
+				INTERNAL_COIN_TYPES.map((coinType) =>
 					this.createCreditTransaction({
 						userId: user.id,
 						coinType,

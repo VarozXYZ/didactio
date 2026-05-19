@@ -79,6 +79,42 @@ function paragraphMargin(
 	}
 }
 
+function tableSurface(stylePreset?: string): string {
+	switch (stylePreset) {
+		case "modern":
+			return "#F0F8F6";
+		case "plain":
+			return "#FAFBFC";
+		case "classic":
+		default:
+			return "#FFF8EF";
+	}
+}
+
+function tableHeaderSurface(stylePreset?: string): string {
+	switch (stylePreset) {
+		case "modern":
+			return "#DFF3EE";
+		case "plain":
+			return "#F1F5F9";
+		case "classic":
+		default:
+			return "#F3E5D3";
+	}
+}
+
+function tableBorder(stylePreset?: string): string {
+	switch (stylePreset) {
+		case "modern":
+			return "#B7DCD1";
+		case "plain":
+			return "#CBD5E1";
+		case "classic":
+		default:
+			return "#DEC7AE";
+	}
+}
+
 export function resolvePresentationTheme(
 	unitTheme?: PresentationTheme | null,
 	userTheme?: PresentationTheme | null,
@@ -105,5 +141,8 @@ export function themeVars(theme: PresentationTheme): CSSProperties {
 		"--unit-code-accent": theme.codeAccentColor ?? "#7A4E28",
 		"--unit-code-border": theme.codeBorderColor ?? "#E4D0BC",
 		"--unit-code-header-bg": theme.codeHeaderBackground ?? "#EEE1D0",
+		"--unit-table-bg": tableSurface(theme.stylePreset),
+		"--unit-table-header-bg": tableHeaderSurface(theme.stylePreset),
+		"--unit-table-border": tableBorder(theme.stylePreset),
 	} as CSSProperties;
 }

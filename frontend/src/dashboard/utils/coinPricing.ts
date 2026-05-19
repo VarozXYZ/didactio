@@ -12,13 +12,6 @@ const UNIT_LENGTH_COSTS: Record<UnitLength, number> = {
 	textbook: 3,
 };
 
-export function getSyllabusGenerationCost(): {
-	coinType: BackendCoinType;
-	amount: number;
-} {
-	return {coinType: "bronze", amount: 1};
-}
-
 export function getUnitGenerationCost(input: {
 	quality: BackendGenerationQuality;
 	length: UnitLength;
@@ -31,10 +24,24 @@ export function getUnitGenerationCost(input: {
 
 export function getModuleRegenerationCost(input: {
 	quality: BackendGenerationQuality;
+	length: UnitLength;
+}): {coinType: BackendCoinType; amount: number} {
+	const amount =
+		input.length === "textbook" ? 5
+		: input.length === "long" ? 3
+		: 1;
+	return {
+		coinType: input.quality === "gold" ? "silver" : "bronze",
+		amount,
+	};
+}
+
+export function getActivityGenerationCost(input: {
+	quality: BackendGenerationQuality;
 }): {coinType: BackendCoinType; amount: number} {
 	return {
 		coinType: input.quality === "gold" ? "silver" : "bronze",
-		amount: input.quality === "gold" ? 5 : 1,
+		amount: 1,
 	};
 }
 
@@ -42,7 +49,7 @@ export function getActivityFeedbackRefillCost(input: {
 	quality: BackendGenerationQuality;
 }): {coinType: BackendCoinType; amount: number} {
 	return {
-		coinType: input.quality,
+		coinType: input.quality === "gold" ? "silver" : "bronze",
 		amount: 1,
 	};
 }

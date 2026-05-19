@@ -61,6 +61,17 @@ type RefreshResponse = {
 type Listener = (snapshot: AuthSnapshot) => void;
 
 const SESSION_EXPIRED_MESSAGE = "Your session expired. Please sign in again.";
+const SILENT_REFRESH_ERROR_CODES = new Set([
+	"missing_refresh_token",
+	"invalid_refresh_token",
+	"refresh_token_reuse_detected",
+	"session_expired",
+	"session_mismatch",
+	"session_rotation_failed",
+	"unauthenticated",
+	"user_unavailable",
+]);
+const SILENT_OAUTH_ERROR_CODES = new Set(["google_auth_failed"]);
 
 let snapshot: AuthSnapshot = {
 	status: "loading",
@@ -115,22 +126,31 @@ function getPublicAuthErrorMessage(error: string, message: string): string {
 	return message;
 }
 
-async function requestRefresh(): Promise<string | null> {
-	const response = await fetch("/auth/refresh", {
-		method: "POST",
-		credentials: "include",
-	});
-
-	if (!response.ok) {
-		const {message, error} = await parseErrorBody(response);
+async function requestRefresh({surfaceError = false} = {}): Promise<string | null> {
+	let response: Response;
+	try {
+		response = await fetch("/auth/refresh", {
+			method: "POST",
+			credentials: "include",
+		});
+	} catch {
 		setSnapshot({
 			status: "unauthenticated",
 			user: null,
 			accessToken: null,
-			error:
-				error === "missing_refresh_token" ? null : (
-					getPublicAuthErrorMessage(error, message)
-				),
+			error: surfaceError ? "Could not restore your session. Please try again." : null,
+		});
+		return null;
+	}
+
+	if (!response.ok) {
+		const {message, error} = await parseErrorBody(response);
+		const shouldShowError = surfaceError && !SILENT_REFRESH_ERROR_CODES.has(error);
+		setSnapshot({
+			status: "unauthenticated",
+			user: null,
+			accessToken: null,
+			error: shouldShowError ? getPublicAuthErrorMessage(error, message) : null,
 		});
 		return null;
 	}
@@ -317,17 +337,20 @@ export const authClient = {
 		const error = params.get("error");
 
 		if (status !== "success") {
-			const message = error ? `Google sign-in failed: ${error}` : "Google sign-in failed.";
+			const message =
+				error && !SILENT_OAUTH_ERROR_CODES.has(error) ?
+					`Google sign-in failed: ${error}`
+				:	"";
 			setSnapshot({
 				status: "unauthenticated",
 				user: null,
 				accessToken: null,
-				error: message,
+				error: message || null,
 			});
 			throw new Error(message);
 		}
 
-		await this.refreshAccessToken();
+		await requestRefresh({surfaceError: true});
 		return snapshot;
 	},
 

@@ -3,14 +3,20 @@ import type {PresentationTheme} from "../../presentation-theme/types.js";
 export type AuthProvider = "google";
 export type UserRole = "admin" | "user";
 export type AuthUserStatus = "active" | "disabled";
-export type CreditCoinType = "bronze" | "silver" | "gold";
+export type CreditCoinType = "bronze" | "silver" | "gold" | "dark";
 export type CreditDirection = "credit" | "debit";
 
 export interface CreditBalances {
 	bronze: number;
 	silver: number;
 	gold: number;
+	dark: number;
 }
+
+export type PublicCreditBalances = Pick<
+	CreditBalances,
+	"bronze" | "silver" | "gold"
+>;
 
 export type BillingSubscriptionTier = "teacher" | "teacher_pro";
 
@@ -153,7 +159,7 @@ export interface PublicAuthUser {
 	locale?: string;
 	role: UserRole;
 	status: AuthUserStatus;
-	credits: CreditBalances;
+	credits: PublicCreditBalances;
 	billing?: {
 		stripeCustomerId?: string;
 		stripeSubscriptionId?: string;

@@ -44,14 +44,15 @@ describe("coin system", () => {
 
 		const authService = app.locals.authService as AuthService;
 		const user = await authService.getUserById("mock-user");
-		expect(user?.credits.bronze).toBe(29);
+		expect(user?.credits.bronze).toBe(30);
+		expect(user?.credits.dark).toBe(49);
 
 		await authService.adjustUserCredits({
 			userId: "mock-user",
 			actorUserId: "mock-user",
-			coinType: "bronze",
+			coinType: "dark",
 			direction: "debit",
-			amount: 29,
+			amount: 49,
 			reason: "test_exhaustion",
 		});
 
@@ -63,9 +64,7 @@ describe("coin system", () => {
 
 		expect(rejected.status).toBe(402);
 		expect(rejected.body).toMatchObject({
-			error: "insufficient_credits",
-			requiredCost: {coinType: "bronze", amount: 1},
-			credits: {bronze: 0},
+			error: "free_generation_limit_reached",
 		});
 	});
 
@@ -88,7 +87,7 @@ describe("coin system", () => {
 
 		await generateDidacticUnitChapter(app, syllabusReady.id, 0);
 		await generateDidacticUnitChapter(app, syllabusReady.id, 0);
-		expect((await authService.getUserById("mock-user"))?.credits.silver).toBe(10);
+		expect((await authService.getUserById("mock-user"))?.credits.silver).toBe(14);
 	});
 
 	it("does not charge admin users for generation operations", async () => {

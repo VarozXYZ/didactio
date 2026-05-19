@@ -1,5 +1,4 @@
 import {
-	Clock,
 	FolderInput,
 	MoreHorizontal,
 	PenLine,
@@ -30,6 +29,8 @@ import {
 	DropdownMenuTrigger,
 } from "../../../../components/ui/dropdown-menu";
 import {getFolderEmoji, getFolderVisuals} from "../../../utils/folderDisplay";
+import {getProviderLogo} from "../../../utils/modelOptions";
+import {LengthBadge} from "./LengthBadge";
 
 type UnitCardProps = {
 	allFolders: BackendFolder[];
@@ -52,13 +53,88 @@ export function UnitCard({
 }: UnitCardProps) {
 	const style = getFolderVisuals(unit.folder);
 	const folderEmoji = getFolderEmoji(unit.folder.icon);
+	const modelLogo = getProviderLogo(unit.modelUsed?.provider);
 	const handleOpenItem = () => onOpenItem(unit.id);
 	const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
 	return (
 		<>
 			<div className="group">
-				<div className="overflow-hidden rounded-2xl border border-[#E5E5E7] bg-white transition-all duration-300 hover:border-[#4ADE80] hover:shadow-lg">
+				<div className="relative overflow-hidden rounded-2xl border border-[#E5E5E7] bg-white transition-all duration-300 hover:border-[#4ADE80] hover:shadow-lg">
+					<DropdownMenu>
+						<DropdownMenuTrigger asChild>
+							<button
+								type="button"
+								className="absolute right-3 top-3 z-10 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-white/85 opacity-0 shadow-sm backdrop-blur-md transition-all hover:bg-white group-hover:opacity-100 data-[state=open]:bg-white data-[state=open]:opacity-100"
+								aria-label="Unit actions"
+							>
+								<MoreHorizontal
+									size={16}
+									className="text-[#86868B]"
+								/>
+							</button>
+						</DropdownMenuTrigger>
+						<DropdownMenuContent side="left" align="end">
+							{unit.canOpenEditor ?
+								<DropdownMenuItem
+									onSelect={() => onOpenEditor(unit.id)}
+								>
+									<PenLine />
+									Open editor
+								</DropdownMenuItem>
+							:	<DropdownMenuItem
+									onSelect={() => onOpenSetup(unit.id)}
+								>
+									<Settings2 />
+									Open Setup
+								</DropdownMenuItem>
+							}
+
+							{allFolders.filter((f) => f.id !== unit.folder.id)
+								.length > 0 && (
+								<DropdownMenuSub>
+									<DropdownMenuSubTrigger>
+										<FolderInput />
+										Move to folder
+									</DropdownMenuSubTrigger>
+									<DropdownMenuSubContent>
+										{allFolders
+											.filter(
+												(f) => f.id !== unit.folder.id,
+											)
+											.map((folder) => (
+												<DropdownMenuItem
+													key={folder.id}
+													onSelect={() =>
+														onMoveToFolder(
+															unit.id,
+															folder.id,
+														)
+													}
+												>
+													<span>
+														{getFolderEmoji(
+															folder.icon,
+														)}
+													</span>
+													{folder.name}
+												</DropdownMenuItem>
+											))}
+									</DropdownMenuSubContent>
+								</DropdownMenuSub>
+							)}
+
+							<DropdownMenuSeparator />
+							<DropdownMenuItem
+								destructive
+								onSelect={() => setShowDeleteDialog(true)}
+							>
+								<Trash2 />
+								Remove unit
+							</DropdownMenuItem>
+						</DropdownMenuContent>
+					</DropdownMenu>
+
 					<button
 						type="button"
 						onClick={handleOpenItem}
@@ -93,7 +169,7 @@ export function UnitCard({
 										className="h-full transition-all"
 										style={{
 											width: `${unit.primaryProgressPercent}%`,
-											backgroundColor: style.accentColor,
+											backgroundColor: "#4ADE80",
 										}}
 									/>
 								</div>
@@ -101,108 +177,25 @@ export function UnitCard({
 						</div>
 					</button>
 
-					<div className="p-5">
-						<div className="mb-2 flex items-start justify-between gap-2">
-							<button
-								type="button"
-								onClick={handleOpenItem}
-								className="min-w-0 flex-1 text-left"
-							>
-								<h3 className="line-clamp-2 text-[15px] font-semibold leading-snug text-[#1D1D1F] transition-colors group-hover:text-[#4ADE80]">
-									{unit.title}
-								</h3>
-							</button>
-							<DropdownMenu>
-								<DropdownMenuTrigger asChild>
-									<button
-										type="button"
-										className="cursor-pointer rounded-lg p-1.5 opacity-0 transition-all group-hover:bg-[#F5F5F7] group-hover:opacity-100 data-[state=open]:bg-[#F5F5F7] data-[state=open]:opacity-100"
-									>
-										<MoreHorizontal
-											size={16}
-											className="text-[#86868B]"
-										/>
-									</button>
-								</DropdownMenuTrigger>
-								<DropdownMenuContent side="left" align="end">
-									{unit.canOpenEditor ?
-										<DropdownMenuItem
-											onSelect={() =>
-												onOpenEditor(unit.id)
-											}
-										>
-											<PenLine />
-											Open editor
-										</DropdownMenuItem>
-									:	<DropdownMenuItem
-											onSelect={() =>
-												onOpenSetup(unit.id)
-											}
-										>
-											<Settings2 />
-											Open Setup
-										</DropdownMenuItem>
-									}
-
-									{allFolders.filter(
-										(f) => f.id !== unit.folder.id,
-									).length > 0 && (
-										<DropdownMenuSub>
-											<DropdownMenuSubTrigger>
-												<FolderInput />
-												Move to folder
-											</DropdownMenuSubTrigger>
-											<DropdownMenuSubContent>
-												{allFolders
-													.filter(
-														(f) =>
-															f.id !==
-															unit.folder.id,
-													)
-													.map((folder) => (
-														<DropdownMenuItem
-															key={folder.id}
-															onSelect={() =>
-																onMoveToFolder(
-																	unit.id,
-																	folder.id,
-																)
-															}
-														>
-															<span>
-																{getFolderEmoji(
-																	folder.icon,
-																)}
-															</span>
-															{folder.name}
-														</DropdownMenuItem>
-													))}
-											</DropdownMenuSubContent>
-										</DropdownMenuSub>
-									)}
-
-									<DropdownMenuSeparator />
-									<DropdownMenuItem
-										destructive
-										onSelect={() =>
-											setShowDeleteDialog(true)
-										}
-									>
-										<Trash2 />
-										Remove unit
-									</DropdownMenuItem>
-								</DropdownMenuContent>
-							</DropdownMenu>
-						</div>
+					<div className="px-5 py-5">
+						<button
+							type="button"
+							onClick={handleOpenItem}
+							className="flex min-h-[82px] w-full items-center justify-center text-center"
+						>
+							<h3 className="line-clamp-3 max-w-[92%] text-[16px] font-semibold leading-snug text-[#1D1D1F] transition-colors group-hover:text-[#4ADE80]">
+								{unit.title}
+							</h3>
+						</button>
 
 						<button
 							type="button"
 							onClick={handleOpenItem}
-							className="block w-full text-left"
+							className="mt-3 block w-full text-left"
 						>
-							<div className="mb-4 flex items-center gap-2">
+							<div className="flex min-w-0 items-center gap-2 text-[11px] text-[#86868B]">
 								<span
-									className="inline-flex min-w-0 max-w-[calc(100%-4.5rem)] shrink items-center gap-1.5 rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+									className="inline-flex w-fit min-w-0 max-w-[52%] shrink items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide"
 									style={{
 										backgroundColor: style.bgColor,
 										color: style.iconColor,
@@ -216,25 +209,28 @@ export function UnitCard({
 									</span>
 								</span>
 								{unit.canOpenEditor && (
-									<span className="ml-auto shrink-0 text-[11px] text-[#86868B]">
-										{unit.chapterCount}{" "}
-										{unit.chapterCount === 1 ?
-											"module"
-										:	"modules"}
-									</span>
+									<LengthBadge length={unit.length} />
 								)}
-							</div>
-
-							<div className="flex items-center justify-between text-[11px] text-[#86868B]">
-								<div className="flex items-center gap-1.5">
-									<Clock size={12} />
-									<span>{unit.lastActivityAt}</span>
-								</div>
+								<span className="flex-1" />
+								{modelLogo ?
+									<img
+										src={modelLogo}
+										alt={
+											unit.modelUsed?.label ??
+											"Model used"
+										}
+										title={unit.modelUsed?.label}
+										className="h-5 w-5 shrink-0 rounded-full object-contain"
+									/>
+								:	<span className="shrink-0 text-[11px] font-medium text-[#AEAEB2]">
+										No model
+									</span>
+								}
 								{unit.canOpenEditor ?
-									<div className="font-semibold text-[#4ADE80]">
+									<div className="shrink-0 font-semibold text-[#4ADE80]">
 										{unit.primaryProgressPercent}%
 									</div>
-								:	<span className="inline-flex items-center gap-2 rounded-full border border-[#E5E5E7] bg-white/70 px-2 py-1 text-[11px] font-medium leading-tight text-[#6E6E73]">
+								:	<span className="inline-flex shrink-0 items-center gap-2 rounded-full border border-[#E5E5E7] bg-white/70 px-2 py-1 text-[11px] font-medium leading-tight text-[#6E6E73]">
 										<span className="h-1.5 w-1.5 rounded-full bg-amber-500/80" />
 										Setup needed
 									</span>

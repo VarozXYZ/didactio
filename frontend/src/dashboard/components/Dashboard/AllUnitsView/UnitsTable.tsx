@@ -30,6 +30,8 @@ import {
 } from "../../../../components/ui/dropdown-menu";
 import {getFolderEmoji, getFolderVisuals} from "../../../utils/folderDisplay";
 import {getMoveTargetFolders} from "../../../utils/folderTargets";
+import {getProviderLogo} from "../../../utils/modelOptions";
+import {LengthBadge} from "./LengthBadge";
 
 type UnitsTableProps = {
 	allFolders: BackendFolder[];
@@ -66,13 +68,13 @@ export function UnitsTable({
 								Folder
 							</th>
 							<th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-[#86868B]">
-								Modules
+								Length
 							</th>
 							<th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-[#86868B]">
 								Progress
 							</th>
 							<th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-[#86868B]">
-								Last Modified
+								Model used
 							</th>
 							<th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-[#86868B]">
 								Actions
@@ -84,6 +86,9 @@ export function UnitsTable({
 							const style = getFolderVisuals(unit.folder);
 							const folderEmoji = getFolderEmoji(
 								unit.folder.icon,
+							);
+							const modelLogo = getProviderLogo(
+								unit.modelUsed?.provider,
 							);
 							const moveTargetFolders = getMoveTargetFolders(
 								allFolders,
@@ -137,8 +142,8 @@ export function UnitsTable({
 											{unit.folder.name}
 										</span>
 									</td>
-									<td className="px-6 py-4 text-[14px] text-[#1D1D1F]">
-										{unit.chapterCount}
+									<td className="px-6 py-4">
+										<LengthBadge length={unit.length} />
 									</td>
 									<td className="px-6 py-4">
 										{unit.canOpenEditor ?
@@ -149,7 +154,7 @@ export function UnitsTable({
 														style={{
 															width: `${unit.primaryProgressPercent}%`,
 															backgroundColor:
-																style.accentColor,
+																"#4ADE80",
 														}}
 													/>
 												</div>
@@ -166,8 +171,24 @@ export function UnitsTable({
 											</span>
 										}
 									</td>
-									<td className="px-6 py-4 text-[13px] text-[#86868B]">
-										{unit.lastActivityAt}
+									<td className="px-6 py-4 text-[13px] text-[#1D1D1F]">
+										{unit.modelUsed ?
+											<span className="inline-flex max-w-[180px] items-center gap-2">
+												{modelLogo ?
+													<img
+														src={modelLogo}
+														alt=""
+														className="h-4 w-4 shrink-0 rounded-full object-contain"
+													/>
+												:	null}
+												<span className="truncate font-medium">
+													{unit.modelUsed.label}
+												</span>
+											</span>
+										:	<span className="text-[#AEAEB2]">
+												No model yet
+											</span>
+										}
 									</td>
 									<td className="px-6 py-4">
 										<DropdownMenu>

@@ -40,7 +40,7 @@ export interface GenerateDidacticUnitNoteInput {
 	chapterIndex: number;
 	selectedText: string;
 	question?: string;
-	quality: GenerationQuality;
+	quality?: GenerationQuality;
 	anchor: DidacticUnitNoteAnchor;
 }
 
@@ -121,7 +121,7 @@ export function parseGenerateDidacticUnitNoteInput(
 		throw new Error("Request body must be a JSON object.");
 	}
 	const payload = body as Record<string, unknown>;
-	const quality = payload.quality;
+	const quality = payload.quality ?? "silver";
 	if (!isGenerationQuality(quality)) {
 		throw new Error('quality must be either "silver" or "gold".');
 	}

@@ -4,11 +4,24 @@ import type {PresentationTheme} from "../../types/presentationTheme";
 
 export class DashboardApiError extends Error {
 	status: number;
+	code?: string;
 
-	constructor(message: string, status: number) {
+	constructor(message: string, status: number, code?: string) {
 		super(message);
 		this.status = status;
+		this.code = code;
 	}
+}
+
+export function getDashboardErrorMessage(error: unknown, fallback: string): string {
+	if (
+		error instanceof DashboardApiError &&
+		error.code === "free_generation_limit_reached"
+	) {
+		return `${error.message} Contact support at /contact.`;
+	}
+
+	return error instanceof Error ? error.message : fallback;
 }
 
 type BackendProvider = string;
@@ -206,9 +219,15 @@ export interface BackendDidacticUnitSummary {
 	folderId: string;
 	folder: Omit<BackendFolder, "unitCount">;
 	provider: BackendProvider;
+	modelUsed?: {
+		provider: BackendProvider;
+		model: string;
+		label: string;
+	} | null;
 	status: string;
 	nextAction: string;
 	overview: string;
+	length: "intro" | "short" | "long" | "textbook";
 	moduleCount: number;
 	generatedChapterCount: number;
 	readBlockCount: number;
@@ -250,6 +269,7 @@ export interface BackendDidacticUnitDetail {
 	additionalContext?: string;
 	level: "beginner" | "intermediate" | "advanced";
 	depth: "basic" | "intermediate" | "technical";
+	learningProfile?: "beginner" | "intermediate" | "advanced";
 	length: "intro" | "short" | "long" | "textbook";
 	generationTier?: BackendAiModelTier;
 	generationQuality?: BackendGenerationQuality;
@@ -518,15 +538,17 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
 			message = "Your session expired. Please sign in again.";
 		}
 
+		let code: string | undefined;
 		try {
 			const body = (await response.json()) as {error?: string; message?: string};
 			if (body.error && response.status !== 401) {
+				code = body.error;
 				message = body.message ?? body.error;
 			}
 		} catch {
 		}
 
-		throw new DashboardApiError(message, response.status);
+		throw new DashboardApiError(message, response.status, code);
 	}
 
 	if (response.status === 204) {
@@ -562,15 +584,17 @@ async function streamNdjson<T>(
 			message = "Your session expired. Please sign in again.";
 		}
 
+		let code: string | undefined;
 		try {
 			const body = (await response.json()) as {error?: string; message?: string};
 			if (body.error && response.status !== 401) {
+				code = body.error;
 				message = body.message ?? body.error;
 			}
 		} catch {
 		}
 
-		throw new DashboardApiError(message, response.status);
+		throw new DashboardApiError(message, response.status, code);
 	}
 
 	if (!response.body) {
@@ -702,6 +726,7 @@ export const dashboardApi = {
 		additionalContext?: string;
 		level?: "beginner" | "intermediate" | "advanced";
 		depth?: "basic" | "intermediate" | "technical";
+		learningProfile?: "beginner" | "intermediate" | "advanced";
 		length?: "intro" | "short" | "long" | "textbook";
 		questionnaireEnabled?: boolean;
 		folderSelection?: {
@@ -1010,6 +1035,15 @@ export const dashboardApi = {
 	completeDidacticUnitChapter(id: string, chapterIndex: number) {
 		return requestJson<BackendDidacticUnitDetail>(
 			`/api/didactic-unit/${id}/modules/${chapterIndex}/complete`,
+			{
+				method: "POST",
+				body: JSON.stringify({}),
+			},
+		);
+	},
+	markDidacticUnitChapterUnread(id: string, chapterIndex: number) {
+		return requestJson<BackendDidacticUnitDetail>(
+			`/api/didactic-unit/${id}/modules/${chapterIndex}/unread`,
 			{
 				method: "POST",
 				body: JSON.stringify({}),

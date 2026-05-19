@@ -3,7 +3,6 @@ import {BriefcaseBusiness, Check, Loader2, Scale, Smile, Star} from "lucide-reac
 import type {LucideIcon} from "lucide-react";
 import {toastError} from "@/hooks/use-toast";
 import {LanguageSelector} from "../../../../onboarding/LanguageSelector";
-import {CoinIcon} from "../../../../components/Coin";
 import {
 	type BackendAiConfig,
 	type BackendAiModelConfig,
@@ -245,9 +244,8 @@ function ModelColumn({
 	return (
 		<div className="min-w-0">
 			<div className="mb-2 flex items-center gap-1.5">
-				<CoinIcon type={tier} size={15} />
 				<span className="text-[12.5px] font-bold text-[#1D1D1F]">
-					{tier === "silver" ? "Silver model" : "Gold model"}
+					{tier === "silver" ? "Standard model" : "Pro model"}
 				</span>
 			</div>
 			<div className="grid gap-2 md:grid-cols-3">
@@ -444,7 +442,7 @@ export function PreferencesView() {
 
 							<SettingSection
 								title="AI models"
-								description="Silver is used for fast everyday generation. Gold is used for premium, higher-depth outputs."
+								description="Standard is used for fast everyday generation. Pro is used for premium, higher-depth outputs."
 							>
 								<div className="grid gap-4">
 									<ModelColumn

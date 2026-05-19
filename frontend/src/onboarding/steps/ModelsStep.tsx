@@ -1,7 +1,6 @@
 import {useEffect, useState} from "react";
 import {Star, ChevronRight, ChevronLeft} from "lucide-react";
 import {dashboardApi, type BackendModelEntry} from "../../dashboard/api/dashboardApi";
-import {CoinIcon} from "../../components/Coin";
 
 type Props = {
 	silverModelId: string;
@@ -114,8 +113,8 @@ export function ModelsStep({
 					Choose your AI models
 				</h2>
 				<p className="mt-1.5 text-[14px] text-[#6E6E73] leading-relaxed">
-					Silver models are used for fast, everyday tasks. Gold models are for
-					in-depth, premium content generation.
+					Standard models are used for fast, everyday tasks. Pro models are for
+					in-depth premium generation.
 				</p>
 			</div>
 
@@ -125,12 +124,10 @@ export function ModelsStep({
 				</div>
 			:	<div className="grid grid-cols-2 gap-x-4 gap-y-0">
 					<div className="mb-2 flex items-center gap-1.5">
-						<CoinIcon type="silver" size={15} />
-						<span className="text-[12.5px] font-bold text-[#1D1D1F]">Silver model</span>
+						<span className="text-[12.5px] font-bold text-[#1D1D1F]">Standard model</span>
 					</div>
 					<div className="mb-2 flex items-center gap-1.5">
-						<CoinIcon type="gold" size={15} />
-						<span className="text-[12.5px] font-bold text-[#1D1D1F]">Gold model</span>
+						<span className="text-[12.5px] font-bold text-[#1D1D1F]">Pro model</span>
 					</div>
 
 					{Array.from({length: maxCards}).map((_, i) => (

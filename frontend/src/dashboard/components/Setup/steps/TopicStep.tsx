@@ -15,13 +15,9 @@ type TopicStepProps = {
 	setDraftTopic: Dispatch<SetStateAction<string>>;
 	draftAdditionalContext: string;
 	setDraftAdditionalContext: Dispatch<SetStateAction<string>>;
-	draftLevel: "beginner" | "intermediate" | "advanced";
-	setDraftLevel: Dispatch<
+	draftLearningProfile: "beginner" | "intermediate" | "advanced";
+	setDraftLearningProfile: Dispatch<
 		SetStateAction<"beginner" | "intermediate" | "advanced">
-	>;
-	draftDepth: "basic" | "intermediate" | "technical";
-	setDraftDepth: Dispatch<
-		SetStateAction<"basic" | "intermediate" | "technical">
 	>;
 	draftLength: "intro" | "short" | "long" | "textbook";
 	setDraftLength: Dispatch<
@@ -41,7 +37,7 @@ type TopicStepProps = {
 	onCancel: () => void;
 };
 
-const LEVEL_OPTIONS: Array<{
+const LEARNING_PROFILE_OPTIONS: Array<{
 	value: "beginner" | "intermediate" | "advanced";
 	label: string;
 }> = [
@@ -50,23 +46,14 @@ const LEVEL_OPTIONS: Array<{
 	{value: "advanced", label: "Advanced"},
 ];
 
-const DEPTH_OPTIONS: Array<{
-	value: "basic" | "intermediate" | "technical";
-	label: string;
-}> = [
-	{value: "basic", label: "Basic"},
-	{value: "intermediate", label: "Intermediate"},
-	{value: "technical", label: "Technical"},
-];
-
 const LENGTH_OPTIONS: Array<{
 	value: "intro" | "short" | "long" | "textbook";
 	label: string;
+	multiplier: number;
 }> = [
-	{value: "intro", label: "Intro"},
-	{value: "short", label: "Short"},
-	{value: "long", label: "Long"},
-	{value: "textbook", label: "Textbook"},
+	{value: "short", label: "Introduction", multiplier: 1},
+	{value: "long", label: "Course", multiplier: 2},
+	{value: "textbook", label: "Textbook", multiplier: 3},
 ];
 
 const TOPIC_PLACEHOLDER_EXAMPLES = [
@@ -143,21 +130,14 @@ function segIdleStyle(): React.CSSProperties {
 	return {transition: SPRING};
 }
 
-function levelSegmentColors(v: string): (typeof SEG)[keyof typeof SEG] {
+function learningProfileSegmentColors(v: string): (typeof SEG)[keyof typeof SEG] {
 	if (v === "beginner") return SEG.teal;
 	if (v === "intermediate") return SEG.orange;
 	return SEG.red;
 }
 
-function depthSegmentColors(v: string): (typeof SEG)[keyof typeof SEG] {
-	if (v === "basic") return SEG.teal;
-	if (v === "intermediate") return SEG.orange;
-	return SEG.red;
-}
-
 function lengthSegmentColors(v: string): (typeof SEG)[keyof typeof SEG] {
-	if (v === "intro") return SEG.teal;
-	if (v === "short") return SEG.gold;
+	if (v === "short") return SEG.teal;
 	if (v === "long") return SEG.orange;
 	return SEG.red;
 }
@@ -198,7 +178,11 @@ function SegmentedControl<T extends string>({
 	tooltip?: string;
 	value: T;
 	onChange: (v: T) => void;
-	options: Array<{value: T; label: string}>;
+	options: Array<{
+		value: T;
+		label: string;
+		multiplier?: number;
+	}>;
 	colorsFor: (v: T) => (typeof SEG)[keyof typeof SEG];
 }) {
 	const cols = segmentedGridColsClass(options.length);
@@ -236,7 +220,20 @@ function SegmentedControl<T extends string>({
 								)
 							}`}
 						>
-							{opt.label}
+							<span className="inline-flex min-w-0 items-center justify-center gap-2">
+								<span className="truncate">{opt.label}</span>
+								{opt.multiplier ?
+									<span
+										className="inline-flex shrink-0 items-center gap-1 text-[11px] font-bold leading-none"
+									>
+										<span
+											className="length-coin-cycle"
+											aria-hidden="true"
+										/>
+										<span>x {opt.multiplier}</span>
+									</span>
+								:	null}
+							</span>
 						</button>
 					);
 				})}
@@ -250,10 +247,8 @@ export function TopicStep({
 	setDraftTopic,
 	draftAdditionalContext,
 	setDraftAdditionalContext,
-	draftLevel,
-	setDraftLevel,
-	draftDepth,
-	setDraftDepth,
+	draftLearningProfile,
+	setDraftLearningProfile,
 	draftLength,
 	setDraftLength,
 	draftFolderId,
@@ -470,20 +465,12 @@ export function TopicStep({
 
 			<div className="flex flex-col gap-4">
 				<SegmentedControl
-					label="Level"
-					tooltip="Sets the learner experience assumed by the unit."
-					value={draftLevel}
-					onChange={(v) => setDraftLevel(v)}
-					options={LEVEL_OPTIONS}
-					colorsFor={(v) => levelSegmentColors(v)}
-				/>
-				<SegmentedControl
-					label="Depth"
-					tooltip="Controls how detailed and technical the unit is."
-					value={draftDepth}
-					onChange={(v) => setDraftDepth(v)}
-					options={DEPTH_OPTIONS}
-					colorsFor={(v) => depthSegmentColors(v)}
+					label="Level & depth"
+					tooltip="Sets the learner experience and technical depth assumed by the unit."
+					value={draftLearningProfile}
+					onChange={(v) => setDraftLearningProfile(v)}
+					options={LEARNING_PROFILE_OPTIONS}
+					colorsFor={(v) => learningProfileSegmentColors(v)}
 				/>
 				<SegmentedControl
 					label="Length"

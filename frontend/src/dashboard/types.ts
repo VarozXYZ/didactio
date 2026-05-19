@@ -36,6 +36,12 @@ export interface DashboardListItem {
 	title: string;
 	subtitle: string;
 	folder: DashboardFolderSummary;
+	modelUsed?: {
+		provider: string;
+		model: string;
+		label: string;
+	} | null;
+	length: "intro" | "short" | "long" | "textbook";
 	status: string;
 	primaryProgressPercent: number;
 	studyProgressPercent?: number;
@@ -97,6 +103,7 @@ export interface PlanningDetailViewModel {
 	moderationAttempts?: number;
 	level: "beginner" | "intermediate" | "advanced";
 	depth: "basic" | "intermediate" | "technical";
+	learningProfile: "beginner" | "intermediate" | "advanced";
 	length: "intro" | "short" | "long" | "textbook";
 	generationQuality?: "silver" | "gold";
 	questionnaireEnabled: boolean;
@@ -171,6 +178,7 @@ export interface DidacticUnitEditorViewModel {
 	overview: string;
 	provider: string;
 	generationQuality?: "silver" | "gold";
+	length: "intro" | "short" | "long" | "textbook";
 	presentationTheme: PresentationTheme | null;
 	chapters: DidacticUnitEditorChapter[];
 }

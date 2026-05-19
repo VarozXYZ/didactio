@@ -2,6 +2,10 @@ export type DidacticUnitProvider = string;
 export type DidacticUnitDepth = "basic" | "intermediate" | "technical";
 export type DidacticUnitLength = "intro" | "short" | "long" | "textbook";
 export type DidacticUnitLevel = "beginner" | "intermediate" | "advanced";
+export type DidacticUnitLearningProfile =
+	| "beginner"
+	| "intermediate"
+	| "advanced";
 export type DidacticUnitFolderAssignmentMode = "manual" | "auto";
 
 export type DidacticUnitNextAction =
@@ -20,6 +24,7 @@ export interface CreateDidacticUnitInput {
 	depth: DidacticUnitDepth;
 	length: DidacticUnitLength;
 	level: DidacticUnitLevel;
+	learningProfile: DidacticUnitLearningProfile;
 	questionnaireEnabled: boolean;
 	folderSelection: DidacticUnitFolderSelectionInput;
 }
@@ -141,6 +146,55 @@ function parseEnumValue<T extends string>(
 	return normalized as T;
 }
 
+export function resolveLearningProfile(input: {
+	learningProfile?: unknown;
+	level?: unknown;
+	depth?: unknown;
+}): {
+	learningProfile: DidacticUnitLearningProfile;
+	level: DidacticUnitLevel;
+	depth: DidacticUnitDepth;
+} {
+	const profile = parseEnumValue(
+		input.learningProfile,
+		"learningProfile",
+		["beginner", "intermediate", "advanced"],
+		(
+			typeof input.level === "string" && input.level.trim() ?
+				input.level.trim()
+			:	"beginner"
+		) as DidacticUnitLearningProfile,
+	);
+
+	if (profile === "advanced") {
+		return {
+			learningProfile: profile,
+			level: "advanced",
+			depth: "technical",
+		};
+	}
+
+	if (profile === "intermediate") {
+		return {
+			learningProfile: profile,
+			level: "intermediate",
+			depth: "intermediate",
+		};
+	}
+
+	return {
+		learningProfile: profile,
+		level: "beginner",
+		depth: "basic",
+	};
+}
+
+export function normalizeDidacticUnitLength(
+	length: DidacticUnitLength,
+): DidacticUnitLength {
+	return length === "intro" ? "short" : length;
+}
+
 export function normalizeKeywordList(value: string): string[] {
 	const byDelimiter = value
 		.split(/[,\n;]/)
@@ -250,6 +304,7 @@ export function parseCreateDidacticUnitInput(
 		depth?: unknown;
 		length?: unknown;
 		level?: unknown;
+		learningProfile?: unknown;
 		questionnaireEnabled?: unknown;
 		folderSelection?: unknown;
 	};
@@ -258,6 +313,12 @@ export function parseCreateDidacticUnitInput(
 	if (!topic) {
 		throw new Error("Topic is required.");
 	}
+
+	const profile = resolveLearningProfile({
+		learningProfile: payload.learningProfile,
+		level: payload.level,
+		depth: payload.depth,
+	});
 
 	return {
 		topic,
@@ -272,24 +333,17 @@ export function parseCreateDidacticUnitInput(
 			) ?
 				payload.additionalContext.trim()
 			:	undefined,
-		depth: parseEnumValue(
-			payload.depth,
-			"depth",
-			["basic", "intermediate", "technical"],
-			"intermediate",
+		depth: profile.depth,
+		length: normalizeDidacticUnitLength(
+			parseEnumValue(
+				payload.length,
+				"length",
+				["intro", "short", "long", "textbook"],
+				"short",
+			),
 		),
-		length: parseEnumValue(
-			payload.length,
-			"length",
-			["intro", "short", "long", "textbook"],
-			"short",
-		),
-		level: parseEnumValue(
-			payload.level,
-			"level",
-			["beginner", "intermediate", "advanced"],
-			"beginner",
-		),
+		level: profile.level,
+		learningProfile: profile.learningProfile,
 		questionnaireEnabled:
 			payload.questionnaireEnabled === undefined ?
 				true

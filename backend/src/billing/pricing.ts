@@ -28,7 +28,7 @@ export const BILLING_PRODUCTS: BillingProduct[] = [
 		description: "A focused top-up for trying richer generations.",
 		priceLabel: "5€ + VAT",
 		stripePriceEnvKey: "STRIPE_PRICE_STARTER_PACK",
-		credits: {bronze: 50, silver: 25, gold: 5},
+		credits: {bronze: 50, silver: 25, gold: 5, dark: 50},
 		features: ["50 bronze", "25 silver", "5 gold", "Credits never expire"],
 	},
 	{
@@ -38,7 +38,7 @@ export const BILLING_PRODUCTS: BillingProduct[] = [
 		description: "Better value for regular lesson planning bursts.",
 		priceLabel: "15€ + VAT",
 		stripePriceEnvKey: "STRIPE_PRICE_CREATOR_PACK",
-		credits: {bronze: 100, silver: 50, gold: 15},
+		credits: {bronze: 100, silver: 50, gold: 15, dark: 100},
 		features: ["100 bronze", "50 silver", "15 gold", "Credits never expire"],
 	},
 	{
@@ -49,7 +49,7 @@ export const BILLING_PRODUCTS: BillingProduct[] = [
 		priceLabel: "10€ + VAT",
 		interval: "/month",
 		stripePriceEnvKey: "STRIPE_PRICE_TEACHER_MONTHLY",
-		credits: {bronze: 100, silver: 50, gold: 10},
+		credits: {bronze: 100, silver: 50, gold: 10, dark: 100},
 		subscriptionTier: "teacher",
 		features: [
 			"100 bronze every month",
@@ -66,7 +66,7 @@ export const BILLING_PRODUCTS: BillingProduct[] = [
 		priceLabel: "20€ + VAT",
 		interval: "/month",
 		stripePriceEnvKey: "STRIPE_PRICE_TEACHER_PRO_MONTHLY",
-		credits: {bronze: 0, silver: 100, gold: 20},
+		credits: {bronze: 0, silver: 100, gold: 20, dark: 0},
 		subscriptionTier: "teacher_pro",
 		recommended: true,
 		unlimitedBronze: true,

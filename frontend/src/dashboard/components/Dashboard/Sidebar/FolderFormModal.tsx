@@ -29,6 +29,8 @@ const MORE_EMOJIS = [
     '🍎', '🌈', '❤️', '⚡', '🔥', '💫', '🎁', '🌺',
 ]
 
+const MAX_FOLDER_NAME_LENGTH = 24
+
 type Props = {
     open: boolean
     mode: 'create' | 'edit'
@@ -123,10 +125,14 @@ export function FolderFormModal({
                                 type="text"
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
+                                maxLength={MAX_FOLDER_NAME_LENGTH}
                                 placeholder="e.g. Computer Science"
                                 autoFocus
                                 className="w-full rounded-[10px] border border-[#E5E5E7] bg-[#FAFAFA] px-3 py-2 text-[13px] text-[#1D1D1F] outline-none transition-colors focus:border-[#1D1D1F] focus:bg-white"
                             />
+                            <div className="mt-1 text-right text-[11px] font-medium text-[#AEAEB2]">
+                                {name.length}/{MAX_FOLDER_NAME_LENGTH}
+                            </div>
                         </div>
 
                         <div>

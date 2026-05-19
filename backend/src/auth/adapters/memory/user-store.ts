@@ -18,6 +18,7 @@ function createEmptyCredits(): CreditBalances {
 		bronze: 0,
 		silver: 0,
 		gold: 0,
+		dark: 0,
 	};
 }
 
@@ -177,9 +178,10 @@ export class InMemoryUserStore implements UserStore {
 		const updated: AuthUser = {
 			...user,
 			credits: {
-				bronze: currentCredits.bronze + credits.bronze,
-				silver: currentCredits.silver + credits.silver,
-				gold: currentCredits.gold + credits.gold,
+				bronze: (currentCredits.bronze ?? 0) + credits.bronze,
+				silver: (currentCredits.silver ?? 0) + credits.silver,
+				gold: (currentCredits.gold ?? 0) + credits.gold,
+				dark: (currentCredits.dark ?? 0) + credits.dark,
 			},
 			launchGiftGrantedAt: grantedAt,
 			updatedAt: grantedAt,
@@ -236,7 +238,7 @@ export class InMemoryUserStore implements UserStore {
 		}
 
 		const credits = {...(user.credits ?? createEmptyCredits())};
-		const nextValue = credits[input.coinType] + input.delta;
+		const nextValue = (credits[input.coinType] ?? 0) + input.delta;
 		if (input.requireSufficientBalance && nextValue < 0) {
 			return null;
 		}

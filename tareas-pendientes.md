@@ -30,3 +30,4 @@
 30. ~~Añadir las actividades creadas al indice del modulo~~
 31. ~~Create note system - ask AI about specific parts of the unit~~
 32. ~~Hacer que los ejercicios de los módulos sean borrables~~
+33. Añadir recordatorios frecuentes de que la IA puede cometer fallos y de que el usuario no tiene propiedad intelectual sobre el contenido

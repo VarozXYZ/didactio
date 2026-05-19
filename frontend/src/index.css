@@ -300,12 +300,13 @@ button[aria-disabled="true"],
 	margin: 1.1em 0 1.2em;
 	border-collapse: collapse;
 	border-spacing: 0;
-	background: #fbfbfc;
+	background: var(--unit-table-bg, #fbfbfc);
+	border: 1px solid var(--unit-table-border, #e5e5e7);
 }
 
 .prose thead,
 .unit-page-scope thead {
-	background: #f3f4f6;
+	background: var(--unit-table-header-bg, #f3f4f6);
 }
 
 .prose th,
@@ -313,7 +314,7 @@ button[aria-disabled="true"],
 .unit-page-scope th,
 .unit-page-scope td {
 	padding: 0.75rem 0.9rem;
-	border: 1px solid #e5e5e7;
+	border: 1px solid var(--unit-table-border, #e5e5e7);
 	vertical-align: top;
 	text-align: left;
 	word-wrap: break-word;
@@ -338,7 +339,7 @@ button[aria-disabled="true"],
 
 .prose tbody tr:last-child td,
 .unit-page-scope tbody tr:last-child td {
-	border-bottom: 0;
+	border-bottom: 1px solid var(--unit-table-border, #e5e5e7);
 }
 
 .prose code,
@@ -714,4 +715,31 @@ button[aria-disabled="true"],
 
 ::-webkit-scrollbar-thumb:hover {
 	background: #86868b;
+}
+
+.length-coin-cycle {
+	display: inline-block;
+	width: 14px;
+	height: 14px;
+	flex: 0 0 14px;
+	background-image: url("/assets/props/bronce-coin.png");
+	background-position: center;
+	background-repeat: no-repeat;
+	background-size: contain;
+	animation: length-coin-cycle 2.4s steps(1, end) infinite;
+}
+
+@keyframes length-coin-cycle {
+	0%,
+	33.32% {
+		background-image: url("/assets/props/bronce-coin.png");
+	}
+	33.33%,
+	66.65% {
+		background-image: url("/assets/props/silver-coin.png");
+	}
+	66.66%,
+	100% {
+		background-image: url("/assets/props/gold-coin.png");
+	}
 }

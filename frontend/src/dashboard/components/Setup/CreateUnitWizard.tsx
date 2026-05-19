@@ -5,6 +5,7 @@ import {
 	type BackendFolder,
 	type BackendGenerationQuality,
 	dashboardApi,
+	getDashboardErrorMessage,
 } from "../../api/dashboardApi";
 import {useAuth} from "../../../auth/AuthProvider";
 import {adaptDidacticUnitPlanning} from "../../adapters";
@@ -12,10 +13,11 @@ import type {PlanningDetailViewModel, PlanningSyllabus} from "../../types";
 import {TopicStep} from "./steps/TopicStep";
 import {QuestionnaireStep} from "./steps/QuestionnaireStep";
 import {SyllabusStep} from "./steps/SyllabusStep";
+import {getUnitGenerationCost} from "../../utils/coinPricing";
 import {
-	getSyllabusGenerationCost,
-	getUnitGenerationCost,
-} from "../../utils/coinPricing";
+	buildGenerationModelOptions,
+	type GenerationModelOption,
+} from "../../utils/modelOptions";
 
 export type WizardStep = 0 | 1 | 2;
 
@@ -224,15 +226,15 @@ export function CreateUnitWizard({
 	const [availableFolders, setAvailableFolders] = useState<BackendFolder[]>(
 		[],
 	);
+	const [generationModelOptions, setGenerationModelOptions] = useState<
+		GenerationModelOption[]
+	>(() => buildGenerationModelOptions(null, null));
 
 	const [draftTopic, setDraftTopic] = useState("");
 	const [draftAdditionalContext, setDraftAdditionalContext] = useState("");
-	const [draftLevel, setDraftLevel] = useState<
+	const [draftLearningProfile, setDraftLearningProfile] = useState<
 		"beginner" | "intermediate" | "advanced"
 	>("beginner");
-	const [draftDepth, setDraftDepth] = useState<
-		"basic" | "intermediate" | "technical"
-	>("intermediate");
 	const [draftLength, setDraftLength] = useState<
 		"intro" | "short" | "long" | "textbook"
 	>("short");
@@ -264,9 +266,8 @@ export function CreateUnitWizard({
 			setPlanning(pd);
 			setQuestionnaireAnswers(pd.questionnaire?.answers ?? {});
 			setDraftAdditionalContext(pd.additionalContext ?? "");
-			setDraftLevel(pd.level);
-			setDraftDepth(pd.depth);
-			setDraftLength(pd.length);
+			setDraftLearningProfile(pd.learningProfile ?? pd.level);
+			setDraftLength(pd.length === "intro" ? "short" : pd.length);
 			setDraftFolderId(pd.folder.id);
 			setActiveUnitId(pd.id);
 
@@ -283,8 +284,15 @@ export function CreateUnitWizard({
 	useEffect(() => {
 		void (async () => {
 			try {
-				const response = await dashboardApi.listFolders();
+				const [response, config, catalog] = await Promise.all([
+					dashboardApi.listFolders(),
+					dashboardApi.getAiConfig(),
+					dashboardApi.getAiConfigCatalog(),
+				]);
 				setAvailableFolders(response.folders);
+				setGenerationModelOptions(
+					buildGenerationModelOptions(config, catalog),
+				);
 			} catch (e) {
 				toastError(
 					e instanceof Error ? e.message : "Failed to load folders.",
@@ -324,8 +332,7 @@ export function CreateUnitWizard({
 			const created = await dashboardApi.createDidacticUnit({
 				topic: draftTopic.trim(),
 				additionalContext: draftAdditionalContext.trim() || undefined,
-				level: draftLevel,
-				depth: draftDepth,
+				learningProfile: draftLearningProfile,
 				length: draftLength,
 				questionnaireEnabled: true,
 				folderSelection:
@@ -346,15 +353,14 @@ export function CreateUnitWizard({
 				setCurrentStep(1);
 			}
 		} catch (e) {
-			toastError(e instanceof Error ? e.message : "Action failed.");
+			toastError(getDashboardErrorMessage(e, "Action failed."));
 		} finally {
 			setIsSubmitting(false);
 		}
 	}, [
 		draftTopic,
 		draftAdditionalContext,
-		draftLevel,
-		draftDepth,
+		draftLearningProfile,
 		draftLength,
 		draftFolderId,
 		onDataChanged,
@@ -440,7 +446,7 @@ export function CreateUnitWizard({
 			setPlanning(pd);
 			setCurrentStep(2);
 		} catch (e) {
-			toastError(e instanceof Error ? e.message : "Action failed.");
+			toastError(getDashboardErrorMessage(e, "Action failed."));
 		} finally {
 			setIsSubmitting(false);
 		}
@@ -460,7 +466,7 @@ export function CreateUnitWizard({
 			setPlanning(pd);
 			setCurrentStep(2);
 		} catch (e) {
-			toastError(e instanceof Error ? e.message : "Action failed.");
+			toastError(getDashboardErrorMessage(e, "Action failed."));
 		} finally {
 			setIsSubmitting(false);
 		}
@@ -481,7 +487,7 @@ export function CreateUnitWizard({
 				);
 			}
 		} catch (e) {
-			toastError(e instanceof Error ? e.message : "Action failed.");
+			toastError(getDashboardErrorMessage(e, "Action failed."));
 		} finally {
 			setIsSubmitting(false);
 		}
@@ -524,7 +530,7 @@ export function CreateUnitWizard({
 				onDataChanged();
 				await refreshUser();
 			} catch (e) {
-				toastError(e instanceof Error ? e.message : "Action failed.");
+				toastError(getDashboardErrorMessage(e, "Action failed."));
 				await refreshUser();
 			} finally {
 				setIsSubmitting(false);
@@ -551,7 +557,7 @@ export function CreateUnitWizard({
 				await refreshUser();
 				onOpenEditor(detail.id);
 			} catch (e) {
-				toastError(e instanceof Error ? e.message : "Action failed.");
+				toastError(getDashboardErrorMessage(e, "Action failed."));
 				await refreshUser();
 			} finally {
 				setIsSubmitting(false);
@@ -592,13 +598,10 @@ export function CreateUnitWizard({
 		}
 	}, [needsInitialSyllabusGeneration, currentStep, handleGenerateSyllabus]);
 
-	const syllabusCost = getSyllabusGenerationCost();
 	const selectedUnitCost = getUnitGenerationCost({
 		quality: selectedGenerationTier,
 		length: draftLength,
 	});
-	const canPaySyllabus =
-		(user?.credits[syllabusCost.coinType] ?? 0) >= syllabusCost.amount;
 	const canPaySelectedUnit =
 		(user?.credits[selectedUnitCost.coinType] ?? 0) >= selectedUnitCost.amount;
 
@@ -740,10 +743,10 @@ export function CreateUnitWizard({
 								setDraftAdditionalContext={
 									setDraftAdditionalContext
 								}
-								draftLevel={draftLevel}
-								setDraftLevel={setDraftLevel}
-								draftDepth={draftDepth}
-								setDraftDepth={setDraftDepth}
+								draftLearningProfile={draftLearningProfile}
+								setDraftLearningProfile={
+									setDraftLearningProfile
+								}
 								draftLength={draftLength}
 								setDraftLength={setDraftLength}
 								draftFolderId={draftFolderId}
@@ -803,8 +806,8 @@ export function CreateUnitWizard({
 								onGenerateSyllabus={handleGenerateSyllabus}
 								onStartGeneration={handleStartGeneration}
 								credits={user?.credits ?? {bronze: 0, silver: 0, gold: 0}}
-								canPaySyllabus={canPaySyllabus}
 								canPaySelectedUnit={canPaySelectedUnit}
+								modelOptions={generationModelOptions}
 							/>
 						)}
 					</div>
