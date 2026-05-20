@@ -23,6 +23,7 @@ import {
 import {
 	resolveTypography,
 	defaultTypography,
+	FONT_CATALOG,
 	STYLE_PRESETS,
 	type ResolvedTypography,
 	type FontId,
@@ -961,7 +962,7 @@ function createPostModuleActionMeasurementMarkup(input: {
 		:	"Finish this unit and return to your dashboard.";
 	const footerLabel = input.hasNextModule ? "Next lesson" : "Unit finished";
 	return `
-        <div style="border:1px solid ${palette.border}; background:${palette.panelBg}; border-radius:22px; padding:20px;">
+        <div style="border:0;background:transparent;border-radius:22px;padding:20px;">
             <div style="text-align:center;">
                 <div style="width:44px;height:44px;margin:0 auto;border-radius:999px;border:1px solid ${palette.tipBorder};background:${palette.accentSoft};color:${palette.accent};display:flex;align-items:center;justify-content:center;font-weight:700;">✓</div>
                 <div style="margin-top:12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.24em;color:#6B7280;">Next steps</div>
@@ -993,7 +994,7 @@ function createPostModuleActionMeasurementMarkup(input: {
     `;
 
 	return `
-        <div style="border:1px solid ${palette.border}; background:${palette.panelBg}; border-radius:22px; padding:20px;">
+        <div style="border:0;background:transparent;border-radius:22px;padding:20px;">
             <div style="text-align:center;">
                 <div style="width:44px;height:44px;margin:0 auto;border-radius:999px;border:1px solid ${palette.tipBorder};background:${palette.accentSoft};color:${palette.accent};display:flex;align-items:center;justify-content:center;font-weight:700;">✓</div>
                 <div style="margin-top:12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.24em;color:#6B7280;">Next steps</div>
@@ -1076,34 +1077,34 @@ export function getStatusPillClass(status: UnitChapter["status"]): string {
 function createHeaderMarkup(
 	activeChapter: MeasurePageChapter,
 	chapterIndex: number,
+	moduleTitleSizePx: number,
+	stylePresetId: string,
 ): string {
 	const overviewHtml = escapeHtml(activeChapter.summary);
+	const preset =
+		STYLE_PRESETS[(stylePresetId as keyof typeof STYLE_PRESETS) ?? "classic"] ??
+		STYLE_PRESETS.classic;
+	const headingFamily = FONT_CATALOG[preset.heading as FontId].family;
+	const bodyFamily = FONT_CATALOG[preset.body as FontId].family;
+	const moduleNumberSizePx =
+		typeof window === "undefined" ?
+			72
+		:	Math.min(72, Math.max(48, window.innerWidth * 0.06));
 
 	return `
-    <div class="mb-4 flex-shrink-0 space-y-2">
-      <div class="flex items-center gap-2">
-        <span class="rounded-full bg-[#F5F5F7] px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-[#86868B]">
-          Module ${chapterIndex + 1}
-        </span>
-        <span class="rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest ${getStatusPillClass(activeChapter.status)}">
-          ${escapeHtml(activeChapter.status)}
+    <div style="flex-shrink:0;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;">
+        <h2 style="flex:1;margin:0;color:#1D1D1F;font-family:${headingFamily};font-size:${moduleTitleSizePx}px;font-weight:700;line-height:1.25;letter-spacing:0;">
+          ${escapeHtml(activeChapter.title)}
+        </h2>
+        <span style="flex-shrink:0;user-select:none;font-family:${headingFamily};font-size:${moduleNumberSizePx}px;font-weight:700;line-height:1;color:${preset.numberColor};">
+          ${String(chapterIndex + 1).padStart(2, "0")}
         </span>
       </div>
-      <h2 class="text-xl font-bold leading-tight tracking-tight text-[#1D1D1F] md:text-2xl">
-        ${escapeHtml(activeChapter.title)}
-      </h2>
-      <div class="text-xs font-medium italic leading-relaxed text-[#86868B] md:text-sm">
+      <div style="margin-top:16px;color:#86868B;font-family:${bodyFamily};font-size:16px;font-style:italic;font-weight:500;line-height:1.625;text-align:justify;">
         ${overviewHtml}
       </div>
-      <div class="flex items-center gap-3 pt-1 text-[10px] text-[#86868B]">
-        <div class="flex items-center gap-1">
-          <span>${escapeHtml(activeChapter.readingTime)}</span>
-        </div>
-        <div class="flex items-center gap-1">
-          <span>${escapeHtml(activeChapter.level)}</span>
-        </div>
-      </div>
-      <div class="my-3 h-[1px] w-full bg-[#E5E5E7]"></div>
+      <div style="margin-top:20px;height:1.5px;width:100%;background-image:linear-gradient(to right, transparent, ${preset.numberColor}, transparent);"></div>
     </div>
   `;
 }
@@ -1115,6 +1116,8 @@ export function measurePages({
 	pageHeight,
 	chapterIndex,
 	hasNextModule,
+	compactModuleTitle = false,
+	moduleTitleSizePx,
 	textStyle,
 }: {
 	activeChapter: MeasurePageChapter;
@@ -1123,6 +1126,8 @@ export function measurePages({
 	pageHeight: number;
 	chapterIndex: number;
 	hasNextModule: boolean;
+	compactModuleTitle?: boolean;
+	moduleTitleSizePx?: number;
 	textStyle?: EditorTextStyle;
 }): MeasuredModulePage[] {
 	if (!content || !pageWidth || !pageHeight) return [];
@@ -1142,8 +1147,15 @@ export function measurePages({
 		pageHeight - pagePaddingTop - pagePaddingBottom,
 	);
 	const primaryActionLabel = hasNextModule ? "Next module" : "Finish unit 🎉";
+	const measuredModuleTitleSizePx =
+		moduleTitleSizePx ??
+		(compactModuleTitle ?
+			Math.min(28, Math.max(20, 24))
+		:	Math.min(36, Math.max(24, 32)));
 
 	const stylePresetId = textStyle?.stylePreset ?? "classic";
+	const firstPageStyleBuffer =
+		stylePresetId === "classic" ? 0 : isMobile ? 8 : 18;
 	const typography =
 		textStyle ?
 			(() => {
@@ -1183,7 +1195,12 @@ export function measurePages({
 	const headerMeasure = document.createElement("div");
 	headerMeasure.style.width = `${contentWidth}px`;
 	headerMeasure.style.overflow = "hidden";
-	headerMeasure.innerHTML = createHeaderMarkup(activeChapter, chapterIndex);
+	headerMeasure.innerHTML = createHeaderMarkup(
+		activeChapter,
+		chapterIndex,
+		measuredModuleTitleSizePx,
+		stylePresetId,
+	);
 
 	const labelMeasure = document.createElement("div");
 	labelMeasure.style.width = `${contentWidth}px`;
@@ -1208,7 +1225,8 @@ export function measurePages({
 		contentLimit -
 			headerMeasure.scrollHeight -
 			FIRST_PAGE_HEADER_BOTTOM_GAP -
-			measurementBuffer,
+			measurementBuffer -
+			firstPageStyleBuffer,
 	);
 	const regularPageLimit = Math.max(
 		140,
@@ -1397,12 +1415,13 @@ export function calculateSpreadMetrics({
 	viewportHeight: number;
 }) {
 	const isMobile = viewportWidth < MOBILE_BREAKPOINT;
+	const isLaptop = !isMobile && viewportWidth < 1600;
 	const pageWidthRatio =
 		isMobile ? PAGE_WIDTH_RATIO_MOBILE : PAGE_WIDTH_RATIO_DESKTOP;
-	const stagePaddingTop = isMobile ? 16 : 24;
-	const stagePaddingBottom = isMobile ? 20 : 32;
-	const indicatorHeight = isMobile ? 42 : 48;
-	const indicatorGap = isMobile ? 12 : 16;
+	const stagePaddingTop = isMobile ? 16 : isLaptop ? 12 : 24;
+	const stagePaddingBottom = isMobile ? 20 : isLaptop ? 28 : 32;
+	const indicatorHeight = isMobile ? 42 : isLaptop ? 40 : 48;
+	const indicatorGap = isMobile ? 12 : isLaptop ? 10 : 16;
 	const arrowAllowance = isMobile ? 64 : 84;
 	const mainStageHorizontalGutter = isMobile ? 24 : 48;
 	const spreadGap = isMobile ? 16 : 32;

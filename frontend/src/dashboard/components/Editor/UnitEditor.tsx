@@ -120,7 +120,7 @@ import {
 } from "../../utils/htmlContent";
 import {getFolderEmoji} from "../../utils/folderDisplay";
 import {useAuth} from "../../../auth/AuthProvider";
-import {CoinAmount} from "@/components/Coin";
+import {CoinAmount, CoinIcon} from "@/components/Coin";
 import {
 	getActivityGenerationCost,
 	getModuleRegenerationCost,
@@ -155,6 +155,58 @@ import {
 } from "../../utils/unitNotes";
 
 const VISIBLE_COIN_TYPES = ["bronze", "silver", "gold"] as const;
+
+function HeaderCoinBalance({
+	credits,
+	onOpenSubscription,
+}: {
+	credits: Record<(typeof VISIBLE_COIN_TYPES)[number], number>;
+	onOpenSubscription: () => void;
+}) {
+	return (
+		<div
+			className="flex shrink-0 items-center gap-2 rounded-full border border-[#E5E5E7] bg-white px-3 py-1.5"
+			aria-label="Available credits"
+			title="Available credits"
+		>
+			{VISIBLE_COIN_TYPES.map((coinType) => (
+				<span
+					key={coinType}
+					className="inline-flex items-center gap-1.5 text-[12px] font-semibold tabular-nums text-[#3A3A3C]"
+				>
+					<span>{credits[coinType]}</span>
+					<CoinIcon type={coinType} size={18} />
+				</span>
+			))}
+			<button
+				aria-label="Open subscription and credits"
+				className="ml-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[#1D1D1F] transition-all hover:bg-[#F7FFF9] hover:text-[#34C759] active:text-[#34C759]"
+				onClick={onOpenSubscription}
+				title="Open subscription and credits"
+				type="button"
+			>
+				<CirclePlus size={14} />
+			</button>
+		</div>
+	);
+}
+
+function HeaderControlTooltip({
+	children,
+	label,
+}: {
+	children: ReactNode;
+	label: string;
+}) {
+	return (
+		<div className="group/header-control relative shrink-0">
+			{children}
+			<div className="pointer-events-none absolute left-1/2 top-[calc(100%+8px)] z-[80] -translate-x-1/2 whitespace-nowrap rounded-md border border-[#E5E5E7] bg-white px-2.5 py-1.5 text-[11px] font-semibold text-[#1D1D1F] opacity-0 shadow-[0_8px_24px_rgba(0,0,0,0.12)] transition-opacity group-hover/header-control:opacity-100 group-focus-within/header-control:opacity-100">
+				{label}
+			</div>
+		</div>
+	);
+}
 
 function ChapterStatusIcon({
 	status,
@@ -926,7 +978,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	);
 	const [activeChapterIndex, setActiveChapterIndex] = useState(0);
 	const [draft, setDraft] = useState<ChapterDraft | null>(null);
-	const [isSaving, setIsSaving] = useState(false);
+	const [, setIsSaving] = useState(false);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [isPostModuleActionPending, setIsPostModuleActionPending] =
 		useState(false);
@@ -1090,6 +1142,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	const isCancellingGenerationRef = useRef(false);
 	const measuredReadPagesCacheRef = useRef<{
 		chapterIndex: number;
+		measureKey: string;
 		pages: MeasuredModulePage[];
 	} | null>(null);
 
@@ -1809,6 +1862,10 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		isDraftForActiveChapter ?
 			draft.textStyle
 		: 	activeChapter?.textStyle;
+	const activeTextStyleKey = [
+		activeDraftSettings?.stylePreset ?? "classic",
+		activeDraftSettings?.sizeProfile ?? "regular",
+	].join(":");
 
 	useEffect(() => {
 		if (fontsReady) return;
@@ -1832,14 +1889,27 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			}),
 		[viewport.height, viewport.width],
 	);
+	const compactModuleTitle = viewport.width < 1600;
+	const moduleTitleSizePx = compactModuleTitle ?
+		Math.min(28, Math.max(20, viewport.width * 0.02))
+	:	Math.min(36, Math.max(24, viewport.width * 0.035));
+	const pageMeasureKey = [
+		activeChapterLayoutSnapshot?.chapterIndex ?? "none",
+		activeTextStyleKey,
+		spreadMetrics.pageWidth,
+		spreadMetrics.pageHeight,
+		moduleTitleSizePx,
+	].join(":");
 	const rawMeasuredReadPages = useMemo(
 		() =>
 			fontsReady && activeChapterLayoutSnapshot && activeDraftContent ?
 				measurePages({
 					activeChapter: activeChapterLayoutSnapshot,
 					chapterIndex: activeChapterLayoutSnapshot.chapterIndex,
+					compactModuleTitle,
 					content: activeDraftContent,
 					hasNextModule: hasNextActiveModule,
+					moduleTitleSizePx,
 					pageHeight: spreadMetrics.pageHeight,
 					pageWidth: spreadMetrics.pageWidth,
 					textStyle: activeDraftSettings,
@@ -1850,9 +1920,13 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			activeChapterLayoutSnapshot,
 			activeDraftContent,
 			hasNextActiveModule,
+			compactModuleTitle,
+			moduleTitleSizePx,
 			spreadMetrics.pageHeight,
 			spreadMetrics.pageWidth,
-			activeDraftSettings,
+			activeDraftSettings?.stylePreset,
+			activeDraftSettings?.sizeProfile,
+			pageMeasureKey,
 		],
 	);
 	useEffect(() => {
@@ -1863,19 +1937,21 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		if (rawMeasuredReadPages.length > 0) {
 			measuredReadPagesCacheRef.current = {
 				chapterIndex: activeChapter.chapterIndex,
+				measureKey: pageMeasureKey,
 				pages: rawMeasuredReadPages,
 			};
 		}
-	}, [activeChapter?.chapterIndex, rawMeasuredReadPages]);
+	}, [activeChapter?.chapterIndex, pageMeasureKey, rawMeasuredReadPages]);
 	const measuredReadPages = useMemo(() => {
 		if (rawMeasuredReadPages.length > 0 || !activeChapter) {
 			return rawMeasuredReadPages;
 		}
 		const cached = measuredReadPagesCacheRef.current;
-		return cached?.chapterIndex === activeChapter.chapterIndex ?
+		return cached?.chapterIndex === activeChapter.chapterIndex &&
+			cached.measureKey === pageMeasureKey ?
 				cached.pages
 			:	rawMeasuredReadPages;
-	}, [activeChapter, rawMeasuredReadPages]);
+	}, [activeChapter, pageMeasureKey, rawMeasuredReadPages]);
 	const readPages: ReadPage[] = useMemo(
 		() => buildReadPages(measuredReadPages, activeLearningActivities),
 		[activeLearningActivities, measuredReadPages],
@@ -3326,6 +3402,8 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	const postModuleCompletionStyle = resolvePostModuleCompletionStyle(
 		draft.textStyle.stylePreset,
 	);
+	const headerIconButtonClass =
+		"flex h-10 w-10 items-center justify-center rounded-full border border-[#D4D7DD] bg-white text-[#1D1D1F] transition-all hover:border-[#34C759] hover:bg-[#F7FFF9] hover:text-[#34C759] active:border-[#34C759] active:text-[#34C759]";
 
 	const renderPostModuleActionBody = ({
 		hasNextModule,
@@ -3335,11 +3413,8 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		primaryActionLabel: string;
 	}) => (
 		<div
-			className="flex-shrink-0 rounded-[22px] border p-5"
+			className="flex-shrink-0 rounded-[22px] p-5"
 			style={{
-				background: postModuleCompletionStyle.panelBackground,
-				borderColor: postModuleCompletionStyle.panelBorder,
-				boxShadow: postModuleCompletionStyle.panelShadow,
 				color: postModuleCompletionStyle.bodyColor,
 				fontFamily: postModuleCompletionStyle.bodyFamily,
 			}}
@@ -3846,7 +3921,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 							className="flex-1 font-bold leading-tight tracking-tight text-[#1D1D1F] outline-none"
 							style={{
 								fontFamily: titleHeadingFamily,
-								fontSize: "clamp(1.5rem, 3.5vw, 2.25rem)",
+								fontSize: `${moduleTitleSizePx}px`,
 							}}
 							contentEditable={editable}
 							onInput={(event) =>
@@ -3968,6 +4043,10 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			const activityTheme = resolvePostModuleCompletionStyle(
 				draft.textStyle.stylePreset,
 			);
+			const activityContentScale = Math.min(
+				1.2,
+				Math.max(1, spreadMetrics.pageHeight / 700),
+			);
 			return (
 				<div
 					className="relative overflow-hidden rounded-[16px] border shadow-[0_8px_60px_rgba(0,0,0,0.08)] md:rounded-[24px]"
@@ -3982,6 +4061,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 						<LearningActivityRenderer
 							activity={page.activity}
 							attempts={activityAttempts[page.activity.id] ?? []}
+							contentScale={activityContentScale}
 							isSubmitting={isActivityAttemptSubmitting}
 							onSubmitAttempt={handleLearningActivityAttempt}
 							onRefillAttempts={handleRefillActivityAttempts}
@@ -4131,7 +4211,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 
 			<div
 				className={cn(
-					"mt-3 flex max-w-full items-center justify-center gap-1.5 transition-all duration-150 md:gap-2",
+					"relative z-50 mt-3 flex max-w-full items-center justify-center gap-1.5 transition-all duration-150 md:gap-2",
 					isPagePickerOpen &&
 						"pointer-events-none translate-y-1 scale-95 opacity-0",
 				)}
@@ -4140,7 +4220,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				{!editable && (
 					<button
 						aria-label="Previous pages"
-						className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#E5E5E7] bg-white shadow-md transition-all hover:bg-[#F5F5F7] disabled:cursor-not-allowed disabled:opacity-30 md:h-10 md:w-10"
+						className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#E5E5E7] bg-white shadow-md transition-all hover:bg-[#F5F5F7] disabled:cursor-not-allowed disabled:opacity-30 md:h-10 md:w-10 max-[1599px]:h-9 max-[1599px]:w-9"
 						disabled={!canGoPrev}
 						onClick={goToPrevSpread}
 						type="button"
@@ -4150,9 +4230,9 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				)}
 				<div
 					className={cn(
-						"rounded-full border border-[#E5E5E7] bg-white/90 py-2 shadow-lg backdrop-blur-sm md:py-3",
+						"rounded-full border border-[#E5E5E7] bg-white/90 py-2 shadow-lg backdrop-blur-sm md:py-3 max-[1599px]:py-0.5",
 						editable ?
-							"w-max max-w-full shrink-0 flex-none overflow-x-auto overflow-y-hidden px-2 md:px-4 [-webkit-overflow-scrolling:touch]"
+							"w-max max-w-full shrink-0 flex-none overflow-visible px-2 md:px-4 max-[1599px]:px-2.5"
 						:	"min-w-0 max-w-[min(100vw-8rem,720px)] flex-1 overflow-visible px-3 md:px-5",
 					)}
 					style={
@@ -4226,13 +4306,15 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 									<PopoverContent
 										align="center"
 										side="top"
-										sideOffset={-42}
-										className="w-[136px] overflow-hidden rounded-full border-[#E5E5E7] bg-white/90 px-3 py-2 shadow-lg backdrop-blur-sm"
+										sideOffset={-26}
+										className="w-[112px] overflow-hidden rounded-full border-[#E5E5E7] bg-white/90 px-2.5 py-1 shadow-lg backdrop-blur-sm"
 									>
 										<DidactioWheelPicker
 											className="w-full"
+											optionItemHeight={18}
 											options={pageWheelOptions}
 											value={pageWheelValue}
+											visibleCount={7}
 											onValueChange={(value) => {
 												if (spreadMetrics.isMobile) {
 													goToPageIndex(value);
@@ -4251,7 +4333,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				{!editable && (
 					<button
 						aria-label="Next pages"
-						className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#E5E5E7] bg-white shadow-md transition-all hover:bg-[#F5F5F7] disabled:cursor-not-allowed disabled:opacity-30 md:h-10 md:w-10"
+						className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#E5E5E7] bg-white shadow-md transition-all hover:bg-[#F5F5F7] disabled:cursor-not-allowed disabled:opacity-30 md:h-10 md:w-10 max-[1599px]:h-9 max-[1599px]:w-9"
 						disabled={!canGoNext}
 						onClick={goToNextSpread}
 						type="button"
@@ -4744,92 +4826,93 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			</Motion.aside>
 
 			<main className="relative flex h-full flex-1 flex-col overflow-hidden">
-				<header className="z-10 flex h-[64px] shrink-0 items-center justify-between border-b border-[#E5E5E7] bg-white/80 px-6 backdrop-blur-md">
-					<div className="flex items-center gap-4">
-						<div className="flex flex-col gap-0.5">
-							<h1 className="text-[20px] font-bold text-[#1D1D1F]">
-								{workspace.title}
-							</h1>
-							<div className="flex items-baseline gap-1.5">
-								<span className="text-[11px] leading-none">
-									{getFolderEmoji(workspace.folder.icon)}
-								</span>
-								<span className="text-[11px] font-medium text-[#AEAEB2]">
-									{workspace.folder.name}
-								</span>
-							</div>
+				<header className="z-10 flex h-[64px] shrink-0 items-center justify-between gap-8 border-b border-[#E5E5E7] bg-white/80 px-6 backdrop-blur-md">
+					<div className="flex min-w-0 flex-[1_1_auto] items-center gap-4">
+						<div className="flex shrink-0 items-center gap-1.5 border-r border-[#D1D1D6] pr-4">
+							<span className="text-[13px] leading-none">
+								{getFolderEmoji(workspace.folder.icon)}
+							</span>
+							<span className="font-sora truncate text-[12px] font-medium text-[#3A3A3C]">
+								{workspace.folder.name}
+							</span>
 						</div>
+
+						<h1 className="unit-title-responsive line-clamp-2 min-w-0 flex-1 font-bold text-[#1D1D1F]">
+							{workspace.title}
+						</h1>
 					</div>
 
-					<div className="flex items-center gap-6">
-						<div className="flex items-center gap-2 text-[13px] text-[#86868B]">
-							<span
-								className={cn(
-									"h-2 w-2 rounded-full",
-									isSaving || isSubmitting ? "bg-amber-400"
-									:	"bg-[#4ADE80]",
-								)}
-							/>
-							{isSaving || isSubmitting ? "Saving..." : "Saved"}
-						</div>
+					<HeaderCoinBalance
+						credits={user?.credits ?? {bronze: 0, silver: 0, gold: 0}}
+						onOpenSubscription={() =>
+							navigate("/dashboard?section=subscription")
+						}
+					/>
 
-						<div className="h-4 w-[1px] bg-[#E5E5E7]" />
-
+					<div className="flex shrink-0 items-center gap-6">
 						<div className="flex items-center gap-1.5">
-							<button
-								className={cn(
-									"flex items-center gap-2 rounded-full border px-3 py-1.5 text-[13px] font-medium transition-all",
-									isNotesPanelOpen ?
-										"border-[#34C759] bg-[#34C759]/10 text-[#1D1D1F]"
-									:	"border-[#D4D7DD] bg-white text-[#1D1D1F] hover:bg-[#F5F5F7]",
-								)}
-								onClick={() =>
-									setIsNotesPanelOpen((value) => !value)
-								}
-								type="button"
-							>
-								<StickyNote size={16} className="text-[#34C759]" />
-								<span>Notes</span>
-								{validUnitNotes.length > 0 && (
-									<span className="rounded-full bg-[#34C759] px-1.5 py-0.5 text-[10px] font-bold text-white">
-										{validUnitNotes.length}
-									</span>
-								)}
-							</button>
-							<button
-								className="flex items-center gap-2 rounded-full border border-[#D4D7DD] bg-white px-3 py-1.5 text-[13px] font-medium text-[#1D1D1F] transition-all hover:bg-[#F5F5F7]"
-								onClick={() =>
-									setIsHistoryOpen((value) => !value)
-								}
-								type="button"
-							>
-								<History size={16} className="text-[#86868B]" />
-								<span>Version History</span>
-							</button>
+							<HeaderControlTooltip label="Notes">
+								<button
+									aria-label="Notes"
+									className={cn(
+										headerIconButtonClass,
+										isNotesPanelOpen ?
+											"border-[#34C759] text-[#34C759]"
+										:	"border-[#D4D7DD]",
+									)}
+									onClick={() =>
+										setIsNotesPanelOpen((value) => !value)
+									}
+									type="button"
+								>
+									<StickyNote size={18} />
+								</button>
+							</HeaderControlTooltip>
+							<HeaderControlTooltip label="Version history">
+								<button
+									aria-label="Version history"
+									className={cn(
+										headerIconButtonClass,
+										isHistoryOpen &&
+											"border-[#34C759] text-[#34C759]",
+									)}
+									onClick={() =>
+										setIsHistoryOpen((value) => !value)
+									}
+									type="button"
+								>
+									<History size={18} />
+								</button>
+							</HeaderControlTooltip>
 							{hasConfiguredGenerationTier &&
 								(activeChapter.status === "ready" ||
 									activeChapter.status === "failed") && (
-									<button
-										className="flex items-center gap-2 rounded-full border border-[#D4D7DD] bg-white px-3 py-1.5 text-[13px] font-medium text-[#1D1D1F] transition-all hover:bg-[#F5F5F7]"
-										onClick={() =>
-											setRegenerateConfirmOpen(true)
+									<HeaderControlTooltip
+										label={
+											activeChapter.status === "ready" ?
+												"Regenerate module"
+											:	"Retry generation"
 										}
-										type="button"
 									>
-										<RotateCcw
-											size={16}
-											className="text-[#86868B]"
-										/>
-										<span>
-											{activeChapter.status === "ready" ?
-												"Regenerate"
-											:	"Retry"}
-										</span>
-									</button>
+										<button
+											aria-label={
+												activeChapter.status === "ready" ?
+													"Regenerate module"
+												:	"Retry generation"
+											}
+											className={headerIconButtonClass}
+											onClick={() =>
+												setRegenerateConfirmOpen(true)
+											}
+											type="button"
+										>
+											<RotateCcw size={18} />
+										</button>
+									</HeaderControlTooltip>
 								)}
 							{draft !== null && (
 								<ChapterStyleMenu
-									compact={false}
+									iconOnly
 									value={draft.textStyle}
 									onChange={(textStyle) => {
 										setDraft((previous) =>
@@ -4876,7 +4959,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 							)}
 							{isEditMode ?
 								<div
-									className="flex h-8 w-[117px] overflow-hidden rounded-full border border-[#D4D7DD] bg-white shadow-sm"
+									className="flex h-10 w-[132px] overflow-hidden rounded-full border border-[#D4D7DD] bg-white shadow-sm"
 									role="group"
 									aria-label="Edit actions"
 								>
@@ -4902,14 +4985,19 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 								</div>
 							: 	<div className="group relative">
 									<Button
-										className="h-8 w-[117px] gap-2 rounded-full bg-[#1D1D1F] px-4 py-1.5 text-[13px] font-medium text-white hover:bg-[#333333] disabled:cursor-not-allowed disabled:bg-[#D1D1D6] disabled:text-white"
+										aria-label="Edit"
+										className="h-10 w-10 rounded-full border border-[#D4D7DD] bg-white p-0 text-[#1D1D1F] hover:border-[#34C759] hover:bg-[#F7FFF9] hover:text-[#34C759] active:border-[#34C759] active:text-[#34C759] disabled:cursor-not-allowed disabled:border-[#D4D7DD] disabled:bg-white disabled:text-[#D1D1D6]"
 										disabled={isExerciseOnlySpread}
 										onClick={enterEditMode}
 										type="button"
 									>
-										<Edit3 size={16} />
-										<span>Edit</span>
+										<Edit3 size={18} />
 									</Button>
+									{!isExerciseOnlySpread && (
+										<div className="pointer-events-none absolute left-1/2 top-[calc(100%+8px)] z-[80] -translate-x-1/2 whitespace-nowrap rounded-md border border-[#E5E5E7] bg-white px-2.5 py-1.5 text-[11px] font-semibold text-[#1D1D1F] opacity-0 shadow-[0_8px_24px_rgba(0,0,0,0.12)] transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+											Edit module
+										</div>
+									)}
 									{isExerciseOnlySpread && (
 										<div className="pointer-events-none absolute right-0 top-[calc(100%+8px)] z-50 w-64 rounded-[12px] border border-[#E5E5E7] bg-white px-3 py-2 text-[12px] leading-relaxed text-[#3A3A3C] opacity-0 shadow-[0_12px_36px_rgba(0,0,0,0.14)] transition-opacity group-hover:opacity-100">
 											Edit mode is not available on exercise pages. Move to a content page to edit the unit.
@@ -4921,7 +5009,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 					</div>
 				</header>
 
-				<div className="relative flex flex-1 flex-col items-center justify-center bg-[#F5F5F7] px-3 py-4 md:px-6 md:py-6">
+				<div className="relative flex flex-1 flex-col items-center justify-center bg-[#F5F5F7] px-3 py-4 md:px-6 md:py-6 max-[1599px]:pb-7 max-[1599px]:pt-3">
 					{pendingNoteSelection && !isNoteDialogOpen && (
 						<button
 							className="fixed z-50 flex items-center gap-2 rounded-full border border-[#34C759]/40 bg-white px-3 py-2 text-[13px] font-semibold text-[#1D1D1F] shadow-[0_12px_36px_rgba(0,0,0,0.16)] transition hover:bg-[#F7FFF9]"

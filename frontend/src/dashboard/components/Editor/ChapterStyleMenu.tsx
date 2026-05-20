@@ -8,11 +8,13 @@ import {
 	type FontId,
 } from "../../utils/typography";
 import {loadFonts} from "../../utils/fontLoader";
+import {cn} from "@/lib/utils";
 
 type ChapterStyleMenuProps = {
 	value: EditorTextStyle;
 	onChange: (value: EditorTextStyle) => void;
 	compact?: boolean;
+	iconOnly?: boolean;
 };
 
 const SIZE_PROFILES: Array<{
@@ -41,6 +43,7 @@ export function ChapterStyleMenu({
 	value,
 	onChange,
 	compact = false,
+	iconOnly = false,
 }: ChapterStyleMenuProps) {
 	const [isOpen, setIsOpen] = useState(false);
 	const containerRef = useRef<HTMLDivElement | null>(null);
@@ -68,28 +71,44 @@ export function ChapterStyleMenu({
 	const activePreset = value.stylePreset ?? "classic";
 
 	return (
-		<div ref={containerRef} className="relative shrink-0">
+		<div ref={containerRef} className="group/style-menu relative shrink-0">
 			<button
 				type="button"
-				aria-label={compact ? "Module style" : undefined}
+				aria-label={compact || iconOnly ? "Module style" : undefined}
 				onClick={() => setIsOpen((current) => !current)}
-				className={`flex items-center rounded-full border border-[#D4D7DD] bg-white py-1.5 text-[13px] font-medium text-[#1D1D1F] transition-all ${
-					compact ? "gap-1 px-2" : "gap-2 px-3"
+				className={`group flex items-center rounded-full border border-[#D4D7DD] bg-white py-1.5 text-[13px] font-medium text-[#1D1D1F] transition-all hover:border-[#34C759] hover:text-[#34C759] active:border-[#34C759] active:text-[#34C759] ${
+					iconOnly ? "h-10 w-10 justify-center px-0"
+					: compact ? "gap-1 px-2"
+					: "gap-2 px-3"
 				} ${
 					isOpen ?
-						"bg-[#F5F5F7]"
+						"border-[#1D1D1F] bg-white text-[#1D1D1F]"
 					:	"hover:bg-[#F5F5F7]"
 				}`}
 			>
-				<span className="font-bold text-[14px]">Aa</span>
-				{!compact ?
+				<span
+					className={cn(
+						"text-[14px] font-bold transition-colors group-hover:text-[#34C759] group-active:text-[#34C759]",
+						isOpen ? "text-[#34C759]" : "text-[#1D1D1F]",
+					)}
+				>
+					Aa
+				</span>
+				{!compact && !iconOnly ?
 					<span>Style</span>
 				:	null}
-				<ChevronDown
-					size={14}
-					className={`transition-transform ${isOpen ? "rotate-180" : ""}`}
-				/>
+				{iconOnly ? null : (
+					<ChevronDown
+						size={14}
+						className={`transition-transform ${isOpen ? "rotate-180" : ""}`}
+					/>
+				)}
 			</button>
+			{iconOnly && !isOpen ? (
+				<div className="pointer-events-none absolute left-1/2 top-[calc(100%+8px)] z-[80] -translate-x-1/2 whitespace-nowrap rounded-md border border-[#E5E5E7] bg-white px-2.5 py-1.5 text-[11px] font-semibold text-[#1D1D1F] opacity-0 shadow-[0_8px_24px_rgba(0,0,0,0.12)] transition-opacity group-hover/style-menu:opacity-100 group-focus-within/style-menu:opacity-100">
+					Style
+				</div>
+			) : null}
 
 			{isOpen ?
 				<div className="absolute top-[calc(100%+10px)] right-0 z-30 w-[280px] rounded-md border border-[#D4D7DD] bg-white p-4 shadow-[0_2px_8px_rgba(0,0,0,0.1)]">

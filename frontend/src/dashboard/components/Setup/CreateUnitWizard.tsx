@@ -710,10 +710,14 @@ export function CreateUnitWizard({
 					</nav>
 				</div>
 
-				<div className="flex min-h-0 min-w-0 flex-1 flex-col">
+				<div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
 					<div
 						className={`flex shrink-0 items-center px-6 pt-5 ${
 							currentStep === 1 ? "justify-between" : "justify-end"
+						} ${
+							currentStep === 2 ?
+								"absolute right-0 top-0 z-10 px-4 pt-4"
+							:	""
 						}`}
 					>
 						{currentStep === 1 && (
@@ -734,7 +738,11 @@ export function CreateUnitWizard({
 							<X size={15} />
 						</button>
 					</div>
-					<div className="min-h-0 flex-1 overflow-y-auto px-6 pb-5 pt-3">
+					<div
+						className={`min-h-0 flex-1 overflow-y-auto px-6 pb-5 pt-3 ${
+							currentStep === 2 ? "pt-4" : ""
+						}`}
+					>
 						{currentStep === 0 && (
 							<TopicStep
 								draftTopic={draftTopic}

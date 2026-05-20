@@ -61,7 +61,9 @@ function ToolbarButton({
 			onClick={onClick}
 			className={cn(
 				"flex shrink-0 items-center justify-center rounded-full border border-transparent text-[12px] font-medium text-[#1D1D1F] transition-all hover:border-[#E3E1DA] hover:bg-[#F7F4EC] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-transparent disabled:hover:bg-transparent",
-				compact ? "h-8 w-8 px-0" : "h-9 gap-2 px-3",
+				compact ?
+					"h-8 w-8 px-0"
+				:	"h-9 gap-2 px-3 max-[1599px]:h-7 max-[1599px]:gap-1.5 max-[1599px]:px-2 max-[1599px]:text-[11px]",
 			)}
 		>
 			{icon}
@@ -180,7 +182,9 @@ export function EditorToolbar({
 					onClick={() => setOpen((current) => !current)}
 					className={cn(
 						"flex shrink-0 items-center rounded-full border text-[12px] font-medium transition-all disabled:opacity-40",
-						compact ? "h-8 gap-1 px-2" : "h-9 gap-2 px-3",
+						compact ?
+							"h-8 gap-1 px-2"
+						:	"h-9 gap-2 px-3 max-[1599px]:h-7 max-[1599px]:gap-1.5 max-[1599px]:px-2 max-[1599px]:text-[11px]",
 						open ?
 							"border-[#D9D1C1] bg-[#F7F4EC] text-[#1D1D1F]"
 						:	"border-transparent text-[#1D1D1F] hover:border-[#E3E1DA] hover:bg-[#F7F4EC]",
@@ -201,7 +205,7 @@ export function EditorToolbar({
 				</button>
 
 				{open ? (
-					<div className="absolute bottom-[calc(100%+8px)] left-0 z-30 min-w-[180px] rounded-2xl border border-[#E7E1D6] bg-white p-2 shadow-[0_18px_48px_rgba(28,24,18,0.12)]">
+					<div className="absolute bottom-[calc(100%+8px)] left-0 z-[80] min-w-[180px] rounded-2xl border border-[#E7E1D6] bg-white p-2 shadow-[0_18px_48px_rgba(28,24,18,0.12)]">
 						{BLOCK_TYPE_OPTIONS.map((option) => (
 							<button
 								key={option.value}

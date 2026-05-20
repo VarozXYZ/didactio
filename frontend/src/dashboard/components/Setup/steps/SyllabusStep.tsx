@@ -336,7 +336,7 @@ function SyllabusCard({
 		<div className="space-y-5">
 			<div>
 				<div className="flex items-center gap-2">
-					<h3 className="text-[22px] font-bold tracking-tight text-[#1D1D1F]">
+					<h3 className="pr-10 text-[22px] font-bold tracking-tight text-[#1D1D1F]">
 						{syllabus.title || "Building syllabus…"}
 					</h3>
 					{isStreaming && (

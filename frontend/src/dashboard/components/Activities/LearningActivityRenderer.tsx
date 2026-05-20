@@ -570,7 +570,7 @@ function MultipleChoiceActivity({
 
 	return (
 		<div className="flex flex-1 flex-col overflow-hidden">
-			<div className="mb-3 flex items-center gap-1.5">
+			<div className="mb-[calc(12px*var(--activity-scale,1))] flex items-center gap-1.5">
 				{questions.map((_, i) => {
 					const qId = asText(questions[i]?.id) || `q${i + 1}`;
 					const isConfirmed = !!confirmedAnswers[qId];
@@ -596,8 +596,8 @@ function MultipleChoiceActivity({
 				})}
 			</div>
 
-			<div className="mb-2 flex items-center justify-between">
-				<span className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#AEAEB2]">
+			<div className="mb-[calc(8px*var(--activity-scale,1))] flex items-center justify-between">
+				<span className="text-[calc(11px*var(--activity-scale,1))] font-bold uppercase tracking-[0.14em] text-[#AEAEB2]">
 					Pregunta {viewIndex + 1} de {questions.length}
 				</span>
 				<div className="flex items-center gap-1">
@@ -623,10 +623,10 @@ function MultipleChoiceActivity({
 			<div className="min-h-0 flex-1 overflow-y-auto">
 				{currentQuestion && (
 					<div>
-						<p className="text-[14.5px] font-semibold leading-snug text-[#1D1D1F]">
+						<p className="text-[calc(14.5px*var(--activity-scale,1))] font-semibold leading-snug text-[#1D1D1F]">
 							{asText(currentQuestion.prompt)}
 						</p>
-						<div className="mt-3 grid gap-2">
+						<div className="mt-[calc(12px*var(--activity-scale,1))] grid gap-[calc(8px*var(--activity-scale,1))]">
 							{asArray(currentQuestion.options).map((option, optionIndex) => {
 								const optionId = asText(option.id) || String(optionIndex);
 								const isSelected =
@@ -640,7 +640,7 @@ function MultipleChoiceActivity({
 									<label
 										key={optionId}
 										className={cn(
-											"flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 transition-all",
+											"flex cursor-pointer items-center gap-[calc(12px*var(--activity-scale,1))] rounded-lg border px-[calc(16px*var(--activity-scale,1))] py-[calc(12px*var(--activity-scale,1))] transition-all",
 											confirmed ?
 												isCorrectOption ? "border-[#4ADE80] bg-[#F0FDF4]"
 												: isWrongSelected ? "border-[#F87171] bg-[#FEF2F2]"
@@ -661,7 +661,7 @@ function MultipleChoiceActivity({
 										/>
 										<span
 											className={cn(
-												"flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border-2 transition-all",
+												"flex h-[calc(18px*var(--activity-scale,1))] w-[calc(18px*var(--activity-scale,1))] shrink-0 items-center justify-center rounded-full border-2 transition-all",
 												confirmed ?
 													isCorrectOption ? "border-[#16A34A]"
 													: isWrongSelected ? "border-[#DC2626]"
@@ -683,7 +683,7 @@ function MultipleChoiceActivity({
 											)}
 										</span>
 										<span className={cn(
-											"text-[13.5px] leading-snug",
+											"text-[calc(13.5px*var(--activity-scale,1))] leading-snug",
 											confirmed ?
 												isCorrectOption ? "font-medium text-[#166534]"
 												: isWrongSelected ? "font-medium text-[#991B1B]"
@@ -700,13 +700,13 @@ function MultipleChoiceActivity({
 
 						{confirmed && (
 							<div className={cn(
-								"mt-3 rounded-md border p-3",
+								"mt-[calc(12px*var(--activity-scale,1))] rounded-md border p-[calc(12px*var(--activity-scale,1))]",
 								confirmed.isCorrect ?
 									"border-[#BBF7D0] bg-[#F0FDF4]"
 								:	"border-[#FECACA] bg-[#FEF2F2]",
 							)}>
 								<div className={cn(
-									"flex items-center gap-1.5 text-[12px] font-bold",
+									"flex items-center gap-1.5 text-[calc(12px*var(--activity-scale,1))] font-bold",
 									confirmed.isCorrect ? "text-[#166534]" : "text-[#991B1B]",
 								)}>
 									{confirmed.isCorrect ?
@@ -716,7 +716,7 @@ function MultipleChoiceActivity({
 									{confirmed.isCorrect ? "¡Correcto!" : "Incorrecto"}
 								</div>
 								{confirmed.explanation && (
-									<p className="mt-1.5 text-[12px] leading-relaxed text-[#374151]">
+									<p className="mt-1.5 text-[calc(12px*var(--activity-scale,1))] leading-relaxed text-[#374151]">
 										{confirmed.explanation}
 									</p>
 								)}
@@ -726,13 +726,13 @@ function MultipleChoiceActivity({
 				)}
 			</div>
 
-			<div className="mt-3 border-t border-[#F0F0F2] pt-3">
+			<div className="mt-[calc(12px*var(--activity-scale,1))] border-t border-[#F0F0F2] pt-[calc(12px*var(--activity-scale,1))]">
 				{isCurrentInteractive && !confirmed && (
 					<button
 						type="button"
 						disabled={!pendingAnswer}
 						onClick={handleConfirm}
-						className="w-full rounded-xl bg-[#1D1D1F] py-2.5 text-[13px] font-bold text-white transition hover:bg-[#1F2937] disabled:cursor-not-allowed disabled:opacity-40"
+						className="w-full rounded-xl bg-[#1D1D1F] py-[calc(10px*var(--activity-scale,1))] text-[calc(13px*var(--activity-scale,1))] font-bold text-white transition hover:bg-[#1F2937] disabled:cursor-not-allowed disabled:opacity-40"
 					>
 						Confirm answer
 					</button>
@@ -741,7 +741,7 @@ function MultipleChoiceActivity({
 					<button
 						type="button"
 						onClick={handleNext}
-						className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#1D1D1F] py-2.5 text-[13px] font-bold text-white transition hover:bg-[#1F2937]"
+						className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#1D1D1F] py-[calc(10px*var(--activity-scale,1))] text-[calc(13px*var(--activity-scale,1))] font-bold text-white transition hover:bg-[#1F2937]"
 					>
 						Siguiente pregunta
 						<ChevronRight size={15} />
@@ -2095,6 +2095,7 @@ function FlashcardsActivity({activity}: {activity: BackendLearningActivity}) {
 export function LearningActivityRenderer({
 	activity,
 	attempts,
+	contentScale = 1,
 	isSubmitting,
 	onSubmitAttempt,
 	onRefillAttempts,
@@ -2103,6 +2104,7 @@ export function LearningActivityRenderer({
 }: {
 	activity: BackendLearningActivity;
 	attempts: BackendLearningActivityAttempt[];
+	contentScale?: number;
 	isSubmitting: boolean;
 	onSubmitAttempt: (activityId: string, answers: unknown) => Promise<void>;
 	onRefillAttempts: (activityId: string) => Promise<void>;
@@ -2473,6 +2475,7 @@ export function LearningActivityRenderer({
 			style={{
 				backgroundColor: activityTheme.surface,
 				color: activityTheme.text,
+				"--activity-scale": contentScale,
 				"--activity-surface": activityTheme.surface,
 				"--activity-surface-alt": activityTheme.surfaceAlt,
 				"--activity-border": activityTheme.border,
@@ -2488,21 +2491,21 @@ export function LearningActivityRenderer({
 				"--activity-focus": activityTheme.focus,
 			} as CSSProperties}
 		>
-			<div className="border-b border-[var(--activity-border)] pb-3">
+			<div className="border-b border-[var(--activity-border)] pb-[calc(12px*var(--activity-scale,1))]">
 				<div className="flex items-start justify-between gap-3">
 					<div className="min-w-0">
 						<div className="flex flex-wrap items-center gap-2">
-							<div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--activity-primary)] text-white">
+							<div className="flex h-[calc(28px*var(--activity-scale,1))] w-[calc(28px*var(--activity-scale,1))] shrink-0 items-center justify-center rounded-lg bg-[var(--activity-primary)] text-white">
 								<ActivityIcon type={activity.type} />
 							</div>
-							<span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--activity-muted)] opacity-70">
+							<span className="text-[calc(10px*var(--activity-scale,1))] font-bold uppercase tracking-[0.18em] text-[var(--activity-muted)] opacity-70">
 								{activityTypeLabel(activity.type)}
 							</span>
 							<HoverCard openDelay={150} closeDelay={100}>
 								<HoverCardTrigger asChild>
 									<button
 										type="button"
-										className="inline-flex items-center gap-1.5 rounded-full border border-[var(--activity-border-strong)] bg-[var(--activity-accent-softer)] px-2.5 py-1 text-[11px] font-bold text-[var(--activity-accent-text)] transition hover:bg-[var(--activity-accent-soft)] focus-visible:ring-2 focus-visible:ring-[var(--activity-focus)]"
+										className="inline-flex items-center gap-1.5 rounded-full border border-[var(--activity-border-strong)] bg-[var(--activity-accent-softer)] px-[calc(10px*var(--activity-scale,1))] py-[calc(4px*var(--activity-scale,1))] text-[calc(11px*var(--activity-scale,1))] font-bold text-[var(--activity-accent-text)] transition hover:bg-[var(--activity-accent-soft)] focus-visible:ring-2 focus-visible:ring-[var(--activity-focus)]"
 									>
 										<MessageCircleQuestionMark size={12} />
 										About
@@ -2525,11 +2528,11 @@ export function LearningActivityRenderer({
 								</HoverCardContent>
 							</HoverCard>
 						</div>
-						<h3 className="mt-2 font-[Sora] text-[15.5px] font-bold leading-snug text-[var(--activity-text)]">
+						<h3 className="mt-[calc(8px*var(--activity-scale,1))] font-[Sora] text-[calc(15.5px*var(--activity-scale,1))] font-bold leading-snug text-[var(--activity-text)]">
 							{activity.title}
 						</h3>
 						{activity.type !== "short_answer" && (
-							<p className="mt-1 text-[12px] leading-relaxed text-[var(--activity-muted)]">{activity.instructions}</p>
+							<p className="mt-[calc(4px*var(--activity-scale,1))] text-[calc(12px*var(--activity-scale,1))] leading-relaxed text-[var(--activity-muted)]">{activity.instructions}</p>
 						)}
 					</div>
 					{onDeleteActivity && (
@@ -2545,7 +2548,7 @@ export function LearningActivityRenderer({
 				</div>
 			</div>
 
-			<div className="mt-3 flex min-h-0 flex-1 flex-col">
+			<div className="mt-[calc(12px*var(--activity-scale,1))] flex min-h-0 flex-1 flex-col">
 				{renderBody()}
 			</div>
 

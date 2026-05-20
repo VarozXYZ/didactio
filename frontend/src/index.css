@@ -74,6 +74,23 @@ h6 {
 	font-family: var(--font-sora);
 }
 
+.unit-title-responsive {
+	font-size: 24px;
+	line-height: 1.2;
+}
+
+@media (max-width: 1919px) {
+	.unit-title-responsive {
+		font-size: 20px;
+	}
+}
+
+@media (max-width: 1599px) {
+	.unit-title-responsive {
+		font-size: 15px;
+	}
+}
+
 * {
 	box-sizing: border-box;
 }
@@ -142,7 +159,7 @@ button[aria-disabled="true"],
 .prose h2,
 .typography-scope h2 {
 	margin-top: 1.2em;
-	margin-bottom: 0.5em;
+	margin-bottom: 0;
 	color: #1d1d1f;
 	font-family: var(--typo-heading-family, Inter);
 	font-size: var(--typo-h2-size, 20px);
@@ -152,7 +169,7 @@ button[aria-disabled="true"],
 
 .unit-page-scope h2 {
 	margin-top: 1.2em;
-	margin-bottom: 0.5em;
+	margin-bottom: 0;
 	font-weight: 700;
 	letter-spacing: -0.01em;
 }
@@ -175,7 +192,7 @@ button[aria-disabled="true"],
 }
 
 .unit-page-scope h3 {
-	margin-top: 1em;
+	margin-top: 0;
 	margin-bottom: 0.4em;
 	font-weight: 600;
 	letter-spacing: -0.01em;
