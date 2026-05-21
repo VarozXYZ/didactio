@@ -118,35 +118,37 @@ function ProductCard({
 
 	return (
 		<div
-			className={`relative rounded-[12px] border bg-white p-4 shadow-[0_8px_18px_rgba(17,24,39,0.04)] ${
+			className={`relative min-w-0 rounded-[12px] border bg-white p-3 shadow-[0_8px_18px_rgba(17,24,39,0.04)] sm:p-4 ${
 				product.recommended ?
 					"border-[#15803D]"
 				:	"border-[#E5E5E7]"
 			}`}
 		>
-			{product.recommended && (
-				<span className="absolute right-3 top-3 rounded-full border border-[#BBF7D0] bg-white px-2.5 py-1 text-[10px] font-bold uppercase text-[#15803D]">
-					Recommended
-				</span>
-			)}
-			<div className="flex items-start justify-between gap-4 pr-20">
-				<div className="flex items-center gap-4">
-					<div className="flex h-12 w-12 items-center justify-center rounded-[12px] bg-[#ECFDF3] text-[#15803D]">
+			<div className="flex min-w-0 items-start justify-between gap-2 sm:gap-4">
+				<div className="flex min-w-0 items-center gap-3 sm:gap-4">
+					<div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-[#ECFDF3] text-[#15803D] sm:h-12 sm:w-12">
 						{isSubscription ?
-							<GraduationCap size={24} />
-						:	<Gift size={22} />}
+							<GraduationCap size={22} />
+						:	<Gift size={20} />}
 					</div>
-					<div>
-						<h3 className="text-[18px] font-bold text-[#0F0F12]">
+					<div className="min-w-0">
+						<h3 className="text-[16px] font-bold leading-tight text-[#0F0F12] sm:text-[18px]">
 							{product.name}
 						</h3>
-						<p className="mt-1 inline-flex rounded-full bg-[#DCFCE7] px-2 py-0.5 text-[10px] font-bold uppercase text-[#15803D]">
-							{isSubscription ? "Monthly" : "One-time"}
-						</p>
+						<div className="mt-1 flex flex-wrap items-center gap-1.5">
+							<p className="inline-flex rounded-full bg-[#DCFCE7] px-2 py-0.5 text-[10px] font-bold uppercase text-[#15803D]">
+								{isSubscription ? "Monthly" : "One-time"}
+							</p>
+							{product.recommended && (
+								<span className="inline-flex rounded-full border border-[#BBF7D0] bg-white px-2 py-0.5 text-[8px] font-bold uppercase text-[#15803D] sm:text-[10px]">
+									Recommended
+								</span>
+							)}
+						</div>
 					</div>
 				</div>
-				<div className="shrink-0 text-right">
-					<div className="text-[28px] font-bold leading-none text-[#0F0F12]">
+				<div className="ml-auto shrink-0 text-right">
+					<div className="text-[23px] font-bold leading-none text-[#0F0F12] sm:text-[28px]">
 						{product.priceLabel.replace(" + VAT", "")}
 					</div>
 					<div className="mt-1 text-[11px] font-semibold text-[#86868B]">
@@ -154,31 +156,31 @@ function ProductCard({
 					</div>
 				</div>
 			</div>
-			<div className="mt-3 grid grid-cols-3 gap-2">
+			<div className="mt-3 grid min-w-0 grid-cols-3 gap-1.5 sm:gap-2">
 				{(["bronze", "silver", "gold"] as const).map((type) => (
 					<div
 						key={type}
-						className="rounded-[8px] border border-[#E5E5E7] bg-white px-2 py-1.5"
+						className="min-w-0 rounded-[8px] border border-[#E5E5E7] bg-white px-1 py-1.5 sm:px-2"
 					>
 						<div className="flex min-h-[22px] items-center justify-center gap-1">
 							{product.unlimitedBronze && type === "bronze" ?
 								<>
-									<CoinIcon type={type} size={16} />
-									<span className="text-[12px] font-semibold text-[#1D1D1F]">
+									<CoinIcon type={type} size={14} />
+									<span className="truncate text-[10px] font-semibold text-[#1D1D1F] sm:text-[12px]">
 										Unlimited*
 									</span>
 								</>
 							:	<>
-									<span className="text-[15px] font-bold text-[#15803D]">
+									<span className="text-[13px] font-bold text-[#15803D] sm:text-[15px]">
 										+
 									</span>
-									<CoinIcon type={type} size={16} />
-									<span className="text-[12px] font-semibold text-[#1D1D1F]">
+									<CoinIcon type={type} size={14} />
+									<span className="text-[11px] font-semibold text-[#1D1D1F] sm:text-[12px]">
 										{product.credits[type]}
 									</span>
 								</>}
 						</div>
-						<div className="mt-0.5 text-center text-[9px] font-semibold uppercase text-[#86868B]">
+						<div className="mt-0.5 truncate text-center text-[8px] font-semibold uppercase text-[#86868B] sm:text-[9px]">
 							{type}
 						</div>
 					</div>
@@ -283,7 +285,7 @@ export function SubscriptionView() {
 						</div>
 					)}
 
-					<div className="rounded-[14px] border border-[#E5E5E7] bg-white p-7 shadow-[0_12px_30px_rgba(17,24,39,0.05)]">
+					<div>
 						<div className="mb-7">
 							<div>
 								<h2 className="text-[30px] font-bold tracking-tight text-[#0F0F12]">
@@ -352,10 +354,7 @@ export function SubscriptionView() {
 						</div>
 					</div>
 
-					<div
-						id="plans-and-credit-packs"
-						className="rounded-[14px] border border-[#E5E5E7] bg-white p-6 shadow-[0_12px_30px_rgba(17,24,39,0.05)]"
-					>
+					<div id="plans-and-credit-packs">
 						<div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
 							<div>
 								<h2 className="text-[24px] font-bold tracking-tight text-[#0F0F12]">

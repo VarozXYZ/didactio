@@ -108,7 +108,7 @@ function MetricCard({
 	children?: ReactNode;
 }) {
 	return (
-		<div className="flex min-h-[170px] flex-col justify-between rounded-[12px] border border-[#E5E5E7] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.025)]">
+		<div className="flex min-h-[170px] min-w-0 flex-col justify-between rounded-[12px] border border-[#E5E5E7] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.025)]">
 			<div>
 				<div className="mb-4 flex items-start justify-between gap-3">
 					<div
@@ -149,7 +149,7 @@ function HighlightCard({
 	iconBg?: string;
 }) {
 	return (
-		<div className="flex items-center gap-4 rounded-[12px] border border-[#E5E5E7] bg-white px-4 py-3">
+		<div className="flex min-w-0 items-center gap-3 rounded-[12px] border border-[#E5E5E7] bg-white px-3 py-3 sm:gap-4 sm:px-4">
 			<div
 				className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[12px] text-[#15803D]"
 				style={{backgroundColor: iconBg}}
@@ -164,9 +164,11 @@ function HighlightCard({
 					{value}
 				</div>
 			</div>
-			<div className="shrink-0 text-right">
-				<div className="text-[12px] text-[#667085]">{meta}</div>
-				<div className="mt-1 text-[13px] font-bold text-[#15803D]">
+			<div className="min-w-[70px] shrink-0 text-right">
+				<div className="truncate text-[11px] text-[#667085] sm:text-[12px]">
+					{meta}
+				</div>
+				<div className="mt-1 truncate text-[13px] font-bold text-[#15803D]">
 					{count}
 				</div>
 			</div>
@@ -203,12 +205,9 @@ function ActivityChart({
 	onPeriodChange: (period: BackendUsageAnalyticsPeriod) => void;
 }) {
 	return (
-		<div className="rounded-[14px] border border-[#E5E5E7] bg-white p-6 shadow-[0_12px_30px_rgba(17,24,39,0.05)]">
+		<div className="min-w-0 rounded-[14px] border border-[#E5E5E7] bg-white p-4 shadow-[0_12px_30px_rgba(17,24,39,0.05)] sm:p-6">
 			<div className="mb-5 flex flex-wrap items-start justify-between gap-4">
-				<div className="flex items-start gap-4">
-					<div className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-[#15803D] text-white shadow-[0_8px_18px_rgba(21,128,61,0.22)]">
-						<Sparkles size={18} />
-					</div>
+				<div className="min-w-0">
 					<div>
 						<h2 className="text-[18px] font-bold tracking-tight text-[#0F0F12]">
 							AI Generations Over Time
@@ -218,13 +217,13 @@ function ActivityChart({
 						</p>
 					</div>
 				</div>
-				<div className="flex items-center overflow-hidden rounded-[10px] border border-[#E5E5E7] bg-white p-1">
+				<div className="flex w-full items-center overflow-hidden rounded-[10px] border border-[#E5E5E7] bg-white p-1 sm:w-auto">
 					{PERIOD_OPTIONS.map((option) => (
 						<button
 							key={option.value}
 							type="button"
 							onClick={() => onPeriodChange(option.value)}
-							className={`rounded-[7px] px-4 py-1.5 text-[12px] font-bold transition ${
+							className={`flex-1 rounded-[7px] px-3 py-1.5 text-[12px] font-bold transition sm:flex-none sm:px-4 ${
 								analytics.period === option.value ?
 									"bg-[#15803D] text-white shadow-[0_6px_16px_rgba(21,128,61,0.22)]"
 								:	"text-[#667085] hover:text-[#0F0F12]"
@@ -239,7 +238,7 @@ function ActivityChart({
 			<ResponsiveContainer width="100%" height={250}>
 				<AreaChart
 					data={analytics.chart}
-					margin={{top: 4, right: 4, left: -16, bottom: 0}}
+					margin={{top: 4, right: 0, left: -24, bottom: 0}}
 				>
 					<defs>
 						<linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
@@ -331,9 +330,9 @@ export function AnalyticsView() {
 
 	return (
 		<div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-			<header className="flex h-[80px] shrink-0 items-center border-b border-[#E5E5E7] bg-white/80 px-8 backdrop-blur-md">
+			<header className="flex min-h-[80px] shrink-0 items-center border-b border-[#E5E5E7] bg-white/80 px-4 py-4 backdrop-blur-md sm:px-8 sm:py-0">
 				<div>
-					<h1 className="text-[28px] font-bold tracking-tight text-[#1D1D1F]">
+					<h1 className="text-[27px] font-bold tracking-tight text-[#1D1D1F] sm:text-[28px]">
 						Usage & Analytics
 					</h1>
 					<p className="mt-0.5 text-[13px] text-[#86868B]">
@@ -342,8 +341,8 @@ export function AnalyticsView() {
 				</div>
 			</header>
 
-			<div className="min-h-0 flex-1 overflow-y-auto bg-[#F7F8FA] p-8">
-				<div className="mx-auto max-w-[1260px] space-y-5">
+			<div className="min-h-0 flex-1 overflow-y-auto bg-[#F7F8FA] px-4 py-6 sm:p-8">
+				<div className="mx-auto w-full max-w-[520px] space-y-5 xl:max-w-[1260px]">
 					{error ? (
 						<div className="flex items-center gap-3 rounded-[16px] border border-red-200 bg-red-50 px-4 py-3 text-[13px] font-medium text-red-700">
 							<AlertCircle size={16} />
@@ -362,9 +361,11 @@ export function AnalyticsView() {
 					) : null}
 
 					{analytics ? (
-						<div className={isLoading ? "opacity-60 transition" : "transition"}>
+						<div
+							className={`min-w-0 ${isLoading ? "opacity-60 transition" : "transition"}`}
+						>
 							<div className="grid gap-5 xl:grid-cols-[1.8fr_1fr]">
-								<section className="rounded-[14px] border border-[#E5E5E7] bg-white p-5 shadow-[0_12px_30px_rgba(17,24,39,0.05)]">
+								<section className="min-w-0 rounded-[14px] border border-[#E5E5E7] bg-white p-4 shadow-[0_12px_30px_rgba(17,24,39,0.05)] sm:p-5">
 									<div className="mb-6">
 										<h2 className="text-[20px] font-bold tracking-tight text-[#0F0F12]">
 											Overview
@@ -373,7 +374,7 @@ export function AnalyticsView() {
 											Key performance metrics at a glance
 										</p>
 									</div>
-									<div className="grid gap-5 md:grid-cols-3">
+									<div className="grid min-w-0 gap-5 md:grid-cols-3">
 										<MetricCard
 											icon={
 												<AssetIcon
@@ -404,7 +405,7 @@ export function AnalyticsView() {
 									</div>
 								</section>
 
-								<section className="rounded-[14px] border border-[#E5E5E7] bg-white p-5 shadow-[0_12px_30px_rgba(17,24,39,0.05)]">
+								<section className="min-w-0 rounded-[14px] border border-[#E5E5E7] bg-white p-4 shadow-[0_12px_30px_rgba(17,24,39,0.05)] sm:p-5">
 									<div className="mb-6">
 										<h2 className="text-[20px] font-bold tracking-tight text-[#0F0F12]">
 											Highlights

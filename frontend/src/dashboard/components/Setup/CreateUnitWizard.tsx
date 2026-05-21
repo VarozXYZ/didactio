@@ -172,16 +172,25 @@ export function normalizeStreamedSyllabusPreview(
 const STEPS = [
 	{
 		label: "Topic",
+		mobileLabel: "Topic",
+		title: "What do you want to learn?",
+		subtitle: "Start with a topic. You can refine it in the next step.",
 		description:
 			"Tell us what you want to learn and how deep you want to go.",
 	},
 	{
 		label: "Questionnaire",
+		mobileLabel: "Questions",
+		title: "A few quick questions",
+		subtitle: "Help us match the unit to your level and goals.",
 		description:
 			"A few quick questions so we can match the content to your level.",
 	},
 	{
 		label: "Syllabus",
+		mobileLabel: "Syllabus",
+		title: "Review your syllabus",
+		subtitle: "Check the plan before generating the full unit.",
 		description:
 			"See what your unit will cover and give it the green light.",
 	},
@@ -604,6 +613,7 @@ export function CreateUnitWizard({
 	});
 	const canPaySelectedUnit =
 		(user?.credits[selectedUnitCost.coinType] ?? 0) >= selectedUnitCost.amount;
+	const currentStepMeta = STEPS[currentStep];
 
 	if (isLoading) {
 		return (
@@ -619,7 +629,7 @@ export function CreateUnitWizard({
 
 	return (
 		<div
-			className="fixed inset-0 z-50 flex items-center justify-center px-4 py-3 sm:py-6"
+			className="fixed inset-0 z-50 flex items-center justify-center overflow-x-hidden px-4 py-3 sm:py-6"
 			style={{
 				background:
 					"radial-gradient(ellipse at 60% 40%, rgba(17,160,125,0.18) 0%, rgba(52,52,195,0.12) 40%, rgba(239,160,71,0.10) 70%, rgba(0,0,0,0.45) 100%)",
@@ -627,7 +637,7 @@ export function CreateUnitWizard({
 			}}
 		>
 			<div
-				className="flex min-h-0 max-h-[calc(100dvh-0.75rem)] w-full max-w-[920px] overflow-hidden rounded-[22px] sm:max-h-[calc(100dvh-1.5rem)]"
+				className="flex min-h-0 max-h-[calc(100dvh-0.75rem)] w-full max-w-[520px] flex-col overflow-hidden rounded-[22px] md:max-w-[920px] md:flex-row md:max-h-[calc(100dvh-1.5rem)]"
 				style={{
 					background: "rgba(255,255,255,0.72)",
 					backdropFilter: "blur(40px) saturate(1.6)",
@@ -637,7 +647,7 @@ export function CreateUnitWizard({
 				}}
 			>
 				<div
-					className="flex w-[232px] shrink-0 flex-col"
+					className="hidden w-[232px] shrink-0 flex-col md:flex"
 					style={{
 						background: "rgba(248,248,250,0.7)",
 						borderRight: "1px solid rgba(0,0,0,0.06)",
@@ -710,26 +720,72 @@ export function CreateUnitWizard({
 					</nav>
 				</div>
 
-				<div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+				<div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden">
+					<div className="shrink-0 border-b border-black/[0.06] px-5 pb-4 pt-5 md:hidden">
+						<div className="flex items-start justify-between gap-4">
+							<div className="min-w-0">
+								<p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#AEAEB2]">
+									New Unit
+								</p>
+								<h2 className="mt-4 text-[27px] font-bold leading-tight tracking-tight text-[#1D1D1F]">
+									{currentStepMeta.title}
+								</h2>
+								<p className="mt-3 text-[15px] font-medium leading-relaxed text-[#7A7A7F]">
+									{currentStepMeta.subtitle}
+								</p>
+							</div>
+							<button
+								type="button"
+								onClick={onClose}
+								className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[#8E8E93] transition-colors hover:bg-black/[0.06] hover:text-[#1D1D1F]"
+								aria-label="Close wizard"
+							>
+								<X size={18} />
+							</button>
+						</div>
+						<div className="mt-6">
+							<p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#AEAEB2]">
+								Step {currentStep + 1} of {STEPS.length}
+							</p>
+						</div>
+					</div>
+
+					<div className="w-full min-w-0 shrink-0 overflow-hidden px-5 pb-4 pt-2 md:hidden">
+						<div className="grid overflow-hidden rounded-[16px] border border-black/[0.08] bg-black/[0.05] p-0.5 grid-cols-3">
+						{STEPS.map((step, index) => {
+							const isCompleted = index < currentStep;
+							const isCurrent = index === currentStep;
+
+							return (
+								<div
+									key={step.label}
+									className={`flex min-w-0 items-center justify-center gap-1.5 px-2 py-2 text-[11px] font-bold transition ${
+										isCurrent ?
+											"rounded-[13px] bg-[#1D1D1F] text-white"
+										: isCompleted ?
+											"text-[#0A9068]"
+										:	"text-[#AEAEB2]"
+									} ${!isCurrent && index > 0 ? "border-l border-black/[0.08]" : ""}`}
+								>
+									<span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-white/20 text-[10px]">
+										{isCompleted ?
+											<Check size={10} strokeWidth={3} />
+										:	index + 1}
+									</span>
+									<span className="truncate">{step.mobileLabel}</span>
+								</div>
+							);
+						})}
+						</div>
+					</div>
+
 					<div
-						className={`flex shrink-0 items-center px-6 pt-5 ${
-							currentStep === 1 ? "justify-between" : "justify-end"
-						} ${
+						className={`hidden shrink-0 items-center justify-end px-6 pt-5 md:flex ${
 							currentStep === 2 ?
 								"absolute right-0 top-0 z-10 px-4 pt-4"
-							:	""
+							:	"absolute right-0 top-0 z-10 px-4 pt-4"
 						}`}
 					>
-						{currentStep === 1 && (
-							<div className="flex items-center gap-2">
-								<p className="text-[13px] text-[#86868B]">
-									Answer these questions to personalize your unit.
-								</p>
-								<span className="rounded-full border border-[#D1D1D6] bg-white/70 px-2 py-0.5 text-[10px] font-bold tracking-[0.12em] text-[#6E6E73]">
-									OPTIONAL
-								</span>
-							</div>
-						)}
 						<button
 							type="button"
 							onClick={onClose}
@@ -739,7 +795,7 @@ export function CreateUnitWizard({
 						</button>
 					</div>
 					<div
-						className={`min-h-0 flex-1 overflow-y-auto px-6 pb-5 pt-3 ${
+						className={`min-h-0 w-full min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-5 pb-5 pt-4 md:px-6 md:pt-4 ${
 							currentStep === 2 ? "pt-4" : ""
 						}`}
 					>

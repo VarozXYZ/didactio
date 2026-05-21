@@ -24,8 +24,11 @@ import {PreferencesView} from "./components/Dashboard/SettingsViews/PreferencesV
 import {ProfileView} from "./components/Dashboard/SettingsViews/ProfileView";
 import {SubscriptionView} from "./components/Dashboard/SettingsViews/SubscriptionView";
 import {Sidebar} from "./components/Dashboard/Sidebar/Sidebar";
+import {MobileBottomNav} from "./components/Dashboard/Mobile/MobileBottomNav";
+import {MobileDashboardView} from "./components/Dashboard/Mobile/MobileDashboardView";
 import {UnitEditor} from "./components/Editor/UnitEditor";
 import {CreateUnitWizard} from "./components/Setup/CreateUnitWizard";
+import {useMediaQuery} from "./hooks/useMediaQuery";
 import type {DashboardListItem, DashboardSection} from "./types";
 import type {BackendFolder} from "./api/dashboardApi";
 
@@ -84,6 +87,7 @@ function DidacticUnitRoute({onDataChanged}: {onDataChanged: () => void}) {
 export default function DashboardApp() {
 	const navigate = useNavigate();
 	const location = useLocation();
+	const isMobileViewport = useMediaQuery("(max-width: 767px)");
 	const isDidacticUnitEditorRoute = /^\/dashboard\/unit\/[^/]+$/.test(
 		location.pathname,
 	);
@@ -123,8 +127,9 @@ export default function DashboardApp() {
 		const section = normalizeDashboardSection(
 			new URLSearchParams(location.search).get("section"),
 		);
-		if (section && section !== activeSection) {
-			setActiveSection(section);
+		const nextSection = section ?? "all-units";
+		if (nextSection !== activeSection) {
+			setActiveSection(nextSection);
 		}
 	}, [activeSection, location.pathname, location.search]);
 
@@ -366,6 +371,83 @@ export default function DashboardApp() {
 					element={<Navigate replace to="/dashboard" />}
 				/>
 			</Routes>
+		);
+	}
+
+	if (isMobileViewport && location.pathname === "/dashboard") {
+		const mobileContent =
+			activeSection === "all-units" ?
+				isLoadingIndex && items.length === 0 ?
+					<div className="flex min-h-screen items-center justify-center bg-[#F7F7F8] pb-24 text-[15px] font-medium text-[#8E8E93] md:hidden">
+						Loading library...
+					</div>
+				:	<MobileDashboardView
+						allFolders={allFolders}
+						filteredUnits={filteredItems}
+						onCreateFolder={createFolder}
+						onCreateUnit={openCreateView}
+						onDeleteItem={deleteItem}
+						onDeleteFolder={deleteFolder}
+						onEditFolder={editFolder}
+						onMoveToFolder={moveItemToFolder}
+						onOpenEditor={openEditor}
+						onOpenItem={openItem}
+						onOpenSetup={openSetup}
+						searchQuery={searchQuery}
+						setSearchQuery={setSearchQuery}
+					/>
+			:	<div className="min-h-screen bg-[#F7F7F8] pb-[calc(env(safe-area-inset-bottom)+92px)] text-[#1D1D1F] md:hidden">
+					<header className="sticky top-0 z-20 border-b border-[#E5E5E7] bg-white/95 px-4 pb-4 pt-[calc(env(safe-area-inset-top)+14px)] backdrop-blur-xl">
+						<div className="mx-auto flex w-full max-w-[min(100%,900px)] items-center justify-between gap-4">
+							<img
+								src="/assets/logos/logo-horizontal.png"
+								alt="Didactio"
+								className="h-10 min-w-0 max-w-[150px] object-contain"
+							/>
+							<CreateUnitButton onClick={openCreateView} />
+						</div>
+					</header>
+					<div className="min-h-0 overflow-x-hidden">
+						{renderSettingsView(activeSection)}
+					</div>
+				</div>;
+
+		return (
+			<>
+				<Routes>
+					<Route index element={mobileContent} />
+					<Route
+						path="*"
+						element={<Navigate replace to="/dashboard" />}
+					/>
+				</Routes>
+
+				<MobileBottomNav
+					activeSection={activeSection}
+					onSelectSection={handleSetActiveSection}
+				/>
+
+				{modalState.isOpen && (
+					<CreateUnitWizard
+						didacticUnitId={modalState.didacticUnitId}
+						onClose={() =>
+							setModalState({
+								isOpen: false,
+								didacticUnitId: null,
+							})
+						}
+						onDataChanged={refreshDashboard}
+						onOpenEditor={(didacticUnitId) => {
+							setModalState({
+								isOpen: false,
+								didacticUnitId: null,
+							});
+							refreshDashboard();
+							navigate(`/dashboard/unit/${didacticUnitId}`);
+						}}
+					/>
+				)}
+			</>
 		);
 	}
 

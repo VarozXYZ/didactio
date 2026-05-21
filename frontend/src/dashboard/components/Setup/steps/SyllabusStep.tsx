@@ -334,25 +334,22 @@ function SyllabusCard({
 
 	return (
 		<div className="space-y-5">
-			<div>
-				<div className="flex items-center gap-2">
-					<h3 className="pr-10 text-[22px] font-bold tracking-tight text-[#1D1D1F]">
+			<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-2">
+					<h3 className="min-w-0 text-[22px] font-bold tracking-tight text-[#1D1D1F] sm:pr-10">
 						{syllabus.title || "Building syllabus…"}
 					</h3>
 					{isStreaming && (
-						<span className="flex items-center gap-1.5 rounded-full bg-[#EAF9EF] px-2.5 py-0.5 text-[10px] font-semibold text-[#2D8F4B]">
+						<span className="flex w-fit shrink-0 items-center gap-1.5 rounded-full bg-[#EAF9EF] px-2.5 py-0.5 text-[10px] font-semibold text-[#2D8F4B]">
 							<span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-[#34C759]" />
 							Generando
 						</span>
 					)}
-				</div>
 			</div>
 
 			{(syllabus.overview || (syllabus.keywords?.length ?? 0) > 0) && (
 				<div
-					className="grid gap-x-5 gap-y-3"
+					className="grid grid-cols-1 gap-x-5 gap-y-3 sm:grid-cols-[1fr_auto]"
 					style={{
-						gridTemplateColumns: "1fr auto",
 						alignItems: "start",
 					}}
 				>
@@ -368,7 +365,7 @@ function SyllabusCard({
 					)}
 
 					{(syllabus.keywords?.length ?? 0) > 0 && (
-						<div className="w-[200px] shrink-0">
+						<div className="w-full shrink-0 sm:w-[200px]">
 							<div className="mb-1.5 text-[10px] font-bold uppercase tracking-widest text-[#AEAEB2]">
 								Keywords
 							</div>
@@ -646,7 +643,7 @@ export function SyllabusStep({
 											e.target.style.height = `${e.target.scrollHeight}px`;
 										}}
 										placeholder="Context for regeneration"
-										className="min-h-[44px] w-full resize-none overflow-hidden rounded-[14px] px-4 py-[11px] text-[13px] font-medium leading-[20px] text-[#1D1D1F] placeholder:text-[#8E8E93] focus:outline-none"
+										className="min-h-9 w-full resize-none overflow-hidden whitespace-nowrap rounded-[12px] px-3 py-2 text-[12px] font-medium leading-5 text-[#1D1D1F] placeholder:text-[#8E8E93] focus:outline-none sm:min-h-[44px] sm:rounded-[14px] sm:px-4 sm:py-[11px] sm:text-[13px]"
 										style={{
 											background: "rgba(255,255,255,0.7)",
 											border: "1px solid rgba(0,0,0,0.07)",
@@ -666,7 +663,7 @@ export function SyllabusStep({
 										onClick={() =>
 											void onGenerateSyllabus("silver")
 										}
-										className="h-[44px] rounded-[12px] bg-[#1D1D1F] px-5 text-[13px] font-bold text-white transition-colors hover:bg-[#2C2C2E] disabled:opacity-40"
+										className="h-9 rounded-[12px] bg-[#1D1D1F] px-4 text-[12px] font-bold text-white transition-colors hover:bg-[#2C2C2E] disabled:opacity-40 sm:h-[44px] sm:px-5 sm:text-[13px]"
 									>
 										{isStreamingSyllabus ?
 											"Regenerating…"

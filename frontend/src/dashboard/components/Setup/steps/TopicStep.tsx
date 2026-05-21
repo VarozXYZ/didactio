@@ -37,6 +37,8 @@ type TopicStepProps = {
 	onCancel: () => void;
 };
 
+type SegmentedControlVariant = "default" | "cost";
+
 const LEARNING_PROFILE_OPTIONS: Array<{
 	value: "beginner" | "intermediate" | "advanced";
 	label: string;
@@ -120,8 +122,6 @@ function segSelectedStyle(
 	return {
 		background: `linear-gradient(150deg, ${color.from} 0%, ${color.to} 100%)`,
 		color: color.fg,
-		boxShadow: `0 3px 12px ${color.glow}, inset 0 1px 0 rgba(255,255,255,0.45), inset 0 -1px 0 rgba(0,0,0,0.12)`,
-		transform: "scale(1.02) translateY(-1px)",
 		transition: SPRING,
 	};
 }
@@ -150,7 +150,7 @@ function segmentedGridColsClass(count: number): string {
 
 function FieldTooltip({text}: {text: string}) {
 	return (
-		<span className="group relative inline-flex">
+		<span className="group relative inline-flex min-w-0">
 			<button
 				type="button"
 				tabIndex={0}
@@ -159,7 +159,7 @@ function FieldTooltip({text}: {text: string}) {
 			>
 				<CircleHelp size={14} />
 			</button>
-			<span className="pointer-events-none absolute left-full top-1/2 z-20 ml-2 w-64 -translate-y-1/2 rounded-[10px] bg-[#1D1D1F] px-3 py-2 text-left text-[12px] font-medium leading-5 text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
+			<span className="pointer-events-none absolute left-full top-1/2 z-20 ml-2 hidden w-64 -translate-y-1/2 rounded-[10px] bg-[#1D1D1F] px-3 py-2 text-left text-[12px] font-medium leading-5 text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100 md:block">
 				{text}
 			</span>
 		</span>
@@ -173,6 +173,7 @@ function SegmentedControl<T extends string>({
 	onChange,
 	options,
 	colorsFor,
+	variant = "default",
 }: {
 	label: string;
 	tooltip?: string;
@@ -184,15 +185,28 @@ function SegmentedControl<T extends string>({
 		multiplier?: number;
 	}>;
 	colorsFor: (v: T) => (typeof SEG)[keyof typeof SEG];
+	variant?: SegmentedControlVariant;
 }) {
 	const cols = segmentedGridColsClass(options.length);
+	const selectedOption = options.find((option) => option.value === value);
 	return (
 		<div className="w-full min-w-0">
 			<div className="mb-2 flex items-center gap-1.5 text-[12px] font-medium text-[#86868B]">
-				<span>{label}</span>
-				{tooltip ?
-					<FieldTooltip text={tooltip} />
-				:	null}
+				<div className="flex min-w-0 items-center gap-1.5">
+					<span>{label}</span>
+					{tooltip ?
+						<FieldTooltip text={tooltip} />
+					:	null}
+					{variant === "cost" && selectedOption?.multiplier ? (
+						<span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-semibold text-[#6E6E73] sm:hidden">
+							<span
+								className="length-coin-cycle"
+								aria-hidden="true"
+							/>
+							x {selectedOption.multiplier}
+						</span>
+					) : null}
+				</div>
 			</div>
 			<div
 				className={`grid w-full gap-0.5 rounded-[14px] p-0.5 ${cols}`}
@@ -222,9 +236,9 @@ function SegmentedControl<T extends string>({
 						>
 							<span className="inline-flex min-w-0 items-center justify-center gap-2">
 								<span className="truncate">{opt.label}</span>
-								{opt.multiplier ?
+								{opt.multiplier && variant !== "cost" ?
 									<span
-										className="inline-flex shrink-0 items-center gap-1 text-[11px] font-bold leading-none"
+										className="hidden shrink-0 items-center gap-1 text-[11px] font-bold leading-none sm:inline-flex"
 									>
 										<span
 											className="length-coin-cycle"
@@ -285,9 +299,9 @@ export function TopicStep({
 	};
 
 	return (
-		<form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
+		<form onSubmit={(e) => void handleSubmit(e)} className="w-full min-w-0 space-y-4 overflow-x-hidden">
 			<div>
-				<label className="mb-1.5 block text-[13px] font-semibold text-[#1D1D1F]">
+				<label className="mb-1.5 hidden text-[13px] font-semibold text-[#1D1D1F] md:block">
 					What do you want to learn?
 				</label>
 				<input
@@ -340,7 +354,7 @@ export function TopicStep({
 					Folder
 				</div>
 				<div className="flex items-center gap-2">
-					<div className="relative w-[240px] shrink-0">
+					<div className="relative min-w-0 flex-1 md:w-[240px] md:flex-none md:shrink-0">
 						<button
 							type="button"
 							onClick={() =>
@@ -474,11 +488,12 @@ export function TopicStep({
 				/>
 				<SegmentedControl
 					label="Length"
-					tooltip="Sets the overall scope and amount of content."
+					tooltip="Sets the overall scope and amount of content. Different lengths have different generation costs."
 					value={draftLength}
 					onChange={(v) => setDraftLength(v)}
 					options={LENGTH_OPTIONS}
 					colorsFor={(v) => lengthSegmentColors(v)}
+					variant="cost"
 				/>
 			</div>
 
@@ -495,7 +510,7 @@ export function TopicStep({
 				<button
 					type="button"
 					onClick={onCancel}
-					className="rounded-[10px] px-4 py-2 text-[13px] font-medium text-[#1D1D1F] transition-all hover:opacity-70"
+					className="hidden rounded-[10px] px-4 py-2 text-[13px] font-medium text-[#1D1D1F] transition-all hover:opacity-70 md:inline-flex"
 					style={{
 						background: "rgba(0,0,0,0.06)",
 						border: "1px solid rgba(0,0,0,0.07)",
@@ -506,7 +521,7 @@ export function TopicStep({
 				<button
 					type="submit"
 					disabled={!draftTopic.trim() || isSubmitting || isResumed}
-					className="rounded-[10px] bg-[#1D1D1F] px-5 py-2 text-[13px] font-semibold text-white transition-all hover:opacity-80 disabled:opacity-35"
+					className="w-full rounded-[10px] bg-[#1D1D1F] px-5 py-2.5 text-[13px] font-semibold text-white transition-all hover:opacity-80 disabled:opacity-35 md:w-auto md:py-2"
 				>
 					{isSubmitting ? "Preparing..." : "Continue"}
 				</button>

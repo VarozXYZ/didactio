@@ -105,7 +105,7 @@ export function FolderFormModal({
 
     return (
         <Dialog open={open} onOpenChange={(o: boolean) => { if (!o) onClose() }}>
-            <DialogContent className="max-w-[400px]">
+            <DialogContent className="w-[calc(100vw-32px)] max-w-[380px]">
                 <form onSubmit={handleSubmit}>
                     <DialogHeader>
                         <DialogTitle>{isCreate ? 'New Folder' : 'Edit Folder'}</DialogTitle>
@@ -171,7 +171,7 @@ export function FolderFormModal({
                                 Color
                             </label>
                             <div className="relative" ref={pickerRef}>
-                                <div className="flex items-center gap-2">
+                                <div className="flex flex-wrap items-center gap-2">
                                     {SWATCHES.map((hex) => {
                                         const isSelected = selectedColor.toLowerCase() === hex.toLowerCase()
                                         return (
@@ -190,7 +190,7 @@ export function FolderFormModal({
                                         )
                                     })}
 
-                                    <div className="ml-auto flex items-center gap-1.5">
+                                    <div className="flex min-w-0 items-center gap-1.5 sm:ml-auto">
                                         <button
                                             type="button"
                                             onClick={() => setShowPicker((v) => !v)}
@@ -210,7 +210,7 @@ export function FolderFormModal({
                                         <input
                                             value={selectedColor}
                                             onChange={(e) => setSelectedColor(e.target.value)}
-                                            className="w-[88px] rounded-lg border border-[#E5E5E7] bg-[#FAFAFA] px-2 py-1 text-[12px] text-[#1D1D1F] outline-none transition-colors focus:border-[#1D1D1F] focus:bg-white"
+                                            className="w-[78px] rounded-lg border border-[#E5E5E7] bg-[#FAFAFA] px-2 py-1 text-[12px] text-[#1D1D1F] outline-none transition-colors focus:border-[#1D1D1F] focus:bg-white sm:w-[88px]"
                                             placeholder="#6B7280"
                                             spellCheck={false}
                                         />

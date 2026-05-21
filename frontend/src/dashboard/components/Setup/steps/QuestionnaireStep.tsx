@@ -122,6 +122,10 @@ export function QuestionnaireStep({
                 </div>
             )}
 
+            <p className="text-[13px] text-center font-medium leading-relaxed text-[#6E6E73]">
+                Answering these questions is optional.
+            </p>
+
             <div className="space-y-4">
                 {questions.map((question, index) => (
                     <div key={question.id} className="rounded-[14px] border border-[#E5E5E7] bg-white p-4">
