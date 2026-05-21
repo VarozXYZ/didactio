@@ -67,7 +67,7 @@ export function WelcomeCoinsStep({user, onComplete, isSubmitting, onBack}: Props
 
 	return (
 		<div className="flex flex-col gap-6 py-2">
-			<div>
+			<div className="hidden md:block">
 				<h2 className="font-sora text-[22px] font-bold text-[#1D1D1F] leading-tight">
 					Your starting coins
 				</h2>
@@ -76,24 +76,24 @@ export function WelcomeCoinsStep({user, onComplete, isSubmitting, onBack}: Props
 				</p>
 			</div>
 
-			<div className="grid grid-cols-3 gap-3">
+			<div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
 				<CoinCard
 					type="bronze"
 					amount={credits.bronze}
 					label="Bronze"
-					description="Used for small or short, simple tasks"
+					description="Used for notes, exercises or small tasks"
 				/>
 				<CoinCard
 					type="silver"
 					amount={credits.silver}
 					label="Silver"
-					description="Used for unit content generation with lower quality models"
+					description="Used for complex generations with standard quality models"
 				/>
 				<CoinCard
 					type="gold"
 					amount={credits.gold}
 					label="Gold"
-					description="Used for in-depth content generation with high quality models"
+					description="Used for in-depth content generation with state of the art models"
 				/>
 			</div>
 
@@ -105,12 +105,12 @@ export function WelcomeCoinsStep({user, onComplete, isSubmitting, onBack}: Props
 				</p>
 			</div>
 
-			<div className="flex justify-between pt-2">
+			<div className="flex items-center justify-between gap-4 pt-2">
 				<button
 					type="button"
 					onClick={onBack}
 					disabled={isSubmitting}
-					className="flex items-center gap-1.5 rounded-[10px] px-4 py-2.5 text-[14px] font-medium text-[#6E6E73] transition hover:bg-black/[0.05] disabled:opacity-40"
+					className="flex shrink-0 items-center justify-center gap-1.5 rounded-[10px] px-2 py-2 text-[14px] font-medium text-[#6E6E73] transition hover:bg-black/[0.05] disabled:opacity-40 sm:px-4 sm:py-2.5"
 				>
 					<ChevronLeft size={15} strokeWidth={2.5} />
 					Back
@@ -119,7 +119,7 @@ export function WelcomeCoinsStep({user, onComplete, isSubmitting, onBack}: Props
 					type="button"
 					onClick={onComplete}
 					disabled={isSubmitting}
-					className="flex items-center gap-1.5 rounded-[10px] bg-[#11A07D] px-6 py-2.5 text-[14px] font-semibold text-white transition hover:bg-[#0E8A6C] disabled:cursor-not-allowed disabled:opacity-60"
+					className="flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-[10px] bg-[#11A07D] px-5 py-2 text-[14px] font-semibold text-white transition hover:bg-[#0E8A6C] disabled:cursor-not-allowed disabled:opacity-60 sm:py-2.5"
 				>
 					{isSubmitting ? "Setting up…" : "Start learning"}
 					{!isSubmitting && <ChevronRight size={15} strokeWidth={2.5} />}

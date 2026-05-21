@@ -617,8 +617,14 @@ export function CreateUnitWizard({
 
 	if (isLoading) {
 		return (
-			<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
-				<div className="rounded-[18px] bg-white/95 px-10 py-8 shadow-[0_30px_100px_rgba(0,0,0,0.18)] backdrop-blur-xl">
+			<div
+				className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm"
+				onClick={onClose}
+			>
+				<div
+					className="rounded-[18px] bg-white/95 px-10 py-8 shadow-[0_30px_100px_rgba(0,0,0,0.18)] backdrop-blur-xl"
+					onClick={(event) => event.stopPropagation()}
+				>
 					<div className="text-[14px] text-[#86868B]">
 						Loading unit...
 					</div>
@@ -630,6 +636,7 @@ export function CreateUnitWizard({
 	return (
 		<div
 			className="fixed inset-0 z-50 flex items-center justify-center overflow-x-hidden px-4 py-3 sm:py-6"
+			onClick={onClose}
 			style={{
 				background:
 					"radial-gradient(ellipse at 60% 40%, rgba(17,160,125,0.18) 0%, rgba(52,52,195,0.12) 40%, rgba(239,160,71,0.10) 70%, rgba(0,0,0,0.45) 100%)",
@@ -638,6 +645,7 @@ export function CreateUnitWizard({
 		>
 			<div
 				className="flex min-h-0 max-h-[calc(100dvh-0.75rem)] w-full max-w-[520px] flex-col overflow-hidden rounded-[22px] md:max-w-[920px] md:flex-row md:max-h-[calc(100dvh-1.5rem)]"
+				onClick={(event) => event.stopPropagation()}
 				style={{
 					background: "rgba(255,255,255,0.72)",
 					backdropFilter: "blur(40px) saturate(1.6)",
@@ -742,11 +750,6 @@ export function CreateUnitWizard({
 							>
 								<X size={18} />
 							</button>
-						</div>
-						<div className="mt-6">
-							<p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#AEAEB2]">
-								Step {currentStep + 1} of {STEPS.length}
-							</p>
 						</div>
 					</div>
 

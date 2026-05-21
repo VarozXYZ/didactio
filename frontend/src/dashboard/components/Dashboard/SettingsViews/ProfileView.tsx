@@ -1,9 +1,9 @@
 import {useState} from "react";
-import {Lock} from "lucide-react";
+import {Lock, LogOut} from "lucide-react";
 import {useAuth} from "../../../../auth/AuthProvider";
 
 export function ProfileView() {
-	const {user} = useAuth();
+	const {user, logout} = useAuth();
 	const [pictureFailed, setPictureFailed] = useState(false);
 	const initials =
 		user?.displayName
@@ -15,7 +15,7 @@ export function ProfileView() {
 
 	return (
 		<div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-			<header className="flex h-[80px] shrink-0 items-center border-b border-[#E5E5E7] bg-white/80 px-8 backdrop-blur-md">
+			<header className="hidden h-[80px] shrink-0 items-center border-b border-[#E5E5E7] bg-white/80 px-8 backdrop-blur-md md:flex">
 				<div>
 					<h1 className="text-[28px] font-bold tracking-tight text-[#1D1D1F]">
 						Profile & Security
@@ -92,6 +92,29 @@ export function ProfileView() {
 									{user?.email ?? "Unknown account"}
 								</div>
 							</div>
+						</div>
+					</div>
+
+					<div className="rounded-[12px] border border-[#E5E5E7] bg-white p-8">
+						<div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+							<div>
+								<h2 className="mb-1 text-[18px] font-bold text-[#1D1D1F]">
+									Account
+								</h2>
+								<p className="text-[13px] text-[#86868B]">
+									Sign out from this browser session.
+								</p>
+							</div>
+							<button
+								type="button"
+								onClick={() => {
+									void logout();
+								}}
+								className="inline-flex items-center justify-center gap-2 rounded-[8px] border border-[#E5E5E7] bg-white px-4 py-2.5 text-[14px] font-semibold text-[#1D1D1F] transition-all hover:border-[#D1D1D6] hover:bg-[#F5F5F7] sm:w-auto"
+							>
+								<LogOut size={16} />
+								Sign out
+							</button>
 						</div>
 					</div>
 

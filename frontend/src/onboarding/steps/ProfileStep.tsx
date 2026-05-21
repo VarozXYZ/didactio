@@ -1,4 +1,5 @@
 import {ChevronRight} from "lucide-react";
+import {useState} from "react";
 import type {AuthUser} from "../../auth/authClient";
 import {LanguageSelector} from "../LanguageSelector";
 
@@ -20,10 +21,11 @@ export function ProfileStep({
 	onNext,
 }: Props) {
 	const canProceed = displayName.trim().length > 0 && language.trim().length > 0;
+	const [pictureFailed, setPictureFailed] = useState(false);
 
 	return (
-		<div className="flex flex-col gap-5 py-2">
-			<div>
+		<div className="flex flex-col gap-5 py-2 md:py-2">
+			<div className="hidden md:block">
 				<h2 className="font-sora text-[22px] font-bold text-[#1D1D1F] leading-tight">
 					Welcome to Didactio
 				</h2>
@@ -32,12 +34,14 @@ export function ProfileStep({
 				</p>
 			</div>
 
-			<div className="flex items-center gap-4 rounded-[12px] border border-black/[0.07] bg-white/60 px-4 py-3.5">
+			<div className="flex flex-col gap-4 rounded-[12px] border border-black/[0.07] bg-white/60 px-4 py-3.5 sm:flex-row sm:items-center">
 				<div className="flex shrink-0 flex-col items-center gap-1">
-					{user.pictureUrl ?
+					{user.pictureUrl && !pictureFailed ?
 						<img
 							src={user.pictureUrl}
-							alt="Profile"
+							alt={displayName || user.displayName || "Profile"}
+							referrerPolicy="no-referrer"
+							onError={() => setPictureFailed(true)}
 							className="h-12 w-12 rounded-full object-cover ring-1 ring-black/[0.08]"
 						/>
 					:	<div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#1D1D1F] text-white font-bold">
@@ -47,7 +51,7 @@ export function ProfileStep({
 					<span className="text-[10px] text-[#AEAEB2]">Google photo</span>
 				</div>
 
-				<div className="flex flex-1 flex-col gap-1">
+				<div className="flex w-full min-w-0 flex-1 flex-col gap-1">
 					<label
 						htmlFor="display-name"
 						className="text-[12px] font-semibold text-[#6E6E73]"
@@ -84,7 +88,7 @@ export function ProfileStep({
 					type="button"
 					onClick={onNext}
 					disabled={!canProceed}
-					className="flex items-center gap-1.5 rounded-[10px] bg-[#1D1D1F] px-5 py-2.5 text-[14px] font-semibold text-white transition hover:bg-[#3A3A3C] disabled:cursor-not-allowed disabled:opacity-40"
+					className="flex w-full items-center justify-center gap-1.5 rounded-[10px] bg-[#1D1D1F] px-5 py-2.5 text-[14px] font-semibold text-white transition hover:bg-[#3A3A3C] disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
 				>
 					Continue
 					<ChevronRight size={15} strokeWidth={2.5} />

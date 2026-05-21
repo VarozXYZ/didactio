@@ -13,14 +13,23 @@ type OnboardingStep = 0 | 1 | 2;
 const STEPS = [
 	{
 		label: "Profile",
+		mobileLabel: "Profile",
+		title: "Welcome to Didactio",
+		subtitle: "Set up your profile and content language.",
 		description: "Confirm your name and pick the language for your content.",
 	},
 	{
 		label: "AI Models",
+		mobileLabel: "Models",
+		title: "Choose your AI models",
+		subtitle: "Pick the models that will power your learning.",
 		description: "Choose the models that will power your learning.",
 	},
 	{
 		label: "Welcome",
+		mobileLabel: "Coins",
+		title: "Your starting coins",
+		subtitle: "Collect your starting coins and learn how they work.",
 		description: "Collect your starting coins and learn how they work.",
 	},
 ] as const;
@@ -65,13 +74,29 @@ export function OnboardingWizard() {
 		return map[lang] ?? "English";
 	});
 	const [silverModelId, setSilverModelId] = useState("deepseek/deepseek-v4-flash");
-	const [goldModelId, setGoldModelId] = useState("openai/gpt-5.5");
+	const [goldModelId, setGoldModelId] = useState(
+		"anthropic/claude-sonnet-4-6",
+	);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 
 	if (!user) return null;
 
 	const goNext = () => setCurrentStep((s) => Math.min(s + 1, 2) as OnboardingStep);
 	const goBack = () => setCurrentStep((s) => Math.max(s - 1, 0) as OnboardingStep);
+	const currentStepMeta = STEPS[currentStep];
+	const canLeaveProfile =
+		displayName.trim().length > 0 && language.trim().length > 0;
+	const canLeaveModels = Boolean(silverModelId && goldModelId);
+	const canSelectStep = (index: number) => {
+		if (index <= currentStep) return true;
+		if (index === 1) return canLeaveProfile;
+		if (index === 2) return canLeaveProfile && canLeaveModels;
+		return false;
+	};
+	const handleSelectStep = (index: number) => {
+		if (!canSelectStep(index)) return;
+		setCurrentStep(index as OnboardingStep);
+	};
 
 	const handleProfileNext = async () => {
 		if (displayName.trim() !== user.displayName) {
@@ -108,7 +133,7 @@ export function OnboardingWizard() {
 
 	return (
 		<div
-			className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6"
+			className="fixed inset-0 z-50 flex items-start justify-center overflow-x-hidden overflow-y-auto px-4 py-3 sm:py-6 md:items-center"
 			style={{
 				background:
 					"radial-gradient(ellipse at 60% 40%, rgba(17,160,125,0.18) 0%, rgba(52,52,195,0.12) 40%, rgba(239,160,71,0.10) 70%, rgba(0,0,0,0.45) 100%)",
@@ -116,7 +141,7 @@ export function OnboardingWizard() {
 			}}
 		>
 			<div
-				className="flex min-h-0 max-h-[calc(100dvh-3rem)] w-full max-w-[920px] overflow-hidden rounded-[22px]"
+				className="flex min-h-0 w-full max-w-[520px] flex-col overflow-hidden rounded-[22px] md:max-h-[calc(100dvh-3rem)] md:max-w-[920px] md:flex-row"
 				style={{
 					background: "rgba(255,255,255,0.72)",
 					backdropFilter: "blur(40px) saturate(1.6)",
@@ -126,7 +151,7 @@ export function OnboardingWizard() {
 				}}
 			>
 				<div
-					className="flex w-[232px] shrink-0 flex-col"
+					className="hidden w-[232px] shrink-0 flex-col md:flex"
 					style={{
 						background: "rgba(248,248,250,0.7)",
 						borderRight: "1px solid rgba(0,0,0,0.06)",
@@ -195,8 +220,54 @@ export function OnboardingWizard() {
 					</nav>
 				</div>
 
-				<div className="flex min-h-0 min-w-0 flex-1 flex-col">
-					<div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6 pt-6">
+				<div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden md:overflow-hidden">
+					<div className="shrink-0 border-b border-black/[0.06] px-5 pb-4 pt-5 md:hidden">
+						<p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#AEAEB2]">
+							Getting Started
+						</p>
+						<h2 className="mt-4 text-[27px] font-bold leading-tight tracking-tight text-[#1D1D1F]">
+							{currentStepMeta.title}
+						</h2>
+						<p className="mt-3 text-[15px] font-medium leading-relaxed text-[#7A7A7F]">
+							{currentStepMeta.subtitle}
+						</p>
+					</div>
+
+					<div className="w-full min-w-0 shrink-0 overflow-hidden px-5 pb-4 pt-2 md:hidden">
+						<div className="grid grid-cols-3 overflow-hidden rounded-[16px] border border-black/[0.08] bg-black/[0.05] p-0.5">
+							{STEPS.map((step, index) => {
+								const isCompleted = index < currentStep;
+								const isCurrent = index === currentStep;
+
+								return (
+									<button
+										type="button"
+										key={step.label}
+										onClick={() => handleSelectStep(index)}
+										disabled={!canSelectStep(index)}
+										className={`flex min-w-0 items-center justify-center gap-1.5 px-2 py-2 text-[11px] font-bold transition ${
+											isCurrent ?
+												"rounded-[13px] bg-[#1D1D1F] text-white"
+											: isCompleted ?
+												"text-[#0A9068]"
+											:	"text-[#AEAEB2]"
+										} ${!isCurrent && index > 0 ? "border-l border-black/[0.08]" : ""} disabled:cursor-not-allowed disabled:opacity-50`}
+									>
+										<span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-white/20 text-[10px]">
+											{isCompleted ?
+												<Check size={10} strokeWidth={3} />
+											:	index + 1}
+										</span>
+										<span className="truncate">
+											{step.mobileLabel}
+										</span>
+									</button>
+								);
+							})}
+						</div>
+					</div>
+
+					<div className="min-h-0 min-w-0 flex-1 overflow-x-hidden px-5 pb-5 pt-0 md:overflow-y-auto md:px-6 md:pb-6 md:pt-6">
 						{currentStep === 0 && (
 							<ProfileStep
 								user={user}

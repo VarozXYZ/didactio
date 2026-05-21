@@ -1,5 +1,6 @@
 import {
 	useEffect,
+	useLayoutEffect,
 	useMemo,
 	useRef,
 	useState,
@@ -110,7 +111,7 @@ export default function DashboardApp() {
 		didacticUnitId: null,
 	});
 
-	useEffect(() => {
+	useLayoutEffect(() => {
 		if (
 			location.pathname !== "/dashboard" &&
 			activeSection !== "all-units"
@@ -119,7 +120,7 @@ export default function DashboardApp() {
 		}
 	}, [activeSection, location.pathname]);
 
-	useEffect(() => {
+	useLayoutEffect(() => {
 		if (location.pathname !== "/dashboard") {
 			return;
 		}
@@ -350,7 +351,7 @@ export default function DashboardApp() {
 			</div>
 		:	<div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
 			{renderSettingsView(activeSection)}
-			<div className="absolute right-8 top-5">
+			<div className="absolute right-8 top-4">
 				<CreateUnitButton onClick={openCreateView} />
 			</div>
 		</div>;

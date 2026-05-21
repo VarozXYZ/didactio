@@ -330,7 +330,7 @@ export function AnalyticsView() {
 
 	return (
 		<div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-			<header className="flex min-h-[80px] shrink-0 items-center border-b border-[#E5E5E7] bg-white/80 px-4 py-4 backdrop-blur-md sm:px-8 sm:py-0">
+			<header className="hidden min-h-[80px] shrink-0 items-center border-b border-[#E5E5E7] bg-white/80 px-4 py-4 backdrop-blur-md sm:px-8 sm:py-0 md:flex">
 				<div>
 					<h1 className="text-[27px] font-bold tracking-tight text-[#1D1D1F] sm:text-[28px]">
 						Usage & Analytics

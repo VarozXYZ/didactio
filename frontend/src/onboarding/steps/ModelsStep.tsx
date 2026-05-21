@@ -38,7 +38,7 @@ function ModelCard({
 		<button
 			type="button"
 			onClick={onSelect}
-			className={`relative flex h-full w-full flex-col gap-2 rounded-[12px] border p-3.5 text-left transition-all ${
+			className={`relative flex min-h-[94px] w-full flex-col gap-2 rounded-[12px] border p-3.5 text-left transition-all md:min-h-[96px] ${
 				selected ?
 					"border-[#1D1D1F] bg-[#1D1D1F] text-white"
 				:	"border-black/[0.1] bg-white hover:border-[#1D1D1F]/40 hover:bg-black/[0.02]"
@@ -104,11 +104,9 @@ export function ModelsStep({
 		});
 	}, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-	const maxCards = Math.max(silverModels.length, goldModels.length);
-
 	return (
 		<div className="flex flex-col gap-6 py-2">
-			<div>
+			<div className="hidden md:block">
 				<h2 className="font-sora text-[22px] font-bold text-[#1D1D1F] leading-tight">
 					Choose your AI models
 				</h2>
@@ -122,44 +120,45 @@ export function ModelsStep({
 				<div className="flex items-center justify-center py-10 text-[13px] text-[#AEAEB2]">
 					Loading models…
 				</div>
-			:	<div className="grid grid-cols-2 gap-x-4 gap-y-0">
-					<div className="mb-2 flex items-center gap-1.5">
-						<span className="text-[12.5px] font-bold text-[#1D1D1F]">Standard model</span>
+			:	<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+					<div>
+						<div className="mb-2 flex items-center gap-1.5">
+							<span className="text-[12.5px] font-bold text-[#1D1D1F]">Standard model</span>
+						</div>
+						<div className="space-y-2">
+							{silverModels.map((model) => (
+								<ModelCard
+									key={model.id}
+									entry={model}
+									selected={silverModelId === model.id}
+									onSelect={() => onSilverChange(model.id)}
+								/>
+							))}
+						</div>
 					</div>
-					<div className="mb-2 flex items-center gap-1.5">
-						<span className="text-[12.5px] font-bold text-[#1D1D1F]">Pro model</span>
+					<div>
+						<div className="mb-2 flex items-center gap-1.5">
+							<span className="text-[12.5px] font-bold text-[#1D1D1F]">Pro model</span>
+						</div>
+						<div className="space-y-2">
+							{goldModels.map((model) => (
+								<ModelCard
+									key={model.id}
+									entry={model}
+									selected={goldModelId === model.id}
+									onSelect={() => onGoldChange(model.id)}
+								/>
+							))}
+						</div>
 					</div>
-
-					{Array.from({length: maxCards}).map((_, i) => (
-						<>
-							<div key={`silver-${i}`} className="pb-2">
-								{silverModels[i] && (
-									<ModelCard
-										entry={silverModels[i]}
-										selected={silverModelId === silverModels[i].id}
-										onSelect={() => onSilverChange(silverModels[i].id)}
-									/>
-								)}
-							</div>
-							<div key={`gold-${i}`} className="pb-2">
-								{goldModels[i] && (
-									<ModelCard
-										entry={goldModels[i]}
-										selected={goldModelId === goldModels[i].id}
-										onSelect={() => onGoldChange(goldModels[i].id)}
-									/>
-								)}
-							</div>
-						</>
-					))}
 				</div>
 			}
 
-			<div className="flex justify-between pt-1">
+			<div className="flex justify-between gap-3 pt-1">
 				<button
 					type="button"
 					onClick={onBack}
-					className="flex items-center gap-1.5 rounded-[10px] px-4 py-2.5 text-[14px] font-medium text-[#6E6E73] transition hover:bg-black/[0.05]"
+					className="flex flex-1 items-center justify-center gap-1.5 rounded-[10px] px-4 py-2.5 text-[14px] font-medium text-[#6E6E73] transition hover:bg-black/[0.05] sm:flex-none"
 				>
 					<ChevronLeft size={15} strokeWidth={2.5} />
 					Back
@@ -168,7 +167,7 @@ export function ModelsStep({
 					type="button"
 					onClick={onNext}
 					disabled={loading || !silverModelId || !goldModelId}
-					className="flex items-center gap-1.5 rounded-[10px] bg-[#1D1D1F] px-5 py-2.5 text-[14px] font-semibold text-white transition hover:bg-[#3A3A3C] disabled:cursor-not-allowed disabled:opacity-40"
+					className="flex flex-1 items-center justify-center gap-1.5 rounded-[10px] bg-[#1D1D1F] px-5 py-2.5 text-[14px] font-semibold text-white transition hover:bg-[#3A3A3C] disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none"
 				>
 					Continue
 					<ChevronRight size={15} strokeWidth={2.5} />
