@@ -1012,7 +1012,7 @@ function MobileInlineHtmlEditor({
 	return (
 		<div
 			ref={editorRef}
-			className="unit-page-scope min-h-[calc(100dvh-168px)] rounded-[16px] border border-[#E5E5E7] bg-white px-4 py-4 text-[#1D1D1F] outline-none"
+			className="unit-page-scope mobile-inline-editor min-h-[calc(100dvh-168px)] max-w-full overflow-x-hidden rounded-[16px] bg-white px-4 py-4 text-[#1D1D1F] outline-none"
 			contentEditable
 			onInput={(event) =>
 				onChange((event.currentTarget as HTMLDivElement).innerHTML)

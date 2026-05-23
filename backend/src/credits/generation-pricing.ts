@@ -50,8 +50,15 @@ export function resolveModuleRegenerationCost(input: {
 	quality: GenerationQuality;
 	length: DidacticUnitLength;
 }): GenerationCoinCost {
+	if (input.quality === "gold") {
+		return {
+			coinType: "silver",
+			amount: 5,
+		};
+	}
+
 	return {
-		coinType: input.quality === "gold" ? "silver" : "bronze",
+		coinType: "bronze",
 		amount: MODULE_REGENERATION_LENGTH_COSTS[input.length],
 	};
 }

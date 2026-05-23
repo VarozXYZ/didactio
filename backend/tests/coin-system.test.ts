@@ -87,7 +87,7 @@ describe("coin system", () => {
 
 		await generateDidacticUnitChapter(app, syllabusReady.id, 0);
 		await generateDidacticUnitChapter(app, syllabusReady.id, 0);
-		expect((await authService.getUserById("mock-user"))?.credits.silver).toBe(14);
+		expect((await authService.getUserById("mock-user"))?.credits.silver).toBe(10);
 	});
 
 	it("does not charge admin users for generation operations", async () => {

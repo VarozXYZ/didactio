@@ -26,12 +26,19 @@ export function getModuleRegenerationCost(input: {
 	quality: BackendGenerationQuality;
 	length: UnitLength;
 }): {coinType: BackendCoinType; amount: number} {
+	if (input.quality === "gold") {
+		return {
+			coinType: "silver",
+			amount: 5,
+		};
+	}
+
 	const amount =
 		input.length === "textbook" ? 5
 		: input.length === "long" ? 3
 		: 1;
 	return {
-		coinType: input.quality === "gold" ? "silver" : "bronze",
+		coinType: "bronze",
 		amount,
 	};
 }
