@@ -168,15 +168,13 @@ button[aria-disabled="true"],
 }
 
 .unit-page-scope h2 {
-	margin-top: 1.2em;
+	margin-top: 0;
 	margin-bottom: 0;
 	font-weight: 700;
 	letter-spacing: -0.01em;
 }
 
-.unit-page-scope > h2:first-child,
-.unit-page-scope > h3:first-child,
-.unit-page-scope > h4:first-child {
+.unit-page-scope > *:first-child {
 	margin-top: 0;
 }
 
@@ -193,7 +191,7 @@ button[aria-disabled="true"],
 
 .unit-page-scope h3 {
 	margin-top: 0;
-	margin-bottom: 0.4em;
+	margin-bottom: 0;
 	font-weight: 600;
 	letter-spacing: -0.01em;
 }
@@ -233,6 +231,20 @@ button[aria-disabled="true"],
 	padding-right: 0;
 	margin-left: 0.75em;
 	margin-right: 0.75em;
+}
+
+@media (max-width: 1599px) {
+	.unit-page-scope > *:not(h2):not(h3):not(h4) {
+		padding-left: 0.45em;
+		padding-right: 0.45em;
+	}
+
+	.unit-page-scope > .code-block-wrapper {
+		padding-left: 0;
+		padding-right: 0;
+		margin-left: 0;
+		margin-right: 0;
+	}
 }
 
 .prose p.paragraph-fragment {
@@ -295,7 +307,7 @@ button[aria-disabled="true"],
 }
 
 .unit-page-scope li {
-	margin-bottom: 0.3em;
+	margin-bottom: 0;
 	padding-left: 1.1em;
 	text-indent: -1.1em;
 }

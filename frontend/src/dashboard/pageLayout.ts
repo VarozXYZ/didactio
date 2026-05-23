@@ -38,6 +38,7 @@ const PAGE_WIDTH_RATIO_MOBILE = 0.72;
 const POST_MODULE_ACTION_GAP = 40;
 const FIRST_PAGE_HEADER_BOTTOM_GAP = 16;
 const DOM_BLOCK_HEIGHT_CACHE_LIMIT = 2000;
+const PAGINATION_LAYOUT_VERSION = "unit-page-compact-inset-v3";
 
 const domBlockHeightCache = new Map<string, number>();
 
@@ -394,17 +395,43 @@ function makeParagraphFragment({
 	};
 }
 
+function isWordCharacter(value: string | undefined): boolean {
+	return Boolean(value && /[\p{L}\p{N}_]/u.test(value));
+}
+
+function snapParagraphSplitToWordBoundary(
+	fullText: string,
+	proposedFittingText: string,
+): string {
+	let end = Math.min(proposedFittingText.trimEnd().length, fullText.length);
+
+	if (end <= 0 || end >= fullText.length) {
+		return proposedFittingText.trimEnd();
+	}
+
+	if (!isWordCharacter(fullText[end - 1]) || !isWordCharacter(fullText[end])) {
+		return proposedFittingText.trimEnd();
+	}
+
+	while (end > 0 && isWordCharacter(fullText[end - 1])) {
+		end -= 1;
+	}
+
+	const snapped = fullText.slice(0, end).trimEnd();
+	return snapped || proposedFittingText.trimEnd();
+}
+
 function splitParagraphToFit({
 	block,
 	currentLimit,
-	contentWidth,
+	paragraphContentWidth,
 	typography,
 	currentBlocks,
 	domMeasurePage,
 }: {
 	block: Extract<AnnotatedHtmlPageBlock, {type: "paragraph"}>;
 	currentLimit: number;
-	contentWidth: number;
+	paragraphContentWidth: number;
 	typography: ResolvedTypography;
 	currentBlocks: AnnotatedHtmlPageBlock[];
 	domMeasurePage: (blocks: HtmlPageBlock[], pageLimit: number) => number;
@@ -418,7 +445,7 @@ function splitParagraphToFit({
 	const measurement =
 		block.blockMeasurement ??
 		prepareParagraphBlock(undefined, block.text, typography);
-	const lines = getBlockLines(measurement, contentWidth);
+	const lines = getBlockLines(measurement, paragraphContentWidth);
 	if (lines.length === 0) {
 		return {fittingBlock: null, remainder: {...block}};
 	}
@@ -434,7 +461,10 @@ function splitParagraphToFit({
 
 	while (lo <= hi) {
 		const mid = Math.floor((lo + hi) / 2);
-		const fittingText = lines.slice(0, mid).join(" ");
+		const fittingText = snapParagraphSplitToWordBoundary(
+			block.text,
+			lines.slice(0, mid).join(" "),
+		);
 		const remainderText = lines.slice(mid).join(" ");
 		const candidate = makeParagraphFragment({
 			block,
@@ -708,14 +738,14 @@ function paginateBlocks({
 	blocks,
 	firstPageLimit,
 	regularPageLimit,
-	contentWidth,
+	paragraphContentWidth,
 	typography,
 	domMeasurePage,
 }: {
 	blocks: AnnotatedHtmlPageBlock[];
 	firstPageLimit: number;
 	regularPageLimit: number;
-	contentWidth: number;
+	paragraphContentWidth: number;
 	typography: ResolvedTypography;
 	domMeasurePage: (blocks: HtmlPageBlock[], pageLimit: number) => number;
 }): AnnotatedHtmlPageBlock[][] {
@@ -753,7 +783,7 @@ function paginateBlocks({
 			return splitParagraphToFit({
 				block,
 				currentLimit: pageLimit,
-				contentWidth,
+				paragraphContentWidth,
 				typography,
 				currentBlocks,
 				domMeasurePage,
@@ -860,6 +890,7 @@ function validatePagesWithDom(
 			(validated.length === 0 ? firstPageLimit : regularPageLimit) + 1;
 		const pageHtml = joinBlocksHtml(page);
 		const cacheKey = [
+			PAGINATION_LAYOUT_VERSION,
 			"page",
 			proseMeasure.style.cssText,
 			pageHtml,
@@ -1142,9 +1173,9 @@ export function measurePages({
 
 	const isMobile = pageWidth < 420;
 
-	const pagePaddingSide = isMobile ? 20 : 24;
-	const pagePaddingTop = isMobile ? 16 : 20;
-	const pagePaddingBottom = isMobile ? 16 : 20;
+	const pagePaddingSide = compactModuleTitle ? 17 : isMobile ? 20 : 24;
+	const pagePaddingTop = compactModuleTitle ? 12 : isMobile ? 16 : 20;
+	const pagePaddingBottom = compactModuleTitle ? 12 : isMobile ? 16 : 20;
 	const measurementBuffer = isMobile ? 8 : 6;
 
 	const contentWidth = Math.max(240, pageWidth - pagePaddingSide * 2);
@@ -1152,11 +1183,14 @@ export function measurePages({
 		160,
 		pageHeight - pagePaddingTop - pagePaddingBottom,
 	);
+	const nonHeadingInsetEm = compactModuleTitle ? 0.45 : 0.75;
+	const pageNumberReserve = compactModuleTitle ? 16 : 0;
+	const firstPageNumberReserve = compactModuleTitle ? 6 : pageNumberReserve;
 	const primaryActionLabel = hasNextModule ? "Next module" : "Finish unit 🎉";
 	const measuredModuleTitleSizePx =
 		moduleTitleSizePx ??
 		(compactModuleTitle ?
-			Math.min(28, Math.max(20, 24))
+			Math.min(27, Math.max(20, 24))
 		:	Math.min(36, Math.max(24, 32)));
 
 	const stylePresetId = textStyle?.stylePreset ?? "classic";
@@ -1174,9 +1208,13 @@ export function measurePages({
 				});
 			})()
 		:	defaultTypography(isMobile);
-	const firstPageStyleBuffer = Math.ceil(
-		typography.body.sizePx * typography.body.lineHeight * (isMobile ? 0.65 : 1),
-	);
+	const firstPageStyleBuffer = compactModuleTitle ?
+		0
+	:	Math.ceil(
+			typography.body.sizePx *
+				typography.body.lineHeight *
+				(isMobile ? 0.65 : 1),
+		);
 
 	const sandbox = document.createElement("div");
 	sandbox.style.position = "fixed";
@@ -1233,11 +1271,12 @@ export function measurePages({
 			headerMeasure.scrollHeight -
 			FIRST_PAGE_HEADER_BOTTOM_GAP -
 			measurementBuffer -
+			firstPageNumberReserve -
 			firstPageStyleBuffer,
 	);
 	const regularPageLimit = Math.max(
 		140,
-		contentLimit - measurementBuffer,
+		contentLimit - measurementBuffer - pageNumberReserve,
 	);
 	const blocks = annotateBlocks(
 		extractHtmlBlocks(renderedContent),
@@ -1251,9 +1290,12 @@ export function measurePages({
 	): number => {
 		const pageHtml = joinBlocksHtml(pageBlocks);
 		const cacheKey = [
+			PAGINATION_LAYOUT_VERSION,
 			"candidate-page",
 			contentWidth,
 			pageLimit,
+			nonHeadingInsetEm,
+			proseMeasure.style.cssText,
 			typographyCacheKey,
 			pageHtml,
 		].join("\u0000");
@@ -1272,7 +1314,10 @@ export function measurePages({
 		blocks,
 		firstPageLimit,
 		regularPageLimit,
-		contentWidth,
+		paragraphContentWidth: Math.max(
+			180,
+			contentWidth - typography.body.sizePx * nonHeadingInsetEm * 2,
+		),
 		typography,
 		domMeasurePage,
 	});
@@ -1345,6 +1390,10 @@ export function paginateHtmlContent({
 	const regularPageLimit = Math.max(140, contentLimit - measurementBuffer);
 
 	const typography = defaultTypography(isMobile);
+	const paragraphContentWidth = Math.max(
+		180,
+		contentWidth - typography.body.sizePx * 0.75 * 2,
+	);
 
 	const sandbox = document.createElement("div");
 	sandbox.style.position = "fixed";
@@ -1376,9 +1425,12 @@ export function paginateHtmlContent({
 	): number => {
 		const pageHtml = joinBlocksHtml(pageBlocks);
 		const cacheKey = [
+			PAGINATION_LAYOUT_VERSION,
 			"candidate-page",
 			contentWidth,
 			pageLimit,
+			paragraphContentWidth,
+			proseMeasure.style.cssText,
 			typographyCacheKey,
 			pageHtml,
 		].join("\u0000");
@@ -1397,7 +1449,7 @@ export function paginateHtmlContent({
 		blocks,
 		firstPageLimit: regularPageLimit,
 		regularPageLimit,
-		contentWidth,
+		paragraphContentWidth,
 		typography,
 		domMeasurePage,
 	});
@@ -1425,13 +1477,13 @@ export function calculateSpreadMetrics({
 	const isLaptop = !isMobile && viewportWidth < 1600;
 	const pageWidthRatio =
 		isMobile ? PAGE_WIDTH_RATIO_MOBILE : PAGE_WIDTH_RATIO_DESKTOP;
-	const stagePaddingTop = isMobile ? 16 : isLaptop ? 12 : 24;
+	const stagePaddingTop = isMobile ? 16 : isLaptop ? 0 : 24;
 	const stagePaddingBottom = isMobile ? 20 : isLaptop ? 28 : 32;
 	const indicatorHeight = isMobile ? 42 : isLaptop ? 40 : 48;
 	const indicatorGap = isMobile ? 12 : isLaptop ? 10 : 16;
-	const arrowAllowance = isMobile ? 64 : 84;
-	const mainStageHorizontalGutter = isMobile ? 24 : 48;
-	const spreadGap = isMobile ? 16 : 32;
+	const arrowAllowance = isMobile ? 64 : isLaptop ? 48 : 84;
+	const mainStageHorizontalGutter = isMobile ? 24 : isLaptop ? 24 : 48;
+	const spreadGap = isMobile ? 16 : isLaptop ? 24 : 32;
 	const availableWidth = Math.max(
 		360,
 		viewportWidth -

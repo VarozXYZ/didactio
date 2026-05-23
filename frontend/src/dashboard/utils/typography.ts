@@ -141,14 +141,15 @@ const PLAIN_LINE_HEIGHT_BODY = 2;
 const CLASSIC_LINE_HEIGHT_BODY = 1.9;
 const LINE_HEIGHT_HEADING = 1.25;
 const MARGIN_BOTTOM_BODY_EM = 0.8;
-const MARGIN_TOP_H2_EM = 1.2;
+const MARGIN_TOP_H1_EM = 1.2;
+const MARGIN_TOP_H2_EM = 0;
 const MARGIN_BOTTOM_H2_EM = 0;
 const MARGIN_TOP_H3_EM = 0;
-const MARGIN_BOTTOM_H3_EM = 0.4;
+const MARGIN_BOTTOM_H3_EM = 0;
 const LIST_MARGIN_TOP_EM = 0.5;
 const LIST_MARGIN_BOTTOM_EM = 0.8;
 const LIST_PADDING_LEFT_EM = 1.2;
-const LIST_ITEM_MARGIN_EM = 0.3;
+const LIST_ITEM_MARGIN_EM = 0;
 const CODE_FONT_SIZE_EM = 0.92;
 const CODE_PADDING_H_EM = 0.35;
 const BLOCKQUOTE_INDENT_EM = 1.0;
@@ -263,7 +264,7 @@ export function resolveTypography(settings: {
 			family: headingFamily,
 			sizePx: h1Sz,
 			lineHeight: LINE_HEIGHT_HEADING,
-			marginTopPx: h1Sz * MARGIN_TOP_H2_EM,
+			marginTopPx: h1Sz * MARGIN_TOP_H1_EM,
 			marginBottomPx: h1Sz * MARGIN_BOTTOM_H2_EM,
 			fontString: cssFont(700, h1Sz, headingFamily),
 		},

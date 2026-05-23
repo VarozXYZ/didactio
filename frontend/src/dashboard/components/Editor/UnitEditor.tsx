@@ -1880,7 +1880,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	);
 	const compactModuleTitle = viewport.width < 1600;
 	const moduleTitleSizePx = compactModuleTitle ?
-		Math.min(28, Math.max(20, viewport.width * 0.02))
+		Math.min(27, Math.max(20, viewport.width * 0.02))
 	:	Math.min(36, Math.max(24, viewport.width * 0.035));
 	const pageMeasureKey = [
 		activeChapterLayoutSnapshot?.chapterIndex ?? "none",
@@ -3705,6 +3705,9 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		(resolvedThemeVars as Record<string, string | undefined>)[
 			"--unit-page-bg"
 		] ?? "#ffffff";
+	const compactPagePaddingStyle = compactModuleTitle ?
+		{padding: "12px 17px"}
+	:	undefined;
 
 	const renderContentPage = ({
 		editable,
@@ -3742,7 +3745,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 					backgroundColor: unitPageBackground,
 				}}
 			>
-				<div className="flex h-full flex-col overflow-hidden px-5 py-4 md:px-6 md:py-5">
+				<div className="flex h-full flex-col overflow-hidden px-5 py-4 md:px-6 md:py-5" style={compactPagePaddingStyle}>
 					<div
 						className={cn(
 							"relative flex min-h-0 flex-1 flex-col",
@@ -3848,7 +3851,13 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				backgroundColor: unitPageBackground,
 			}}
 		>
-			<div className="flex h-full flex-col overflow-hidden px-5 py-4 md:px-6 md:py-5" style={resolvedThemeVars}>
+			<div
+				className="flex h-full flex-col overflow-hidden px-5 py-4 md:px-6 md:py-5"
+				style={{
+					...resolvedThemeVars,
+					...compactPagePaddingStyle,
+				}}
+			>
 				<div className="flex-shrink-0">
 					<div className="flex items-center justify-between gap-4">
 						<h2
@@ -3991,7 +4000,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 						borderColor: activityTheme.panelBorder,
 					}}
 				>
-					<div className="flex h-full flex-col overflow-hidden px-5 py-4 md:px-6 md:py-5">
+					<div className="flex h-full flex-col overflow-hidden px-5 py-4 md:px-6 md:py-5" style={compactPagePaddingStyle}>
 						<LearningActivityRenderer
 							activity={page.activity}
 							attempts={activityAttempts[page.activity.id] ?? []}
@@ -4020,7 +4029,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 						width: `${spreadMetrics.pageWidth}px`,
 					}}
 				>
-					<div className="flex h-full flex-col overflow-hidden px-5 py-4 md:px-6 md:py-5">
+					<div className="flex h-full flex-col overflow-hidden px-5 py-4 md:px-6 md:py-5" style={compactPagePaddingStyle}>
 						<div className="flex min-h-0 flex-1 items-center justify-center">
 							{renderPostModuleActionBody({
 								hasNextModule: page.hasNextModule,
@@ -4145,7 +4154,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 
 			<div
 				className={cn(
-					"relative z-50 mt-3 flex max-w-full items-center justify-center gap-1.5 transition-all duration-150 md:gap-2",
+					"relative z-50 mt-3 flex max-w-full items-center justify-center gap-1.5 pb-2 transition-all duration-150 md:gap-2",
 					isPagePickerOpen &&
 						"pointer-events-none translate-y-1 scale-95 opacity-0",
 				)}
@@ -4943,7 +4952,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 					</div>
 				</header>
 
-				<div className="relative flex flex-1 flex-col items-center justify-center bg-[#F5F5F7] px-3 py-4 md:px-6 md:py-6 max-[1599px]:pb-7 max-[1599px]:pt-3">
+				<div className="relative flex flex-1 flex-col items-center justify-center bg-[#F5F5F7] px-3 py-4 md:px-6 md:py-6 max-[1599px]:pb-7 max-[1599px]:pt-0">
 					{pendingNoteSelection && !isNoteDialogOpen && (
 						<button
 							className="fixed z-50 flex items-center gap-2 rounded-full border border-[#34C759]/40 bg-white px-3 py-2 text-[13px] font-semibold text-[#1D1D1F] shadow-[0_12px_36px_rgba(0,0,0,0.16)] transition hover:bg-[#F7FFF9]"
