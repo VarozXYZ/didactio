@@ -226,15 +226,11 @@ export function UnitCard({
 										No model
 									</span>
 								}
-								{unit.canOpenEditor ?
+								{unit.canOpenEditor && (
 									<div className="shrink-0 font-semibold text-[#4ADE80]">
 										{unit.primaryProgressPercent}%
 									</div>
-								:	<span className="inline-flex shrink-0 items-center gap-2 rounded-full border border-[#E5E5E7] bg-white/70 px-2 py-1 text-[11px] font-medium leading-tight text-[#6E6E73]">
-										<span className="h-1.5 w-1.5 rounded-full bg-amber-500/80" />
-										Setup needed
-									</span>
-								}
+								)}
 							</div>
 						</button>
 					</div>

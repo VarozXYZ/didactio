@@ -612,6 +612,7 @@ export function CreateUnitWizard({
 		length: draftLength,
 	});
 	const canPaySelectedUnit =
+		user?.role === "admin" ||
 		(user?.credits[selectedUnitCost.coinType] ?? 0) >= selectedUnitCost.amount;
 	const currentStepMeta = STEPS[currentStep];
 

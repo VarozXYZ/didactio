@@ -198,12 +198,14 @@ function ChapterAccordion({
 	isOpen,
 	onHover,
 	onLeave,
+	onToggle,
 }: {
 	chapter: NonNullable<PartialPlanningSyllabus["chapters"]>[number];
 	index: number;
 	isOpen: boolean;
 	onHover: () => void;
 	onLeave: () => void;
+	onToggle: () => void;
 }) {
 	const contentRef = useRef<HTMLDivElement>(null);
 	const [height, setHeight] = useState(0);
@@ -226,7 +228,11 @@ function ChapterAccordion({
 			onMouseEnter={onHover}
 			onMouseLeave={onLeave}
 		>
-			<div className="flex items-center gap-3 px-4 py-3.5">
+			<button
+				type="button"
+				onClick={onToggle}
+				className="flex w-full items-center gap-3 px-4 py-3.5 text-left"
+			>
 				<span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[8px] bg-gradient-to-br from-[#34C759] to-[#11A07D] text-[11px] font-bold text-white shadow-[0_2px_8px_rgba(52,199,89,0.35)]">
 					{index + 1}
 				</span>
@@ -245,7 +251,7 @@ function ChapterAccordion({
 						}}
 					/>
 				</div>
-			</div>
+			</button>
 
 			<div
 				className="overflow-hidden transition-[height] duration-500"
@@ -315,14 +321,23 @@ function SyllabusCard({
 	const chapters = syllabus.chapters ?? [];
 	const [openIndex, setOpenIndex] = useState<number | null>(null);
 	const leaveTimer = useRef<ReturnType<typeof setTimeout>>(null);
+	const canUseHover = () =>
+		window.matchMedia("(hover: hover) and (pointer: fine)").matches;
 
 	const handleHover = useCallback((idx: number) => {
+		if (!canUseHover()) return;
 		if (leaveTimer.current) clearTimeout(leaveTimer.current);
 		setOpenIndex(idx);
 	}, []);
 
 	const handleLeave = useCallback(() => {
+		if (!canUseHover()) return;
 		leaveTimer.current = setTimeout(() => setOpenIndex(null), 200);
+	}, []);
+
+	const handleToggle = useCallback((idx: number) => {
+		if (leaveTimer.current) clearTimeout(leaveTimer.current);
+		setOpenIndex((current) => (current === idx ? null : idx));
 	}, []);
 
 	useEffect(
@@ -409,6 +424,7 @@ function SyllabusCard({
 								isOpen={openIndex === idx}
 								onHover={() => handleHover(idx)}
 								onLeave={handleLeave}
+								onToggle={() => handleToggle(idx)}
 							/>
 						))}
 					</div>
