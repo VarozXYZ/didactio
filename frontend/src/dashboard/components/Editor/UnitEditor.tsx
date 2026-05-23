@@ -650,17 +650,6 @@ function buildReadPages(
 	return [...measuredPages, ...activityPages];
 }
 
-function getLastModuleContentPageIndex(pages: ReadPage[]): number {
-	for (let index = pages.length - 1; index >= 0; index -= 1) {
-		const page = pages[index];
-		if (page.kind === "content" || page.kind === "content_with_actions") {
-			return index;
-		}
-	}
-
-	return Math.max(0, pages.length - 1);
-}
-
 function calculateUnitStudyProgressPercent(
 	chapters: DidacticUnitEditorChapter[],
 	input: {
@@ -2885,54 +2874,6 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	const canGoPrev = currentSpread > 0;
 	const canGoNext = currentSpread < totalSpreads - 1;
 
-	const completeChapterFromReading = useCallback(
-		(chapter: DidacticUnitEditorChapter) => {
-			if (chapter.isCompleted || chapter.status !== "ready") {
-				return;
-			}
-
-			applyReadingProgressLocally({
-				chapterIndex: chapter.chapterIndex,
-				readBlockIndex: Math.max(0, chapter.totalBlocks - 1),
-				readBlockOffset: chapter.htmlBlocks.at(-1)?.textLength ?? 0,
-				readBlocksVersion: chapter.htmlBlocksVersion,
-				totalBlocks: chapter.totalBlocks,
-				lastVisitedPageIndex: Math.max(0, readPages.length - 1),
-				isCompleted: true,
-				completedAt: new Date().toISOString(),
-			});
-
-			void dashboardApi
-				.completeDidacticUnitChapter(
-					didacticUnitId,
-					chapter.chapterIndex,
-				)
-				.then(() => {
-					onDataChanged();
-					const hasNextModule = workspace?.chapters.some(
-						(item) => item.chapterIndex > chapter.chapterIndex,
-					);
-					if (!hasNextModule) {
-						setIsUnitCompleteModalOpen(true);
-					}
-				})
-				.catch((error) => {
-					toastError(
-						error instanceof Error ?
-							error.message
-						:	"Could not save module completion.",
-					);
-				});
-		},
-		[
-			applyReadingProgressLocally,
-			didacticUnitId,
-			onDataChanged,
-			readPages.length,
-			workspace?.chapters,
-		],
-	);
-
 	const persistVisitedSpread = useCallback(
 		(nextSpread: number) => {
 			if (
@@ -2947,8 +2888,6 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				0,
 				Math.min(nextSpread * 2 + 1, readPages.length - 1),
 			);
-			const lastModuleContentPageIndex =
-				getLastModuleContentPageIndex(readPages);
 			const visibleTextOffset = getReadTextOffsetForSpread(
 				measuredReadPages,
 				nextSpread,
@@ -2959,14 +2898,9 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				visibleTextOffset,
 				lastVisitedPageIndex,
 			);
-
-			if (lastVisitedPageIndex >= lastModuleContentPageIndex) {
-				completeChapterFromReading(activeChapter);
-			}
 		},
 		[
 			activeChapter,
-			completeChapterFromReading,
 			isEditMode,
 			measuredReadPages,
 			persistReadProgress,

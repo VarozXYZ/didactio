@@ -177,6 +177,10 @@ function createCodeBlockMeasurementHtml(html: string): string {
 	document.body.querySelectorAll("pre").forEach((pre) => {
 		const codeElement = pre.querySelector("code");
 		const language = getLanguageFromCodeElement(codeElement);
+		const code = codeElement?.textContent ?? pre.textContent ?? "";
+		const lineCount = Math.max(1, code.split("\n").length);
+		const measuredPre = pre.cloneNode(true) as HTMLPreElement;
+		measuredPre.style.minHeight = `${lineCount * 1.5 + 2}em`;
 		const wrapper = document.createElement("div");
 		wrapper.className = "code-block-wrapper";
 		wrapper.innerHTML = `
@@ -190,7 +194,7 @@ function createCodeBlockMeasurementHtml(html: string): string {
 		`;
 		wrapper
 			.querySelector(".code-block-highlight")
-			?.appendChild(pre.cloneNode(true));
+			?.appendChild(measuredPre);
 		pre.replaceWith(wrapper);
 	});
 
@@ -777,7 +781,7 @@ function paginateBlocks({
 
 		return {fittingBlock: null, remainder: block};
 	};
-	const useSplitResult = (
+	const applySplitResult = (
 		splitResult: {
 			fittingBlock: AnnotatedHtmlPageBlock | null;
 			remainder: AnnotatedHtmlPageBlock | null;
@@ -821,7 +825,7 @@ function paginateBlocks({
 		}
 
 		const splitResult = splitBlock(block, pageLimit);
-		if (useSplitResult(splitResult)) continue;
+		if (applySplitResult(splitResult)) continue;
 
 		if (currentBlocks.length > 0) {
 			closeCurrentPage();
@@ -829,7 +833,7 @@ function paginateBlocks({
 		}
 
 		const freshSplitResult = splitBlock(block, currentLimit());
-		if (useSplitResult(freshSplitResult)) continue;
+		if (applySplitResult(freshSplitResult)) continue;
 
 		pages.push([block]);
 		blockIndex += 1;
@@ -1101,8 +1105,10 @@ function createHeaderMarkup(
           ${String(chapterIndex + 1).padStart(2, "0")}
         </span>
       </div>
-      <div style="margin-top:16px;color:#86868B;font-family:${bodyFamily};font-size:16px;font-style:italic;font-weight:500;line-height:1.625;text-align:justify;">
+      <div style="position:relative;margin-top:16px;padding:0.1em 0.2em 0.1em 1.6em;color:#86868B;font-family:${bodyFamily};font-size:16px;font-style:italic;font-weight:500;line-height:1.625;text-align:justify;">
+        <span style="position:absolute;top:-0.1em;left:0;font-size:2em;line-height:1;color:#D6CEC4;font-family:Georgia,'Times New Roman',serif;font-style:normal;">&ldquo;</span>
         ${overviewHtml}
+        <span style="font-size:1.7em;line-height:1;color:#D6CEC4;font-family:Georgia,'Times New Roman',serif;font-style:normal;margin-left:0.1em;vertical-align:-0.25em;">&rdquo;</span>
       </div>
       <div style="margin-top:20px;height:1.5px;width:100%;background-image:linear-gradient(to right, transparent, ${preset.numberColor}, transparent);"></div>
     </div>
@@ -1154,8 +1160,6 @@ export function measurePages({
 		:	Math.min(36, Math.max(24, 32)));
 
 	const stylePresetId = textStyle?.stylePreset ?? "classic";
-	const firstPageStyleBuffer =
-		stylePresetId === "classic" ? 0 : isMobile ? 8 : 18;
 	const typography =
 		textStyle ?
 			(() => {
@@ -1170,6 +1174,9 @@ export function measurePages({
 				});
 			})()
 		:	defaultTypography(isMobile);
+	const firstPageStyleBuffer = Math.ceil(
+		typography.body.sizePx * typography.body.lineHeight * (isMobile ? 0.65 : 1),
+	);
 
 	const sandbox = document.createElement("div");
 	sandbox.style.position = "fixed";

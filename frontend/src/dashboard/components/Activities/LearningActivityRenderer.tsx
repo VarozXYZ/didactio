@@ -5,6 +5,7 @@ import {
 	useState,
 	type CSSProperties,
 	type MouseEvent,
+	type UIEvent,
 } from "react";
 import {
 	Flashcard,
@@ -64,6 +65,12 @@ import {
 } from "@/components/ui/hover-card";
 import {CoinAmount} from "@/components/Coin";
 import {getActivityFeedbackRefillCost} from "../../utils/coinPricing";
+import {
+	CODE_LANGUAGE_ALIASES,
+	CODE_THEME_MAP,
+	getCodeHighlighter,
+} from "../Content/codeHighlighting";
+import {STYLE_PRESETS} from "../../utils/typography";
 
 type Answers = Record<string, unknown>;
 type ActivityStylePresetId = "modern" | "classic" | "plain";
@@ -424,6 +431,14 @@ function ActivityIcon({type}: {type: BackendLearningActivity["type"]}) {
 		: type === "short_answer" || type === "case_study" ? BookOpenCheck
 		:	ListChecks;
 	return <Icon size={18} />;
+}
+
+function isDraftPersistedActivity(type: BackendLearningActivity["type"]) {
+	return (
+		type === "case_study" ||
+		type === "guided_project" ||
+		type === "coding_practice"
+	);
 }
 
 interface ConfirmedAnswer {
@@ -1124,6 +1139,307 @@ function VirtualFileFormatIcon({format}: {format: string}) {
 		>
 			<Icon size={13} />
 		</span>
+	);
+}
+
+function escapeCodeHtml(value: string): string {
+	return value
+		.replace(/&/g, "&amp;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;");
+}
+
+function CodePracticeEditor({
+	code,
+	language,
+	stylePreset,
+	onChange,
+}: {
+	code: string;
+	language: string;
+	stylePreset: ActivityStylePresetId;
+	onChange: (value: string) => void;
+}) {
+	const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null);
+	const highlightScrollRef = useRef<HTMLDivElement | null>(null);
+	const lineScrollRef = useRef<HTMLDivElement | null>(null);
+	const lineCount = useMemo(() => Math.max(12, code.split("\n").length), [code]);
+	const codeTheme = CODE_THEME_MAP[stylePreset];
+	const codePreset = STYLE_PRESETS[stylePreset];
+
+	useEffect(() => {
+		let cancelled = false;
+		const normalizedLanguage = language.toLowerCase().trim();
+		const lang = CODE_LANGUAGE_ALIASES[normalizedLanguage] ?? "text";
+
+		void getCodeHighlighter()
+			.then((highlighter) => highlighter.codeToHtml(code || " ", {
+				lang,
+				theme: codeTheme,
+			}))
+			.then((html) => {
+				if (!cancelled) {
+					setHighlightedHtml(html);
+				}
+			})
+			.catch(() => {
+				if (!cancelled) {
+					setHighlightedHtml(`<pre><code>${escapeCodeHtml(code)}</code></pre>`);
+				}
+			});
+
+		return () => {
+			cancelled = true;
+		};
+	}, [code, codeTheme, language]);
+
+	const syncScroll = (event: UIEvent<HTMLTextAreaElement>) => {
+		const target = event.currentTarget;
+		if (highlightScrollRef.current) {
+			highlightScrollRef.current.scrollTop = target.scrollTop;
+			highlightScrollRef.current.scrollLeft = target.scrollLeft;
+		}
+		if (lineScrollRef.current) {
+			lineScrollRef.current.scrollTop = target.scrollTop;
+		}
+	};
+
+	return (
+		<div className="grid min-h-0 flex-1 grid-cols-[38px_minmax(0,1fr)]">
+			<div
+				ref={lineScrollRef}
+				className="select-none overflow-hidden border-r px-2 py-3 text-right font-mono text-[11px] leading-[1.65]"
+				style={{
+					backgroundColor: codePreset.codeHeaderBackground,
+					borderColor: codePreset.codeBorderColor,
+					color: codePreset.codeAccentColor,
+					opacity: 0.62,
+				}}
+			>
+				{Array.from({length: lineCount}).map((_, index) => (
+					<div key={index}>{index + 1}</div>
+				))}
+			</div>
+			<div className="relative min-h-[260px] min-w-0 flex-1 overflow-hidden">
+				<div
+					ref={highlightScrollRef}
+					className="pointer-events-none absolute inset-0 overflow-hidden p-3 font-mono text-[12.5px] leading-[1.65] [&_code]:font-mono [&_pre]:!m-0 [&_pre]:!bg-transparent [&_pre]:!p-0 [&_pre]:font-mono [&_pre]:text-[12.5px] [&_pre]:leading-[1.65]"
+					dangerouslySetInnerHTML={{
+						__html: highlightedHtml ?? `<pre><code>${escapeCodeHtml(code)}</code></pre>`,
+					}}
+				/>
+				<textarea
+					className="absolute inset-0 h-full w-full resize-none overflow-auto bg-transparent p-3 font-mono text-[12.5px] leading-[1.65] text-transparent outline-none placeholder:text-[#8E8E93] selection:bg-[#2563EB]"
+					style={{caretColor: codePreset.codeAccentColor}}
+					value={code}
+					onChange={(event) => onChange(event.target.value)}
+					onScroll={syncScroll}
+					spellCheck={false}
+					placeholder="Write your code here..."
+				/>
+			</div>
+		</div>
+	);
+}
+
+function CodePracticeActivity({
+	content,
+	answers,
+	setAnswer,
+	latestAttempt,
+	stylePreset,
+}: {
+	content: Record<string, unknown>;
+	answers: Answers;
+	setAnswer: (key: string, value: unknown) => void;
+	latestAttempt?: BackendLearningActivityAttempt;
+	stylePreset: ActivityStylePresetId | string;
+}) {
+	const prompt = asText(content.prompt);
+	const starterCode = asText(content.starterCode);
+	const code = asText(answers.code) || starterCode;
+	const language = asText(content.language) || "Code";
+	const expectedOutcome = asText(content.expectedOutcome);
+	const testCases = asArray(content.testCases);
+	const [activeTab, setActiveTab] = useState<"info" | "code" | "feedback">("info");
+	const latestAttemptId = latestAttempt?.id;
+	const resolvedStylePreset: ActivityStylePresetId =
+		stylePreset === "classic" || stylePreset === "plain" || stylePreset === "modern" ?
+			stylePreset
+		:	"modern";
+	const codePreset = STYLE_PRESETS[resolvedStylePreset];
+
+	useEffect(() => {
+		if (latestAttemptId) {
+			setActiveTab("feedback");
+		}
+	}, [latestAttemptId]);
+
+	const visibleTab = activeTab === "feedback" && !latestAttempt ? "code" : activeTab;
+	const tabButtonClass = (selected: boolean) =>
+		cn(
+			"-mb-px min-w-[112px] border border-b-2 px-4 py-3 text-center text-[12px] font-bold transition",
+			selected ?
+				"border-[var(--activity-border)] border-b-[var(--activity-border-strong)] bg-[var(--activity-surface)] text-[var(--activity-accent)]"
+			:	"border-[var(--activity-border)] border-b-[var(--activity-border)] bg-[var(--activity-surface-alt)] text-[var(--activity-muted)] hover:border-[var(--activity-border-strong)] hover:border-b-[var(--activity-border-strong)] hover:bg-[var(--activity-accent-softer)] hover:text-[var(--activity-accent-text)]",
+		);
+
+	return (
+		<div className="flex min-h-0 flex-1 flex-col gap-3">
+			<div className="flex min-h-0 flex-1 flex-col">
+				<div className="flex items-end overflow-x-auto border-b border-[var(--activity-border)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+					{(["info", "code", ...(latestAttempt ? ["feedback" as const] : [])] as const).map((tab) => {
+						const selected = visibleTab === tab;
+						return (
+							<button
+								key={tab}
+								type="button"
+								onClick={() => setActiveTab(tab)}
+								className={tabButtonClass(selected)}
+							>
+								{tab === "info" ? "Activity" : tab === "code" ? "Code" : "Feedback"}
+							</button>
+						);
+					})}
+				</div>
+
+				<div
+					className={cn(
+						"min-h-0 flex-1 rounded-b-[8px] border border-t-0 border-[var(--activity-border)] shadow-[0_10px_28px_rgba(17,24,39,0.03)]",
+						visibleTab === "code" ? "overflow-hidden p-0" : "bg-[var(--activity-surface)] p-3",
+					)}
+					style={
+						visibleTab === "code" ?
+							{
+								backgroundColor: codePreset.codeBackground,
+								borderColor: codePreset.codeBorderColor,
+							}
+						:	undefined
+					}
+				>
+					{visibleTab === "info" ? (
+						<div className="grid content-start gap-3 pr-1">
+							<section className="p-1">
+								<div className="mb-2 flex items-center gap-2">
+									<span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--activity-accent-soft)] text-[var(--activity-accent)]">
+										<Code2 size={12} strokeWidth={2.25} />
+									</span>
+									<h4 className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--activity-muted)]">
+										Task
+									</h4>
+								</div>
+								<p className="whitespace-pre-wrap text-[13px] leading-[1.6] text-[var(--activity-muted)]">
+									{prompt || "Complete the coding task using the module concepts."}
+								</p>
+							</section>
+
+							{expectedOutcome && (
+								<section className="border-t border-[var(--activity-border)] p-1 pt-3">
+									<div className="mb-2 flex items-center gap-2">
+										<span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--activity-accent-softer)] text-[var(--activity-accent)]">
+											<MessageCircleQuestionMark size={12} strokeWidth={2.25} />
+										</span>
+										<h4 className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--activity-muted)]">
+											Expected outcome
+										</h4>
+									</div>
+									<p className="text-[13px] font-semibold leading-relaxed text-[var(--activity-text)]">
+										{expectedOutcome}
+									</p>
+								</section>
+							)}
+
+							{testCases.length > 0 && (
+								<section className="border-t border-[var(--activity-border)] p-1 pt-3">
+									<div className="mb-2 flex items-center gap-2">
+										<span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--activity-accent-softer)] text-[var(--activity-accent)]">
+											<ListChecks size={12} strokeWidth={2.25} />
+										</span>
+										<h4 className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--activity-muted)]">
+											Test cases
+										</h4>
+									</div>
+									<div className="grid gap-x-4 gap-y-2 text-[11.5px] leading-relaxed text-[var(--activity-muted)] sm:grid-cols-2">
+										{testCases.slice(0, 4).map((testCase, index) => (
+											<div key={index} className="flex gap-1.5">
+												<span className="mt-[0.45em] h-1 w-1 shrink-0 rounded-full bg-[var(--activity-accent)]" />
+												<span>
+													{asText(testCase.input) && (
+														<>
+															<span className="font-bold text-[var(--activity-text)]">Input:</span>{" "}
+															{asText(testCase.input)}
+														</>
+													)}
+											{asText(testCase.input) && asText(testCase.expected) ? " - " : ""}
+													{asText(testCase.expected) && (
+														<>
+															<span className="font-bold text-[var(--activity-text)]">Expected:</span>{" "}
+															{asText(testCase.expected)}
+														</>
+													)}
+												</span>
+											</div>
+										))}
+									</div>
+								</section>
+							)}
+						</div>
+					) : visibleTab === "code" ? (
+						<section className="flex h-full min-h-[260px] min-w-0 flex-col overflow-hidden">
+							<div
+								className="flex shrink-0 items-center justify-between gap-3 border-b px-3 py-2.5"
+								style={{
+									backgroundColor: codePreset.codeHeaderBackground,
+									borderColor: codePreset.codeBorderColor,
+								}}
+							>
+								<div className="flex min-w-0 items-center gap-2">
+									<span
+										className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[8px]"
+										style={{
+											backgroundColor: codePreset.codeBorderColor,
+											color: codePreset.codeAccentColor,
+										}}
+									>
+										<Code2 size={14} />
+									</span>
+									<div className="min-w-0">
+										<div className="truncate text-[12px] font-bold text-[var(--activity-text)]">
+											{asText(content.fileName) || "Solution"}
+										</div>
+										<div
+											className="text-[10px] font-semibold uppercase tracking-[0.12em]"
+											style={{color: codePreset.codeAccentColor}}
+										>
+											{language}
+										</div>
+									</div>
+								</div>
+								<div
+									className="shrink-0 rounded-full px-2 py-1 text-[10px] font-semibold"
+									style={{
+										backgroundColor: codePreset.codeBackground,
+										color: codePreset.codeAccentColor,
+									}}
+								>
+									{code.length.toLocaleString()} chars
+								</div>
+							</div>
+							<CodePracticeEditor
+								code={code}
+								language={language}
+								stylePreset={resolvedStylePreset}
+								onChange={(value) => setAnswer("code", value)}
+							/>
+						</section>
+					) : latestAttempt ? (
+						<div className="max-h-[360px] overflow-y-auto">
+							<ActivityFeedbackPanel attempt={latestAttempt} />
+						</div>
+					) : null}
+				</div>
+			</div>
+		</div>
 	);
 }
 
@@ -2167,7 +2483,7 @@ export function LearningActivityRenderer({
 			draftSaveTimerRef.current = null;
 		}
 
-		if (activity.type !== "case_study" && activity.type !== "guided_project") {
+		if (!isDraftPersistedActivity(activity.type)) {
 			return;
 		}
 
@@ -2206,7 +2522,7 @@ export function LearningActivityRenderer({
 	};
 
 	const scheduleDraftProgressSave = (nextAnswers: Answers, completed = false) => {
-		if (activity.type !== "case_study" && activity.type !== "guided_project") return;
+		if (!isDraftPersistedActivity(activity.type)) return;
 		if (draftSaveTimerRef.current) {
 			clearTimeout(draftSaveTimerRef.current);
 		}
@@ -2236,7 +2552,7 @@ export function LearningActivityRenderer({
 			shortAnswerHasLocalChangesRef.current = true;
 			setShortAnswerProgressActivityId(activity.id);
 		}
-		if (activity.type === "case_study" || activity.type === "guided_project") {
+		if (isDraftPersistedActivity(activity.type)) {
 			draftHasLocalChangesRef.current = true;
 			setDraftProgressActivityId(activity.id);
 		}
@@ -2244,7 +2560,7 @@ export function LearningActivityRenderer({
 			const base =
 				activity.type === "short_answer" && shortAnswerProgressActivityId !== activity.id ?
 					{}
-				: (activity.type === "case_study" || activity.type === "guided_project") && draftProgressActivityId !== activity.id ?
+				: isDraftPersistedActivity(activity.type) && draftProgressActivityId !== activity.id ?
 					{}
 				:	previous;
 			const next = {...base, [key]: value};
@@ -2258,10 +2574,16 @@ export function LearningActivityRenderer({
 		const currentAnswers =
 			activity.type === "short_answer" && shortAnswerProgressActivityId !== activity.id ?
 				{}
-			: (activity.type === "case_study" || activity.type === "guided_project") && draftProgressActivityId !== activity.id ?
+			: isDraftPersistedActivity(activity.type) && draftProgressActivityId !== activity.id ?
 				{}
 			:	answers;
-		const payload = currentAnswers;
+		const payload =
+			activity.type === "coding_practice" && !asText(currentAnswers.code) ?
+				{
+					...currentAnswers,
+					code: asText(content.starterCode),
+				}
+			:	currentAnswers;
 		if (activity.type === "short_answer") {
 			setShortAnswerDetailTab("correction");
 			if (shortAnswerSaveTimerRef.current) {
@@ -2274,14 +2596,14 @@ export function LearningActivityRenderer({
 				completed: true,
 			});
 		}
-		if (activity.type === "case_study" || activity.type === "guided_project") {
+		if (isDraftPersistedActivity(activity.type)) {
 			if (draftSaveTimerRef.current) {
 				clearTimeout(draftSaveTimerRef.current);
 				draftSaveTimerRef.current = null;
 			}
 			void dashboardApi.saveActivityProgress(activity.id, {
 				confirmedAnswers: {},
-				answers: currentAnswers,
+				answers: payload,
 				completed: true,
 			});
 			if (activity.type === "case_study") {
@@ -2315,7 +2637,7 @@ export function LearningActivityRenderer({
 	const visibleAnswers =
 		activity.type === "short_answer" && shortAnswerProgressActivityId !== activity.id ?
 			{}
-		: (activity.type === "case_study" || activity.type === "guided_project") && draftProgressActivityId !== activity.id ?
+			: isDraftPersistedActivity(activity.type) && draftProgressActivityId !== activity.id ?
 			{}
 		:	answers;
 
@@ -2407,14 +2729,13 @@ export function LearningActivityRenderer({
 
 		if (activity.type === "coding_practice") {
 			return (
-				<div className="space-y-3">
-					<p className="text-[13.5px] leading-relaxed text-[#374151]">{asText(content.prompt)}</p>
-					<textarea
-						className="h-40 w-full resize-none rounded-xl border border-[#E8E8EA] bg-[#1D1D1F] p-4 font-mono text-xs text-white outline-none focus:border-[#4ADE80]"
-						defaultValue={asText(content.starterCode)}
-						onChange={(event) => setAnswer("code", event.target.value)}
-					/>
-				</div>
+				<CodePracticeActivity
+					content={content}
+					answers={visibleAnswers}
+					setAnswer={setAnswer}
+					latestAttempt={latestAttempt}
+					stylePreset={stylePreset}
+				/>
 			);
 		}
 
@@ -2554,14 +2875,14 @@ export function LearningActivityRenderer({
 
 			{activity.type !== "multiple_choice" && activity.type !== "flashcards" && (
 				<>
-					{latestAttempt && activity.type !== "short_answer" && activity.type !== "case_study" && activity.type !== "guided_project" && (
+					{latestAttempt && activity.type !== "short_answer" && activity.type !== "case_study" && activity.type !== "guided_project" && activity.type !== "coding_practice" && (
 						<ActivityFeedbackPanel
 							attempt={latestAttempt}
 							className="mt-3"
 						/>
 					)}
 
-					<div className="mt-3 flex items-center justify-between gap-3 border-t border-[#F0F0F2] pt-3">
+					<div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-[#F0F0F2] pt-3">
 						{!isObjective && (
 							<span className="group relative inline-flex items-center gap-1.5 text-[11px] text-[#AEAEB2]">
 								<button
@@ -2588,7 +2909,7 @@ export function LearningActivityRenderer({
 							type="button"
 							disabled={!canSubmit}
 							onClick={handleSubmit}
-							className="ml-auto mr-8 inline-flex items-center gap-2 rounded-xl bg-[var(--activity-primary)] px-4 py-2 text-xs font-bold text-white transition hover:bg-[var(--activity-primary-hover)] disabled:cursor-not-allowed disabled:opacity-40"
+							className="ml-auto inline-flex items-center gap-2 rounded-xl bg-[var(--activity-primary)] px-4 py-2 text-xs font-bold text-white transition hover:bg-[var(--activity-primary-hover)] disabled:cursor-not-allowed disabled:opacity-40 sm:mr-8"
 						>
 							{isSubmitting ? "Checking..." : submitLabel}
 							<Send size={12} />

@@ -550,7 +550,7 @@ button[aria-disabled="true"],
 	border-radius: 16px;
 	overflow: hidden;
 	position: relative;
-	margin: 1rem 0;
+	margin: 0.5rem 0;
 }
 
 .code-block-header {
@@ -641,7 +641,17 @@ button[aria-disabled="true"],
 	padding: 0.3rem 1.25rem;
 	font-size: 0.85em;
 	line-height: 1.7;
-	overflow-x: auto;
+	overflow-x: hidden;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+	word-break: break-word;
+}
+
+.code-block-highlight code,
+.code-block-skeleton code {
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+	word-break: break-word;
 }
 
 .code-block-highlight pre {

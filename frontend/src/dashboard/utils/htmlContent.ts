@@ -167,6 +167,46 @@ function htmlElementToPageBlock(element: HTMLElement): HtmlPageBlock {
 	};
 }
 
+function mergeAdjacentCodeBlocks(blocks: HtmlPageBlock[]): HtmlPageBlock[] {
+	const mergedBlocks: HtmlPageBlock[] = [];
+
+	for (const block of blocks) {
+		const previous = mergedBlocks.at(-1);
+		const canMerge =
+			previous?.type === "code" &&
+			block.type === "code" &&
+			previous.language === block.language &&
+			!previous.splitId &&
+			!block.splitId &&
+			!previous.continued &&
+			!block.continued &&
+			!previous.continuesNext &&
+			!block.continuesNext;
+
+		if (!canMerge || previous.type !== "code" || block.type !== "code") {
+			mergedBlocks.push(block);
+			continue;
+		}
+
+		const code = [previous.code, block.code]
+			.filter((value) => value.length > 0)
+			.join("\n");
+		const mergedBlock: HtmlPageBlock = {
+			...previous,
+			code,
+			html: buildCodeHtml({
+				code,
+				language: previous.language,
+			}),
+			text: normalizeText(code),
+		};
+
+		mergedBlocks[mergedBlocks.length - 1] = mergedBlock;
+	}
+
+	return mergedBlocks;
+}
+
 export function extractHtmlBlocks(html: string): HtmlPageBlock[] {
 	const normalizedHtml = normalizeStoredHtml(html);
 
@@ -176,10 +216,12 @@ export function extractHtmlBlocks(html: string): HtmlPageBlock[] {
 
 	const parser = new DOMParser();
 	const document = parser.parseFromString(normalizedHtml, "text/html");
-	return Array.from(document.body.children)
+	const blocks = Array.from(document.body.children)
 		.filter((element): element is HTMLElement => element instanceof HTMLElement)
 		.map(htmlElementToPageBlock)
 		.filter((block) => block.text || block.html.trim());
+
+	return mergeAdjacentCodeBlocks(blocks);
 }
 
 function createContextualFragment(range: Range): DocumentFragment {
