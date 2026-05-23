@@ -1,4 +1,5 @@
 import {
+	type CSSProperties,
 	type ReactNode,
 	useCallback,
 	useEffect,
@@ -955,6 +956,797 @@ function resolveActivityPageSurface(presetId: string | undefined) {
 	return "#FFFFFF";
 }
 
+type MobileEditorTab = "modules" | "content" | "exercises" | "settings";
+
+type MobileUnitEditorProps = {
+	workspace: DidacticUnitEditorViewModel;
+	activeChapter: DidacticUnitEditorChapter;
+	activeChapterIndex: number;
+	activeContentHtml: string;
+	learningActivitiesByChapter: Record<number, BackendLearningActivity[]>;
+	activityAttempts: Record<string, BackendLearningActivityAttempt[]>;
+	activityContentScale: number;
+	canRegenerate: boolean;
+	canEdit: boolean;
+	isActivityAttemptSubmitting: boolean;
+	isActivityLoading: boolean;
+	isFinishUnitPending: boolean;
+	onBackToDashboard: () => void;
+	onCreateActivity: () => void;
+	onDeleteActivity: (activityId: string) => Promise<void>;
+	onEdit: () => void;
+	onFinishUnit: () => void;
+	onOpenExport: () => void;
+	onOpenHistory: () => void;
+	onOpenNotes: () => void;
+	onOpenPreferences: () => void;
+	onTextStyleChange: (textStyle: EditorTextStyle) => void;
+	onRegenerate: () => void;
+	onRefillActivityAttempts: (activityId: string) => Promise<void>;
+	onSelectChapter: (chapterIndex: number) => void;
+	onSubmitActivityAttempt: (activityId: string, answers: unknown) => Promise<void>;
+	resolvedThemeVars: CSSProperties;
+	stylePreset: EditorTextStyle["stylePreset"];
+	textStyle: EditorTextStyle;
+};
+
+type MobileInlineHtmlEditorProps = {
+	html: string;
+	onChange: (html: string) => void;
+	style?: CSSProperties;
+};
+
+function MobileInlineHtmlEditor({
+	html,
+	onChange,
+	style,
+}: MobileInlineHtmlEditorProps) {
+	const editorRef = useRef<HTMLDivElement | null>(null);
+
+	useEffect(() => {
+		if (editorRef.current && editorRef.current.innerHTML !== html) {
+			editorRef.current.innerHTML = html;
+		}
+	}, [html]);
+
+	return (
+		<div
+			ref={editorRef}
+			className="unit-page-scope min-h-[calc(100dvh-168px)] rounded-[16px] border border-[#E5E5E7] bg-white px-4 py-4 text-[#1D1D1F] outline-none"
+			contentEditable
+			onInput={(event) =>
+				onChange((event.currentTarget as HTMLDivElement).innerHTML)
+			}
+			role="textbox"
+			spellCheck
+			style={style}
+			suppressContentEditableWarning
+		/>
+	);
+}
+
+function MobileUnitEditor({
+	workspace,
+	activeChapter,
+	activeChapterIndex,
+	activeContentHtml,
+	learningActivitiesByChapter,
+	activityAttempts,
+	activityContentScale,
+	canRegenerate,
+	canEdit,
+	isActivityAttemptSubmitting,
+	isActivityLoading,
+	isFinishUnitPending,
+	onBackToDashboard,
+	onCreateActivity,
+	onDeleteActivity,
+	onEdit,
+	onFinishUnit,
+	onOpenExport,
+	onOpenHistory,
+	onOpenNotes,
+	onOpenPreferences,
+	onTextStyleChange,
+	onRegenerate,
+	onRefillActivityAttempts,
+	onSelectChapter,
+	onSubmitActivityAttempt,
+	resolvedThemeVars,
+	stylePreset,
+	textStyle,
+}: MobileUnitEditorProps) {
+	const [activeTab, setActiveTab] = useState<MobileEditorTab>("content");
+	const [selectedActivityId, setSelectedActivityId] = useState<string | null>(
+		null,
+	);
+	const [isFloatingActionsOpen, setIsFloatingActionsOpen] = useState(false);
+	const [isStyleDialogOpen, setIsStyleDialogOpen] = useState(false);
+	const [selectedExerciseChapterIndex, setSelectedExerciseChapterIndex] =
+		useState<number | null>(null);
+	const floatingActionsRef = useRef<HTMLDivElement | null>(null);
+	const contentScrollRef = useRef<HTMLDivElement | null>(null);
+	const allLearningActivities = useMemo(
+		() => Object.values(learningActivitiesByChapter).flat(),
+		[learningActivitiesByChapter],
+	);
+	const selectedActivity =
+		selectedActivityId ?
+			allLearningActivities.find(
+				(activity) => activity.id === selectedActivityId,
+			) ?? null
+		:	null;
+	const activeChapterNumber = activeChapter.chapterIndex + 1;
+	const nextChapter = workspace.chapters.find(
+		(chapter) => chapter.chapterIndex > activeChapter.chapterIndex,
+	);
+	const mobileSurface =
+		(resolvedThemeVars as Record<string, string | undefined>)[
+			"--unit-page-bg"
+		] ?? "#FFFFFF";
+	const stylePresetOptions = ["modern", "classic", "plain"] as const;
+	const sizeProfileOptions = [
+		{value: "small", label: "Small", sampleSize: 12},
+		{value: "regular", label: "Regular", sampleSize: 14},
+		{value: "large", label: "Large", sampleSize: 17},
+	] as const;
+
+	const selectChapter = (chapterIndex: number) => {
+		onSelectChapter(chapterIndex);
+		setSelectedActivityId(null);
+		setActiveTab("content");
+		window.requestAnimationFrame(() => {
+			contentScrollRef.current?.scrollTo({top: 0, left: 0});
+		});
+	};
+
+	useEffect(() => {
+		if (activeTab !== "content") return;
+		contentScrollRef.current?.scrollTo({top: 0, left: 0});
+	}, [activeChapterIndex, activeTab]);
+
+	useEffect(() => {
+		if (!isFloatingActionsOpen) return;
+
+		const handlePointerDown = (event: PointerEvent) => {
+			if (
+				floatingActionsRef.current &&
+				!floatingActionsRef.current.contains(event.target as Node)
+			) {
+				setIsFloatingActionsOpen(false);
+			}
+		};
+
+		document.addEventListener("pointerdown", handlePointerDown);
+		return () =>
+			document.removeEventListener("pointerdown", handlePointerDown);
+	}, [isFloatingActionsOpen]);
+
+	const navItems: Array<{
+		value: MobileEditorTab;
+		label: string;
+		icon: typeof BookOpenCheck;
+	}> = [
+		{value: "modules", label: "Modules", icon: Layers3},
+		{value: "content", label: "Content", icon: BookOpenCheck},
+		{value: "exercises", label: "Exercises", icon: Dumbbell},
+		{value: "settings", label: "Settings", icon: Settings},
+	];
+
+	return (
+		<div
+			className="flex h-screen flex-col overflow-hidden font-sans text-[#1D1D1F] md:hidden"
+			style={{backgroundColor: mobileSurface}}
+		>
+			<button
+				aria-label="Back"
+				className="fixed left-4 top-4 z-40 grid h-8 w-8 place-items-center rounded-full border border-black/20 bg-white text-[#0F0F12] shadow-[0_10px_24px_rgba(17,24,39,0.18)] backdrop-blur-md active:scale-95"
+				onClick={() => {
+					if (activeTab !== "modules") {
+						setSelectedActivityId(null);
+						setSelectedExerciseChapterIndex(null);
+						setActiveTab("modules");
+						return;
+					}
+
+					onBackToDashboard();
+				}}
+				type="button"
+			>
+				<ChevronLeft size={20} strokeWidth={2.8} />
+			</button>
+			<div
+				ref={floatingActionsRef}
+				className="fixed right-4 top-4 z-40 flex flex-col items-end"
+			>
+				<button
+					aria-label="More actions"
+					className="grid h-8 w-8 place-items-center rounded-full border border-black/20 bg-white text-[#0F0F12] shadow-[0_10px_24px_rgba(17,24,39,0.18)] backdrop-blur-md active:scale-95"
+					onClick={() => setIsFloatingActionsOpen((open) => !open)}
+					type="button"
+				>
+					<MoreHorizontal size={20} strokeWidth={2.8} />
+				</button>
+				<AnimatePresence>
+					{isFloatingActionsOpen && (
+						<Motion.div
+							animate={{
+								opacity: 1,
+								transition: {
+									staggerChildren: 0.035,
+									delayChildren: 0.015,
+								},
+							}}
+							className="mt-2 flex flex-col items-end gap-2"
+							exit={{
+								opacity: 0,
+								transition: {
+									staggerChildren: 0.02,
+									staggerDirection: -1,
+								},
+							}}
+							initial={{opacity: 0}}
+						>
+							{[
+								{
+									ariaLabel: "Notes",
+									icon: <StickyNote size={17} />,
+									onClick: onOpenNotes,
+								},
+								{
+									ariaLabel: "Version history",
+									icon: <History size={17} />,
+									onClick: onOpenHistory,
+								},
+								{
+									ariaLabel: "Regenerate module",
+									disabled: !canRegenerate,
+									icon: <RotateCcw size={17} />,
+									onClick: onRegenerate,
+								},
+								{
+									ariaLabel: "Style",
+									icon: (
+										<span className="text-[13px] font-bold">Aa</span>
+									),
+									onClick: () => setIsStyleDialogOpen(true),
+								},
+								{
+									ariaLabel: "Edit",
+									disabled: !canEdit,
+									icon: <Edit3 size={17} />,
+									onClick: onEdit,
+								},
+							].map((action) => (
+								<Motion.button
+									key={action.ariaLabel}
+									aria-label={action.ariaLabel}
+									className="grid h-9 w-9 place-items-center rounded-full border border-black/10 bg-white/90 text-[#1D1D1F] shadow-[0_8px_20px_rgba(17,24,39,0.10)] backdrop-blur-md active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+									disabled={action.disabled}
+									exit={{opacity: 0, scale: 0.8, y: -8}}
+									initial={{opacity: 0, scale: 0.72, y: -12}}
+									animate={{
+										opacity: 1,
+										scale: 1,
+										y: 0,
+										transition: {
+											type: "spring",
+											stiffness: 520,
+											damping: 28,
+										},
+									}}
+									onClick={() => {
+										if (action.disabled) return;
+										setIsFloatingActionsOpen(false);
+										action.onClick();
+									}}
+									type="button"
+									whileTap={{scale: 0.92}}
+								>
+									{action.icon}
+								</Motion.button>
+							))}
+						</Motion.div>
+					)}
+				</AnimatePresence>
+			</div>
+			<Dialog open={isStyleDialogOpen} onOpenChange={setIsStyleDialogOpen}>
+				<DialogContent className="w-[calc(100vw-40px)] max-w-[340px] rounded-[20px] p-0">
+					<DialogHeader className="border-b border-[#E5E5E7] px-5 pb-4 pt-5 text-left">
+						<DialogTitle>Style</DialogTitle>
+						<DialogDescription>
+							Adjust how this unit reads.
+						</DialogDescription>
+					</DialogHeader>
+					<div className="space-y-5 px-5 py-5">
+						<section>
+							<div className="mb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-[#86868B]">
+								Style
+							</div>
+							<div className="grid grid-cols-3 gap-2">
+								{stylePresetOptions.map((presetId) => {
+									const preset = STYLE_PRESETS[presetId];
+									const isActive = textStyle.stylePreset === presetId;
+
+									return (
+										<button
+											key={presetId}
+											type="button"
+											onClick={() =>
+												onTextStyleChange({
+													...textStyle,
+													stylePreset: presetId,
+												})
+											}
+											className={cn(
+												"rounded-[12px] border px-2 py-3 text-[12px] font-bold transition-colors",
+												isActive ?
+													"border-[#1D1D1F] bg-[#1D1D1F] text-white"
+												:	"border-[#D4D7DD] bg-white text-[#1D1D1F]",
+											)}
+										>
+											{preset.label}
+										</button>
+									);
+								})}
+							</div>
+						</section>
+						<section>
+							<div className="mb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-[#86868B]">
+								Text size
+							</div>
+							<div className="grid grid-cols-3 gap-2">
+								{sizeProfileOptions.map((profile) => {
+									const isActive =
+										textStyle.sizeProfile === profile.value;
+
+									return (
+										<button
+											key={profile.value}
+											type="button"
+											onClick={() =>
+												onTextStyleChange({
+													...textStyle,
+													sizeProfile: profile.value,
+												})
+											}
+											className={cn(
+												"rounded-[12px] border px-2 py-3 text-center font-bold transition-colors",
+												isActive ?
+													"border-[#1D1D1F] bg-[#1D1D1F] text-white"
+												:	"border-[#D4D7DD] bg-white text-[#1D1D1F]",
+											)}
+										>
+											<span style={{fontSize: profile.sampleSize}}>
+												Aa
+											</span>
+											<span className="mt-1 block text-[10px]">
+												{profile.label}
+											</span>
+										</button>
+									);
+								})}
+							</div>
+						</section>
+					</div>
+				</DialogContent>
+			</Dialog>
+
+			<main className="min-h-0 flex-1 overflow-hidden">
+				{activeTab === "modules" && (
+					<div className="h-full overflow-y-auto px-4 pb-24 pt-16">
+						<div className="mb-4">
+							<div className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#8E8E93]">
+								Unit
+							</div>
+							<h2 className="mt-1 text-[22px] font-extrabold leading-tight tracking-tight text-[#1D1D1F]">
+								{workspace.title}
+							</h2>
+						</div>
+						<div className="mb-4">
+							<div className="mb-2 flex items-center justify-between text-[11px] font-bold uppercase tracking-[0.14em] text-[#8E8E93]">
+								<span>Overall progress</span>
+								<span>{workspace.progress}%</span>
+							</div>
+							<div className="h-1.5 overflow-hidden rounded-full bg-[#E5E5E7]">
+								<div
+									className="h-full rounded-full bg-[#34C759]"
+									style={{width: `${workspace.progress}%`}}
+								/>
+							</div>
+						</div>
+
+						<div className="space-y-2">
+							{workspace.chapters.map((chapter) => {
+								const selected =
+									chapter.chapterIndex === activeChapterIndex;
+								const isGenerating =
+									chapter.status === "pending";
+								const progress =
+									chapter.totalBlocks > 0 ?
+										Math.min(
+											100,
+											Math.round(
+												((chapter.readBlockIndex + 1) /
+													chapter.totalBlocks) *
+													100,
+											),
+										)
+									:	0;
+								return (
+									<button
+										key={chapter.chapterIndex}
+										className={cn(
+											"w-full rounded-[14px] border bg-white p-3 text-left transition active:scale-[0.99]",
+											selected ?
+												"border-[#34C759] shadow-[0_10px_24px_rgba(52,199,89,0.10)]"
+											:	"border-[#E5E5E7]",
+										)}
+										onClick={() =>
+											selectChapter(chapter.chapterIndex)
+										}
+										type="button"
+									>
+										<div className="flex items-start gap-3">
+											<span
+												className={cn(
+													"flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] text-[13px] font-bold",
+													selected ?
+														"bg-[#DCFCE7] text-[#15803D]"
+													:	"bg-[#F5F5F7] text-[#6E6E73]",
+												)}
+											>
+												{chapter.chapterIndex + 1}
+											</span>
+											<div className="min-w-0 flex-1">
+												<div className="line-clamp-2 text-[14px] font-bold leading-snug">
+													{chapter.title}
+												</div>
+												<div className="mt-1 flex items-center gap-2 text-[11px] font-medium text-[#8E8E93]">
+													<span>
+														{isGenerating ?
+															"Generating"
+														: chapter.status ===
+															"failed" ?
+															"Failed"
+														: chapter.isCompleted ?
+															"Completed"
+														:	`${progress}% read`}
+													</span>
+													{chapter.isCompleted && (
+														<CheckCircle2
+															size={13}
+															className="text-[#34C759]"
+														/>
+													)}
+												</div>
+											</div>
+										</div>
+									</button>
+								);
+							})}
+						</div>
+					</div>
+				)}
+
+				{activeTab === "content" && (
+					<div
+						ref={contentScrollRef}
+						className="h-full overflow-y-auto px-5 pb-24 pt-16"
+						style={{backgroundColor: mobileSurface}}
+					>
+						<div className="mb-5 flex items-start justify-between gap-4">
+							<div className="min-w-0">
+								<div className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#8E8E93]">
+									Module {activeChapterNumber}
+								</div>
+								<h2 className="mt-2 text-[24px] font-extrabold leading-tight tracking-tight">
+									{activeChapter.title}
+								</h2>
+							</div>
+							<span className="shrink-0 text-[34px] font-extrabold leading-none text-[#BBF7D0]">
+								{String(activeChapterNumber).padStart(2, "0")}
+							</span>
+						</div>
+
+						{activeChapter.summary && (
+							<p className="mb-5 border-l-2 border-[#BBF7D0] pl-3 text-[13px] italic leading-relaxed text-[#6E6E73]">
+								{activeChapter.summary}
+							</p>
+						)}
+
+						{activeChapter.status === "ready" ?
+							<ChapterRenderer
+								html={activeContentHtml}
+								className="unit-page-scope mobile-unit-content text-[#1D1D1F]"
+								style={resolvedThemeVars}
+								stylePreset={stylePreset}
+							/>
+						:	<div className="rounded-[14px] border border-[#E5E5E7] bg-[#F9FAFB] p-4 text-[13px] font-medium text-[#6E6E73]">
+								{activeChapter.status === "pending" ?
+									"This module is still generating."
+								:	"This module could not be generated."}
+							</div>
+						}
+						{activeChapter.status === "ready" && (
+							<div className="mt-8 space-y-3 border-t border-[#E5E5E7] pt-5">
+								<button
+									className="flex w-full items-center justify-center gap-2 rounded-[14px] bg-[#1D1D1F] px-4 py-3 text-[14px] font-bold text-white active:scale-[0.99]"
+									onClick={() => {
+										setSelectedActivityId(null);
+										setActiveTab("exercises");
+									}}
+									type="button"
+								>
+									<Dumbbell size={17} />
+									Practice with exercises
+								</button>
+								{nextChapter ?
+									<button
+										className="flex w-full items-center justify-center gap-2 rounded-[14px] border border-[#1D1D1F] bg-white px-4 py-3 text-[14px] font-bold text-[#1D1D1F] active:scale-[0.99]"
+										onClick={() => {
+											selectChapter(nextChapter.chapterIndex);
+										}}
+										type="button"
+									>
+										Continue to next module
+										<ChevronRight size={17} />
+									</button>
+								:	(
+									<button
+										className="flex w-full items-center justify-center gap-2 rounded-[14px] bg-[#16A34A] px-4 py-3 text-[14px] font-bold text-white active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-[#9CA3AF]"
+										disabled={isFinishUnitPending}
+										onClick={onFinishUnit}
+										type="button"
+									>
+										<PartyPopper size={17} />
+										Finish unit 🎉
+									</button>
+									)}
+							</div>
+						)}
+					</div>
+				)}
+
+				{activeTab === "exercises" && (
+					<div className="h-full overflow-y-auto px-4 pb-24 pt-16">
+						{selectedActivity ?
+							<div>
+								<button
+									className="mb-3 flex items-center gap-1 text-[13px] font-semibold text-[#6E6E73]"
+									onClick={() => setSelectedActivityId(null)}
+									type="button"
+								>
+									<ChevronLeft size={17} />
+									Exercises
+								</button>
+								<LearningActivityRenderer
+									activity={selectedActivity}
+									attempts={
+										activityAttempts[selectedActivity.id] ?? []
+									}
+									contentScale={activityContentScale}
+									isSubmitting={isActivityAttemptSubmitting}
+									onDeleteActivity={onDeleteActivity}
+									onRefillAttempts={onRefillActivityAttempts}
+									onSubmitAttempt={onSubmitActivityAttempt}
+									stylePreset={stylePreset}
+									surfaceColor={mobileSurface}
+								/>
+							</div>
+						: selectedExerciseChapterIndex !== null ?
+							<div>
+								<button
+									className="mb-4 flex items-center gap-1 text-[13px] font-semibold text-[#6E6E73]"
+									onClick={() => setSelectedExerciseChapterIndex(null)}
+									type="button"
+								>
+									<ChevronLeft size={17} />
+									Exercises
+								</button>
+								<div className="mb-4">
+									<div className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#8E8E93]">
+										Module {selectedExerciseChapterIndex + 1}
+									</div>
+									<h2 className="mt-1 text-[22px] font-extrabold leading-tight tracking-tight">
+										{workspace.chapters.find(
+											(chapter) =>
+												chapter.chapterIndex ===
+												selectedExerciseChapterIndex,
+										)?.title ?? "Exercises"}
+									</h2>
+								</div>
+								<div className="space-y-2">
+									{(
+										learningActivitiesByChapter[
+											selectedExerciseChapterIndex
+										] ?? []
+									).map((activity) => (
+										<button
+											key={activity.id}
+											className="flex w-full items-center gap-3 rounded-[14px] border border-[#E5E5E7] bg-white p-3 text-left"
+											onClick={() => setSelectedActivityId(activity.id)}
+											type="button"
+										>
+											<span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-[#ECFDF3] text-[#15803D]">
+												{(() => {
+													const Icon = activityTypeOutlineIcon(
+														activity.type,
+													);
+													return <Icon size={18} />;
+												})()}
+											</span>
+											<span className="min-w-0 flex-1">
+												<span className="block text-[14px] font-bold">
+													{activityTypeOutlineLabel(activity.type)}
+												</span>
+												<span className="mt-0.5 block truncate text-[12px] text-[#6E6E73]">
+													{activityAttempts[activity.id]?.length ?? 0} attempts
+												</span>
+											</span>
+											<ChevronRight
+												size={18}
+												className="text-[#8E8E93]"
+											/>
+										</button>
+									))}
+								</div>
+							</div>
+						:	<>
+								<div className="mb-4 flex items-center justify-between gap-3">
+									<div>
+										<h2 className="text-[22px] font-extrabold tracking-tight">
+											Exercises
+										</h2>
+										<p className="mt-1 text-[12px] text-[#6E6E73]">
+											Practice for the current module.
+										</p>
+									</div>
+									<button
+										className="rounded-full bg-[#1D1D1F] px-4 py-2 text-[12px] font-bold text-white disabled:opacity-50"
+										disabled={isActivityLoading}
+										onClick={onCreateActivity}
+										type="button"
+									>
+										{isActivityLoading ? "Creating..." : "Create"}
+									</button>
+								</div>
+								{allLearningActivities.length === 0 ?
+									<div className="rounded-[16px] border border-dashed border-[#D1D1D6] bg-white p-6 text-center">
+										<Dumbbell
+											size={24}
+											className="mx-auto text-[#34C759]"
+										/>
+										<div className="mt-3 text-[15px] font-bold">
+											No exercises yet
+										</div>
+										<p className="mt-1 text-[12px] leading-relaxed text-[#6E6E73]">
+											Create one from this module when you are ready.
+										</p>
+									</div>
+								:	<div className="space-y-2">
+										{workspace.chapters
+											.filter(
+												(chapter) =>
+													(learningActivitiesByChapter[
+														chapter.chapterIndex
+													]?.length ?? 0) > 0,
+											)
+											.map((chapter) => (
+											<button
+												key={chapter.chapterIndex}
+												className="flex w-full items-center gap-3 rounded-[14px] border border-[#E5E5E7] bg-white p-3 text-left"
+												onClick={() =>
+													setSelectedExerciseChapterIndex(
+														chapter.chapterIndex,
+													)
+												}
+												type="button"
+											>
+												<span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-[#ECFDF3] text-[#15803D]">
+													{chapter.chapterIndex + 1}
+												</span>
+												<span className="min-w-0 flex-1">
+													<span className="block text-[14px] font-bold">
+														Module {chapter.chapterIndex + 1}
+													</span>
+													<span className="mt-0.5 block truncate text-[12px] text-[#6E6E73]">
+														{
+															learningActivitiesByChapter[
+																chapter.chapterIndex
+															]?.length
+														} exercises · {chapter.title}
+													</span>
+												</span>
+												<ChevronRight
+													size={18}
+													className="text-[#8E8E93]"
+												/>
+											</button>
+										))}
+									</div>
+								}
+							</>
+						}
+					</div>
+				)}
+
+				{activeTab === "settings" && (
+					<div className="h-full overflow-y-auto px-4 pb-24 pt-16">
+						<div className="space-y-2">
+							<button
+								className="flex w-full items-center gap-3 rounded-[14px] border border-[#E5E5E7] bg-white p-4 text-left text-[14px] font-bold"
+								onClick={onOpenNotes}
+								type="button"
+							>
+								<StickyNote size={18} />
+								Notes
+							</button>
+							<button
+								className="flex w-full items-center gap-3 rounded-[14px] border border-[#E5E5E7] bg-white p-4 text-left text-[14px] font-bold"
+								onClick={onOpenHistory}
+								type="button"
+							>
+								<History size={18} />
+								Version history
+							</button>
+							<button
+								className="flex w-full items-center gap-3 rounded-[14px] border border-[#E5E5E7] bg-white p-4 text-left text-[14px] font-bold disabled:opacity-40"
+								disabled={!canRegenerate}
+								onClick={onRegenerate}
+								type="button"
+							>
+								<RotateCcw size={18} />
+								Regenerate module
+							</button>
+							<button
+								className="flex w-full items-center gap-3 rounded-[14px] border border-[#E5E5E7] bg-white p-4 text-left text-[14px] font-bold"
+								onClick={onOpenExport}
+								type="button"
+							>
+								<Share2 size={18} />
+								Export unit
+							</button>
+							<button
+								className="flex w-full items-center gap-3 rounded-[14px] border border-[#E5E5E7] bg-white p-4 text-left text-[14px] font-bold"
+								onClick={onOpenPreferences}
+								type="button"
+							>
+								<Settings size={18} />
+								Preferences
+							</button>
+						</div>
+					</div>
+				)}
+			</main>
+
+			<nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-[#E5E5E7] bg-white/95 px-2 pb-[max(env(safe-area-inset-bottom),8px)] pt-2 backdrop-blur">
+				{navItems.map((item) => {
+					const Icon = item.icon;
+					const selected = activeTab === item.value;
+					return (
+						<button
+							key={item.value}
+							className={cn(
+								"flex flex-col items-center gap-1 rounded-[12px] py-1.5 text-[11px] font-semibold transition",
+								selected ? "text-[#16A34A]" : "text-[#8E8E93]",
+							)}
+							onClick={() => {
+								setSelectedActivityId(null);
+								setActiveTab(item.value);
+							}}
+							type="button"
+						>
+							<Icon size={21} strokeWidth={selected ? 2.4 : 2} />
+							<span>{item.label}</span>
+						</button>
+					);
+				})}
+			</nav>
+		</div>
+	);
+}
+
 export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	const navigate = useNavigate();
 	const [workspace, setWorkspace] =
@@ -974,6 +1766,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
 	const [isUnitCompleteModalOpen, setIsUnitCompleteModalOpen] =
 		useState(false);
+	const [isMobileEditOpen, setIsMobileEditOpen] = useState(false);
 	const [learningActivities, setLearningActivities] = useState<
 		Record<number, BackendLearningActivity[]>
 	>({});
@@ -1260,6 +2053,77 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		};
 	}, [activeChapter?.chapterIndex, activeChapter?.status, didacticUnitId]);
 
+	useEffect(() => {
+		if (!workspace || viewport.width >= 768) {
+			return;
+		}
+
+		const missingChapters = workspace.chapters.filter(
+			(chapter) =>
+				chapter.status === "ready" &&
+				!Object.prototype.hasOwnProperty.call(
+					learningActivities,
+					chapter.chapterIndex,
+				),
+		);
+		if (missingChapters.length === 0) {
+			return;
+		}
+
+		let cancelled = false;
+		void Promise.all(
+			missingChapters.map(async (chapter) => {
+				const {activities} = await dashboardApi.listLearningActivities(
+					didacticUnitId,
+					chapter.chapterIndex,
+				);
+				const attemptsEntries = await Promise.all(
+					activities.map(async (activity) => {
+						const {attempts} =
+							await dashboardApi.listLearningActivityAttempts(activity.id);
+						return [activity.id, attempts] as const;
+					}),
+				);
+				return {
+					activities,
+					attemptsEntries,
+					chapterIndex: chapter.chapterIndex,
+				};
+			}),
+		)
+			.then((results) => {
+				if (cancelled) return;
+				setLearningActivities((previous) => ({
+					...previous,
+					...Object.fromEntries(
+						results.map((result) => [
+							result.chapterIndex,
+							result.activities,
+						]),
+					),
+				}));
+				setActivityAttempts((previous) => ({
+					...previous,
+					...Object.fromEntries(
+						results.flatMap((result) => result.attemptsEntries),
+					),
+				}));
+			})
+			.catch((error) => {
+				if (!cancelled) {
+					toastError(
+						error instanceof Error ?
+							error.message
+						:	"Could not load learning activities.",
+					);
+				}
+			});
+
+		return () => {
+			cancelled = true;
+		};
+	}, [didacticUnitId, learningActivities, viewport.width, workspace]);
+
 	const loadRevisions = useCallback(
 		async (chapterIndex: number) => {
 			try {
@@ -1414,7 +2278,8 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			return;
 		}
 
-		const duration = 2400;
+		const isMobileConfetti = viewport.width < 768;
+		const duration = isMobileConfetti ? 900 : 2400;
 		const animationEnd = Date.now() + duration;
 		const colors = ["#4ADE80", "#22C55E", "#FACC15", "#60A5FA", "#F472B6"];
 		const randomInRange = (min: number, max: number) =>
@@ -1426,20 +2291,20 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			}
 
 			confetti({
-				particleCount: 3,
+				particleCount: isMobileConfetti ? 1 : 3,
 				angle: 60,
-				spread: 55,
-				startVelocity: 48,
+				spread: isMobileConfetti ? 36 : 55,
+				startVelocity: isMobileConfetti ? 30 : 48,
 				origin: {x: 0, y: randomInRange(0.45, 0.7)},
 				colors,
 				zIndex: 70,
 				disableForReducedMotion: true,
 			});
 			confetti({
-				particleCount: 3,
+				particleCount: isMobileConfetti ? 1 : 3,
 				angle: 120,
-				spread: 55,
-				startVelocity: 48,
+				spread: isMobileConfetti ? 36 : 55,
+				startVelocity: isMobileConfetti ? 30 : 48,
 				origin: {x: 1, y: randomInRange(0.45, 0.7)},
 				colors,
 				zIndex: 70,
@@ -1450,7 +2315,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		};
 
 		frame();
-	}, [isUnitCompleteModalOpen]);
+	}, [isUnitCompleteModalOpen, viewport.width]);
 
 	useEffect(() => {
 		isEditModeRef.current = isEditMode;
@@ -4287,6 +5152,548 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			</div>
 		</>
 	);
+
+	if (spreadMetrics.isMobile) {
+		return (
+			<>
+				<MobileUnitEditor
+					workspace={workspace}
+					activeChapter={activeChapter}
+					activeChapterIndex={activeChapterIndex}
+					activeContentHtml={activeDraftContent}
+					learningActivitiesByChapter={learningActivities}
+					activityAttempts={activityAttempts}
+					activityContentScale={Math.min(
+						1.08,
+						Math.max(0.92, viewport.height / 760),
+					)}
+					canRegenerate={
+						hasConfiguredGenerationTier &&
+						(activeChapter.status === "ready" ||
+							activeChapter.status === "failed") &&
+						canPayRegeneration
+					}
+					canEdit={activeChapter.status === "ready"}
+					isActivityAttemptSubmitting={isActivityAttemptSubmitting}
+					isActivityLoading={isActivityLoading}
+					isFinishUnitPending={isPostModuleActionPending}
+					onBackToDashboard={() => navigate("/dashboard")}
+					onCreateActivity={() => setIsActivityModalOpen(true)}
+					onDeleteActivity={handleDeleteLearningActivity}
+					onEdit={() => setIsMobileEditOpen(true)}
+					onFinishUnit={() => void handlePostModulePrimaryAction()}
+					onOpenExport={() => setIsExportDialogOpen(true)}
+					onOpenHistory={() => setIsHistoryOpen(true)}
+					onOpenNotes={() => setIsNotesPanelOpen(true)}
+					onOpenPreferences={() =>
+						navigate("/dashboard?section=preferences")
+					}
+					onTextStyleChange={(textStyle) => {
+						setDraft((previous) =>
+							previous ?
+								{
+									...previous,
+									textStyle,
+								}
+							:	previous,
+						);
+						const presentationTheme = themeFromTextStyle(
+							resolvedTheme,
+							textStyle,
+						);
+						setWorkspace((previous) =>
+							previous ?
+								{
+									...previous,
+									presentationTheme,
+									chapters: previous.chapters.map((chapter) => ({
+										...chapter,
+										textStyle,
+									})),
+								}
+							:	previous,
+						);
+						void dashboardApi
+							.updateDidacticUnitTheme(
+								didacticUnitId,
+								presentationTheme,
+							)
+							.catch((error) => {
+								toastError(
+									error instanceof Error ?
+										error.message
+									:	"Could not update the unit style.",
+								);
+							});
+					}}
+					onRegenerate={() => setRegenerateConfirmOpen(true)}
+					onRefillActivityAttempts={handleRefillActivityAttempts}
+					onSelectChapter={(chapterIndex) => {
+						setActiveChapterIndex(chapterIndex);
+						setCurrentSpread(0);
+						setSelectedOutlineItemId(null);
+					}}
+					onSubmitActivityAttempt={handleLearningActivityAttempt}
+					resolvedThemeVars={resolvedThemeVars}
+					stylePreset={draft.textStyle.stylePreset}
+					textStyle={draft.textStyle}
+				/>
+				{isMobileEditOpen && (
+					<div
+						className="fixed inset-0 z-[70] flex flex-col overflow-hidden font-sans text-[#1D1D1F]"
+						style={{
+							backgroundColor:
+								(resolvedThemeVars as Record<string, string | undefined>)[
+									"--unit-page-bg"
+								] ?? "#FFFFFF",
+						}}
+					>
+						<header className="flex shrink-0 items-center justify-between gap-3 border-b border-[#E5E5E7] bg-white/90 px-4 py-3 backdrop-blur">
+							<button
+								className="rounded-full px-3 py-2 text-[13px] font-bold text-[#6E6E73]"
+								onClick={() => {
+									exitEditMode();
+									setIsMobileEditOpen(false);
+								}}
+								type="button"
+							>
+								Cancel
+							</button>
+							<div className="min-w-0 flex-1 text-center">
+								<div className="truncate text-[13px] font-bold">
+									Edit module
+								</div>
+								<div className="truncate text-[11px] text-[#86868B]">
+									{activeChapter.title}
+								</div>
+							</div>
+							<button
+								className="rounded-full bg-[#1D1D1F] px-4 py-2 text-[13px] font-bold text-white"
+								onClick={async () => {
+									await handleSave();
+									setIsMobileEditOpen(false);
+								}}
+								type="button"
+							>
+								Save
+							</button>
+						</header>
+						<div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+							<MobileInlineHtmlEditor
+								html={activeDraftContent}
+								onChange={(html) =>
+									setDraft((previous) =>
+										previous ?
+											{
+												...previous,
+												htmlDraft: html,
+											}
+										:	previous,
+									)
+								}
+								style={resolvedThemeVars}
+							/>
+						</div>
+					</div>
+				)}
+				<Dialog
+					open={isNotesPanelOpen}
+					onOpenChange={setIsNotesPanelOpen}
+				>
+					<DialogContent className="max-h-[82vh] w-[calc(100vw-32px)] overflow-y-auto rounded-[18px] p-0">
+						<DialogHeader className="border-b border-[#E5E5E7] px-5 pb-4 pt-5">
+							<DialogTitle>Notes</DialogTitle>
+							<DialogDescription>
+								{validUnitNotes.length} saved in this unit
+							</DialogDescription>
+						</DialogHeader>
+						<div className="space-y-3 px-5 py-4">
+							{validUnitNotes.length === 0 ?
+								<div className="rounded-[14px] border border-dashed border-[#D4D7DD] p-5 text-center">
+									<StickyNote
+										size={24}
+										className="mx-auto mb-2 text-[#34C759]"
+									/>
+									<div className="text-[13px] font-semibold text-[#1D1D1F]">
+										No notes yet
+									</div>
+									<div className="mt-1 text-[12px] leading-relaxed text-[#86868B]">
+										Select text in a generated module to create one.
+									</div>
+								</div>
+							:	validUnitNotes.map((note) => {
+									const chapter = workspace.chapters.find(
+										(item) =>
+											item.chapterIndex === note.chapterIndex,
+									);
+									return (
+										<div
+											key={note.id}
+											className="rounded-[14px] border border-[#E5E5E7] bg-[#FAFAFA] p-3"
+										>
+											<div className="mb-2">
+												<div className="text-[11px] font-bold uppercase tracking-wide text-[#34C759]">
+													Module {note.chapterIndex + 1}
+												</div>
+												<div className="truncate text-[12px] font-semibold text-[#1D1D1F]">
+													{chapter?.title ?? "Module"}
+												</div>
+											</div>
+											<div className="mb-2 rounded-[10px] bg-white px-3 py-2 text-[12px] italic leading-relaxed text-[#5A5A60]">
+												"{note.selectedText}"
+											</div>
+											{note.question && (
+												<div className="mb-1 text-[12px] font-semibold text-[#1D1D1F]">
+													{note.question}
+												</div>
+											)}
+											<div className="whitespace-pre-wrap text-[13px] leading-relaxed text-[#3A3A3C]">
+												{note.content}
+											</div>
+										</div>
+									);
+								})
+							}
+						</div>
+					</DialogContent>
+				</Dialog>
+				<Dialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
+					<DialogContent className="max-h-[82vh] w-[calc(100vw-32px)] overflow-y-auto rounded-[18px] p-0">
+						<DialogHeader className="border-b border-[#E5E5E7] px-5 pb-4 pt-5">
+							<DialogTitle>Version history</DialogTitle>
+							<DialogDescription>
+								{activeChapter.title}
+							</DialogDescription>
+						</DialogHeader>
+						<div className="space-y-3 px-5 py-4">
+							{revisions.length === 0 ?
+								<div className="rounded-[14px] border border-[#E5E5E7] bg-[#F5F5F7] p-4 text-[13px] text-[#86868B]">
+									No revisions yet for this module.
+								</div>
+							:	revisions.map((revision) => {
+									const isCurrentRevision =
+										isRevisionCurrent(revision);
+									return (
+										<div
+											key={revision.id}
+											className="rounded-[14px] border border-[#E5E5E7] p-4"
+										>
+											<div className="flex items-center justify-between gap-3">
+												<span className="text-[12px] font-semibold text-[#1D1D1F]">
+													{sourceLabel(revision.source)}
+												</span>
+												<span className="text-[11px] text-[#86868B]">
+													{revision.createdAt}
+												</span>
+											</div>
+											<div className="mt-1 text-[13px] text-[#5A5A60]">
+												{revision.title}
+											</div>
+											<button
+												className={cn(
+													"mt-3 rounded-full px-3 py-1.5 text-[12px] font-medium transition-all",
+													isCurrentRevision ?
+														"bg-[#F5F5F7] text-[#86868B]"
+													:	"bg-[#1D1D1F] text-white",
+												)}
+												disabled={
+													isCurrentRevision || isSubmitting
+												}
+												onClick={() =>
+													void handleRestoreRevision(revision)
+												}
+												type="button"
+											>
+												{isCurrentRevision ?
+													"Current"
+												:	"Restore"}
+											</button>
+										</div>
+									);
+								})
+							}
+						</div>
+					</DialogContent>
+				</Dialog>
+				<AlertDialog
+					open={regenerateConfirmOpen}
+					onOpenChange={setRegenerateConfirmOpen}
+				>
+					<AlertDialogContent className="w-[calc(100vw-32px)] rounded-[18px]">
+						<AlertDialogHeader>
+							<AlertDialogTitle>
+								{activeChapter.status === "ready" ?
+									"Regenerate this module?"
+								:	"Retry generating this module?"}
+							</AlertDialogTitle>
+							<AlertDialogDescription>
+								This will replace the current module content. Earlier snapshots stay available in Version history.
+								{regenerationCost && (
+									<span className="mt-3 flex items-center gap-2">
+										<span>This action will cost</span>
+										<CoinAmount
+											type={regenerationCost.coinType}
+											amount={regenerationCost.amount}
+										/>
+									</span>
+								)}
+							</AlertDialogDescription>
+						</AlertDialogHeader>
+						<AlertDialogFooter>
+							<AlertDialogCancel>Cancel</AlertDialogCancel>
+							<AlertDialogAction
+								onClick={() => {
+									void handlePrimaryGeneration();
+								}}
+							>
+								{activeChapter.status === "ready" ?
+									"Regenerate"
+								:	"Retry"}
+							</AlertDialogAction>
+						</AlertDialogFooter>
+					</AlertDialogContent>
+				</AlertDialog>
+				<Dialog
+					open={isActivityModalOpen}
+					onOpenChange={setIsActivityModalOpen}
+				>
+					<DialogContent className="max-h-[88vh] w-[calc(100vw-32px)] overflow-y-auto rounded-[18px] p-0 sm:max-w-[760px]">
+						<DialogHeader className="px-5 pb-0 pt-5">
+							<DialogTitle>Exercises & Practice</DialogTitle>
+							<DialogDescription>
+								{hasNextActiveModule ?
+									"Create a structured activity before moving to the next module."
+								:	"Create a structured activity to close out this unit."
+								}
+							</DialogDescription>
+						</DialogHeader>
+
+						<div className="space-y-5 px-5 py-5">
+							<div className="rounded-[16px] bg-[#F5F5F7] p-1">
+								<div className="grid grid-cols-2 gap-1">
+									{[
+										{value: "current_module" as const, label: "Current", icon: BookOpenCheck},
+										{value: "cumulative_until_module" as const, label: "Past modules", icon: History},
+									].map((option) => {
+										const TabIcon = option.icon;
+										const selected = activityScope === option.value;
+										return (
+											<button
+												key={option.value}
+												type="button"
+												onClick={() => setActivityScope(option.value)}
+												className={cn(
+													"flex items-center justify-center gap-2 rounded-[13px] px-3 py-2.5 text-[12px] font-bold transition",
+													selected ?
+														"bg-white text-[#16A34A] shadow-sm ring-1 ring-[#4ADE80]"
+													:	"text-[#6B7280]",
+												)}
+											>
+												<TabIcon size={15} />
+												{option.label}
+											</button>
+										);
+									})}
+								</div>
+							</div>
+
+							<div>
+								<div className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#86868B]">
+									Activity type
+								</div>
+								<div className="grid gap-2">
+									{ACTIVITY_OPTIONS.map((option) => {
+										const Icon = option.icon;
+										const selected = activityType === option.type;
+										return (
+											<button
+												key={option.type}
+												type="button"
+												onClick={() => setActivityType(option.type)}
+												className={cn(
+													"relative flex items-start gap-3 rounded-[14px] border p-3 text-left transition",
+													selected ?
+														"border-[#4ADE80] bg-[#F0FDF4] text-[#0F0F12]"
+													:	"border-[#E5E5E7] bg-white text-[#0F0F12]",
+												)}
+											>
+												{selected && (
+													<CheckCircle2
+														size={16}
+														className="absolute right-3 top-3 text-[#16A34A]"
+														fill="white"
+													/>
+												)}
+												<span
+													className={cn(
+														"flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
+														selected ?
+															"bg-[#DCFCE7] text-[#16A34A]"
+														:	"bg-[#F3F4F6] text-[#0F0F12]",
+													)}
+												>
+													<Icon size={17} />
+												</span>
+												<span className="pr-5">
+													<span className="block text-[13px] font-bold">{option.label}</span>
+													<span className="mt-1 block text-[11px] leading-relaxed text-[#6B7280]">
+														{option.description}
+													</span>
+												</span>
+											</button>
+										);
+									})}
+								</div>
+							</div>
+
+							<div>
+								<div className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#86868B]">
+									Model
+								</div>
+								<div className="grid gap-2">
+									{generationModelOptions.map((option) => {
+										const selected = activityQuality === option.quality;
+										return (
+											<button
+												key={option.quality}
+												type="button"
+												onClick={() => setActivityQuality(option.quality)}
+												className={cn(
+													"relative flex h-[54px] items-center gap-3 rounded-[14px] border px-3 text-left transition",
+													selected ?
+														"border-[#4ADE80] bg-white"
+													:	"border-[#E5E5E7] bg-[#F8F8F9]",
+												)}
+											>
+												{selected && (
+													<CheckCircle2
+														size={16}
+														className="absolute right-3 top-3 text-[#16A34A]"
+														fill="white"
+													/>
+												)}
+												<span className="flex h-9 w-9 shrink-0 items-center justify-center">
+													{option.icon ?
+														<img
+															src={option.icon}
+															alt=""
+															className="h-6 w-6 object-contain"
+														/>
+													:	<Brain size={18} className="text-[#0F0F12]" />
+													}
+												</span>
+												<span className="min-w-0 pr-5">
+													<span className="block truncate text-[13px] font-bold text-[#0F0F12]">
+														{option.label}
+													</span>
+												</span>
+											</button>
+										);
+									})}
+								</div>
+								<div className="mt-3 space-y-2 text-[11px] font-bold text-[#0F0F12]">
+									<span className="flex items-center justify-between gap-2">
+										<span>Cost</span>
+										<CoinAmount
+											type={
+												getActivityGenerationCost({
+													quality: activityQuality,
+												}).coinType
+											}
+											amount={
+												getActivityGenerationCost({
+													quality: activityQuality,
+												}).amount
+											}
+											size={16}
+										/>
+									</span>
+									<span className="flex items-center justify-between gap-2">
+										<span>Current balance</span>
+										<span className="inline-flex items-center gap-2">
+											{VISIBLE_COIN_TYPES.map((coinType) => (
+												<CoinAmount
+													key={coinType}
+													type={coinType}
+													amount={user?.credits[coinType] ?? 0}
+													size={16}
+												/>
+											))}
+										</span>
+									</span>
+								</div>
+							</div>
+						</div>
+
+						<DialogFooter className="grid grid-cols-2 gap-2 border-t border-[#F0F0F2] bg-[#FAFAFB] px-5 py-4">
+							<Button
+								type="button"
+								variant="outline"
+								onClick={() => setIsActivityModalOpen(false)}
+							>
+								Cancel
+							</Button>
+							<Button
+								type="button"
+								disabled={isActivityLoading}
+								onClick={() => {
+									void handleCreateLearningActivity();
+								}}
+								className="gap-2 bg-[#4ADE80] text-[#0F0F12] hover:bg-[#3BCD6F]"
+							>
+								{isActivityLoading ?
+									<Loader2 size={16} className="animate-spin" />
+								:	<CirclePlus size={16} />
+								}
+								{isActivityLoading ? "Creating..." : "Create"}
+							</Button>
+						</DialogFooter>
+					</DialogContent>
+				</Dialog>
+				<Dialog
+					open={isUnitCompleteModalOpen}
+					onOpenChange={setIsUnitCompleteModalOpen}
+				>
+					<DialogContent className="w-[calc(100vw-48px)] max-w-[340px] overflow-hidden rounded-[18px] p-0 text-center sm:max-w-[460px]">
+						<div className="relative px-7 pt-8 pb-6">
+							<div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#DCFCE7] text-[#16A34A] shadow-[0_14px_40px_rgba(34,197,94,0.22)]">
+								<PartyPopper size={30} />
+							</div>
+							<DialogHeader className="border-0 px-0 pb-0 pt-5 text-center">
+								<DialogTitle className="text-[24px] font-bold tracking-tight text-[#0F0F12]">
+									Congratulations
+								</DialogTitle>
+								<DialogDescription className="mx-auto mt-2 max-w-[330px] text-[14px] leading-relaxed text-[#6B7280]">
+									You have finished every module in this unit. Keep practicing to reinforce the material, or return to your dashboard.
+								</DialogDescription>
+							</DialogHeader>
+						</div>
+						<DialogFooter className="grid grid-cols-1 gap-2 border-t border-[#F0F0F2] bg-[#FAFAFB] px-5 py-4 sm:grid-cols-2">
+							<Button
+								type="button"
+								variant="outline"
+								className="h-10 rounded-full font-semibold"
+								onClick={() => {
+									setIsUnitCompleteModalOpen(false);
+									setActivityScope("current_module");
+									setIsActivityModalOpen(true);
+								}}
+							>
+								Keep practicing
+							</Button>
+							<Button
+								type="button"
+								className="h-10 rounded-full bg-[#0F0F12] font-semibold text-white hover:bg-[#2A2A2D]"
+								onClick={() => navigate("/dashboard")}
+							>
+								Go to dashboard
+							</Button>
+						</DialogFooter>
+					</DialogContent>
+				</Dialog>
+			</>
+		);
+	}
 
 	return (
 		<div className="flex h-screen overflow-hidden bg-[#F5F5F7] font-sans text-[#1D1D1F]">

@@ -2417,6 +2417,7 @@ export function LearningActivityRenderer({
 	onRefillAttempts,
 	onDeleteActivity,
 	stylePreset = "modern",
+	surfaceColor,
 }: {
 	activity: BackendLearningActivity;
 	attempts: BackendLearningActivityAttempt[];
@@ -2426,8 +2427,10 @@ export function LearningActivityRenderer({
 	onRefillAttempts: (activityId: string) => Promise<void>;
 	onDeleteActivity?: (activityId: string) => Promise<void>;
 	stylePreset?: ActivityStylePresetId | string;
+	surfaceColor?: string;
 }) {
 	const activityTheme = resolveActivityColorTheme(stylePreset);
+	const activitySurface = surfaceColor ?? activityTheme.surface;
 	const [answers, setAnswers] = useState<Answers>({});
 	const [shortAnswerDetailTab, setShortAnswerDetailTab] = useState<"answer" | "correction">("answer");
 	const [caseStudyTab, setCaseStudyTab] = useState<"case" | "analysis" | "feedback">("case");
@@ -2794,10 +2797,10 @@ export function LearningActivityRenderer({
 		<div
 			className="group/activity flex h-full min-h-0 flex-col font-[Inter] text-[var(--activity-text)]"
 			style={{
-				backgroundColor: activityTheme.surface,
+				backgroundColor: activitySurface,
 				color: activityTheme.text,
 				"--activity-scale": contentScale,
-				"--activity-surface": activityTheme.surface,
+				"--activity-surface": activitySurface,
 				"--activity-surface-alt": activityTheme.surfaceAlt,
 				"--activity-border": activityTheme.border,
 				"--activity-border-strong": activityTheme.borderStrong,

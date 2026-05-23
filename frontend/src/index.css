@@ -333,6 +333,40 @@ button[aria-disabled="true"],
 	border: 1px solid var(--unit-table-border, #e5e5e7);
 }
 
+.unit-page-scope .unit-table-scroll {
+	max-width: 100%;
+	margin: 1.1em 0 1.2em;
+	overflow-x: auto;
+	overflow-y: hidden;
+	-webkit-overflow-scrolling: touch;
+	scrollbar-color: rgba(142, 142, 147, 0.45) transparent;
+	scrollbar-width: thin;
+}
+
+.unit-page-scope .unit-table-scroll table {
+	min-width: max-content;
+	margin: 0;
+}
+
+.unit-page-scope .unit-table-scroll::-webkit-scrollbar {
+	height: 4px;
+}
+
+.unit-page-scope .unit-table-scroll::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+.unit-page-scope .unit-table-scroll::-webkit-scrollbar-thumb {
+	border-radius: 999px;
+	background: rgba(142, 142, 147, 0.4);
+}
+
+@media (max-width: 767px) {
+	.unit-page-scope .unit-table-scroll {
+		width: 100%;
+	}
+}
+
 .prose thead,
 .unit-page-scope thead {
 	background: var(--unit-table-header-bg, #f3f4f6);
@@ -392,6 +426,8 @@ button[aria-disabled="true"],
 	line-height: 1.7;
 	white-space: pre;
 	border: 1px solid #d0d7de;
+	scrollbar-color: rgba(142, 142, 147, 0.45) transparent;
+	scrollbar-width: thin;
 }
 
 .prose pre code,
@@ -513,6 +549,25 @@ button[aria-disabled="true"],
 	border-radius: 6px;
 	overflow-x: auto;
 	padding: 1em;
+	scrollbar-color: rgba(142, 142, 147, 0.45) transparent;
+	scrollbar-width: thin;
+}
+
+.prose pre::-webkit-scrollbar,
+.unit-page-scope pre::-webkit-scrollbar {
+	width: 4px;
+	height: 4px;
+}
+
+.prose pre::-webkit-scrollbar-track,
+.unit-page-scope pre::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+.prose pre::-webkit-scrollbar-thumb,
+.unit-page-scope pre::-webkit-scrollbar-thumb {
+	border-radius: 999px;
+	background: rgba(142, 142, 147, 0.4);
 }
 
 .unit-page-scope ul,
@@ -668,10 +723,13 @@ button[aria-disabled="true"],
 
 .code-block-highlight pre {
 	background: transparent !important;
+	scrollbar-color: rgba(142, 142, 147, 0.45) transparent;
+	scrollbar-width: thin;
 }
 
 .code-block-highlight pre::-webkit-scrollbar {
-	height: 6px;
+	width: 4px;
+	height: 4px;
 }
 
 .code-block-highlight pre::-webkit-scrollbar-track {
@@ -679,12 +737,12 @@ button[aria-disabled="true"],
 }
 
 .code-block-highlight pre::-webkit-scrollbar-thumb {
-	background: #d0d7de;
-	border-radius: 10px;
+	background: rgba(142, 142, 147, 0.4);
+	border-radius: 999px;
 }
 
 .code-block-highlight pre::-webkit-scrollbar-thumb:hover {
-	background: #8c959f;
+	background: rgba(142, 142, 147, 0.62);
 }
 
 .tiptap-editor .hljs-keyword,
@@ -740,7 +798,8 @@ button[aria-disabled="true"],
 }
 
 ::-webkit-scrollbar {
-	width: 5px;
+	width: 4px;
+	height: 4px;
 }
 
 ::-webkit-scrollbar-track {

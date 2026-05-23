@@ -92,6 +92,16 @@ export function ChapterRenderer({
 				);
 			}
 
+			if (node.name === "table") {
+				return (
+					<div className="unit-table-scroll">
+						<table {...node.attribs}>
+							{domToReact(node.children as DOMNode[], options)}
+						</table>
+					</div>
+				);
+			}
+
 			return undefined;
 		},
 	};

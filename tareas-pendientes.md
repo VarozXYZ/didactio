@@ -7,7 +7,7 @@
 7. Actualizar landing para el nuevo concepto de la web actual y el nuevo pricing
 8. ~~Problema: cuando se va a rechazar una syllabus y se va a regenerar, no se debe pedir silver/gold ya que esto no se cobra ya al usuario~~
 9. ~~Añadir funcionalidad de exportar a pdf la unidad~~
-10. Mejorar el responsive
+10. ~~Mejorar el responsive~~
 11. Crear unidades permanentes, que estan siempre cuando un usuario crea su cuenta
 12. ~~Añadir a las cards de las unidades: tipo de generacion (silver / gold) usando icono, longitud seleccionada - potenialmente añadir brillo / mate a la unidad creada con gold~~
 13. ~~Sistema de generacion de actividades~~
