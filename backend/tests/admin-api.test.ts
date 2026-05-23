@@ -52,6 +52,6 @@ describe("admin api", () => {
 				reason: "Initial grant",
 		});
 		expect(creditResponse.status).toBe(200);
-		expect(creditResponse.body.user.credits.gold).toBe(6);
+		expect(creditResponse.body.user.credits.gold).toBe(5);
 	});
 });

@@ -9,61 +9,53 @@ const faqColumns: FaqItem[][] = [
 	[
 		{
 			question: "Do I need a credit card to start using Didactio?",
-			answer: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+			answer: "No, you can test our platform for free. After you register, you will receive a free credit pack to explore the features and see how it can work for you.",
 		},
 		{
-			question: "How is billing handled for paid plans?",
-			answer: "Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
+			question: "How do credits work?",
+			answer: "Credits are spent when AI generation runs. Different actions use different coin types, such as syllabus drafts, unit generation, module regeneration, activities, feedback, and notes.",
+		},
+		{
+			question: "What are Standard and Pro generations?",
+			answer: "Standard and Pro are quality tiers. Pro is intended for more demanding generation work, while Standard is a lower-cost option for everyday authoring.",
+		},
+		{
+			question: "Do purchased credits expire?",
+			answer: "Credit packs do not expire. For subscriptions, unused Standard and Pro credits are kept; Bronze may be subject to the plan's monthly fair-use rules.",
 		},
 		{
 			question: "Are prices shown with or without VAT?",
-			answer: "Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.",
+			answer: "The prices shown here are listed before VAT. The final tax calculation is handled during checkout.",
 		},
 		{
-			question: "How do upgrades and downgrades work?",
-			answer: "Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.",
-		},
-		{
-			question: "Do you offer refunds?",
-			answer: "Curabitur non nulla sit amet nisl tempus convallis quis ac lectus. Vivamus magna justo, lacinia eget consectetur sed.",
-		},
-		{
-			question: "Can several teachers share one Pro account?",
-			answer: "Pellentesque in ipsum id orci porta dapibus. Nulla porttitor accumsan tincidunt.",
-		},
-		{
-			question: "What’s included in the Free plan?",
-			answer: "Mauris blandit aliquet elit, eget tincidunt nibh pulvinar a. Donec sollicitudin molestie malesuada.",
+			question: "Can I cancel a subscription?",
+			answer: "Subscriptions are managed through the billing portal when Stripe is configured for the deployment.",
 		},
 	],
 	[
 		{
-			question: "What does the Pro plan add beyond Free?",
-			answer: "Sed porttitor lectus nibh. Proin eget tortor risus.",
+			question: "What does Plus add?",
+			answer: "Plus includes unlimited bronze use under fair-use limits and a larger monthly allowance of Standard and Pro credits for premium generation.",
 		},
 		{
-			question: "Is my data processed in compliance with GDPR?",
-			answer: "Vivamus suscipit tortor eget felis porttitor volutpat. Vestibulum ac diam sit amet quam vehicula elementum sed sit amet dui.",
+			question: "Can several teachers share one account?",
+			answer: "The current product is designed around individual user accounts. Multi-user workspaces and institutional collaboration are future product areas.",
 		},
 		{
-			question: "Where is my data stored?",
-			answer: "Praesent sapien massa, convallis a pellentesque nec, egestas non nisi.",
-		},
-		{
-			question: "Can I request deletion or export of my data?",
-			answer: "Quisque velit nisi, pretium ut lacinia in, elementum id enim.",
-		},
-		{
-			question: "Can I use the generated content commercially?",
-			answer: "Donec rutrum congue leo eget malesuada. Curabitur arcu erat, accumsan id imperdiet et, porttitor at sem.",
+			question: "Can I export the generated material?",
+			answer: "Yes. Units can be reviewed, edited, and exported to PDF from the editor.",
 		},
 		{
 			question: "Can I use the platform in multiple languages?",
-			answer: "Nulla quis lorem ut libero malesuada feugiat. Pellentesque in ipsum id orci porta dapibus.",
+			answer: "Yes, you can generated courses in any language. The interface is currently in English, but we plan to support more languages in the future.",
+		},
+		{
+			question: "Do I own the generated content?",
+			answer: "AI-generated content may have legal and quality limitations. Review the output before use and follow the terms that apply to your account and AI providers.",
 		},
 		{
 			question: "Does the app replace teachers?",
-			answer: "Cras ultricies ligula sed magna dictum porta. Donec sollicitudin molestie malesuada.",
+			answer: "No. Didactio is an authoring assistant. Teachers and learners remain responsible for checking accuracy, context, and pedagogical fit.",
 		},
 	],
 ];
@@ -72,7 +64,7 @@ const accentFilter =
 	"brightness(0) saturate(100%) invert(64%) sepia(70%) saturate(463%) hue-rotate(83deg) brightness(95%) contrast(92%)";
 
 function PricingFaq() {
-	const [openId, setOpenId] = useState<string | null>("0-0");
+	const [openId, setOpenId] = useState<string | null>(null);
 
 	return (
 		<section className="w-[1120px] max-w-[95vw] py-16">
@@ -81,9 +73,8 @@ function PricingFaq() {
 					Still got questions?
 				</h2>
 				<p className="mt-4 max-w-[760px] font-inter text-base text-dark/70 leading-relaxed">
-					We have answered some of the most frequently asked questions
-					about the product, payments, and your advantages as a
-					subscriber!
+					Here are the practical details about credits, billing, exports,
+					and what the current product does today.
 				</p>
 			</div>
 

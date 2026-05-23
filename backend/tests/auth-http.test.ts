@@ -45,7 +45,7 @@ describe("auth http", () => {
 		expect(meResponse.body.user.credits).toEqual({
 			bronze: 30,
 			silver: 15,
-			gold: 1,
+			gold: 0,
 		});
 		const rotatedRefreshCookie = refreshResponse.headers["set-cookie"][0]
 			.split(";")

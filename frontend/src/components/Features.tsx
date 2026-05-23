@@ -48,7 +48,7 @@ const features = [
 		icon: "/assets/icons/hand-holding-dollar-solid-full.png",
 		title: "Affordable & scalable",
 		description:
-			"Try our systems for free and scale them across your entire organization for a fraction of the cost.",
+			"Try our app for free and learn for a fraction of the cost of traditional learning materials.",
 		iconMargin: "ml-0.25 mb-0.5",
 	},
 	{
@@ -81,7 +81,7 @@ function Features() {
 	return (
 		<section className="w-[1040px] py-16">
 			<h2 className="font-sora font-bold text-4xl text-dark mb-12">
-				Why teachers and students choose us
+				Why students and educators chose us
 			</h2>
 
 			<div className="flex gap-6">

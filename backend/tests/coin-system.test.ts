@@ -71,6 +71,15 @@ describe("coin system", () => {
 	it("charges approval by unit length and module regeneration by stored quality", async () => {
 		const app = createTestApp();
 		const syllabusReady = await createSyllabusReadyDidacticUnit(app);
+		const authService = app.locals.authService as AuthService;
+		await authService.adjustUserCredits({
+			userId: "mock-user",
+			actorUserId: "mock-user",
+			coinType: "gold",
+			direction: "credit",
+			amount: 1,
+			reason: "test_gold_approval",
+		});
 
 		const approveResponse = await request(app)
 			.post(`/api/didactic-unit/${syllabusReady.id}/approve-syllabus`)
@@ -82,7 +91,6 @@ describe("coin system", () => {
 			unitGenerationCreditTransactionId: expect.any(String),
 		});
 
-		const authService = app.locals.authService as AuthService;
 		expect((await authService.getUserById("mock-user"))?.credits.gold).toBe(0);
 
 		await generateDidacticUnitChapter(app, syllabusReady.id, 0);

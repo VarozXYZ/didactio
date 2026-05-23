@@ -8,31 +8,31 @@ type FaqItem = {
 const faqs: FaqItem[] = [
 	{
 		question: "What is Didactio?",
-		answer: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+		answer: "Didactio is a platform that combines the power of AI models with the background of educational design to generate tailored courses and learning materials based on user preferences and needs.",
 	},
 	{
 		question: "How does Didactio differ from other tools?",
-		answer: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aenean euismod bibendum laoreet. Proin gravida dolor sit amet lacus accumsan et viverra justo commodo. Proin sodales pulvinar tempor. Cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus.",
+		answer: "Didactio offers both high quality content to learn about any topic and a platform where you can both study and practice with tailored exercises and feedback",
 	},
 	{
 		question: "Who should use Didactio?",
-		answer: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer nec odio. Praesent libero. Sed cursus ante dapibus diam.",
+		answer: "It is useful for teachers, tutors, trainers, students, and anyone who wants structured learning material without designing the whole unit from scratch.",
 	},
 	{
 		question: "Is Didactio suitable for my subject area?",
-		answer: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla quis sem at nibh elementum imperdiet. Duis sagittis ipsum.",
+		answer: "Unless treating a topic that goes against our content policy, Didactio can generate courses for virtually any subject: STEM, humanities, languages, professional development and beyond.",
 	},
 	{
 		question: "Can I edit the generated syllabus?",
-		answer: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent mauris. Fusce nec tellus sed augue semper porta.",
+		answer: "Yes. You can review the syllabus before approving it, change its structure, and later edit or regenerate generated modules from the editor.",
 	},
 	{
 		question: "What content types can Didactio generate?",
-		answer: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Mauris ipsum. Nulla metus metus, ullamcorper vel, tincidunt sed, euismod in, nibh.",
+		answer: "Didactio can generate different lengths of units depending on the depth and level that you want to learn. After reading, you can generated various types of exercises to practice and get feedback on your learning.",
 	},
 	{
-		question: "How long is a typical generated syllabus?",
-		answer: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Quisque volutpat condimentum velit. Class aptent taciti sociosqu ad litora torquent per conubia nostra.",
+		question: "Can I trust AI-generated content as final material?",
+		answer: "AI can be wrong at times. We have handcrafted railways that guide the generation process to be as high quality and accurate as possible, but we recommend reviewing the generated content before using it as final material.",
 	},
 ];
 

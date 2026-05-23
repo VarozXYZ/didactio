@@ -1,17 +1,38 @@
 import type {ReactNode} from "react";
 import {useState} from "react";
 import {Link} from "react-router-dom";
+import {useAuth} from "../auth/AuthProvider";
 
 const checkIcon = "/assets/icons/check-mark.png";
+const coinIcons = {
+	bronze: "/assets/props/bronce-coin.png",
+	silver: "/assets/props/silver-coin.png",
+	gold: "/assets/props/gold-coin.png",
+};
 
-type BillingMode = "monthly" | "yearly";
+type SubscriptionMode = "pro" | "plus";
+type PackMode = "start" | "creator";
+type CreditAmount = number | "unlimited";
 
-type PlanBadge = {type: "single"; text: string} | {type: "toggle"};
+type PlanBadge =
+	| {type: "single"; text: string}
+	| {type: "subscriptionToggle"}
+	| {type: "packToggle"};
+
+type CreditBundle = {
+	bronze: CreditAmount;
+	silver: CreditAmount;
+	gold: CreditAmount;
+};
 
 type Plan = {
 	name: string;
 	price?: string;
-	prices?: {monthly: string; yearly: string};
+	prices?: Record<SubscriptionMode, string>;
+	packPrices?: Record<PackMode, string>;
+	credits?: CreditBundle;
+	subscriptionCredits?: Record<SubscriptionMode, CreditBundle>;
+	packCredits?: Record<PackMode, CreditBundle>;
 	interval: string;
 	badge: PlanBadge;
 	features: ReactNode[];
@@ -23,88 +44,128 @@ type Plan = {
 const plans: Plan[] = [
 	{
 		name: "Free",
-		price: "0€",
-		interval: "/month",
+		price: "0 EUR",
+		interval: "",
 		badge: {type: "single", text: "Free Plan"},
+		credits: {bronze: 30, silver: 15, gold: 0},
 		features: [
-			"Create up to 5 course generations",
-			"All content types available",
+			"Get free sign-up credits to try the platform",
+			"Generations and models available are limited",
 			"Advanced customization",
-			"Full editor and PDF/Markdown export",
+			"Full editor and PDF export",
 		],
 		cta: "Start now, free",
 		variant: "outline",
 	},
 	{
-		name: "Pro",
-		prices: {monthly: "20€", yearly: "15€"},
+		name: "Subscription",
+		prices: {pro: "20 EUR", plus: "10 EUR"},
 		interval: "/month",
-		badge: {type: "toggle"},
+		badge: {type: "subscriptionToggle"},
+		subscriptionCredits: {
+			pro: {bronze: 100, silver: 50, gold: 10},
+			plus: {bronze: "unlimited", silver: 100, gold: 20},
+		},
 		features: [
-			"Everything from free plan",
-			<>
-				Extended use (<span className="text-accent">+30</span>{" "}
-				generations)
-			</>,
+			"Access to state of the art models",
+			"Monthly credit allowance for generations and exports",
 			"Dedicated support in various forms",
-			"Shareable links and collaboration with up to 3 teammates",
+			"Infinite generations for exercises and practice *",
 		],
-		cta: "Start now, free",
+		cta: "Subscribe",
 		variant: "solid",
 		featured: true,
 	},
 	{
-		name: "Institutional",
-		price: "100€",
-		interval: "/month",
-		badge: {type: "single", text: "Annual Billing Only"},
+		name: "Packs",
+		packPrices: {start: "5 EUR", creator: "15 EUR"},
+		interval: "",
+		badge: {type: "packToggle"},
+		packCredits: {
+			start: {bronze: 50, silver: 25, gold: 5},
+			creator: {bronze: 100, silver: 50, gold: 15},
+		},
 		features: [
-			"Unlimited course generations",
-			"All content types available",
-			"Advanced customization",
-			"Full editor and PDF/Markdown export",
+			"One time credit pack purchase, no recurring payments",
+			"Access to state of the art models",
+			"Dedicated support in various forms",
+			"Credits do not expire",
 		],
-		cta: "Start now, free",
+		cta: "Buy Credits",
 		variant: "outline",
 	},
 ];
 
+function ToggleButton({
+	active,
+	children,
+	onClick,
+}: {
+	active: boolean;
+	children: ReactNode;
+	onClick: () => void;
+}) {
+	return (
+		<button
+			type="button"
+			onClick={onClick}
+			aria-pressed={active}
+			className={`px-4 py-1.5 rounded-full font-sora text-sm font-semibold transition-colors ${
+				active ? "bg-accent text-dark" : "text-white/70 hover:text-white"
+			}`}
+		>
+			{children}
+		</button>
+	);
+}
+
 function PlanBadge({
 	badge,
-	billing,
-	onBillingChange,
+	subscription,
+	onSubscriptionChange,
+	pack,
+	onPackChange,
 }: {
 	badge: PlanBadge;
-	billing: BillingMode;
-	onBillingChange: (mode: BillingMode) => void;
+	subscription: SubscriptionMode;
+	onSubscriptionChange: (mode: SubscriptionMode) => void;
+	pack: PackMode;
+	onPackChange: (mode: PackMode) => void;
 }) {
-	if (badge.type === "toggle") {
+	if (badge.type === "subscriptionToggle") {
 		return (
 			<div className="flex items-center gap-1 rounded-full bg-white/15 p-1">
-				<button
-					type="button"
-					onClick={() => onBillingChange("monthly")}
-					aria-pressed={billing === "monthly"}
-					className={`px-4 py-1.5 rounded-full font-sora text-sm font-semibold transition-colors ${
-						billing === "monthly" ?
-							"bg-accent text-dark"
-						:	"text-white/70 hover:text-white"
-					}`}
+				<ToggleButton
+					active={subscription === "pro"}
+					onClick={() => onSubscriptionChange("pro")}
 				>
-					Monthly
-				</button>
-				<button
-					type="button"
-					onClick={() => onBillingChange("yearly")}
-					aria-pressed={billing === "yearly"}
-					className={`px-4 py-1.5 rounded-full font-sora text-sm font-semibold transition-colors ${
-						billing === "yearly" ?
-							"bg-accent text-dark"
-						:	"text-white/70 hover:text-white"
-					}`}
+					Pro
+				</ToggleButton>
+				<ToggleButton
+					active={subscription === "plus"}
+					onClick={() => onSubscriptionChange("plus")}
 				>
-					Yearly
-				</button>
+					Plus
+				</ToggleButton>
+			</div>
+		);
+	}
+
+	if (badge.type === "packToggle") {
+		return (
+			<div className="flex items-center gap-1 rounded-full bg-white/15 p-1">
+				<ToggleButton
+					active={pack === "start"}
+					onClick={() => onPackChange("start")}
+				>
+					Start
+				</ToggleButton>
+				<ToggleButton
+					active={pack === "creator"}
+					onClick={() => onPackChange("creator")}
+				>
+					Creator
+				</ToggleButton>
 			</div>
 		);
 	}
@@ -116,14 +177,89 @@ function PlanBadge({
 	);
 }
 
+function InfinityMark() {
+	return (
+		<span className="inline-flex w-8 items-center justify-center gap-0.5 text-white">
+			<svg
+				viewBox="0 0 32 16"
+				aria-hidden="true"
+				className="h-3.5 w-6"
+				fill="none"
+			>
+				<path
+					d="M8.2 2.5C4.8 2.5 2.5 5 2.5 8s2.3 5.5 5.7 5.5c2.4 0 4.2-1.2 7.8-5.5 3.6 4.3 5.4 5.5 7.8 5.5 3.4 0 5.7-2.5 5.7-5.5s-2.3-5.5-5.7-5.5c-2.4 0-4.2 1.2-7.8 5.5-3.6-4.3-5.4-5.5-7.8-5.5Z"
+					stroke="currentColor"
+					strokeLinecap="round"
+					strokeLinejoin="round"
+					strokeWidth="2.6"
+				/>
+			</svg>
+			<span className="font-sora text-xs font-bold leading-none">*</span>
+		</span>
+	);
+}
+
+function CreditAmountValue({amount}: {amount: CreditAmount}) {
+	return (
+		<span className="font-sora text-base font-bold text-white">
+			{amount === "unlimited" ? <InfinityMark /> : amount}
+		</span>
+	);
+}
+
+function CreditAmountRow({credits}: {credits?: CreditBundle}) {
+	if (!credits) {
+		return null;
+	}
+
+	const visibleCredits = (["bronze", "silver", "gold"] as const)
+		.map((coinType) => ({
+			coinType,
+			amount: credits[coinType],
+		}))
+		.filter(({amount}) => amount === "unlimited" || amount > 0);
+
+	if (visibleCredits.length === 0) {
+		return null;
+	}
+
+	return (
+		<div className="mx-auto mt-5 flex w-fit max-w-full flex-wrap items-center justify-center gap-2 rounded-md bg-white/10 px-4 py-3">
+			{visibleCredits.map(({coinType, amount}, index) => (
+				<div key={coinType} className="flex items-center gap-2">
+					{index > 0 && (
+						<span className="font-sora text-base font-semibold text-white/45">
+							+
+						</span>
+					)}
+					<span className="inline-flex items-center gap-1.5">
+						<img
+							src={coinIcons[coinType]}
+							alt=""
+							className="h-6 w-6 object-contain"
+						/>
+						<CreditAmountValue amount={amount} />
+					</span>
+				</div>
+			))}
+		</div>
+	);
+}
+
 function PlanCard({
 	plan,
-	billing,
-	onBillingChange,
+	subscription,
+	onSubscriptionChange,
+	pack,
+	onPackChange,
+	isAuthenticated,
 }: {
 	plan: Plan;
-	billing: BillingMode;
-	onBillingChange: (mode: BillingMode) => void;
+	subscription: SubscriptionMode;
+	onSubscriptionChange: (mode: SubscriptionMode) => void;
+	pack: PackMode;
+	onPackChange: (mode: PackMode) => void;
+	isAuthenticated: boolean;
 }) {
 	const cardStyle =
 		plan.featured ?
@@ -137,10 +273,20 @@ function PlanCard({
 
 	const price =
 		plan.prices ?
-			billing === "monthly" ?
-				plan.prices.monthly
-			:	plan.prices.yearly
+			plan.prices[subscription]
+		: plan.packPrices ?
+			plan.packPrices[pack]
 		:	plan.price;
+	const credits =
+		plan.subscriptionCredits ? plan.subscriptionCredits[subscription]
+		: plan.packCredits ? plan.packCredits[pack]
+		: plan.credits;
+	const ctaTarget =
+		isAuthenticated &&
+		(plan.badge.type === "subscriptionToggle" ||
+			plan.badge.type === "packToggle") ?
+			"/dashboard?section=subscription"
+		:	"/dashboard";
 
 	return (
 		<div
@@ -163,11 +309,14 @@ function PlanCard({
 					<div className="h-px flex-1 bg-white/10" />
 					<PlanBadge
 						badge={plan.badge}
-						billing={billing}
-						onBillingChange={onBillingChange}
+						subscription={subscription}
+						onSubscriptionChange={onSubscriptionChange}
+						pack={pack}
+						onPackChange={onPackChange}
 					/>
 					<div className="h-px flex-1 bg-white/10" />
 				</div>
+				<CreditAmountRow credits={credits} />
 			</div>
 
 			<ul className="mt-7 flex flex-col gap-4">
@@ -186,7 +335,7 @@ function PlanCard({
 			</ul>
 
 			<Link
-				to="/dashboard"
+				to={ctaTarget}
 				className={`mt-10 self-center rounded-full px-12 py-3 text-base font-sora font-semibold transition-colors ${buttonStyle}`}
 			>
 				{plan.cta}
@@ -196,7 +345,11 @@ function PlanCard({
 }
 
 function PricingPlans() {
-	const [billing, setBilling] = useState<BillingMode>("yearly");
+	const {status} = useAuth();
+	const [subscription, setSubscription] =
+		useState<SubscriptionMode>("plus");
+	const [pack, setPack] = useState<PackMode>("start");
+	const isAuthenticated = status === "authenticated";
 
 	return (
 		<section className="w-full flex flex-col items-center py-16">
@@ -210,8 +363,11 @@ function PricingPlans() {
 						<PlanCard
 							key={plan.name}
 							plan={plan}
-							billing={billing}
-							onBillingChange={setBilling}
+							subscription={subscription}
+							onSubscriptionChange={setSubscription}
+							pack={pack}
+							onPackChange={setPack}
+							isAuthenticated={isAuthenticated}
 						/>
 					))}
 				</div>

@@ -75,7 +75,7 @@ describe("billing", () => {
 		expect(pricing.body.products).toHaveLength(4);
 		expect(pricing.body.products[0]).toMatchObject({
 			id: "starter_pack",
-			priceLabel: "5€ + VAT",
+			priceLabel: "5 EUR + VAT",
 			stripeConfigured: true,
 		});
 
@@ -135,7 +135,7 @@ describe("billing", () => {
 		expect(user?.credits).toEqual({
 			bronze: 80,
 			silver: 40,
-			gold: 6,
+			gold: 5,
 			dark: 100,
 		});
 	});
@@ -173,7 +173,7 @@ describe("billing", () => {
 		expect(user?.credits).toEqual({
 			bronze: 30,
 			silver: 115,
-			gold: 21,
+			gold: 20,
 			dark: 50,
 		});
 		expect(user?.billing).toMatchObject({

@@ -74,7 +74,7 @@ function Testimonials() {
 			<div className="flex items-center justify-between mb-10">
 				<div>
 					<h2 className="font-sora font-bold text-4xl text-dark mb-4">
-						Trusted by educators worldwide
+						Trusted by users worldwide
 					</h2>
 					<p className="font-inter text-base text-dark/80">
 						Discover what our users think about our platform

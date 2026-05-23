@@ -54,10 +54,14 @@ function Header() {
 					}`}
 				>
 					Dashboard
-					<img
-						src="/assets/icons/dashboard-icon.png"
-						alt=""
-						className="h-4 w-4"
+					<span
+						aria-hidden="true"
+						className="h-4 w-4 bg-current transition-colors"
+						style={{
+							WebkitMask:
+								"url('/assets/icons/dashboard-icon.png') center / contain no-repeat",
+							mask: "url('/assets/icons/dashboard-icon.png') center / contain no-repeat",
+						}}
 					/>
 				</Link>
 			</nav>

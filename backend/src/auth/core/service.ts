@@ -38,7 +38,7 @@ const INTERNAL_COIN_TYPES = ["bronze", "silver", "gold", "dark"] as const;
 const LAUNCH_GIFT_CREDITS: CreditBalances = {
 	bronze: 30,
 	silver: 15,
-	gold: 1,
+	gold: 0,
 	dark: INITIAL_DARK_CREDITS,
 };
 
@@ -586,15 +586,17 @@ export class AuthService {
 		) {
 			await Promise.all(
 				INTERNAL_COIN_TYPES.map((coinType) =>
-					this.createCreditTransaction({
-						userId: user.id,
-						coinType,
-						direction: "credit",
-						amount: LAUNCH_GIFT_CREDITS[coinType],
-						reason: "launch_gift",
-						actorUserId: user.id,
-						metadata: {source: "launch_gift"},
-					}),
+					LAUNCH_GIFT_CREDITS[coinType] > 0 ?
+						this.createCreditTransaction({
+							userId: user.id,
+							coinType,
+							direction: "credit",
+							amount: LAUNCH_GIFT_CREDITS[coinType],
+							reason: "launch_gift",
+							actorUserId: user.id,
+							metadata: {source: "launch_gift"},
+						})
+					:	Promise.resolve(),
 				),
 			);
 		}

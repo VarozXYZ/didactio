@@ -37,9 +37,8 @@ function Footer() {
 						className="h-[50px] mb-6"
 					/>
 					<p className="font-inter text-md text-dark leading-relaxed mb-8">
-						AI-powered web platform that creates personalized,
-						didactic syllabi for almost any topic and educational
-						level in minutes.
+						AI-powered workspace for planning, generating, editing,
+						studying, and exporting complete didactic units.
 					</p>
 					<div className="flex items-center gap-3">
 						<a
@@ -88,28 +87,28 @@ function Footer() {
 						</h4>
 						<ul className="space-y-3">
 							<li>
-								<a
-									href="#"
+								<Link
+									to="/dashboard"
 									className="font-inter text-md text-dark/70 hover:text-dark transition-colors"
 								>
-									Documentation
-								</a>
+									Dashboard
+								</Link>
 							</li>
 							<li>
-								<a
-									href="#"
+								<Link
+									to="/pricing"
 									className="font-inter text-md text-dark/70 hover:text-dark transition-colors"
 								>
-									Blog
-								</a>
+									Pricing
+								</Link>
 							</li>
 							<li>
-								<a
-									href="#"
+								<Link
+									to="/contact"
 									className="font-inter text-md text-dark/70 hover:text-dark transition-colors"
 								>
-									Examples
-								</a>
+									Contact
+								</Link>
 							</li>
 						</ul>
 					</div>
@@ -124,24 +123,24 @@ function Footer() {
 									to="/pricing"
 									className="font-inter text-md text-dark/70 hover:text-dark transition-colors"
 								>
-									Pricing
+									Credits
 								</Link>
 							</li>
 							<li>
-								<a
-									href="#"
+								<Link
+									to="/"
 									className="font-inter text-md text-dark/70 hover:text-dark transition-colors"
 								>
 									FAQ
-								</a>
+								</Link>
 							</li>
 							<li>
-								<a
-									href="#"
+								<Link
+									to="/contact"
 									className="font-inter text-md text-dark/70 hover:text-dark transition-colors"
 								>
 									Support
-								</a>
+								</Link>
 							</li>
 						</ul>
 					</div>
@@ -152,12 +151,12 @@ function Footer() {
 						</h4>
 						<ul className="space-y-3">
 							<li>
-								<a
-									href="#"
+								<Link
+									to="/"
 									className="font-inter text-md text-dark/70 hover:text-dark transition-colors"
 								>
-									About Us
-								</a>
+									Product
+								</Link>
 							</li>
 							<li>
 								<Link
@@ -174,7 +173,7 @@ function Footer() {
 
 			<div className="text-center pb-8 px-16">
 				<p className="font-inter text-sm text-dark/75 mb-4">
-					Copyright @ 2025
+					Copyright @ 2026
 				</p>
 				<div className="w-full h-[1px] bg-dark/50"></div>
 			</div>
