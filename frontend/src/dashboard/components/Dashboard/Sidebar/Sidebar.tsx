@@ -145,7 +145,7 @@ export function Sidebar({
 				initial={false}
 				animate={{width: isSidebarOpen ? 280 : 80}}
 				transition={{type: "spring", stiffness: 300, damping: 30}}
-				className="z-20 flex h-screen flex-col overflow-hidden border-r border-[#E5E5E7] bg-white"
+				className="app-dashboard-sidebar z-20 flex h-screen flex-col overflow-hidden border-r border-[#E5E5E7] bg-white"
 			>
 				<div
 					className={`flex shrink-0 items-center p-6 ${
@@ -506,51 +506,49 @@ export function Sidebar({
 
 				<div className="shrink-0 border-t border-[#E5E5E7] p-4">
 					{isSidebarOpen ?
-						<div className="flex items-center gap-3">
-							{user?.pictureUrl && !pictureFailed ?
-								<img
-									src={user.pictureUrl}
-									alt={user.displayName}
-									referrerPolicy="no-referrer"
-									onError={() => setPictureFailed(true)}
-									className="h-9 w-9 rounded-full object-cover"
-								/>
-							:	<div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#4ADE80] to-[#2D8F4B] text-sm font-semibold text-white">
-									{initials}
-								</div>
-							}
-							<div className="min-w-0 flex-1">
-								<div className="truncate text-[13px] font-semibold text-[#1D1D1F]">
-									{user?.displayName ?? "Didactio User"}
-								</div>
-								<div className="text-[11px] text-[#86868B]">
-									{user?.email ?? "Signed in with Google"}
-								</div>
-							</div>
-							<DropdownMenu>
-								<DropdownMenuTrigger asChild>
-									<button
-										type="button"
-										className="rounded-lg p-1 transition-all hover:bg-[#F5F5F7]"
-									>
-										<MoreVertical
-											size={16}
-											className="text-[#86868B]"
+						<DropdownMenu>
+							<DropdownMenuTrigger asChild>
+								<button
+									type="button"
+									className="flex w-full items-center gap-3 rounded-[12px] text-left transition-all hover:bg-[#F5F5F7]"
+								>
+									{user?.pictureUrl && !pictureFailed ?
+										<img
+											src={user.pictureUrl}
+											alt={user.displayName}
+											referrerPolicy="no-referrer"
+											onError={() => setPictureFailed(true)}
+											className="h-9 w-9 rounded-full object-cover"
 										/>
-									</button>
-								</DropdownMenuTrigger>
-								<DropdownMenuContent side="top" align="end">
-									<DropdownMenuItem
-										onSelect={() => {
-											void logout();
-										}}
-									>
-										<LogOut />
-										Sign out
-									</DropdownMenuItem>
-								</DropdownMenuContent>
-							</DropdownMenu>
-						</div>
+									:	<div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#4ADE80] to-[#2D8F4B] text-sm font-semibold text-white">
+											{initials}
+										</div>
+									}
+									<div className="min-w-0 flex-1">
+										<div className="truncate text-[13px] font-semibold text-[#1D1D1F]">
+											{user?.displayName ?? "Didactio User"}
+										</div>
+										<div className="text-[11px] text-[#86868B]">
+											{user?.email ?? "Signed in with Google"}
+										</div>
+									</div>
+									<MoreVertical
+										size={16}
+										className="shrink-0 text-[#86868B]"
+									/>
+								</button>
+							</DropdownMenuTrigger>
+							<DropdownMenuContent side="right" align="center">
+								<DropdownMenuItem
+									onSelect={() => {
+										void logout();
+									}}
+								>
+									<LogOut />
+									Sign out
+								</DropdownMenuItem>
+							</DropdownMenuContent>
+						</DropdownMenu>
 					:	(user?.pictureUrl && !pictureFailed ?
 							<img
 								src={user.pictureUrl}

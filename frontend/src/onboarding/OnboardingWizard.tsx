@@ -141,7 +141,7 @@ export function OnboardingWizard() {
 			}}
 		>
 			<div
-				className="flex min-h-0 w-full max-w-[520px] flex-col overflow-hidden rounded-[22px] md:max-h-[calc(100dvh-3rem)] md:max-w-[920px] md:flex-row"
+				className="app-glass-modal flex min-h-0 w-full max-w-[520px] flex-col overflow-hidden rounded-[22px] md:max-h-[calc(100dvh-3rem)] md:max-w-[920px] md:flex-row"
 				style={{
 					background: "rgba(255,255,255,0.72)",
 					backdropFilter: "blur(40px) saturate(1.6)",
@@ -151,7 +151,7 @@ export function OnboardingWizard() {
 				}}
 			>
 				<div
-					className="hidden w-[232px] shrink-0 flex-col md:flex"
+					className="app-glass-sidebar hidden w-[232px] shrink-0 flex-col md:flex"
 					style={{
 						background: "rgba(248,248,250,0.7)",
 						borderRight: "1px solid rgba(0,0,0,0.06)",

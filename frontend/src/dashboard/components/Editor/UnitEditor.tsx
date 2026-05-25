@@ -121,6 +121,7 @@ import {
 } from "../../utils/htmlContent";
 import {getFolderEmoji} from "../../utils/folderDisplay";
 import {useAuth} from "../../../auth/AuthProvider";
+import {useAppearance} from "../../../theme/AppearanceProvider";
 import {CoinAmount, CoinIcon} from "@/components/Coin";
 import {
 	getActivityGenerationCost,
@@ -876,10 +877,44 @@ const ACTIVITY_OPTIONS: Array<{
 	},
 ];
 
-function resolvePostModuleCompletionStyle(presetId: string | undefined) {
+function resolvePostModuleCompletionStyle(presetId: string | undefined, dark = false) {
 	const resolvedPresetId = presetId ?? "classic";
 	const headingFamily = "Sora";
 	const bodyFamily = "Inter";
+
+	if (dark) {
+		if (resolvedPresetId === "classic") {
+			return {
+				headingFamily, bodyFamily, panelBorder: "#49392D",
+				panelBackground: "linear-gradient(135deg,#1C1917 0%,#211C18 100%)",
+				panelShadow: "none", accent: "#D8AF82", accentSoft: "#332920",
+				accentText: "#E4BE94", headingColor: "#F4E8DC", bodyColor: "#E0D7CF",
+				primaryBackground: "#765D46", primaryHover: "#936F4F",
+				primaryIconBackground: "#332920", secondaryIconBackground: "#29221D",
+				badgeBackground: "#29221D", tipBackground: "#29221D", tipBorder: "#49392D",
+			};
+		}
+		if (resolvedPresetId === "plain") {
+			return {
+				headingFamily, bodyFamily, panelBorder: "#313C4D",
+				panelBackground: "linear-gradient(135deg,#171B22 0%,#202733 100%)",
+				panelShadow: "none", accent: "#73A7FF", accentSoft: "#202F47",
+				accentText: "#9CC1FF", headingColor: "#F1F4F8", bodyColor: "#D4DAE4",
+				primaryBackground: "#356BCE", primaryHover: "#477CDD",
+				primaryIconBackground: "#202F47", secondaryIconBackground: "#202733",
+				badgeBackground: "#202733", tipBackground: "#202733", tipBorder: "#313C4D",
+			};
+		}
+		return {
+			headingFamily, bodyFamily, panelBorder: "#29453C",
+			panelBackground: "linear-gradient(135deg,#17201F 0%,#1F2B29 100%)",
+			panelShadow: "none", accent: "#4ADE80", accentSoft: "#203B2E",
+			accentText: "#6FE39B", headingColor: "#E6EAF0", bodyColor: "#D7E4E1",
+			primaryBackground: "#237D4A", primaryHover: "#2D995C",
+			primaryIconBackground: "#203B2E", secondaryIconBackground: "#1F2B29",
+			badgeBackground: "#1F2B29", tipBackground: "#1F2B29", tipBorder: "#29453C",
+		};
+	}
 
 	if (resolvedPresetId === "classic") {
 		return {
@@ -949,7 +984,10 @@ function resolvePostModuleCompletionStyle(presetId: string | undefined) {
 	};
 }
 
-function resolveActivityPageSurface(presetId: string | undefined) {
+function resolveActivityPageSurface(presetId: string | undefined, dark = false) {
+	if (dark) {
+		return presetId === "classic" ? "#1C1917" : presetId === "plain" ? "#171B22" : "#17201F";
+	}
 	if (presetId === "classic") {
 		return "#FFFDF8";
 	}
@@ -1854,6 +1892,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	const [unitGenerationTier, setUnitGenerationTier] =
 		useState<BackendGenerationQuality | null>(null);
 	const {user, refreshUser} = useAuth();
+	const {resolvedMode} = useAppearance();
 	const resolvedTheme = useMemo(
 		() =>
 			resolvePresentationTheme(
@@ -1870,8 +1909,8 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		[resolvedTheme, draft],
 	);
 	const resolvedThemeVars = useMemo(
-		() => themeVars(effectiveTheme),
-		[effectiveTheme],
+		() => themeVars(effectiveTheme, resolvedMode === "dark"),
+		[effectiveTheme, resolvedMode],
 	);
 	const [activeGeneratingChapterIndex, setActiveGeneratingChapterIndex] =
 		useState<number | null>(null);
@@ -4850,6 +4889,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		if (page.kind === "learning_activity") {
 			const activityTheme = resolvePostModuleCompletionStyle(
 				draft.textStyle.stylePreset,
+				resolvedMode === "dark",
 			);
 			const activityContentScale = Math.min(
 				1.2,
@@ -4861,7 +4901,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 					style={{
 						height: `${spreadMetrics.pageHeight}px`,
 						width: `${spreadMetrics.pageWidth}px`,
-						background: resolveActivityPageSurface(draft.textStyle.stylePreset),
+						background: resolveActivityPageSurface(draft.textStyle.stylePreset, resolvedMode === "dark"),
 						borderColor: activityTheme.panelBorder,
 					}}
 				>

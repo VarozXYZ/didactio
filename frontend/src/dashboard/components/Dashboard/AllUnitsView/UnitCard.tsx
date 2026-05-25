@@ -60,7 +60,7 @@ export function UnitCard({
 	return (
 		<>
 			<div className="group">
-				<div className="relative overflow-hidden rounded-2xl border border-[#E5E5E7] bg-white transition-all duration-300 hover:border-[#4ADE80] hover:shadow-lg">
+				<div className="app-dashboard-card relative overflow-hidden rounded-2xl border border-[#E5E5E7] bg-white transition-all duration-300 hover:border-[#4ADE80] hover:shadow-lg">
 					<DropdownMenu>
 						<DropdownMenuTrigger asChild>
 							<button
@@ -157,7 +157,7 @@ export function UnitCard({
 							/>
 
 							{unit.status === "generating" && (
-								<div className="absolute right-3 top-3 flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-600 backdrop-blur-sm">
+								<div className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-600 backdrop-blur-sm">
 									<div className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
 									Setup in progress
 								</div>

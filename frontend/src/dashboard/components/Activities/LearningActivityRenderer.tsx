@@ -71,6 +71,7 @@ import {
 	getCodeHighlighter,
 } from "../Content/codeHighlighting";
 import {STYLE_PRESETS} from "../../utils/typography";
+import {useAppearance} from "../../../theme/AppearanceProvider";
 
 type Answers = Record<string, unknown>;
 type ActivityStylePresetId = "modern" | "classic" | "plain";
@@ -117,7 +118,61 @@ type VirtualFile = {
 	content: string;
 };
 
-function resolveActivityColorTheme(stylePreset?: string): ActivityColorTheme {
+function resolveActivityColorTheme(stylePreset?: string, dark = false): ActivityColorTheme {
+	if (dark) {
+		if (stylePreset === "classic") {
+			return {
+				surface: "#1C1917",
+				surfaceAlt: "#29221D",
+				border: "#49392D",
+				borderStrong: "#765D46",
+				text: "#E0D7CF",
+				muted: "#B7A89B",
+				primary: "#765D46",
+				primaryHover: "#936F4F",
+				accent: "#D8AF82",
+				accentText: "#E4BE94",
+				accentSoft: "#332920",
+				accentSofter: "#27211C",
+				focus: "#D8AF82",
+			};
+		}
+
+		if (stylePreset === "plain") {
+			return {
+				surface: "#171B22",
+				surfaceAlt: "#202733",
+				border: "#313C4D",
+				borderStrong: "#4D6894",
+				text: "#D4DAE4",
+				muted: "#A1A8B3",
+				primary: "#356BCE",
+				primaryHover: "#477CDD",
+				accent: "#73A7FF",
+				accentText: "#9CC1FF",
+				accentSoft: "#202F47",
+				accentSofter: "#1D2635",
+				focus: "#73A7FF",
+			};
+		}
+
+		return {
+			surface: "#17201F",
+			surfaceAlt: "#1F2B29",
+			border: "#29453C",
+			borderStrong: "#2B725D",
+			text: "#D7E4E1",
+			muted: "#A1A8B3",
+			primary: "#237D4A",
+			primaryHover: "#2D995C",
+			accent: "#4ADE80",
+			accentText: "#6FE39B",
+			accentSoft: "#203B2E",
+			accentSofter: "#192C25",
+			focus: "#4ADE80",
+		};
+	}
+
 	if (stylePreset === "classic") {
 		return {
 			surface: "#FFFDF8",
@@ -2429,7 +2484,8 @@ export function LearningActivityRenderer({
 	stylePreset?: ActivityStylePresetId | string;
 	surfaceColor?: string;
 }) {
-	const activityTheme = resolveActivityColorTheme(stylePreset);
+	const {resolvedMode} = useAppearance();
+	const activityTheme = resolveActivityColorTheme(stylePreset, resolvedMode === "dark");
 	const activitySurface = surfaceColor ?? activityTheme.surface;
 	const [answers, setAnswers] = useState<Answers>({});
 	const [shortAnswerDetailTab, setShortAnswerDetailTab] = useState<"answer" | "correction">("answer");

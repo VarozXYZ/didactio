@@ -645,7 +645,7 @@ export function CreateUnitWizard({
 			}}
 		>
 			<div
-				className="flex min-h-0 max-h-[calc(100dvh-0.75rem)] w-full max-w-[520px] flex-col overflow-hidden rounded-[22px] md:max-w-[920px] md:flex-row md:max-h-[calc(100dvh-1.5rem)]"
+				className="app-glass-modal flex min-h-0 max-h-[calc(100dvh-0.75rem)] w-full max-w-[520px] flex-col overflow-hidden rounded-[22px] md:max-w-[920px] md:flex-row md:max-h-[calc(100dvh-1.5rem)]"
 				onClick={(event) => event.stopPropagation()}
 				style={{
 					background: "rgba(255,255,255,0.72)",
@@ -656,7 +656,7 @@ export function CreateUnitWizard({
 				}}
 			>
 				<div
-					className="hidden w-[232px] shrink-0 flex-col md:flex"
+					className="app-glass-sidebar hidden w-[232px] shrink-0 flex-col md:flex"
 					style={{
 						background: "rgba(248,248,250,0.7)",
 						borderRight: "1px solid rgba(0,0,0,0.06)",

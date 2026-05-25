@@ -4,8 +4,10 @@ import type {StylePresetId} from "../../utils/typography";
 import {
 	CODE_LANGUAGE_ALIASES,
 	CODE_THEME_MAP,
+	DARK_CODE_THEME,
 	getCodeHighlighter,
 } from "./codeHighlighting";
+import {useAppearance} from "../../../theme/AppearanceProvider";
 
 type CodeBlockProps = {
 	code: string;
@@ -29,8 +31,9 @@ export function CodeBlock({
 }: CodeBlockProps) {
 	const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null);
 	const [copied, setCopied] = useState(false);
+	const {resolvedMode} = useAppearance();
 	const lineCount = useMemo(() => Math.max(1, code.split("\n").length), [code]);
-	const theme = CODE_THEME_MAP[stylePreset];
+	const theme = resolvedMode === "dark" ? DARK_CODE_THEME : CODE_THEME_MAP[stylePreset];
 
 	useEffect(() => {
 		let cancelled = false;

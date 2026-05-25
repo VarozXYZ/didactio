@@ -30,7 +30,7 @@ export function MobileBottomNav({
 	onSelectSection,
 }: MobileBottomNavProps) {
 	return (
-		<nav className="fixed bottom-0 left-0 right-0 z-30 border-t border-[#E5E5E7] bg-white/95 px-2 pb-[calc(env(safe-area-inset-bottom)+8px)] pt-2 shadow-[0_-8px_30px_rgba(0,0,0,0.06)] backdrop-blur-xl md:hidden">
+		<nav className="app-dashboard-nav fixed bottom-0 left-0 right-0 z-30 border-t border-[#E5E5E7] bg-white/95 px-2 pb-[calc(env(safe-area-inset-bottom)+8px)] pt-2 shadow-[0_-8px_30px_rgba(0,0,0,0.06)] backdrop-blur-xl md:hidden">
 			<div className="mx-auto grid max-w-[520px] grid-cols-5">
 				{navItems.map((item) => {
 					const Icon = item.icon;

@@ -1,8 +1,9 @@
-import {Suspense, lazy} from "react";
+import {Suspense, lazy, useEffect} from "react";
 import {Route, Routes, useLocation} from "react-router-dom";
 import {RequireAuth} from "./auth/RequireAuth";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
+import {useAppearance} from "./theme/AppearanceProvider";
 
 const HomePage = lazy(() => import("./pages/HomePage"));
 const PricingPage = lazy(() => import("./pages/PricingPage"));
@@ -23,6 +24,7 @@ function RouteFallback() {
 
 function App() {
 	const location = useLocation();
+	const {resolvedMode} = useAppearance();
 	const isAuthRoute =
 		location.pathname === "/login" ||
 		location.pathname === "/register" ||
@@ -31,10 +33,24 @@ function App() {
 	const isDashboardRoute = location.pathname.startsWith("/dashboard");
 	const isOnboardingRoute = location.pathname.startsWith("/onboarding");
 	const hideMainChrome = isAuthRoute || isDashboardRoute || isOnboardingRoute;
+	const usesAppAppearance = isAuthRoute || isDashboardRoute || isOnboardingRoute;
+
+	useEffect(() => {
+		const nextTheme = usesAppAppearance ? resolvedMode : "light";
+		document.documentElement.dataset.appTheme = nextTheme;
+		document.documentElement.dataset.appThemed = String(usesAppAppearance);
+		document.documentElement.style.colorScheme = nextTheme;
+
+		return () => {
+			document.documentElement.dataset.appTheme = "light";
+			document.documentElement.dataset.appThemed = "false";
+			document.documentElement.style.colorScheme = "light";
+		};
+	}, [resolvedMode, usesAppAppearance]);
 
 	return (
 		<div
-			className={`mx-auto bg-white min-h-screen flex flex-col ${hideMainChrome ? "" : "items-center"}`}
+			className={`mx-auto min-h-screen flex flex-col ${hideMainChrome ? "app-shell" : "items-center bg-white"}`}
 		>
 			{!hideMainChrome && <Header />}
 			<main

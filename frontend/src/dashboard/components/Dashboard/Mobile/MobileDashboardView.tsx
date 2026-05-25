@@ -85,8 +85,8 @@ export function MobileDashboardView({
 	}, [activeFolderId, filteredUnits]);
 
 	return (
-		<div className="min-h-screen bg-[#F7F7F8] pb-[calc(env(safe-area-inset-bottom)+86px)] text-[#111113] md:hidden">
-			<header className="sticky top-0 z-20 border-b border-[#E5E5E7] bg-white/95 px-4 pb-4 pt-[calc(env(safe-area-inset-top)+14px)] backdrop-blur-xl">
+		<div className="app-dashboard-canvas min-h-screen bg-[#F7F7F8] pb-[calc(env(safe-area-inset-bottom)+86px)] text-[#111113] md:hidden">
+			<header className="app-dashboard-header sticky top-0 z-20 border-b border-[#E5E5E7] bg-white/95 px-4 pb-4 pt-[calc(env(safe-area-inset-top)+14px)] backdrop-blur-xl">
 				<div className="mx-auto flex w-full max-w-[min(100%,900px)] items-center justify-between gap-4">
 					<img
 						src="/assets/logos/logo-horizontal.png"
@@ -114,7 +114,7 @@ export function MobileDashboardView({
 						placeholder="Search units..."
 						value={searchQuery}
 						onChange={(event) => setSearchQuery(event.target.value)}
-						className="h-[48px] w-full rounded-[16px] border border-[#DADADD] bg-white px-4 pl-12 text-[16px] font-medium text-[#1D1D1F] shadow-[0_1px_0_rgba(255,255,255,0.9)_inset] outline-none transition focus:border-[#34C759]"
+						className="app-library-search h-[48px] w-full rounded-[16px] border border-[#DADADD] bg-white px-4 pl-12 text-[16px] font-medium text-[#1D1D1F] shadow-[0_1px_0_rgba(255,255,255,0.9)_inset] outline-none transition focus:border-[#34C759]"
 					/>
 				</div>
 

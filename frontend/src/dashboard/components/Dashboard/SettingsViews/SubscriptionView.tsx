@@ -3,8 +3,6 @@ import {
 	CalendarDays,
 	CreditCard,
 	ExternalLink,
-	Gift,
-	GraduationCap,
 	Loader2,
 	ShoppingBag,
 	Wallet,
@@ -105,102 +103,98 @@ function PlanIllustration() {
 	);
 }
 
-function ProductCard({
-	product,
+function PurchasePanel({
+	products,
+	kind,
 	action,
-	busy,
+	busyProductId,
 }: {
-	product: BackendBillingProduct;
+	products: BackendBillingProduct[];
+	kind: "subscription" | "credit_pack";
 	action: (productId: string) => void;
-	busy: boolean;
+	busyProductId: string | null;
 }) {
-	const isSubscription = product.kind === "subscription";
+	const [selectedProductId, setSelectedProductId] = useState<string>();
+	const isSubscription = kind === "subscription";
+	const fallbackProduct = products.find((product) => product.recommended) ?? products[0];
+	const selectedProduct =
+		products.find((product) => product.id === selectedProductId) ?? fallbackProduct;
 
 	return (
-		<div
-			className={`relative min-w-0 rounded-[12px] border bg-white p-3 shadow-[0_8px_18px_rgba(17,24,39,0.04)] sm:p-4 ${
-				product.recommended ?
-					"border-[#15803D]"
-				:	"border-[#E5E5E7]"
-			}`}
-		>
-			<div className="flex min-w-0 items-start justify-between gap-2 sm:gap-4">
-				<div className="flex min-w-0 items-center gap-3 sm:gap-4">
-					<div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-[#ECFDF3] text-[#15803D] sm:h-12 sm:w-12">
-						{isSubscription ?
-							<GraduationCap size={22} />
-						:	<Gift size={20} />}
+		<section>
+			{selectedProduct && (
+				<div className="rounded-[12px] border border-[#E5E5E7] bg-white p-5 shadow-[0_8px_18px_rgba(17,24,39,0.04)]">
+					<div className="flex items-start justify-between gap-4">
+						<div className="min-w-0">
+							<div className="flex items-center gap-3">
+								<div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-[#ECFDF3] text-[#15803D]">
+									{isSubscription ?
+										<CalendarDays size={18} />
+									:	<ShoppingBag size={18} />}
+								</div>
+								<div>
+									<div className="text-[11px] font-bold uppercase tracking-[0.1em] text-[#15803D]">
+										{isSubscription ? "Monthly" : "One time"}
+									</div>
+									<h3 className="text-[20px] font-bold leading-tight text-[#0F0F12]">
+										{selectedProduct.name}
+									</h3>
+								</div>
+							</div>
+						</div>
+						<div className="grid min-w-[190px] grid-cols-2 gap-1 rounded-[10px] bg-[#F5F5F7] p-1">
+							{products.map((product) => {
+								const selected = selectedProduct.id === product.id;
+								return (
+									<button
+										key={product.id}
+										type="button"
+										aria-pressed={selected}
+										onClick={() => setSelectedProductId(product.id)}
+										className={`rounded-[8px] px-3 py-2 text-center text-[18px] font-bold leading-none transition-colors ${
+											selected ?
+												"bg-white text-[#0F0F12] shadow-sm"
+											:	"text-[#667085] hover:bg-white/70"
+										}`}
+									>
+										{product.priceLabel.replace(" + VAT", "").replace(" EUR", "€")}
+									</button>
+								);
+							})}
+						</div>
 					</div>
-					<div className="min-w-0">
-						<h3 className="text-[16px] font-bold leading-tight text-[#0F0F12] sm:text-[18px]">
-							{product.name}
-						</h3>
-						<div className="mt-1 flex flex-wrap items-center gap-1.5">
-							<p className="inline-flex rounded-full bg-[#DCFCE7] px-2 py-0.5 text-[10px] font-bold uppercase text-[#15803D]">
-								{isSubscription ? "Monthly" : "One-time"}
-							</p>
-							{product.recommended && (
-								<span className="inline-flex rounded-full border border-[#BBF7D0] bg-white px-2 py-0.5 text-[8px] font-bold uppercase text-[#15803D] sm:text-[10px]">
-									Recommended
+					<div className="mt-6 flex flex-wrap items-center justify-center gap-x-8 gap-y-4">
+						{(["bronze", "silver", "gold"] as const).map((type) => (
+							<div key={type} className="flex items-center gap-2 text-[15px] font-bold text-[#1D1D1F]">
+								<CoinIcon type={type} size={24} />
+								<span className="capitalize text-[#667085]">{type}</span>
+								<span className="text-[#0F0F12]">
+									{selectedProduct.unlimitedBronze && type === "bronze" ?
+										"Unlimited*"
+									:	`+${selectedProduct.credits[type]}`}
 								</span>
-							)}
-						</div>
+							</div>
+						))}
+					</div>
+					<div className="mt-6 flex justify-center">
+						<button
+							type="button"
+							disabled={busyProductId === selectedProduct.id || !selectedProduct.stripeConfigured}
+							onClick={() => action(selectedProduct.id)}
+							className="inline-flex min-w-[170px] items-center justify-center gap-1.5 rounded-[8px] bg-[#0F0F12] px-5 py-2.5 text-[13px] font-semibold text-white transition-all hover:bg-[#15803D] disabled:cursor-not-allowed disabled:bg-[#86868B]"
+						>
+							{busyProductId === selectedProduct.id && <Loader2 size={13} className="animate-spin" />}
+							{!selectedProduct.stripeConfigured ?
+								"Stripe price missing"
+							: isSubscription ?
+								"Subscribe"
+							:	"Buy pack"}
+							{selectedProduct.stripeConfigured && <ExternalLink size={12} />}
+						</button>
 					</div>
 				</div>
-				<div className="ml-auto shrink-0 text-right">
-					<div className="text-[23px] font-bold leading-none text-[#0F0F12] sm:text-[28px]">
-						{product.priceLabel.replace(" + VAT", "")}
-					</div>
-					<div className="mt-1 text-[11px] font-semibold text-[#86868B]">
-						+ VAT {product.interval ?? ""}
-					</div>
-				</div>
-			</div>
-			<div className="mt-3 grid min-w-0 grid-cols-3 gap-1.5 sm:gap-2">
-				{(["bronze", "silver", "gold"] as const).map((type) => (
-					<div
-						key={type}
-						className="min-w-0 rounded-[8px] border border-[#E5E5E7] bg-white px-1 py-1.5 sm:px-2"
-					>
-						<div className="flex min-h-[22px] items-center justify-center gap-1">
-							{product.unlimitedBronze && type === "bronze" ?
-								<>
-									<CoinIcon type={type} size={14} />
-									<span className="truncate text-[10px] font-semibold text-[#1D1D1F] sm:text-[12px]">
-										Unlimited*
-									</span>
-								</>
-							:	<>
-									<span className="text-[13px] font-bold text-[#15803D] sm:text-[15px]">
-										+
-									</span>
-									<CoinIcon type={type} size={14} />
-									<span className="text-[11px] font-semibold text-[#1D1D1F] sm:text-[12px]">
-										{product.credits[type]}
-									</span>
-								</>}
-						</div>
-						<div className="mt-0.5 truncate text-center text-[8px] font-semibold uppercase text-[#86868B] sm:text-[9px]">
-							{type}
-						</div>
-					</div>
-				))}
-			</div>
-			<button
-				type="button"
-				disabled={busy || !product.stripeConfigured}
-				onClick={() => action(product.id)}
-				className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-[8px] bg-[#0F0F12] px-4 py-2.5 text-[13px] font-semibold text-white transition-all hover:bg-[#15803D] disabled:cursor-not-allowed disabled:bg-[#86868B]"
-			>
-				{busy && <Loader2 size={15} className="animate-spin" />}
-				{!product.stripeConfigured ?
-					"Stripe price missing"
-				: isSubscription ?
-					"Subscribe"
-				:	"Buy pack"}
-				{product.stripeConfigured && <ExternalLink size={14} />}
-			</button>
-		</div>
+			)}
+		</section>
 	);
 }
 
@@ -266,7 +260,7 @@ export function SubscriptionView() {
 
 	return (
 		<div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-			<header className="hidden h-[80px] shrink-0 items-center border-b border-[#E5E5E7] bg-white/80 px-8 backdrop-blur-md md:flex">
+			<header className="app-dashboard-header hidden h-[80px] shrink-0 items-center border-b border-[#E5E5E7] bg-white/80 px-8 backdrop-blur-md md:flex">
 				<div>
 					<h1 className="text-[28px] font-bold tracking-tight text-[#1D1D1F]">
 						Subscription & Credits
@@ -298,7 +292,7 @@ export function SubscriptionView() {
 						</div>
 
 						<div className="grid gap-5 lg:grid-cols-[1.35fr_1fr]">
-							<section className="flex min-h-[255px] gap-7 rounded-[12px] border border-[#E9DCCB] bg-white p-6">
+        <section className="app-plan-status-panel flex min-h-[255px] gap-7 rounded-[12px] border border-[#E9DCCB] bg-white p-6">
 								<PlanIllustration />
 								<div className="flex min-w-0 flex-1 flex-col justify-center">
 									<div className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-[#667085]">
@@ -368,57 +362,19 @@ export function SubscriptionView() {
 								*Bronze unlimited includes fair use.
 							</p>
 						</div>
-						<div className="mt-4 grid gap-4 lg:grid-cols-2">
-							<div className="rounded-[12px] border border-[#E5E5E7] bg-white p-3">
-								<div className="mb-3 flex items-center gap-3">
-									<div className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-[#ECFDF3] text-[#15803D]">
-										<CalendarDays size={18} />
-									</div>
-									<div>
-										<h3 className="text-[13px] font-bold text-[#15803D]">
-											Monthly Plans
-										</h3>
-										<p className="text-[12px] text-[#5E6A77]">
-											Renew every month.
-										</p>
-									</div>
-								</div>
-								<div className="grid gap-3">
-									{subscriptions.map((product) => (
-										<ProductCard
-											key={product.id}
-											product={product}
-											action={beginCheckout}
-											busy={busyProductId === product.id}
-										/>
-									))}
-								</div>
-							</div>
-							<div className="rounded-[12px] border border-[#E5E5E7] bg-white p-3">
-								<div className="mb-3 flex items-center gap-3">
-									<div className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-[#DCFCE7] text-[#15803D]">
-										<ShoppingBag size={18} />
-									</div>
-									<div>
-										<h3 className="text-[13px] font-bold text-[#15803D]">
-											One-Time Credit Packs
-										</h3>
-										<p className="text-[12px] text-[#647067]">
-											Pay once. Credits never expire.
-										</p>
-									</div>
-								</div>
-								<div className="grid gap-3">
-									{packs.map((product) => (
-										<ProductCard
-											key={product.id}
-											product={product}
-											action={beginCheckout}
-											busy={busyProductId === product.id}
-										/>
-									))}
-								</div>
-							</div>
+						<div className="mt-5 grid gap-5 lg:grid-cols-2">
+							<PurchasePanel
+								products={subscriptions}
+								kind="subscription"
+								action={beginCheckout}
+								busyProductId={busyProductId}
+							/>
+							<PurchasePanel
+								products={packs}
+								kind="credit_pack"
+								action={beginCheckout}
+								busyProductId={busyProductId}
+							/>
 						</div>
 					</div>
 

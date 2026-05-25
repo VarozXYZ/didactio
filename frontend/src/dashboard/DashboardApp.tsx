@@ -398,7 +398,7 @@ export default function DashboardApp() {
 						setSearchQuery={setSearchQuery}
 					/>
 			:	<div className="min-h-screen bg-[#F7F7F8] pb-[calc(env(safe-area-inset-bottom)+92px)] text-[#1D1D1F] md:hidden">
-					<header className="sticky top-0 z-20 border-b border-[#E5E5E7] bg-white/95 px-4 pb-4 pt-[calc(env(safe-area-inset-top)+14px)] backdrop-blur-xl">
+					<header className="app-dashboard-header sticky top-0 z-20 border-b border-[#E5E5E7] bg-white/95 px-4 pb-4 pt-[calc(env(safe-area-inset-top)+14px)] backdrop-blur-xl">
 						<div className="mx-auto flex w-full max-w-[min(100%,900px)] items-center justify-between gap-4">
 							<img
 								src="/assets/logos/logo-horizontal.png"
@@ -453,7 +453,7 @@ export default function DashboardApp() {
 	}
 
 	return (
-		<div className="flex h-screen overflow-hidden bg-[#F5F5F7] font-sans text-[#1D1D1F]">
+		<div className="app-dashboard-canvas flex h-screen overflow-hidden bg-[#F5F5F7] font-sans text-[#1D1D1F]">
 			<Sidebar
 				activeSection={activeSection}
 				allFolders={allFolders}

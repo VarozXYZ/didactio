@@ -6,6 +6,8 @@ export const CODE_THEME_MAP: Record<StylePresetId, string> = {
 	plain: "github-light",
 };
 
+export const DARK_CODE_THEME = "github-dark";
+
 export const CODE_LANGUAGE_ALIASES: Record<string, string> = {
 	bash: "bash",
 	c: "c",
@@ -52,6 +54,7 @@ export async function getCodeHighlighter() {
 			import("@shikijs/themes/everforest-light"),
 			import("@shikijs/themes/github-light"),
 			import("@shikijs/themes/slack-ochin"),
+			import("@shikijs/themes/github-dark"),
 		]).then(
 			([
 				{createHighlighterCore},
@@ -72,6 +75,7 @@ export async function getCodeHighlighter() {
 				everforestLight,
 				githubLight,
 				slackOchin,
+				githubDark,
 			]) =>
 				createHighlighterCore({
 					engine: createJavaScriptRegexEngine(),
@@ -94,6 +98,7 @@ export async function getCodeHighlighter() {
 						everforestLight.default,
 						githubLight.default,
 						slackOchin.default,
+						githubDark.default,
 					],
 				}),
 		);

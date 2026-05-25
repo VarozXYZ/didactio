@@ -115,6 +115,54 @@ function tableBorder(stylePreset?: string): string {
 	}
 }
 
+function darkDisplayTheme(theme: PresentationTheme): PresentationTheme {
+	switch (theme.stylePreset) {
+		case "modern":
+			return {
+				...theme,
+				bodyColor: "#D7E4E1",
+				headingColor: "#E6EAF0",
+				accentColor: "#4ADE80",
+				blockquoteAccent: "#2B725D",
+				codeBackground: "#111B1A",
+				pageBackground: "#17201F",
+				numberColor: "#29594B",
+				codeAccentColor: "#62D795",
+				codeBorderColor: "#29453C",
+				codeHeaderBackground: "#1B2B27",
+			};
+		case "plain":
+			return {
+				...theme,
+				bodyColor: "#D4DAE4",
+				headingColor: "#F1F4F8",
+				accentColor: "#73A7FF",
+				blockquoteAccent: "#445064",
+				codeBackground: "#111820",
+				pageBackground: "#171B22",
+				numberColor: "#465064",
+				codeAccentColor: "#8BB5FF",
+				codeBorderColor: "#313C4D",
+				codeHeaderBackground: "#202733",
+			};
+		case "classic":
+		default:
+			return {
+				...theme,
+				bodyColor: "#E0D7CF",
+				headingColor: "#F4E8DC",
+				accentColor: "#D8AF82",
+				blockquoteAccent: "#755C45",
+				codeBackground: "#211C18",
+				pageBackground: "#1C1917",
+				numberColor: "#765D46",
+				codeAccentColor: "#DFB586",
+				codeBorderColor: "#49392D",
+				codeHeaderBackground: "#29221D",
+			};
+	}
+}
+
 export function resolvePresentationTheme(
 	unitTheme?: PresentationTheme | null,
 	userTheme?: PresentationTheme | null,
@@ -122,27 +170,31 @@ export function resolvePresentationTheme(
 	return unitTheme ?? userTheme ?? SYSTEM_DEFAULT_THEME;
 }
 
-export function themeVars(theme: PresentationTheme): CSSProperties {
+export function themeVars(theme: PresentationTheme, darkDisplay = false): CSSProperties {
+	const displayTheme = darkDisplay ? darkDisplayTheme(theme) : theme;
 	return {
-		"--unit-body-font": fontFamily(theme.bodyFont),
-		"--unit-heading-font": fontFamily(theme.headingFont),
-		"--unit-body-size": bodySize(theme.bodyFontSize, theme.stylePreset),
-		"--unit-line-height": String(theme.lineHeight),
-		"--unit-body-color": theme.bodyColor,
-		"--unit-heading-color": theme.headingColor,
-		"--unit-accent-color": theme.accentColor,
-		"--unit-blockquote-accent": theme.blockquoteAccent,
-		"--unit-code-bg": theme.codeBackground,
-		"--unit-page-bg": theme.pageBackground,
-		"--unit-paragraph-align": theme.paragraphAlign,
-		"--unit-heading-scale": headingScale(theme.headingScale),
-		"--unit-paragraph-margin": paragraphMargin(theme.paragraphSpacing),
-		"--unit-number-color": theme.numberColor ?? "#D4B896",
-		"--unit-code-accent": theme.codeAccentColor ?? "#7A4E28",
-		"--unit-code-border": theme.codeBorderColor ?? "#E4D0BC",
-		"--unit-code-header-bg": theme.codeHeaderBackground ?? "#EEE1D0",
-		"--unit-table-bg": tableSurface(theme.stylePreset),
-		"--unit-table-header-bg": tableHeaderSurface(theme.stylePreset),
-		"--unit-table-border": tableBorder(theme.stylePreset),
+		"--unit-body-font": fontFamily(displayTheme.bodyFont),
+		"--unit-heading-font": fontFamily(displayTheme.headingFont),
+		"--unit-body-size": bodySize(displayTheme.bodyFontSize, displayTheme.stylePreset),
+		"--unit-line-height": String(displayTheme.lineHeight),
+		"--unit-body-color": displayTheme.bodyColor,
+		"--unit-heading-color": displayTheme.headingColor,
+		"--unit-accent-color": displayTheme.accentColor,
+		"--unit-blockquote-accent": displayTheme.blockquoteAccent,
+		"--unit-code-bg": displayTheme.codeBackground,
+		"--unit-page-bg": displayTheme.pageBackground,
+		"--unit-paragraph-align": displayTheme.paragraphAlign,
+		"--unit-heading-scale": headingScale(displayTheme.headingScale),
+		"--unit-paragraph-margin": paragraphMargin(displayTheme.paragraphSpacing),
+		"--unit-number-color": displayTheme.numberColor ?? "#D4B896",
+		"--unit-code-accent": displayTheme.codeAccentColor ?? "#7A4E28",
+		"--unit-code-border": displayTheme.codeBorderColor ?? "#E4D0BC",
+		"--unit-code-header-bg": displayTheme.codeHeaderBackground ?? "#EEE1D0",
+		"--unit-table-bg":
+			darkDisplay ? "#20262D" : tableSurface(displayTheme.stylePreset),
+		"--unit-table-header-bg":
+			darkDisplay ? "#29313C" : tableHeaderSurface(displayTheme.stylePreset),
+		"--unit-table-border":
+			darkDisplay ? "#36404D" : tableBorder(displayTheme.stylePreset),
 	} as CSSProperties;
 }

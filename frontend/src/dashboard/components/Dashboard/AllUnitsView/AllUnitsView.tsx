@@ -50,7 +50,7 @@ export function AllUnitsView({
 				filteredUnitsCount={filteredUnits.length}
 				onCreateUnit={onCreateUnit}
 			/>
-			<div className="min-h-0 flex-1 overflow-y-auto bg-[#F5F5F7] p-8">
+			<div className="app-dashboard-canvas min-h-0 flex-1 overflow-y-auto bg-[#F5F5F7] p-8">
 				<div className="mx-auto w-full max-w-[1560px]">
 					<div className="mb-6 flex items-center justify-between gap-4">
 						<div className="relative">
@@ -65,11 +65,11 @@ export function AllUnitsView({
 								onChange={(event) =>
 									setSearchQuery(event.target.value)
 								}
-								className="w-[280px] rounded-2xl border border-[#D9D9D9] bg-white py-3 pl-11 pr-4 text-[14px] text-[#1D1D1F] shadow-[0_1px_0_rgba(255,255,255,0.8)_inset] transition-all focus:border-[#4ADE80] focus:outline-none md:w-[320px]"
+								className="app-library-search w-[280px] rounded-2xl border border-[#D9D9D9] bg-white py-3 pl-11 pr-4 text-[14px] text-[#1D1D1F] shadow-[0_1px_0_rgba(255,255,255,0.8)_inset] transition-all focus:border-[#4ADE80] focus:outline-none md:w-[320px]"
 							/>
 						</div>
 
-						<div className="flex items-center gap-1 rounded-[10px] border border-[#D9D9D9] bg-white p-1 shadow-[0_1px_0_rgba(255,255,255,0.8)_inset]">
+						<div className="app-library-view-toggle flex items-center gap-1 rounded-[10px] border border-[#D9D9D9] bg-white p-1 shadow-[0_1px_0_rgba(255,255,255,0.8)_inset]">
 							<button
 								type="button"
 								onClick={() => setViewMode("grid")}

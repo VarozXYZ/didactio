@@ -105,7 +105,7 @@ export function FolderFormModal({
 
     return (
         <Dialog open={open} onOpenChange={(o: boolean) => { if (!o) onClose() }}>
-            <DialogContent className="w-[calc(100vw-32px)] max-w-[380px]">
+            <DialogContent className="w-[calc(100vw-32px)] max-w-[380px] sm:max-w-[440px]">
                 <form onSubmit={handleSubmit}>
                     <DialogHeader>
                         <DialogTitle>{isCreate ? 'New Folder' : 'Edit Folder'}</DialogTitle>
@@ -145,10 +145,10 @@ export function FolderFormModal({
                                         key={emoji}
                                         type="button"
                                         onClick={() => setSelectedIcon(emoji)}
-                                        className={`flex items-center justify-center rounded-[8px] p-2 text-xl transition-all ${
+                                        className={`app-folder-icon-option flex items-center justify-center rounded-[8px] p-2 text-xl transition-all ${
                                             selectedIcon === emoji
-                                                ? 'bg-[#E8E8ED] outline outline-2 outline-[#1D1D1F]'
-                                                : 'bg-[#F5F5F7] hover:bg-[#E5E5E7]'
+                                                ? 'app-folder-icon-option-selected bg-[#E8E8ED] outline outline-2 outline-[#1D1D1F]'
+                                                : 'app-folder-icon-option-unselected bg-[#F5F5F7] hover:bg-[#E5E5E7]'
                                         }`}
                                     >
                                         {emoji}
@@ -158,7 +158,7 @@ export function FolderFormModal({
                                     <button
                                         type="button"
                                         onClick={() => setShowMore(true)}
-                                        className="flex items-center justify-center rounded-[8px] bg-[#F5F5F7] p-2 text-[#86868B] transition-all hover:bg-[#E5E5E7] hover:text-[#1D1D1F]"
+                                        className="app-folder-icon-option app-folder-icon-option-unselected flex items-center justify-center rounded-[8px] bg-[#F5F5F7] p-2 text-[#86868B] transition-all hover:bg-[#E5E5E7] hover:text-[#1D1D1F]"
                                     >
                                         <ChevronDown size={16} />
                                     </button>
@@ -171,7 +171,7 @@ export function FolderFormModal({
                                 Color
                             </label>
                             <div className="relative" ref={pickerRef}>
-                                <div className="flex flex-wrap items-center gap-2">
+                                <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
                                     {SWATCHES.map((hex) => {
                                         const isSelected = selectedColor.toLowerCase() === hex.toLowerCase()
                                         return (
@@ -190,7 +190,7 @@ export function FolderFormModal({
                                         )
                                     })}
 
-                                    <div className="flex min-w-0 items-center gap-1.5 sm:ml-auto">
+                                    <div className="flex min-w-0 items-center gap-1.5">
                                         <button
                                             type="button"
                                             onClick={() => setShowPicker((v) => !v)}

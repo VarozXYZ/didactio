@@ -25,6 +25,7 @@ export function CreateUnitButton({onClick, label = "New unit"}: {onClick: () => 
 
 			<button
 				type="button"
+				className="app-create-unit-button"
 				onClick={onClick}
 				onMouseEnter={() => {
 					setHovered(true);
@@ -91,13 +92,13 @@ export function CreateUnitButton({onClick, label = "New unit"}: {onClick: () => 
 				)}
 
 				<div
+					className="app-create-unit-button-content flex select-none items-center gap-2.5 px-5 py-[11px] text-[14px] font-semibold text-white"
 					style={{
 						position: "relative",
 						zIndex: 2,
 						background: "#0f0f12",
 						borderRadius: "12px",
 					}}
-					className="flex select-none items-center gap-2.5 px-5 py-[11px] text-[14px] font-semibold text-white"
 				>
 					<Plus size={17} strokeWidth={2.5} />
 					{label}
@@ -115,7 +116,7 @@ export function AllUnitsHeader({
 	onCreateUnit: () => void;
 }) {
 	return (
-		<header className="z-10 flex h-[80px] shrink-0 items-center justify-between border-b border-[#E5E5E7] bg-white/80 px-8 backdrop-blur-md">
+		<header className="app-dashboard-header z-10 flex h-[80px] shrink-0 items-center justify-between border-b border-[#E5E5E7] bg-white/80 px-8 backdrop-blur-md">
 			<div className="mx-auto flex w-full max-w-[1560px] items-center justify-between gap-6">
 				<div>
 					<h1 className="text-[28px] font-bold tracking-tight text-[#1D1D1F]">

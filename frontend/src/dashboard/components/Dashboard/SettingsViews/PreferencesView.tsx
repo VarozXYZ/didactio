@@ -1,8 +1,19 @@
 import {useEffect, useRef, useState} from "react";
-import {BriefcaseBusiness, Check, Loader2, Scale, Smile, Star} from "lucide-react";
+import {
+	BriefcaseBusiness,
+	Check,
+	Loader2,
+	Monitor,
+	Moon,
+	Scale,
+	Smile,
+	Star,
+	Sun,
+} from "lucide-react";
 import type {LucideIcon} from "lucide-react";
 import {toastError} from "@/hooks/use-toast";
 import {LanguageSelector} from "../../../../onboarding/LanguageSelector";
+import {useAppearance, type AppearanceMode} from "../../../../theme/AppearanceProvider";
 import {
 	type BackendAiConfig,
 	type BackendAiModelConfig,
@@ -17,7 +28,7 @@ type ModelTier = "silver" | "gold";
 const PROVIDER_LOGOS: Record<string, string> = {
 	anthropic: "/assets/brands/claude-reduced.svg",
 	deepseek: "/assets/brands/deepseek-reduced.svg",
-	google: "/assets/brands/gemini.png",
+	google: "/assets/brands/gemini-color.svg",
 	openai: "/assets/brands/chatgpt.png",
 };
 
@@ -44,6 +55,32 @@ const TONE_OPTIONS: Array<{
 		label: "Professional",
 		description: "Formal and polished.",
 		Icon: BriefcaseBusiness,
+	},
+];
+
+const APPEARANCE_OPTIONS: Array<{
+	value: AppearanceMode;
+	label: string;
+	description: string;
+	Icon: LucideIcon;
+}> = [
+	{
+		value: "light",
+		label: "Light",
+		description: "Always use light mode.",
+		Icon: Sun,
+	},
+	{
+		value: "dark",
+		label: "Dark",
+		description: "Always use dark mode.",
+		Icon: Moon,
+	},
+	{
+		value: "system",
+		label: "System",
+		description: "Match your device setting.",
+		Icon: Monitor,
 	},
 ];
 
@@ -130,7 +167,7 @@ function ChoiceCard<TValue extends string>({
 			}`}
 		>
 			<span
-				className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] ${
+				className={`app-preference-icon ${selected ? "app-preference-icon-selected" : ""} flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] ${
 					selected ? "bg-white/15 text-white" : "bg-black/[0.04] text-[#1D1D1F]"
 				}`}
 			>
@@ -184,7 +221,7 @@ function ModelCard({
 			) : null}
 
 			<span
-				className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] ${
+				className={`app-preference-icon ${selected ? "app-preference-icon-selected" : ""} flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] ${
 					selected ? "bg-white/15" : "bg-black/[0.04]"
 				}`}
 			>
@@ -192,9 +229,7 @@ function ModelCard({
 					<img
 						src={logo}
 						alt=""
-						className={`h-5 w-5 object-contain ${
-							selected ? "brightness-0 invert" : ""
-						}`}
+						className="h-5 w-5 object-contain"
 					/>
 				) : null}
 			</span>
@@ -263,6 +298,7 @@ function ModelColumn({
 }
 
 export function PreferencesView() {
+	const {mode: appearanceMode, setMode: setAppearanceMode} = useAppearance();
 	const [config, setConfig] = useState<BackendAiConfig | null>(null);
 	const [catalog, setCatalog] = useState<BackendModelCatalog | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
@@ -345,7 +381,7 @@ export function PreferencesView() {
 
 	return (
 		<div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-			<header className="hidden h-[80px] shrink-0 items-center justify-between gap-4 border-b border-[#E5E5E7] bg-white/80 px-8 backdrop-blur-md md:flex">
+			<header className="app-dashboard-header hidden h-[80px] shrink-0 items-center justify-between gap-4 border-b border-[#E5E5E7] bg-white/80 px-8 backdrop-blur-md md:flex">
 				<div>
 					<h1 className="text-[28px] font-bold tracking-tight text-[#1D1D1F]">
 						Preferences
@@ -385,6 +421,25 @@ export function PreferencesView() {
 
 					{config && catalog ? (
 						<div className="grid gap-5">
+							<SettingSection
+								title="Appearance"
+								description="Choose how Didactio looks on application screens. Marketing pages remain light."
+							>
+								<div className="grid gap-2 md:grid-cols-3">
+									{APPEARANCE_OPTIONS.map((option) => (
+										<ChoiceCard
+											key={option.value}
+											value={option.value}
+											Icon={option.Icon}
+											label={option.label}
+											description={option.description}
+											selected={appearanceMode === option.value}
+											onSelect={setAppearanceMode}
+										/>
+									))}
+								</div>
+							</SettingSection>
+
 							<SettingSection
 								title="Content language"
 								description="All generated lessons and learning materials will use this language by default."

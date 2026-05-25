@@ -61,7 +61,7 @@ export function MobileUnitCard({
 
 	return (
 		<>
-			<article className="relative overflow-hidden rounded-[18px] border border-[#E1E1E4] bg-white shadow-[0_10px_30px_rgba(0,0,0,0.04)]">
+			<article className="app-dashboard-card relative overflow-hidden rounded-[18px] border border-[#E1E1E4] bg-white shadow-[0_10px_30px_rgba(0,0,0,0.04)]">
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>
 						<button

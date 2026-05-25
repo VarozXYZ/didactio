@@ -15,7 +15,7 @@ export function ProfileView() {
 
 	return (
 		<div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-			<header className="hidden h-[80px] shrink-0 items-center border-b border-[#E5E5E7] bg-white/80 px-8 backdrop-blur-md md:flex">
+			<header className="app-dashboard-header hidden h-[80px] shrink-0 items-center border-b border-[#E5E5E7] bg-white/80 px-8 backdrop-blur-md md:flex">
 				<div>
 					<h1 className="text-[28px] font-bold tracking-tight text-[#1D1D1F]">
 						Profile & Security

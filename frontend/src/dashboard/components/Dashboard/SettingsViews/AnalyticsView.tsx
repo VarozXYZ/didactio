@@ -1,5 +1,5 @@
 import {type ReactNode, useEffect, useState} from "react";
-import {AlertCircle, Loader2, PieChart, Sparkles} from "lucide-react";
+import {AlertCircle, Bot, Loader2, PieChart} from "lucide-react";
 import {
 	Area,
 	AreaChart,
@@ -15,8 +15,7 @@ import {
 	dashboardApi,
 } from "../../../api/dashboardApi";
 import {getFolderEmoji, getFolderVisuals} from "../../../utils/folderDisplay";
-
-const ACCENT = "#15803D";
+import {useAppearance} from "../../../../theme/AppearanceProvider";
 
 const PERIOD_OPTIONS: Array<{
 	label: string;
@@ -31,7 +30,7 @@ const PERIOD_OPTIONS: Array<{
 const PROVIDER_LOGOS: Record<string, string> = {
 	anthropic: "/assets/brands/claude-reduced.svg",
 	deepseek: "/assets/brands/deepseek-reduced.svg",
-	google: "/assets/brands/gemini.png",
+	google: "/assets/brands/gemini-color.svg",
 	openai: "/assets/brands/chatgpt.png",
 };
 
@@ -53,30 +52,10 @@ function ProviderIcon({
 	const logo = provider ? PROVIDER_LOGOS[provider] : undefined;
 
 	if (!logo) {
-		return <Sparkles size={20} />;
+		return <Bot size={20} />;
 	}
 
 	return <img src={logo} alt={label} className="h-6 w-6 object-contain" />;
-}
-
-function TinyTrend({color = ACCENT}: {color?: string}) {
-	return (
-		<svg
-			viewBox="0 0 180 28"
-			className="h-8 w-full"
-			aria-hidden="true"
-			focusable="false"
-		>
-			<path
-				d="M1 22 C22 22 27 20 42 20 C55 20 61 17 75 18 C91 19 93 14 108 15 C121 16 126 11 141 13 C154 15 159 11 179 11"
-				fill="none"
-				stroke={color}
-				strokeLinecap="round"
-				strokeWidth="2"
-			/>
-			<circle cx="179" cy="11" r="3" fill={color} />
-		</svg>
-	);
 }
 
 function ProgressBar({value}: {value: number}) {
@@ -112,7 +91,7 @@ function MetricCard({
 			<div>
 				<div className="mb-4 flex items-start justify-between gap-3">
 					<div
-						className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] border border-black/[0.05] text-[#15803D]"
+						className="app-analytics-icon flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] border border-black/[0.05] text-[#15803D]"
 						style={{backgroundColor: iconBg}}
 					>
 						{icon}
@@ -128,7 +107,7 @@ function MetricCard({
 					{description}
 				</p>
 			</div>
-			{children ?? <TinyTrend />}
+			{children}
 		</div>
 	);
 }
@@ -151,7 +130,7 @@ function HighlightCard({
 	return (
 		<div className="flex min-w-0 items-center gap-3 rounded-[12px] border border-[#E5E5E7] bg-white px-3 py-3 sm:gap-4 sm:px-4">
 			<div
-				className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[12px] text-[#15803D]"
+				className="app-analytics-icon flex h-12 w-12 shrink-0 items-center justify-center rounded-[12px] text-[#15803D]"
 				style={{backgroundColor: iconBg}}
 			>
 				{icon}
@@ -200,9 +179,11 @@ function FavoriteTopicHighlight({analytics}: {analytics: BackendUsageAnalytics})
 function ActivityChart({
 	analytics,
 	onPeriodChange,
+	dark,
 }: {
 	analytics: BackendUsageAnalytics;
 	onPeriodChange: (period: BackendUsageAnalyticsPeriod) => void;
+	dark: boolean;
 }) {
 	return (
 		<div className="min-w-0 rounded-[14px] border border-[#E5E5E7] bg-white p-4 shadow-[0_12px_30px_rgba(17,24,39,0.05)] sm:p-6">
@@ -248,18 +229,18 @@ function ActivityChart({
 					</defs>
 					<CartesianGrid
 						strokeDasharray="3 6"
-						stroke="#E4E7EC"
+						stroke={dark ? "#303030" : "#E4E7EC"}
 						vertical={false}
 					/>
 					<XAxis
 						dataKey="label"
-						tick={{fontSize: 11, fill: "#667085", fontWeight: 600}}
+						tick={{fontSize: 11, fill: dark ? "#FFFFFF" : "#667085", fontWeight: 600}}
 						tickLine={false}
 						axisLine={false}
 						interval="preserveStartEnd"
 					/>
 					<YAxis
-						tick={{fontSize: 11, fill: "#667085", fontWeight: 600}}
+						tick={{fontSize: 11, fill: dark ? "#FFFFFF" : "#667085", fontWeight: 600}}
 						tickLine={false}
 						axisLine={false}
 						allowDecimals={false}
@@ -269,13 +250,14 @@ function ActivityChart({
 						contentStyle={{
 							fontSize: 13,
 							borderRadius: 10,
-							border: "1px solid #E5E5E7",
+							border: `1px solid ${dark ? "#303030" : "#E5E5E7"}`,
+							backgroundColor: dark ? "#202020" : "#FFFFFF",
 							boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
-							color: "#1D1D1F",
+							color: dark ? "#FFFFFF" : "#1D1D1F",
 						}}
 						labelStyle={{fontWeight: 600, marginBottom: 2}}
 						formatter={(value) => [Number(value ?? 0), "Generations"]}
-						cursor={{stroke: "#E5E5E7", strokeWidth: 1}}
+						cursor={{stroke: dark ? "#303030" : "#E5E5E7", strokeWidth: 1}}
 					/>
 					<Area
 						type="monotone"
@@ -293,6 +275,7 @@ function ActivityChart({
 }
 
 export function AnalyticsView() {
+	const {resolvedMode} = useAppearance();
 	const [period, setPeriod] = useState<BackendUsageAnalyticsPeriod>("30d");
 	const [analytics, setAnalytics] = useState<BackendUsageAnalytics | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
@@ -330,7 +313,7 @@ export function AnalyticsView() {
 
 	return (
 		<div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-			<header className="hidden min-h-[80px] shrink-0 items-center border-b border-[#E5E5E7] bg-white/80 px-4 py-4 backdrop-blur-md sm:px-8 sm:py-0 md:flex">
+			<header className="app-dashboard-header hidden min-h-[80px] shrink-0 items-center border-b border-[#E5E5E7] bg-white/80 px-4 py-4 backdrop-blur-md sm:px-8 sm:py-0 md:flex">
 				<div>
 					<h1 className="text-[27px] font-bold tracking-tight text-[#1D1D1F] sm:text-[28px]">
 						Usage & Analytics
@@ -378,7 +361,7 @@ export function AnalyticsView() {
 										<MetricCard
 											icon={
 												<AssetIcon
-													src="/assets/icons/project.png"
+													src="/assets/icons/book-open-green.svg"
 													alt="Units created"
 												/>
 											}
@@ -387,7 +370,7 @@ export function AnalyticsView() {
 											description="Total units across all your folders"
 										/>
 										<MetricCard
-											icon={<Sparkles size={19} />}
+											icon={<Bot size={19} />}
 											iconBg="#DCFCE7"
 											label="AI Generations"
 											value={formatNumber(analytics.aiGenerations)}
@@ -445,6 +428,7 @@ export function AnalyticsView() {
 								<ActivityChart
 									analytics={{...analytics, period}}
 									onPeriodChange={setPeriod}
+									dark={resolvedMode === "dark"}
 								/>
 							</div>
 						</div>
