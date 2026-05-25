@@ -784,11 +784,7 @@ export function CreateUnitWizard({
 					</div>
 
 					<div
-						className={`hidden shrink-0 items-center justify-end px-6 pt-5 md:flex ${
-							currentStep === 2 ?
-								"absolute right-0 top-0 z-10 px-4 pt-4"
-							:	"absolute right-0 top-0 z-10 px-4 pt-4"
-						}`}
+						className="absolute right-0 top-0 z-10 hidden shrink-0 items-center justify-end px-4 pt-2 md:flex"
 					>
 						<button
 							type="button"

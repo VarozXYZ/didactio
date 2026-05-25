@@ -14,7 +14,7 @@ function Hero() {
 			<div className="relative z-10 flex flex-col items-center pt-12 sh">
 				<div className="bg-white rounded-full px-6 py-3 shadow-card mb-12">
 					<span className="font-inter font-semibold text-base text-dark">
-						New model released{" "}
+						New model available	{" "}
 					</span>
 					<span className="font-inter text-base text-accent font-semibold">
 						GPT 5.5
