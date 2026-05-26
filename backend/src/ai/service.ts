@@ -72,6 +72,17 @@ interface BaseStageResult {
 	telemetry: AiCallTelemetry;
 }
 
+class SyllabusModuleCountError extends Error {
+	constructor(
+		readonly actual: number,
+		readonly expected: number,
+	) {
+		super(
+			`Syllabus generation returned ${actual} modules; expected exactly ${expected}.`,
+		);
+	}
+}
+
 function extractBalancedJsonObjects(text: string): string[] {
 	const candidates: string[] = [];
 
@@ -617,8 +628,9 @@ function validateReferenceSyllabusLength(
 	const expectedModuleCount = resolveTargetChapterCount(length);
 
 	if (syllabus.modules.length < expectedModuleCount) {
-		throw new Error(
-			`Syllabus generation returned ${syllabus.modules.length} modules; expected exactly ${expectedModuleCount}.`,
+		throw new SyllabusModuleCountError(
+			syllabus.modules.length,
+			expectedModuleCount,
 		);
 	}
 
@@ -630,6 +642,22 @@ function validateReferenceSyllabusLength(
 		...syllabus,
 		modules: syllabus.modules.slice(0, expectedModuleCount),
 	};
+}
+
+function buildSyllabusModuleCountRetryPrompt(input: {
+	originalPrompt: string;
+	actualModuleCount: number;
+	expectedModuleCount: number;
+}): string {
+	return [
+		input.originalPrompt,
+		"",
+		"[Correction Required]",
+		`The previous response returned ${input.actualModuleCount} modules, but the schema contract requires exactly ${input.expectedModuleCount}.`,
+		`Regenerate the full syllabus with a modules array containing exactly ${input.expectedModuleCount} modules.`,
+		"Do not summarize modules together. Do not return fewer modules because the unit is short or introductory.",
+		"Return the complete structured syllabus object again.",
+	].join("\n");
 }
 
 function ensureReferenceSyllabusTopic(
@@ -1098,21 +1126,73 @@ export class GatewayAiService implements AiService {
 			const telemetry = await this.enrichAiCallTelemetry(
 				await collectAiCallTelemetry(result, Date.now() - startedAt),
 			);
+			let finalSyllabus: DidacticUnitReferenceSyllabus;
+			let finalTelemetry = telemetry;
+			let retryCount = 0;
+
+			try {
+				finalSyllabus = validateReferenceSyllabusLength(
+					ensureReferenceSyllabusTopic(object, input.topic),
+					input.length,
+				);
+			} catch (error) {
+				if (!(error instanceof SyllabusModuleCountError)) {
+					throw error;
+				}
+
+				retryCount = 1;
+				this.logger.warn("Syllabus module count mismatch; retrying", {
+					tier: input.tier,
+					topic: input.topic,
+					length: input.length,
+					depth: input.depth,
+					actualModuleCount: error.actual,
+					expectedModuleCount: error.expected,
+				});
+
+				const retryStartedAt = Date.now();
+				const retryPrompt = buildSyllabusModuleCountRetryPrompt({
+					originalPrompt: prompt,
+					actualModuleCount: error.actual,
+					expectedModuleCount: error.expected,
+				});
+				const retryResult = await generateObject({
+					model: this.gateway(selection.modelId),
+					system: buildGatewaySystemPrompt("syllabus"),
+					prompt: retryPrompt,
+					schema: syllabusSchema,
+					maxOutputTokens: resolveStageMaxOutputTokens(
+						"syllabus",
+						input.length,
+					),
+					abortSignal: input.abortSignal,
+				});
+
+				finalTelemetry = await this.enrichAiCallTelemetry(
+					await collectAiCallTelemetry(
+						retryResult,
+						Date.now() - retryStartedAt,
+					),
+				);
+				finalSyllabus = validateReferenceSyllabusLength(
+					ensureReferenceSyllabusTopic(retryResult.object, input.topic),
+					input.length,
+				);
+			}
+
 			const finalResult: SyllabusResult = {
 				provider: selection.provider,
 				model: selection.model,
 				prompt,
-				telemetry,
-				syllabus: validateReferenceSyllabusLength(
-					ensureReferenceSyllabusTopic(object, input.topic),
-					input.length,
-				),
+				telemetry: finalTelemetry,
+				syllabus: finalSyllabus,
 			};
 
-			this.logAiCallCompleted("syllabus", selection, telemetry, {
+			this.logAiCallCompleted("syllabus", selection, finalTelemetry, {
 				tier: input.tier,
 				chapterCount: finalResult.syllabus.modules.length,
 				streaming: true,
+				retryCount,
 			});
 
 			await callbacks.onComplete?.(finalResult);

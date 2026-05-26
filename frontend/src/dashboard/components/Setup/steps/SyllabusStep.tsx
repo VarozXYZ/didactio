@@ -455,10 +455,6 @@ export function SyllabusStep({
 }: SyllabusStepProps) {
 	const isWaiting = !hasSyllabus && !syllabusToRender;
 	const [hasChosen, setHasChosen] = useState(false);
-	const unitCost = getUnitGenerationCost({
-		quality: selectedGenerationTier,
-		length: planning?.length ?? "short",
-	});
 	const choose = (decision: "accept" | "reject") => {
 		setReviewDecision(decision);
 		setHasChosen(true);
@@ -515,16 +511,16 @@ export function SyllabusStep({
 							<button
 								type="button"
 								onClick={() => choose("accept")}
-								className="rounded-[12px] px-5 py-2 text-[13px] font-semibold text-[#1D1D1F] transition-all hover:bg-black/[0.04]"
+								className="app-syllabus-review-choice rounded-[12px] px-5 py-2 text-[13px] font-semibold text-[#1D1D1F] transition-all hover:bg-black/[0.04]"
 								style={{border: "1px solid rgba(0,0,0,0.08)"}}
 							>
 								😊 Yes, looks great
 							</button>
-							<span className="text-[#D1D1D6]">·</span>
+							<span className="app-syllabus-review-separator text-[#D1D1D6]">·</span>
 							<button
 								type="button"
 								onClick={() => choose("reject")}
-								className="rounded-[12px] px-5 py-2 text-[13px] font-semibold text-[#1D1D1F] transition-all hover:bg-black/[0.04]"
+								className="app-syllabus-review-choice rounded-[12px] px-5 py-2 text-[13px] font-semibold text-[#1D1D1F] transition-all hover:bg-black/[0.04]"
 								style={{border: "1px solid rgba(0,0,0,0.08)"}}
 							>
 								😕 No, tweak it
@@ -532,7 +528,11 @@ export function SyllabusStep({
 						</div>
 					:	<div className="flex animate-in fade-in items-center gap-2.5 duration-200">
 							<span
-								className="rounded-[10px] px-4 py-1.5 text-[12.5px] font-semibold"
+								className={`rounded-[10px] px-4 py-1.5 text-[12.5px] font-semibold ${
+									reviewDecision === "reject" ?
+										"app-syllabus-review-decision-reject"
+									:	""
+								}`}
 								style={
 									reviewDecision === "accept" ?
 										{
@@ -554,7 +554,7 @@ export function SyllabusStep({
 							<button
 								type="button"
 								onClick={undoChoice}
-								className="flex h-6 w-6 items-center justify-center rounded-full text-[#AEAEB2] transition-colors hover:bg-black/[0.05] hover:text-[#6E6E73]"
+								className="app-syllabus-review-change flex h-6 w-6 items-center justify-center rounded-full text-[#AEAEB2] transition-colors hover:bg-black/[0.05] hover:text-[#6E6E73]"
 								title="Change answer"
 							>
 								<svg
@@ -571,50 +571,77 @@ export function SyllabusStep({
 					}
 
 					{hasChosen && reviewDecision === "accept" && (
-						<div className="flex animate-in fade-in slide-in-from-bottom-2 flex-col items-center gap-3 duration-200">
+						<div className="flex animate-in fade-in slide-in-from-bottom-2 flex-col items-center gap-5 duration-200">
 							<div
-								className="inline-flex max-w-full items-center rounded-[10px] bg-[#F5F5F7] p-0.5"
-								style={{border: "1px solid rgba(0,0,0,0.06)"}}
+								className="grid w-full max-w-full items-stretch rounded-[10px] bg-[#F5F5F7] p-0.5 sm:inline-flex sm:w-auto sm:items-center"
+								style={{
+									border: "1px solid rgba(0,0,0,0.06)",
+									gridTemplateColumns: `repeat(${qualityOptions.length}, minmax(0, 1fr))`,
+								}}
 							>
-								{qualityOptions.map((option) => (
-									<button
-										key={option.quality}
-										type="button"
-										onClick={() =>
-											setSelectedGenerationTier(
-												option.quality,
-											)
-										}
-										className={`inline-flex h-9 min-w-0 items-center justify-center gap-1.5 rounded-[8px] px-4 text-[12px] font-semibold transition-all ${
-											selectedGenerationTier ===
-											option.quality ?
-												"bg-white text-[#1D1D1F] shadow-[0_1px_3px_rgba(0,0,0,0.08)]"
-											:	"text-[#6E6E73] hover:text-[#1D1D1F]"
-										}`}
-									>
-										{option.icon ? (
-											<img
-												src={option.icon}
-												alt=""
-												className="h-4 w-4 rounded-full object-contain"
-											/>
-										) : null}
-										<span className="max-w-[160px] truncate">
-											{option.label}
-										</span>
-									</button>
-								))}
+								{qualityOptions.map((option) => {
+									const optionCost = getUnitGenerationCost({
+										quality: option.quality,
+										length: planning?.length ?? "short",
+									});
+
+									return (
+										<button
+											key={option.quality}
+											type="button"
+											onClick={() =>
+												setSelectedGenerationTier(
+													option.quality,
+												)
+											}
+											className={`inline-flex min-w-0 items-center justify-center rounded-[8px] px-2 py-2 text-[11px] font-semibold leading-tight transition-all sm:h-9 sm:px-4 sm:py-0 sm:text-[12px] ${
+												selectedGenerationTier ===
+												option.quality ?
+													"bg-white text-[#1D1D1F] shadow-[0_1px_3px_rgba(0,0,0,0.08)]"
+												:	"text-[#6E6E73] hover:text-[#1D1D1F]"
+											}`}
+										>
+											<span className="inline-flex w-[58px] items-center justify-center gap-5 sm:hidden">
+												<span className="inline-flex h-4 w-4 shrink-0 items-center justify-center">
+													{option.icon ? (
+														<img
+															src={option.icon}
+															alt=""
+															className="h-4 w-4 rounded-full object-contain"
+														/>
+													) : null}
+												</span>
+												<span className="shrink-0 pt-[3px] sm:pt-0">
+													<CoinAmount
+														type={optionCost.coinType}
+														amount={optionCost.amount}
+														size={16}
+													/>
+												</span>
+											</span>
+											<span className="hidden min-w-0 items-center justify-center gap-1.5 sm:inline-flex">
+												{option.icon ? (
+													<img
+														src={option.icon}
+														alt=""
+														className="h-4 w-4 shrink-0 rounded-full object-contain"
+													/>
+												) : null}
+												<span className="min-w-0 max-w-[160px] truncate">
+													{option.label}
+												</span>
+												<CoinAmount
+													type={optionCost.coinType}
+													amount={optionCost.amount}
+													size={16}
+												/>
+											</span>
+										</button>
+									);
+								})}
 							</div>
-							<div className="flex w-full max-w-[430px] items-center justify-between gap-5 text-[12px] font-bold text-[#1D1D1F]">
-								<span className="inline-flex items-center gap-1.5 whitespace-nowrap">
-									Cost:
-									<CoinAmount
-										type={unitCost.coinType}
-										amount={unitCost.amount}
-										size={16}
-									/>
-								</span>
-								<span className="inline-flex min-w-0 items-center justify-end gap-1.5 whitespace-nowrap">
+							<div className="flex items-center justify-center text-[12px] font-bold text-[#1D1D1F]">
+								<span className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap">
 									Current balance:
 									<span className="inline-flex items-center gap-2">
 										{VISIBLE_COIN_TYPES.map((coinType) => (

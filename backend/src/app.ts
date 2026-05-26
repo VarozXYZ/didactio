@@ -977,8 +977,25 @@ function resolveStageConfigError(
 
 	return {
 		status: 409,
-		message: error instanceof Error ? error.message : fallbackMessage,
+		message: resolvePublicAiFailureMessage(error, fallbackMessage),
 	};
+}
+
+function resolvePublicAiFailureMessage(
+	error: unknown,
+	fallbackMessage: string,
+): string {
+	const message = error instanceof Error ? error.message : fallbackMessage;
+
+	if (
+		message.includes("No object generated") ||
+		message.includes("response did not match schema") ||
+		message.includes("Syllabus generation returned")
+	) {
+		return fallbackMessage;
+	}
+
+	return message;
 }
 
 function createAbortSignal(request: express.Request): AbortSignal {
@@ -1785,7 +1802,10 @@ export function createApp(options: CreateAppOptions) {
 						failDidacticUnitModeration(
 							latest,
 							error instanceof Error ?
-								error.message
+								resolvePublicAiFailureMessage(
+									error,
+									"Didactic unit moderation failed.",
+								)
 							:	"Didactic unit moderation failed.",
 							attempt,
 						),

@@ -1112,6 +1112,10 @@ function MobileUnitEditor({
 				(activity) => activity.id === selectedActivityId,
 			) ?? null
 		:	null;
+	const shouldRenderActiveContent =
+		activeChapter.status === "ready" || activeContentHtml.trim().length > 0;
+	const shouldShowMobilePostContentActions =
+		activeChapter.status === "ready";
 	const activeChapterNumber = activeChapter.chapterIndex + 1;
 	const nextChapter = workspace.chapters.find(
 		(chapter) => chapter.chapterIndex > activeChapter.chapterIndex,
@@ -1225,25 +1229,41 @@ function MobileUnitEditor({
 						>
 							{[
 								{
-									ariaLabel: "Back to Dashboard",
-									icon: <Undo2 size={17} />,
-									onClick: onBackToDashboard,
+									ariaLabel: "Notes",
+									icon: <StickyNote size={17} />,
+									onClick: onOpenNotes,
 								},
 								{
-									ariaLabel: "Export unit",
-									icon: <Share2 size={17} />,
-									onClick: onOpenExport,
+									ariaLabel: "Version history",
+									icon: <History size={17} />,
+									onClick: onOpenHistory,
 								},
 								{
-									ariaLabel: "Settings",
+									ariaLabel: "Regenerate module",
+									icon: <RotateCcw size={17} />,
+									onClick: onRegenerate,
+									disabled: !canRegenerate,
+								},
+								{
+									ariaLabel: "Reading style",
+									icon: (
+										<span className="flex h-[17px] w-[17px] items-center justify-center text-[12px] font-extrabold leading-none">
+											Aa
+										</span>
+									),
+									onClick: () => setIsStyleDialogOpen(true),
+								},
+								{
+									ariaLabel: "Preferences",
 									icon: <Settings size={17} />,
-									onClick: () => setActiveTab("settings"),
+									onClick: onOpenPreferences,
 								},
 							].map((action) => (
 								<Motion.button
 									key={action.ariaLabel}
 									aria-label={action.ariaLabel}
 									className="app-mobile-editor-action-button grid h-9 w-9 place-items-center rounded-full border border-black/10 bg-white/90 text-[#1D1D1F] shadow-[0_8px_20px_rgba(17,24,39,0.10)] backdrop-blur-md active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+									disabled={action.disabled}
 									exit={{opacity: 0, scale: 0.8, y: -8}}
 									initial={{opacity: 0, scale: 0.72, y: -12}}
 									animate={{
@@ -1475,7 +1495,7 @@ function MobileUnitEditor({
 							</p>
 						)}
 
-						{activeChapter.status === "ready" ?
+						{shouldRenderActiveContent ?
 							<ChapterRenderer
 								html={activeContentHtml}
 								className="unit-page-scope mobile-unit-content text-[#1D1D1F]"
@@ -1488,7 +1508,7 @@ function MobileUnitEditor({
 								:	"This module could not be generated."}
 							</div>
 						}
-						{activeChapter.status === "ready" && (
+						{shouldShowMobilePostContentActions && (
 							<div className="mt-8 space-y-3 border-t border-[#E5E5E7] pt-5">
 								<button
 									className="flex w-full items-center justify-center gap-2 rounded-[14px] bg-[#1D1D1F] px-4 py-3 text-[14px] font-bold text-white active:scale-[0.99]"
@@ -1696,46 +1716,27 @@ function MobileUnitEditor({
 						<div className="space-y-2">
 							<button
 								className="flex w-full items-center gap-3 rounded-[14px] border border-[#E5E5E7] bg-white p-4 text-left text-[14px] font-bold"
-								onClick={onOpenNotes}
+								onClick={onBackToDashboard}
 								type="button"
 							>
-								<StickyNote size={18} />
-								Notes
+								<Undo2 size={18} />
+								Back to Dashboard
 							</button>
 							<button
 								className="flex w-full items-center gap-3 rounded-[14px] border border-[#E5E5E7] bg-white p-4 text-left text-[14px] font-bold"
-								onClick={onOpenHistory}
+								onClick={onOpenExport}
 								type="button"
 							>
-								<History size={18} />
-								Version history
-							</button>
-							<button
-								className="flex w-full items-center gap-3 rounded-[14px] border border-[#E5E5E7] bg-white p-4 text-left text-[14px] font-bold disabled:opacity-40"
-								disabled={!canRegenerate}
-								onClick={onRegenerate}
-								type="button"
-							>
-								<RotateCcw size={18} />
-								Regenerate module
+								<Share2 size={18} />
+								Export unit
 							</button>
 							<button
 								className="flex w-full items-center gap-3 rounded-[14px] border border-[#E5E5E7] bg-white p-4 text-left text-[14px] font-bold"
-								onClick={() => setIsStyleDialogOpen(true)}
-								type="button"
-							>
-								<span className="flex h-[18px] w-[18px] items-center justify-center text-[13px] font-extrabold leading-none">
-									Aa
-								</span>
-								Reading style
-							</button>
-							<button
-								className="flex w-full items-center gap-3 rounded-[14px] border border-[#E5E5E7] bg-white p-4 text-left text-[14px] font-bold"
-								onClick={onOpenPreferences}
+								onClick={() => setActiveTab("settings")}
 								type="button"
 							>
 								<Settings size={18} />
-								Preferences
+								Settings
 							</button>
 						</div>
 					</div>
@@ -2911,7 +2912,9 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			0,
 			Math.min(savedLastVisitedPageIndex, readPages.length - 1),
 		);
-		setCurrentSpread(Math.floor(lastVisitedPageIndex / 2));
+		setCurrentSpread(
+			Math.floor(lastVisitedPageIndex / spreadMetrics.pagesPerSpread),
+		);
 		setLastRestoredActivationKey(activeChapterActivation.key);
 	}, [
 		activeChapter?.chapterIndex,
@@ -2920,6 +2923,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		isEditMode,
 		lastRestoredActivationKey,
 		readPages.length,
+		spreadMetrics.pagesPerSpread,
 	]);
 
 	const runAction = async (
@@ -3760,7 +3764,11 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		isEditMode ?
 			Math.max(visibleEditablePages.length, 1)
 		:	Math.max(readPages.length, 1);
-	const totalSpreads = Math.max(1, Math.ceil(totalVisiblePages / 2));
+	const pagesPerSpread = spreadMetrics.pagesPerSpread;
+	const totalSpreads = Math.max(
+		1,
+		Math.ceil(totalVisiblePages / pagesPerSpread),
+	);
 	const canGoPrev = currentSpread > 0;
 	const canGoNext = currentSpread < totalSpreads - 1;
 
@@ -3776,11 +3784,15 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 
 			const lastVisitedPageIndex = Math.max(
 				0,
-				Math.min(nextSpread * 2 + 1, readPages.length - 1),
+				Math.min(
+					nextSpread * pagesPerSpread + pagesPerSpread - 1,
+					readPages.length - 1,
+				),
 			);
 			const visibleTextOffset = getReadTextOffsetForSpread(
 				measuredReadPages,
 				nextSpread,
+				pagesPerSpread,
 			);
 
 			void persistReadProgress(
@@ -3793,6 +3805,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			activeChapter,
 			isEditMode,
 			measuredReadPages,
+			pagesPerSpread,
 			persistReadProgress,
 			readPages.length,
 		],
@@ -3816,14 +3829,14 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		(pageIndex: number, outlineItemId?: string) => {
 			const nextSpread = Math.max(
 				0,
-				Math.min(Math.floor(pageIndex / 2), totalSpreads - 1),
+				Math.min(Math.floor(pageIndex / pagesPerSpread), totalSpreads - 1),
 			);
 
 			setSelectedOutlineItemId(outlineItemId ?? null);
 			setCurrentSpread(nextSpread);
 			persistVisitedSpread(nextSpread);
 		},
-		[persistVisitedSpread, totalSpreads],
+		[pagesPerSpread, persistVisitedSpread, totalSpreads],
 	);
 
 	const goToNextSpread = useCallback(() => {
@@ -3876,7 +3889,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		}
 
 		const visibleEndPageIndex = Math.min(
-			currentSpread * 2 + 1,
+			currentSpread * pagesPerSpread + pagesPerSpread - 1,
 			totalVisiblePages - 1,
 		);
 		const activeItem = moduleOutline
@@ -3887,6 +3900,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	}, [
 		currentSpread,
 		moduleOutline,
+		pagesPerSpread,
 		selectedOutlineItemId,
 		totalVisiblePages,
 	]);
@@ -3962,9 +3976,10 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		!regenerationCost ||
 		(user?.credits[regenerationCost.coinType] ?? 0) >=
 			regenerationCost.amount;
-	const contentPageOffset = currentSpread * 2;
+	const contentPageOffset = currentSpread * pagesPerSpread;
 	const leftReadPage = readPages[contentPageOffset];
-	const rightReadPage = readPages[contentPageOffset + 1];
+	const rightReadPage =
+		pagesPerSpread > 1 ? readPages[contentPageOffset + 1] : undefined;
 	const visibleReadPages = [leftReadPage, rightReadPage].filter(
 		(page): page is ReadPage => page !== undefined,
 	);
@@ -3973,7 +3988,10 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		visibleReadPages.length > 0 &&
 		visibleReadPages.every((page) => page.kind === "learning_activity");
 	const leftEditablePage = visibleEditablePages[contentPageOffset];
-	const rightEditablePage = visibleEditablePages[contentPageOffset + 1];
+	const rightEditablePage =
+		pagesPerSpread > 1 ?
+			visibleEditablePages[contentPageOffset + 1]
+		:	undefined;
 	const spreadStartPage = contentPageOffset + 1;
 	const hasRightPage =
 		isEditMode ?
@@ -3981,7 +3999,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		:	rightReadPage !== undefined;
 	const spreadEndPage =
 		hasRightPage ?
-			Math.min(contentPageOffset + 2, totalVisiblePages)
+			Math.min(contentPageOffset + pagesPerSpread, totalVisiblePages)
 		:	spreadStartPage;
 	const spreadPageShortLabel =
 		spreadMetrics.isMobile ? `${spreadStartPage} / ${totalVisiblePages}`
@@ -3996,8 +4014,11 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				value: pageIndex,
 			}))
 		:	Array.from({length: totalSpreads}, (_, spreadIndex) => {
-				const startPage = spreadIndex * 2 + 1;
-				const endPage = Math.min(startPage + 1, totalVisiblePages);
+				const startPage = spreadIndex * pagesPerSpread + 1;
+				const endPage = Math.min(
+					startPage + pagesPerSpread - 1,
+					totalVisiblePages,
+				);
 				const label =
 					startPage === endPage ? `${startPage}` : `${startPage}-${endPage}`;
 
@@ -4127,12 +4148,16 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				activity.id,
 			);
 			if (targetPageIndex >= 0) {
-				const targetSpread = Math.floor(targetPageIndex / 2);
+				const targetSpread = Math.floor(targetPageIndex / pagesPerSpread);
 				setCurrentSpread(targetSpread);
 				setSelectedOutlineItemId(`activity-${activity.id}`);
 				void persistReadProgress(
 					activeChapter,
-					getReadTextOffsetForSpread(measuredReadPages, targetSpread),
+					getReadTextOffsetForSpread(
+						measuredReadPages,
+						targetSpread,
+						pagesPerSpread,
+					),
 					targetPageIndex,
 				);
 			}
@@ -5050,7 +5075,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 
 			<div
 				className={cn(
-					"relative z-50 mt-3 flex max-w-full items-center justify-center gap-1.5 pb-2 transition-all duration-150 md:gap-2",
+					"relative z-50 mt-3 flex max-w-full items-center justify-center gap-1.5 transition-all duration-150 md:gap-2",
 					isPagePickerOpen &&
 						"pointer-events-none translate-y-1 scale-95 opacity-0",
 				)}

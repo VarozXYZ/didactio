@@ -154,6 +154,9 @@ describe("prompt quality helpers", () => {
 		expect(prompt).toContain("Return a strict structured syllabus object.");
 		expect(prompt).toContain("Create exactly 9 modules.");
 		expect(prompt).toContain(
+			"The modules array length must be exactly 9",
+		);
+		expect(prompt).toContain(
 			"Use a keywords string, not a keywords array.",
 		);
 		expect(prompt).toContain(

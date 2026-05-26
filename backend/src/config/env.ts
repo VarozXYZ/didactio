@@ -84,7 +84,7 @@ export function getAppEnv(): AppEnv {
 		aiCheapProvider:
 			parseOptionalString(process.env.AI_CHEAP_PROVIDER) ?? "deepseek",
 		aiCheapModel:
-			parseOptionalString(process.env.AI_CHEAP_MODEL) ?? "deepseek-chat",
+			parseOptionalString(process.env.AI_CHEAP_MODEL) ?? "deepseek-v4-flash",
 		aiPremiumProvider:
 			parseOptionalString(process.env.AI_PREMIUM_PROVIDER) ?? "deepseek",
 		aiPremiumModel:

@@ -212,6 +212,17 @@ function resolveStepFromNextAction(nextAction: string): WizardStep {
 	return 0;
 }
 
+function getModerationFailureMessage(message: string | undefined): string {
+	if (
+		message?.includes("No object generated") ||
+		message?.includes("response did not match schema")
+	) {
+		return "Moderation failed. You can retry or edit the topic.";
+	}
+
+	return message ?? "Moderation failed. You can retry or edit the topic.";
+}
+
 export type CreateUnitWizardProps = {
 	didacticUnitId?: string | null;
 	onClose: () => void;
@@ -265,17 +276,22 @@ export function CreateUnitWizard({
 	);
 	const [regenerationContext, setRegenerationContext] = useState("");
 	const [selectedGenerationTier, setSelectedGenerationTier] =
-		useState<BackendGenerationQuality>("gold");
+		useState<BackendGenerationQuality>("silver");
 	const {user, refreshUser} = useAuth();
 
 	const [isLoading, setIsLoading] = useState(Boolean(didacticUnitId));
 	const [isSubmitting, setIsSubmitting] = useState(false);
+	const topicStepLocked =
+		Boolean(activeUnitId) &&
+		planning?.status !== "moderation_failed" &&
+		planning?.status !== "moderation_rejected";
 
 	const applyPlanningState = useCallback(
 		(detail: Awaited<ReturnType<typeof dashboardApi.getDidacticUnit>>) => {
 			const pd = adaptDidacticUnitPlanning(detail);
 			setPlanning(pd);
 			setQuestionnaireAnswers(pd.questionnaire?.answers ?? {});
+			setDraftTopic(pd.topic);
 			setDraftAdditionalContext(pd.additionalContext ?? "");
 			setDraftLearningProfile(pd.learningProfile ?? pd.level);
 			setDraftLength(pd.length === "intro" ? "short" : pd.length);
@@ -404,10 +420,7 @@ export function CreateUnitWizard({
 					);
 					setCurrentStep(0);
 				} else if (pd.status === "moderation_failed") {
-					toastError(
-						pd.moderationError ??
-							"Moderation failed. You can retry or edit the topic.",
-					);
+					toastError(getModerationFailureMessage(pd.moderationError));
 				}
 			} catch (e) {
 				if (!cancelled) {
@@ -834,7 +847,7 @@ export function CreateUnitWizard({
 									return created;
 								}}
 								isSubmitting={isSubmitting}
-								isResumed={Boolean(activeUnitId)}
+								isResumed={topicStepLocked}
 								onSubmit={handleTopicSubmit}
 								onCancel={onClose}
 							/>

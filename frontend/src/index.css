@@ -197,6 +197,7 @@ html[data-app-theme="dark"][data-app-themed="true"] .bg-\[\#F7F8FA\],
 html[data-app-theme="dark"][data-app-themed="true"] .bg-\[\#FAFAFA\],
 html[data-app-theme="dark"][data-app-themed="true"] .bg-\[\#FAFAFB\],
 html[data-app-theme="dark"][data-app-themed="true"] .bg-\[\#FBFBFC\],
+html[data-app-theme="dark"][data-app-themed="true"] .bg-\[\#F9FAFB\],
 html[data-app-theme="dark"][data-app-themed="true"] .bg-\[\#F9F9FB\],
 html[data-app-theme="dark"][data-app-themed="true"] .bg-\[\#F8F8F9\] {
 	background-color: var(--app-bg-primary) !important;
@@ -671,6 +672,27 @@ html[data-app-theme="dark"][data-app-themed="true"] .app-syllabus-chapter-card:h
   border-color: rgba(52, 199, 89, 0.32) !important;
 }
 
+html[data-app-theme="dark"][data-app-themed="true"] .app-syllabus-review-choice,
+html[data-app-theme="dark"][data-app-themed="true"] .app-syllabus-review-decision-reject {
+	background: #242424 !important;
+	border-color: var(--app-border-primary) !important;
+	color: var(--app-text-primary) !important;
+}
+
+html[data-app-theme="dark"][data-app-themed="true"] .app-syllabus-review-choice:hover {
+	background: #2a2a2a !important;
+	border-color: rgba(52, 199, 89, 0.32) !important;
+}
+
+html[data-app-theme="dark"][data-app-themed="true"] .app-syllabus-review-separator {
+	color: #636366 !important;
+}
+
+html[data-app-theme="dark"][data-app-themed="true"] .app-syllabus-review-change:hover {
+	background-color: #2a2a2a !important;
+	color: var(--app-text-primary) !important;
+}
+
 html[data-app-theme="dark"][data-app-themed="true"] .app-wizard-folder-trigger,
 html[data-app-theme="dark"][data-app-themed="true"] .app-wizard-folder-create {
   background: #242424 !important;
@@ -999,6 +1021,27 @@ button[aria-disabled="true"],
 	}
 
 	.unit-page-scope > .code-block-wrapper {
+		padding-left: 0;
+		padding-right: 0;
+		margin-left: 0;
+		margin-right: 0;
+	}
+}
+
+@media (max-width: 767px) {
+	.unit-page-scope.mobile-unit-content,
+	.unit-page-scope.mobile-inline-editor {
+		line-height: 28px;
+	}
+
+	.unit-page-scope.mobile-unit-content > *:not(h2):not(h3):not(h4),
+	.unit-page-scope.mobile-inline-editor > *:not(h2):not(h3):not(h4) {
+		padding-left: 0;
+		padding-right: 0;
+	}
+
+	.unit-page-scope.mobile-unit-content > .code-block-wrapper,
+	.unit-page-scope.mobile-inline-editor > .code-block-wrapper {
 		padding-left: 0;
 		padding-right: 0;
 		margin-left: 0;

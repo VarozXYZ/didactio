@@ -81,14 +81,14 @@ function depthInstruction(depth: DidacticUnitDepth): string {
 function contentLengthInstruction(length: DidacticUnitLength): string {
 	switch (length) {
 		case "intro":
-			return "Keep the scope compact and introductory.";
+			return "Keep the scope compact and introductory. This changes how concise each module is, not the required module count.";
 		case "long":
 			return "Provide substantial coverage with room for explanation, examples, and guided practice.";
 		case "textbook":
 			return "Aim for comprehensive, textbook-like coverage with robust progression and substantial examples.";
 		case "short":
 		default:
-			return "Keep the material focused but genuinely useful.";
+			return "Keep the material focused but genuinely useful. Short means concise module content, not fewer modules.";
 	}
 }
 
@@ -665,6 +665,7 @@ export function buildSyllabusMarkdownPrompt(input: {
 			"For each module, use these exact keys: title, overview, lessons.",
 			"For each lesson, use these exact keys: title, contentOutline.",
 			`Create exactly ${targetModuleCount} modules.`,
+			`The modules array length must be exactly ${targetModuleCount}; do not return fewer modules for a short or introductory unit.`,
 			"Do not include durations or time estimates anywhere.",
 			"Use a keywords string, not a keywords array.",
 			"Each module must include lessons with action-oriented content outlines.",

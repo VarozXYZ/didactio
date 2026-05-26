@@ -45,6 +45,17 @@ const MODERATION_MESSAGES = [
     'Making sure it all fits',
 ]
 
+function getModerationFailureMessage(message: string | undefined): string {
+    if (
+        message?.includes('No object generated') ||
+        message?.includes('response did not match schema')
+    ) {
+        return 'Try again, or go back and adjust the topic.'
+    }
+
+    return message ?? 'Try again, or go back and adjust the topic.'
+}
+
 const OPTION_ICONS: Record<string, LucideIcon> = {
     solve_problems: Puzzle,
     create_project: Hammer,
@@ -110,18 +121,6 @@ export function QuestionnaireStep({
 
     return (
         <div className="space-y-5">
-            {moderationFailed && (
-                <div className="rounded-[12px] border border-[#FFE1D6] bg-[#FFF7F4] px-3.5 py-3">
-                    <div className="flex items-center gap-2 text-[13px] font-medium text-[#1D1D1F]">
-                        <AlertCircle size={15} className="text-[#FF6B4A]" />
-                        Moderation failed
-                    </div>
-                    <p className="mt-1 text-[12px] text-[#6E6E73]">
-                        {planning?.moderationError ?? 'Try again, or go back and adjust the topic.'}
-                    </p>
-                </div>
-            )}
-
             <p className="text-[13px] text-center font-medium leading-relaxed text-[#6E6E73]">
                 Answering these questions is optional.
             </p>
@@ -202,6 +201,21 @@ export function QuestionnaireStep({
                 ))}
             </div>
 
+            {moderationFailed && (
+                <div className="flex justify-center">
+                    <div className="inline-flex w-fit max-w-full items-center gap-2 rounded-[12px] border border-[#FFE1D6] bg-[#FFF7F4] px-3.5 py-3 text-[13px] text-[#1D1D1F]">
+                        <div className="flex shrink-0 items-center gap-2 font-medium">
+                            <AlertCircle size={15} className="text-[#FF6B4A]" />
+                            Moderation failed
+                        </div>
+                        <span className="shrink-0 text-[#86868B]">-</span>
+                        <p className="min-w-0 text-[12px] text-[#6E6E73]">
+                            {getModerationFailureMessage(planning?.moderationError)}
+                        </p>
+                    </div>
+                </div>
+            )}
+
             {isSubmitting && (
                 <div className="space-y-2">
                     <Progress value={60} className="h-1.5 animate-pulse" />
@@ -213,9 +227,9 @@ export function QuestionnaireStep({
                 {isModerating ? (
                     <div className="ml-auto min-w-0 rounded-[10px] border border-[#D8F3E1] bg-[#F2FBF5] px-3 py-2">
                         <div className="flex items-center gap-2 text-[12px] font-medium text-[#1D1D1F]">
-                            <span className="relative flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-[#32D074]/40">
+                            <span className="relative flex h-[15px] w-[15px] shrink-0 items-center justify-center rounded-full border border-[#32D074]/40">
                                 <span className="h-1.5 w-1.5 rounded-full bg-[#32D074]" />
-                                <span className="absolute h-1.5 w-1.5 animate-spin rounded-full bg-[#32D074] [transform-origin:8px_8px] [translate:0_-5px]" />
+                                <span className="absolute h-1.5 w-1.5 animate-spin rounded-full bg-[#32D074] [transform-origin:7.5px_7.5px] [translate:0_-4.5px]" />
                             </span>
                             <span key={moderationMessageIndex} className="animate-in fade-in slide-in-from-bottom-0.5 duration-300">
                                 {MODERATION_MESSAGES[moderationMessageIndex]}

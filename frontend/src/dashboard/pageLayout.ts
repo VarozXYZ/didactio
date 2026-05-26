@@ -31,6 +31,7 @@ import {
 } from "./utils/typography";
 
 const MOBILE_BREAKPOINT = 768;
+const SINGLE_PAGE_SPREAD_BREAKPOINT = 1300;
 const HEADER_HEIGHT = 64;
 const OPEN_SIDEBAR_WIDTH = 280;
 const PAGE_WIDTH_RATIO_DESKTOP = 0.76;
@@ -1071,8 +1072,10 @@ function canMergeTerminalActionPage({
 export function getReadTextOffsetForSpread(
 	pages: MeasuredModulePage[],
 	spreadIndex: number,
+	pagesPerSpread = 2,
 ): number {
-	const spreadPages = pages.slice(spreadIndex * 2, spreadIndex * 2 + 2);
+	const pageOffset = spreadIndex * pagesPerSpread;
+	const spreadPages = pages.slice(pageOffset, pageOffset + pagesPerSpread);
 	const contentPages = spreadPages.filter(isMeasuredPageWithReadableContent);
 
 	if (contentPages.length === 0) {
@@ -1085,6 +1088,7 @@ export function getReadTextOffsetForSpread(
 export function findResumeSpreadIndex(
 	pages: MeasuredModulePage[],
 	readTextOffset: number,
+	pagesPerSpread = 2,
 ): number {
 	if (pages.length === 0) {
 		return 0;
@@ -1097,10 +1101,10 @@ export function findResumeSpreadIndex(
 	);
 
 	if (firstUnreadPageIndex === -1) {
-		return Math.max(0, Math.floor((pages.length - 1) / 2));
+		return Math.max(0, Math.floor((pages.length - 1) / pagesPerSpread));
 	}
 
-	return Math.floor(firstUnreadPageIndex / 2);
+	return Math.floor(firstUnreadPageIndex / pagesPerSpread);
 }
 
 export function getStatusPillClass(status: UnitChapter["status"]): string {
@@ -1474,11 +1478,14 @@ export function calculateSpreadMetrics({
 	viewportHeight: number;
 }) {
 	const isMobile = viewportWidth < MOBILE_BREAKPOINT;
+	const isSinglePageSpread =
+		!isMobile && viewportWidth < SINGLE_PAGE_SPREAD_BREAKPOINT;
 	const isLaptop = !isMobile && viewportWidth < 1600;
 	const pageWidthRatio =
 		isMobile ? PAGE_WIDTH_RATIO_MOBILE : PAGE_WIDTH_RATIO_DESKTOP;
+	const pagesPerSpread = isSinglePageSpread ? 1 : 2;
 	const stagePaddingTop = isMobile ? 16 : isLaptop ? 0 : 24;
-	const stagePaddingBottom = isMobile ? 20 : isLaptop ? 28 : 32;
+	const stagePaddingBottom = isMobile ? 20 : isLaptop ? 28 : 24;
 	const indicatorHeight = isMobile ? 42 : isLaptop ? 40 : 48;
 	const indicatorGap = isMobile ? 12 : isLaptop ? 10 : 16;
 	const arrowAllowance = isMobile ? 64 : isLaptop ? 48 : 84;
@@ -1504,22 +1511,26 @@ export function calculateSpreadMetrics({
 		availableHeight,
 		isMobile ? 680 : viewportHeight * 0.88,
 	);
-	const spreadWidthByHeight = maxPageHeight * pageWidthRatio * 2 + spreadGap;
+	const spreadWidthByHeight =
+		maxPageHeight * pageWidthRatio * pagesPerSpread +
+		(pagesPerSpread - 1) * spreadGap;
 	const spreadWidth = Math.min(
 		availableWidth,
 		spreadWidthByHeight,
 		isMobile ? 980 : 2000,
 	);
-	const pageWidth = (spreadWidth - spreadGap) / 2;
+	const pageWidth =
+		(spreadWidth - (pagesPerSpread - 1) * spreadGap) / pagesPerSpread;
 	const pageHeight = Math.min(maxPageHeight, pageWidth / pageWidthRatio);
 
 	return {
 		indicatorGap,
 		isMobile,
 		pageHeight,
+		pagesPerSpread,
 		pageWidth,
 		spreadGap,
 		spreadHeight: pageHeight,
-		spreadWidth: pageWidth * 2 + spreadGap,
+		spreadWidth: pageWidth * pagesPerSpread + (pagesPerSpread - 1) * spreadGap,
 	};
 }
