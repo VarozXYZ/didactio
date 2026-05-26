@@ -4,17 +4,30 @@ import {ensureDefaultFolders} from "../folders/folder-defaults.js";
 import type {FolderStore} from "../folders/folder-store.js";
 import type {DidacticUnit} from "./create-didactic-unit.js";
 import type {DidacticUnitStore} from "./didactic-unit-store.js";
+import pythonIntroductionTemplate from "./default-templates/e6aa29be-3371-42ce-a33e-4f31fd4207a2.json" with {type: "json"};
 
 export interface DefaultDidacticUnitDefinition {
 	id: string;
-	sourceUnitId: string;
+	template: DefaultDidacticUnitTemplate;
 	folderSlug: string;
 }
+
+type DefaultDidacticUnitTemplate = Omit<
+	DidacticUnit,
+	| "ownerId"
+	| "folderId"
+	| "createdAt"
+	| "updatedAt"
+	| "moduleReadProgress"
+	| "completedChapters"
+	| "unitGenerationPaidAt"
+	| "unitGenerationCreditTransactionId"
+>;
 
 export const DEFAULT_DIDACTIC_UNIT_DEFINITIONS: DefaultDidacticUnitDefinition[] = [
 	{
 		id: "welcome-unit-e6aa29be",
-		sourceUnitId: "e6aa29be-3371-42ce-a33e-4f31fd4207a2",
+		template: pythonIntroductionTemplate as unknown as DefaultDidacticUnitTemplate,
 		folderSlug: "computer-science",
 	},
 ];
@@ -42,33 +55,22 @@ function createCloneId(ownerId: string, templateId: string): string {
 }
 
 function createDefaultUnitClone(input: {
-	source: DidacticUnit;
+	template: DefaultDidacticUnitTemplate;
 	ownerId: string;
 	folderId: string;
 	templateId: string;
 }): DidacticUnit {
-	const {
-		id: _sourceId,
-		ownerId: _sourceOwnerId,
-		folderId: _sourceFolderId,
-		defaultTemplateId: _sourceTemplateId,
-		defaultTemplateSourceId: _sourceTemplateSourceId,
-		moduleReadProgress: _sourceReadProgress,
-		completedChapters: _sourceCompletedChapters,
-		unitGenerationPaidAt: _sourcePaidAt,
-		unitGenerationCreditTransactionId: _sourceTransactionId,
-		...sourceContent
-	} = structuredClone(input.source);
+	const template = structuredClone(input.template);
 	const createdAt = new Date().toISOString();
 
 	return {
-		...sourceContent,
+		...template,
 		id: createCloneId(input.ownerId, input.templateId),
 		ownerId: input.ownerId,
 		folderId: input.folderId,
 		folderAssignmentMode: "manual",
 		defaultTemplateId: input.templateId,
-		defaultTemplateSourceId: input.source.id,
+		defaultTemplateSourceId: input.template.id,
 		createdAt,
 		updatedAt: createdAt,
 	};
@@ -92,13 +94,6 @@ async function ensureDefaultDidacticUnitsOnce(
 			(unit) => unit.defaultTemplateId === definition.id,
 		);
 		if (!existingClone) {
-			const source = await input.didacticUnitStore.getTemplateSourceById(
-				definition.sourceUnitId,
-			);
-			if (!source) {
-				continue;
-			}
-
 			const folder = folders.find(
 				(candidate) => candidate.slug === definition.folderSlug,
 			);
@@ -110,7 +105,7 @@ async function ensureDefaultDidacticUnitsOnce(
 
 			await input.didacticUnitStore.save(
 				createDefaultUnitClone({
-					source,
+					template: definition.template,
 					ownerId: input.user.id,
 					folderId: folder.id,
 					templateId: definition.id,

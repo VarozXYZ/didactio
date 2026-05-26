@@ -33,12 +33,6 @@ export class MongoDidacticUnitStore implements DidacticUnitStore {
 		);
 	}
 
-	async getTemplateSourceById(
-		didacticUnitId: string,
-	): Promise<DidacticUnit | null> {
-		return stripMongoId(await this.collection.findOne({id: didacticUnitId}));
-	}
-
 	async getById(
 		ownerId: string,
 		didacticUnitId: string,

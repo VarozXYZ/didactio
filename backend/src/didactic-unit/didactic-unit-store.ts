@@ -2,7 +2,6 @@ import type {DidacticUnit} from "./create-didactic-unit.js";
 
 export interface DidacticUnitStore {
 	save(didacticUnit: DidacticUnit): Promise<void>;
-	getTemplateSourceById(didacticUnitId: string): Promise<DidacticUnit | null>;
 	getById(
 		ownerId: string,
 		didacticUnitId: string,
@@ -16,12 +15,6 @@ export class InMemoryDidacticUnitStore implements DidacticUnitStore {
 
 	async save(didacticUnit: DidacticUnit): Promise<void> {
 		this.didacticUnits.set(didacticUnit.id, didacticUnit);
-	}
-
-	async getTemplateSourceById(
-		didacticUnitId: string,
-	): Promise<DidacticUnit | null> {
-		return this.didacticUnits.get(didacticUnitId) ?? null;
 	}
 
 	async getById(
