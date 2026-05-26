@@ -35,6 +35,7 @@ const SINGLE_PAGE_SPREAD_BREAKPOINT = 1300;
 const HEADER_HEIGHT = 64;
 const OPEN_SIDEBAR_WIDTH = 280;
 const PAGE_WIDTH_RATIO_DESKTOP = 0.76;
+const PAGE_WIDTH_RATIO_COMPACT_DESKTOP = 0.88;
 const PAGE_WIDTH_RATIO_MOBILE = 0.72;
 const POST_MODULE_ACTION_GAP = 40;
 const FIRST_PAGE_HEADER_BOTTOM_GAP = 16;
@@ -1482,7 +1483,9 @@ export function calculateSpreadMetrics({
 		!isMobile && viewportWidth < SINGLE_PAGE_SPREAD_BREAKPOINT;
 	const isLaptop = !isMobile && viewportWidth < 1600;
 	const pageWidthRatio =
-		isMobile ? PAGE_WIDTH_RATIO_MOBILE : PAGE_WIDTH_RATIO_DESKTOP;
+		isMobile ? PAGE_WIDTH_RATIO_MOBILE
+		: isLaptop ? PAGE_WIDTH_RATIO_COMPACT_DESKTOP
+		: PAGE_WIDTH_RATIO_DESKTOP;
 	const pagesPerSpread = isSinglePageSpread ? 1 : 2;
 	const stagePaddingTop = isMobile ? 16 : isLaptop ? 0 : 24;
 	const stagePaddingBottom = isMobile ? 20 : isLaptop ? 28 : 24;
