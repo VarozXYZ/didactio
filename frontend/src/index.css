@@ -1352,6 +1352,13 @@ button[aria-disabled="true"],
 	line-height: 1.6;
 }
 
+@media (min-width: 768px) and (max-width: 1599px) {
+	.unit-page-scope th,
+	.unit-page-scope td {
+		padding: 0.225rem 0.27rem;
+	}
+}
+
 .prose tbody tr:last-child td,
 .unit-page-scope tbody tr:last-child td {
 	border-bottom: 1px solid var(--unit-table-border, #e5e5e7);

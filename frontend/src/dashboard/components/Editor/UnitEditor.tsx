@@ -2206,6 +2206,12 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	const [unitGenerationTier, setUnitGenerationTier] =
 		useState<BackendGenerationQuality | null>(null);
 	const {user, refreshUser} = useAuth();
+	const [viewport, setViewport] = useState(() => ({
+		height: typeof window !== "undefined" ? window.innerHeight : 900,
+		width: typeof window !== "undefined" ? window.innerWidth : 1440,
+	}));
+	const usesCompactDesktopTextSize =
+		viewport.width >= 768 && viewport.width < 1600;
 	const resolvedTheme = useMemo(
 		() =>
 			resolvePresentationTheme(
@@ -2214,12 +2220,19 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			),
 		[workspace?.presentationTheme, user?.defaultPresentationTheme],
 	);
+	const displayTextStyle = useMemo(
+		() =>
+			draft && usesCompactDesktopTextSize ?
+				{...draft.textStyle, sizeProfile: "small" as const}
+			:	draft?.textStyle,
+		[draft?.textStyle, usesCompactDesktopTextSize],
+	);
 	const effectiveTheme = useMemo(
 		() =>
-			draft ?
-				themeFromTextStyle(resolvedTheme, draft.textStyle)
+			displayTextStyle ?
+				themeFromTextStyle(resolvedTheme, displayTextStyle)
 			:	resolvedTheme,
-		[resolvedTheme, draft],
+		[resolvedTheme, displayTextStyle],
 	);
 	const resolvedThemeVars = useMemo(
 		() => themeVars(effectiveTheme, resolvedMode === "dark"),
@@ -2229,10 +2242,6 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		useState<number | null>(null);
 	const [activeRunId, setActiveRunId] = useState<string | null>(null);
 	const [isCancellingGeneration, setIsCancellingGeneration] = useState(false);
-	const [viewport, setViewport] = useState(() => ({
-		height: typeof window !== "undefined" ? window.innerHeight : 900,
-		width: typeof window !== "undefined" ? window.innerWidth : 1440,
-	}));
 	const [fontsReady, setFontsReady] = useState(() =>
 		typeof document !== "undefined" ?
 			document.fonts.status === "loaded"
@@ -3065,10 +3074,14 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		[],
 	);
 
-	const activeDraftSettings =
+	const storedActiveDraftSettings =
 		isDraftForActiveChapter ?
 			draft.textStyle
 		: 	activeChapter?.textStyle;
+	const activeDraftSettings =
+		storedActiveDraftSettings && usesCompactDesktopTextSize ?
+			{...storedActiveDraftSettings, sizeProfile: "small" as const}
+		:	storedActiveDraftSettings;
 	const activeTextStyleKey = [
 		activeDraftSettings?.stylePreset ?? "classic",
 		activeDraftSettings?.sizeProfile ?? "regular",
@@ -4581,6 +4594,8 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	);
 	const headerIconButtonClass =
 		"flex h-10 w-10 items-center justify-center rounded-full border border-[#D4D7DD] bg-white text-[#1D1D1F] transition-all hover:border-[#34C759] hover:bg-[#F7FFF9] hover:text-[#34C759] active:border-[#34C759] active:text-[#34C759]";
+	const usesTightPostModuleLayout =
+		compactModuleTitle && spreadMetrics.pageHeight < 580;
 
 	const renderPostModuleActionBody = ({
 		hasNextModule,
@@ -4590,7 +4605,12 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		primaryActionLabel: string;
 	}) => (
 		<div
-			className="flex-shrink-0 rounded-[22px] p-5"
+			className={cn(
+				"flex-shrink-0 rounded-[22px]",
+				usesTightPostModuleLayout ? "p-2"
+				: compactModuleTitle ? "p-3"
+				: "p-5",
+			)}
 			style={{
 				color: postModuleCompletionStyle.bodyColor,
 				fontFamily: postModuleCompletionStyle.bodyFamily,
@@ -4598,23 +4618,36 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		>
 			<div className="text-center">
 				<div
-					className="mx-auto flex h-11 w-11 items-center justify-center rounded-full border"
+					className={cn(
+						"mx-auto items-center justify-center rounded-full border",
+						usesTightPostModuleLayout ? "hidden"
+						: compactModuleTitle ? "flex h-9 w-9"
+						: "flex h-11 w-11",
+					)}
 					style={{
 						backgroundColor: postModuleCompletionStyle.accentSoft,
 						borderColor: postModuleCompletionStyle.tipBorder,
 						color: postModuleCompletionStyle.accent,
 					}}
 				>
-					<CheckCircle2 size={22} />
+					<CheckCircle2 size={compactModuleTitle ? 18 : 22} />
 				</div>
 				<div
-					className="mt-3 text-[11px] font-bold uppercase tracking-[0.24em]"
+					className={cn(
+						"text-[11px] font-bold uppercase tracking-[0.24em]",
+						usesTightPostModuleLayout ? "mt-0"
+						: compactModuleTitle ? "mt-2"
+						: "mt-3",
+					)}
 					style={{color: postModuleCompletionStyle.accentText}}
 				>
 					Next steps
 				</div>
 				<h3
-					className="mt-1 text-2xl font-bold tracking-tight"
+					className={cn(
+						"mt-1 font-bold tracking-tight",
+						compactModuleTitle ? "text-xl" : "text-2xl",
+					)}
 					style={{
 						color: postModuleCompletionStyle.headingColor,
 						fontFamily: postModuleCompletionStyle.headingFamily,
@@ -4623,16 +4656,33 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 					Module complete
 				</h3>
 				<p
-					className="mx-auto mt-2 max-w-[460px] text-sm leading-relaxed"
+					className={cn(
+						"mx-auto max-w-[460px] text-sm",
+						compactModuleTitle ? "mt-1 leading-snug" : "mt-2 leading-relaxed",
+					)}
 					style={{color: postModuleCompletionStyle.bodyColor}}
 				>
 					You have finished the theory part. Practice now or continue to the next topic.
 				</p>
 			</div>
 
-			<div className="mt-6 grid gap-4">
+			<div
+				className={cn(
+					"mx-auto grid w-full",
+					usesTightPostModuleLayout ? "mt-3 max-w-[440px] gap-2.5"
+					: compactModuleTitle ? "mt-4 max-w-[460px] gap-3"
+					: "mt-6 gap-4",
+				)}
+			>
 				<button
-					className="group flex min-h-[164px] w-full flex-col rounded-[20px] p-5 text-left text-white transition-all hover:-translate-y-0.5"
+					className={cn(
+						"group flex w-full flex-col text-left text-white transition-all hover:-translate-y-0.5",
+						usesTightPostModuleLayout ?
+							"min-h-[112px] rounded-[16px] p-3"
+						: compactModuleTitle ?
+							"min-h-[124px] rounded-[18px] p-4"
+						:	"min-h-[164px] rounded-[20px] p-5",
+					)}
 					onClick={() => setIsActivityModalOpen(true)}
 					style={{
 						backgroundColor:
@@ -4643,17 +4693,32 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				>
 					<span className="flex w-full items-start justify-between gap-3">
 						<span
-							className="flex h-11 w-11 items-center justify-center rounded-xl"
+							className={cn(
+								"flex items-center justify-center rounded-xl",
+								usesTightPostModuleLayout ? "h-9 w-9"
+								: compactModuleTitle ? "h-10 w-10"
+								: "h-11 w-11",
+							)}
 							style={{
 								backgroundColor:
 									postModuleCompletionStyle.primaryIconBackground,
 								color: postModuleCompletionStyle.accentText,
 							}}
 						>
-							<Dumbbell size={20} />
+							<Dumbbell
+								size={
+									usesTightPostModuleLayout ? 17
+									: compactModuleTitle ? 18
+									: 20
+								}
+							/>
 						</span>
 						<span
-							className="rounded-full bg-white px-3 py-1 text-[11px] font-bold"
+							className={cn(
+								"rounded-full bg-white font-bold",
+								usesTightPostModuleLayout ? "px-2.5 py-1 text-[10px]"
+								: "px-3 py-1 text-[11px]",
+							)}
 							style={{
 								color: postModuleCompletionStyle.accentText,
 							}}
@@ -4661,15 +4726,30 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 							Recommended
 						</span>
 					</span>
-					<span className="mt-5 flex w-full items-center gap-3">
+					<span
+						className={cn(
+							"flex w-full items-center gap-3",
+							usesTightPostModuleLayout ? "mt-3"
+							: compactModuleTitle ? "mt-4"
+							: "mt-5",
+						)}
+					>
 						<span className="min-w-0 flex-1">
 							<span
-								className="block text-lg font-bold"
+								className={cn(
+									"block font-bold",
+									usesTightPostModuleLayout ? "text-base"
+									: compactModuleTitle ? "text-[17px]"
+									: "text-lg",
+								)}
 								style={{fontFamily: postModuleCompletionStyle.headingFamily}}
 							>
 								Exercises & Practice
 							</span>
-							<span className="mt-2 block text-sm font-medium leading-relaxed text-white/75">
+							<span className={cn(
+								"block text-sm font-medium text-white/75",
+								compactModuleTitle ? "mt-1 leading-snug" : "mt-2 leading-relaxed",
+							)}>
 								Apply what you learned with guided exercises.
 							</span>
 						</span>
@@ -4677,7 +4757,14 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 					</span>
 				</button>
 				<button
-					className="group flex min-h-[164px] w-full flex-col rounded-[20px] border border-[#E5E5E7] bg-white p-5 text-left text-[#0F0F12] transition-all hover:-translate-y-0.5 hover:border-[#0F0F12] disabled:cursor-not-allowed disabled:opacity-60"
+					className={cn(
+						"group flex w-full flex-col border border-[#E5E5E7] bg-white text-left text-[#0F0F12] transition-all hover:-translate-y-0.5 hover:border-[#0F0F12] disabled:cursor-not-allowed disabled:opacity-60",
+						usesTightPostModuleLayout ?
+							"min-h-[112px] rounded-[16px] p-3"
+						: compactModuleTitle ?
+							"min-h-[124px] rounded-[18px] p-4"
+						:	"min-h-[164px] rounded-[20px] p-5",
+					)}
 					disabled={isPostModuleActionPending}
 					onClick={() => {
 						void handlePostModulePrimaryAction();
@@ -4691,17 +4778,32 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				>
 					<span className="flex w-full items-start justify-between gap-3">
 						<span
-							className="flex h-11 w-11 items-center justify-center rounded-xl"
+							className={cn(
+								"flex items-center justify-center rounded-xl",
+								usesTightPostModuleLayout ? "h-9 w-9"
+								: compactModuleTitle ? "h-10 w-10"
+								: "h-11 w-11",
+							)}
 							style={{
 								backgroundColor:
 									postModuleCompletionStyle.secondaryIconBackground,
 								color: postModuleCompletionStyle.accent,
 							}}
 						>
-							<BookOpenCheck size={20} />
+							<BookOpenCheck
+								size={
+									usesTightPostModuleLayout ? 17
+									: compactModuleTitle ? 18
+									: 20
+								}
+							/>
 						</span>
 						<span
-							className="rounded-full px-3 py-1 text-[11px] font-bold"
+							className={cn(
+								"rounded-full font-bold",
+								usesTightPostModuleLayout ? "px-2.5 py-1 text-[10px]"
+								: "px-3 py-1 text-[11px]",
+							)}
 							style={{
 								backgroundColor:
 									postModuleCompletionStyle.badgeBackground,
@@ -4711,10 +4813,22 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 							Continue
 						</span>
 					</span>
-					<span className="mt-5 flex w-full items-center gap-3">
+					<span
+						className={cn(
+							"flex w-full items-center gap-3",
+							usesTightPostModuleLayout ? "mt-3"
+							: compactModuleTitle ? "mt-4"
+							: "mt-5",
+						)}
+					>
 						<span className="min-w-0 flex-1">
 							<span
-								className="block text-lg font-bold"
+								className={cn(
+									"block font-bold",
+									usesTightPostModuleLayout ? "text-base"
+									: compactModuleTitle ? "text-[17px]"
+									: "text-lg",
+								)}
 								style={{
 									color: postModuleCompletionStyle.headingColor,
 									fontFamily: postModuleCompletionStyle.headingFamily,
@@ -4723,7 +4837,10 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 								{primaryActionLabel}
 							</span>
 							<span
-								className="mt-2 block text-sm font-medium leading-relaxed"
+								className={cn(
+									"block text-sm font-medium",
+									compactModuleTitle ? "mt-1 leading-snug" : "mt-2 leading-relaxed",
+								)}
 								style={{color: postModuleCompletionStyle.bodyColor}}
 							>
 								{hasNextModule ?
@@ -4737,7 +4854,14 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				</button>
 			</div>
 			<div
-				className="mx-auto mt-5 w-fit rounded-2xl border px-4 py-3 text-center text-sm"
+				className={cn(
+					"mx-auto w-fit border text-center text-sm",
+					usesTightPostModuleLayout ?
+						"mt-3 rounded-xl px-3 py-2 text-[12px] leading-snug"
+					: compactModuleTitle ?
+						"mt-4 rounded-xl px-4 py-2.5 text-[13px] leading-snug"
+					:	"mt-5 rounded-2xl px-4 py-3",
+				)}
 				style={{
 					backgroundColor: postModuleCompletionStyle.tipBackground,
 					borderColor: postModuleCompletionStyle.tipBorder,
@@ -5016,7 +5140,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 										"min-h-0 w-full shrink-0 overflow-visible pb-1"
 									:	"h-full min-h-full overflow-auto",
 								)}
-								baseTextStyle={draft.textStyle}
+								baseTextStyle={displayTextStyle}
 								editable
 								editorId={`content-${didacticUnitId}-${activeChapter.chapterIndex}-${pageIndex}-edit`}
 								initialHtml={html ?? ""}
@@ -5181,7 +5305,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 									"min-h-0 w-full shrink-0 overflow-visible pb-1"
 								:	"h-full min-h-full overflow-auto",
 							)}
-							baseTextStyle={draft.textStyle}
+							baseTextStyle={displayTextStyle}
 							editable
 							editorId={`content-${didacticUnitId}-${activeChapter.chapterIndex}-0-edit`}
 							initialHtml={html ?? ""}

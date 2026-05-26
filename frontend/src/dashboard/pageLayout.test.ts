@@ -9,9 +9,10 @@ describe("calculateSpreadMetrics", () => {
 		});
 
 		expect(compactDesktop.pagesPerSpread).toBe(2);
-		expect(compactDesktop.pageHeight).toBe(626);
-		expect(compactDesktop.pageWidth).toBeGreaterThan(570);
-		expect(compactDesktop.spreadWidth).toBeGreaterThan(1160);
+		expect(compactDesktop.pageHeight).toBe(618);
+		expect(compactDesktop.pageWidth / compactDesktop.pageHeight).toBeCloseTo(
+			0.88,
+		);
 	});
 
 	it("keeps the regular desktop reading ratio on larger viewports", () => {

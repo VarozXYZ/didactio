@@ -1489,7 +1489,7 @@ export function calculateSpreadMetrics({
 	const pagesPerSpread = isSinglePageSpread ? 1 : 2;
 	const stagePaddingTop = isMobile ? 16 : isLaptop ? 0 : 24;
 	const stagePaddingBottom = isMobile ? 20 : isLaptop ? 28 : 24;
-	const indicatorHeight = isMobile ? 42 : isLaptop ? 40 : 48;
+	const indicatorHeight = isMobile ? 42 : 48;
 	const indicatorGap = isMobile ? 12 : isLaptop ? 10 : 16;
 	const arrowAllowance = isMobile ? 64 : isLaptop ? 48 : 84;
 	const mainStageHorizontalGutter = isMobile ? 24 : isLaptop ? 24 : 48;
