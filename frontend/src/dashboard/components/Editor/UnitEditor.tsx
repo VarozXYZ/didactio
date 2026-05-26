@@ -981,6 +981,56 @@ function buildDraft(
 	};
 }
 
+const EDITOR_TEXT_SIZE_PREFERENCE_STORAGE_KEY =
+	"didactio:editor-text-size-preferences";
+
+function readEditorTextSizePreferences(): Record<string, true> {
+	if (typeof window === "undefined") {
+		return {};
+	}
+
+	try {
+		const parsed = JSON.parse(
+			window.localStorage.getItem(
+				EDITOR_TEXT_SIZE_PREFERENCE_STORAGE_KEY,
+			) ?? "{}",
+		);
+		return parsed && typeof parsed === "object" ?
+				(parsed as Record<string, true>)
+			:	{};
+	} catch {
+		return {};
+	}
+}
+
+function hasEditorTextSizePreference(didacticUnitId: string): boolean {
+	return readEditorTextSizePreferences()[didacticUnitId] === true;
+}
+
+function markEditorTextSizePreference(didacticUnitId: string): void {
+	if (typeof window === "undefined") {
+		return;
+	}
+
+	const preferences = readEditorTextSizePreferences();
+	preferences[didacticUnitId] = true;
+	window.localStorage.setItem(
+		EDITOR_TEXT_SIZE_PREFERENCE_STORAGE_KEY,
+		JSON.stringify(preferences),
+	);
+}
+
+function applyCompactDesktopDefaultTextStyle(
+	textStyle: EditorTextStyle,
+	useCompactDefault: boolean,
+): EditorTextStyle {
+	if (!useCompactDefault || textStyle.sizeProfile !== "regular") {
+		return textStyle;
+	}
+
+	return {...textStyle, sizeProfile: "small"};
+}
+
 function getInitialEditorChapterIndex(
 	workspace: DidacticUnitEditorViewModel,
 ): number {
@@ -2212,6 +2262,10 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	}));
 	const usesCompactDesktopTextSize =
 		viewport.width >= 768 && viewport.width < 1600;
+	const [hasUserTextSizePreference, setHasUserTextSizePreference] =
+		useState(() => hasEditorTextSizePreference(didacticUnitId));
+	const shouldUseCompactDesktopTextSizeDefault =
+		usesCompactDesktopTextSize && !hasUserTextSizePreference;
 	const resolvedTheme = useMemo(
 		() =>
 			resolvePresentationTheme(
@@ -2222,11 +2276,19 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	);
 	const displayTextStyle = useMemo(
 		() =>
-			draft && usesCompactDesktopTextSize ?
-				{...draft.textStyle, sizeProfile: "small" as const}
-			:	draft?.textStyle,
-		[draft?.textStyle, usesCompactDesktopTextSize],
+			draft ?
+				applyCompactDesktopDefaultTextStyle(
+					draft.textStyle,
+					shouldUseCompactDesktopTextSizeDefault,
+				)
+			:	undefined,
+		[draft?.textStyle, shouldUseCompactDesktopTextSizeDefault],
 	);
+	useEffect(() => {
+		setHasUserTextSizePreference(
+			hasEditorTextSizePreference(didacticUnitId),
+		);
+	}, [didacticUnitId]);
 	const effectiveTheme = useMemo(
 		() =>
 			displayTextStyle ?
@@ -3079,9 +3141,12 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			draft.textStyle
 		: 	activeChapter?.textStyle;
 	const activeDraftSettings =
-		storedActiveDraftSettings && usesCompactDesktopTextSize ?
-			{...storedActiveDraftSettings, sizeProfile: "small" as const}
-		:	storedActiveDraftSettings;
+		storedActiveDraftSettings ?
+			applyCompactDesktopDefaultTextStyle(
+				storedActiveDraftSettings,
+				shouldUseCompactDesktopTextSizeDefault,
+			)
+		:	undefined;
 	const activeTextStyleKey = [
 		activeDraftSettings?.stylePreset ?? "classic",
 		activeDraftSettings?.sizeProfile ?? "regular",
@@ -4316,6 +4381,67 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		!regenerationCost ||
 		(user?.credits[regenerationCost.coinType] ?? 0) >=
 			regenerationCost.amount;
+	const handleTextStyleChange = useCallback(
+		(textStyle: EditorTextStyle) => {
+			const userChangedSize =
+				displayTextStyle?.sizeProfile !== textStyle.sizeProfile;
+			if (userChangedSize) {
+				markEditorTextSizePreference(didacticUnitId);
+				setHasUserTextSizePreference(true);
+			}
+
+			const persistedTextStyle =
+				!userChangedSize &&
+				!hasUserTextSizePreference &&
+				shouldUseCompactDesktopTextSizeDefault &&
+				textStyle.sizeProfile === "small" ?
+					{...textStyle, sizeProfile: "regular" as const}
+				:	textStyle;
+			const draftTextStyle =
+				userChangedSize ? textStyle : persistedTextStyle;
+
+			setDraft((previous) =>
+				previous ?
+					{
+						...previous,
+						textStyle: draftTextStyle,
+					}
+				:	previous,
+			);
+			const presentationTheme = themeFromTextStyle(
+				resolvedTheme,
+				persistedTextStyle,
+			);
+			setWorkspace((previous) =>
+				previous ?
+					{
+						...previous,
+						presentationTheme,
+						chapters: previous.chapters.map((chapter) => ({
+							...chapter,
+							textStyle: draftTextStyle,
+						})),
+					}
+				:	previous,
+			);
+			void dashboardApi
+				.updateDidacticUnitTheme(didacticUnitId, presentationTheme)
+				.catch((error) => {
+					toastError(
+						error instanceof Error ?
+							error.message
+						:	"Could not update the unit style.",
+					);
+				});
+		},
+		[
+			didacticUnitId,
+			displayTextStyle?.sizeProfile,
+			hasUserTextSizePreference,
+			resolvedTheme,
+			shouldUseCompactDesktopTextSizeDefault,
+		],
+	);
 	const contentPageOffset = currentSpread * pagesPerSpread;
 	const leftReadPage = readPages[contentPageOffset];
 	const rightReadPage =
@@ -4877,8 +5003,8 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				Practicing now helps retain the concepts before moving on.
 			</div>
 			<Dialog open={isActivityModalOpen} onOpenChange={setIsActivityModalOpen}>
-				<DialogContent className="app-activity-create-modal max-h-[88vh] overflow-y-auto sm:max-w-[760px]">
-					<DialogHeader>
+				<DialogContent className="app-activity-create-modal max-h-[88vh] overflow-x-hidden overflow-y-auto sm:max-w-[760px]">
+					<DialogHeader className="max-[1599px]:px-5 max-[1599px]:pb-3 max-[1599px]:pt-4">
 						<DialogTitle>Exercises & Practice</DialogTitle>
 						<DialogDescription>
 							{hasNextModule ?
@@ -4888,8 +5014,8 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 						</DialogDescription>
 					</DialogHeader>
 
-					<div className="space-y-6 px-6 py-5">
-						<div className="app-activity-create-scope rounded-[18px] bg-[#F5F5F7] p-1">
+					<div className="space-y-6 px-6 py-5 max-[1599px]:space-y-3 max-[1599px]:px-5 max-[1599px]:py-3">
+						<div className="app-activity-create-scope rounded-[18px] bg-[#F5F5F7] p-1 max-[1599px]:rounded-[15px]">
 							<div className="grid grid-cols-2 gap-1">
 								{[
 									{value: "current_module" as const, label: "Current module", icon: BookOpenCheck},
@@ -4903,7 +5029,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 											type="button"
 											onClick={() => setActivityScope(option.value)}
 											className={cn(
-												"app-activity-create-scope-option flex items-center justify-center gap-2 rounded-[14px] px-4 py-2.5 text-sm font-bold transition",
+												"app-activity-create-scope-option flex items-center justify-center gap-2 rounded-[14px] px-4 py-2.5 text-sm font-bold transition max-[1599px]:rounded-[12px] max-[1599px]:py-2",
 												selected ?
 													"app-activity-create-scope-option-selected bg-white text-[#16A34A] shadow-sm ring-1 ring-[#4ADE80]"
 												:	"text-[#6B7280] hover:text-[#0F0F12]",
@@ -4917,10 +5043,10 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 							</div>
 						</div>
 
-						<div className="-mx-6 border-t border-[#F0F0F2]" />
+						<div className="-mx-6 border-t border-[#F0F0F2] max-[1599px]:-mx-5" />
 
 						<div>
-							<div className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-[#86868B]">
+							<div className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-[#86868B] max-[1599px]:mb-2">
 								Activity type
 							</div>
 							<div className="grid gap-2 sm:grid-cols-2">
@@ -4933,7 +5059,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 											type="button"
 											onClick={() => setActivityType(option.type)}
 											className={cn(
-												"app-activity-create-option relative flex items-start gap-3 rounded-2xl border p-3 text-left transition",
+												"app-activity-create-option relative flex items-start gap-3 rounded-2xl border p-3 text-left transition max-[1599px]:gap-2.5 max-[1599px]:rounded-[13px] max-[1599px]:p-2",
 												selected ?
 													"app-activity-create-option-selected border-[#4ADE80] bg-[#F0FDF4] text-[#0F0F12]"
 												:	"border-[#E5E5E7] bg-white text-[#0F0F12] hover:border-[#D1D5DB]",
@@ -4948,7 +5074,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 											)}
 											<span
 												className={cn(
-													"app-activity-create-option-icon flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
+													"app-activity-create-option-icon flex h-9 w-9 shrink-0 items-center justify-center rounded-xl max-[1599px]:h-8 max-[1599px]:w-8 max-[1599px]:rounded-[10px]",
 													selected ?
 														"app-activity-create-option-icon-selected bg-[#DCFCE7] text-[#16A34A]"
 													:	"bg-[#F3F4F6] text-[#0F0F12]",
@@ -4958,7 +5084,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 											</span>
 											<span>
 												<span className="block text-sm font-bold">{option.label}</span>
-												<span className="mt-1 block text-xs leading-relaxed text-[#6B7280]">
+												<span className="mt-1 block text-xs leading-relaxed text-[#6B7280] max-[1599px]:mt-0.5 max-[1599px]:leading-snug">
 													{option.description}
 												</span>
 											</span>
@@ -4968,10 +5094,10 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 							</div>
 						</div>
 
-						<div className="-mx-6 border-t border-[#F0F0F2]" />
+						<div className="-mx-6 border-t border-[#F0F0F2] max-[1599px]:-mx-5" />
 
 						<div>
-							<div className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-[#86868B]">
+							<div className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-[#86868B] max-[1599px]:mb-2">
 								Model
 							</div>
 							<div className="grid gap-2 sm:grid-cols-2">
@@ -4983,7 +5109,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 											type="button"
 											onClick={() => setActivityQuality(option.quality)}
 											className={cn(
-												"app-activity-create-model relative flex h-[58px] items-center gap-3 rounded-2xl border px-3 text-left transition",
+												"app-activity-create-model relative flex h-[58px] items-center gap-3 rounded-2xl border px-3 text-left transition max-[1599px]:h-[48px] max-[1599px]:rounded-[13px]",
 												selected ?
 													"app-activity-create-model-selected border-[#4ADE80] bg-white"
 												:	"border-[#E5E5E7] bg-[#F8F8F9] hover:border-[#D1D5DB]",
@@ -5006,7 +5132,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 													/>
 												</span>
 											)}
-											<span className="flex h-9 w-9 shrink-0 items-center justify-center">
+											<span className="flex h-9 w-9 shrink-0 items-center justify-center max-[1599px]:h-8 max-[1599px]:w-8">
 												{option.icon ? (
 													<img
 														src={option.icon}
@@ -5030,7 +5156,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 
 					</div>
 
-					<DialogFooter className="app-activity-create-footer">
+					<DialogFooter className="app-activity-create-footer max-[1599px]:px-5 max-[1599px]:py-3">
 						<span className="mr-auto inline-flex min-w-0 items-center gap-1.5 whitespace-nowrap text-xs font-bold text-[#0F0F12]">
 							Current balance:
 							<span className="inline-flex items-center gap-2">
@@ -5707,44 +5833,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 						navigate("/dashboard?section=preferences")
 					}
 					onOpenTutorial={() => setIsEditorGuideOpen(true)}
-					onTextStyleChange={(textStyle) => {
-						setDraft((previous) =>
-							previous ?
-								{
-									...previous,
-									textStyle,
-								}
-							:	previous,
-						);
-						const presentationTheme = themeFromTextStyle(
-							resolvedTheme,
-							textStyle,
-						);
-						setWorkspace((previous) =>
-							previous ?
-								{
-									...previous,
-									presentationTheme,
-									chapters: previous.chapters.map((chapter) => ({
-										...chapter,
-										textStyle,
-									})),
-								}
-							:	previous,
-						);
-						void dashboardApi
-							.updateDidacticUnitTheme(
-								didacticUnitId,
-								presentationTheme,
-							)
-							.catch((error) => {
-								toastError(
-									error instanceof Error ?
-										error.message
-									:	"Could not update the unit style.",
-								);
-							});
-					}}
+					onTextStyleChange={handleTextStyleChange}
 					onRegenerate={() => setRegenerateConfirmOpen(true)}
 					onRefillActivityAttempts={handleRefillActivityAttempts}
 					onSelectChapter={(chapterIndex) => {
@@ -5755,7 +5844,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 					onSubmitActivityAttempt={handleLearningActivityAttempt}
 					resolvedThemeVars={resolvedThemeVars}
 					stylePreset={draft.textStyle.stylePreset}
-					textStyle={draft.textStyle}
+					textStyle={displayTextStyle ?? draft.textStyle}
 				/>
 				<Dialog
 					open={isExportDialogOpen}
@@ -6885,48 +6974,8 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 							{draft !== null && (
 								<ChapterStyleMenu
 									iconOnly
-									value={draft.textStyle}
-									onChange={(textStyle) => {
-										setDraft((previous) =>
-											previous ?
-												{
-													...previous,
-													textStyle,
-												}
-											:	previous,
-										);
-										const presentationTheme =
-											themeFromTextStyle(
-												resolvedTheme,
-												textStyle,
-											);
-										setWorkspace((previous) =>
-											previous ?
-												{
-													...previous,
-													presentationTheme,
-													chapters: previous.chapters.map(
-														(chapter) => ({
-															...chapter,
-															textStyle,
-														}),
-													),
-												}
-											:	previous,
-										);
-										void dashboardApi
-											.updateDidacticUnitTheme(
-												didacticUnitId,
-												presentationTheme,
-											)
-											.catch((error) => {
-												toastError(
-													error instanceof Error ?
-														error.message
-													:	"Could not update the unit style.",
-												);
-											});
-									}}
+									value={displayTextStyle ?? draft.textStyle}
+									onChange={handleTextStyleChange}
 								/>
 							)}
 							{isEditMode ?

@@ -248,6 +248,9 @@ describe("prompt quality helpers", () => {
 		expect(prompt).toContain("The learner prefers script-based examples.");
 		expect(prompt).toContain("Learning profile: beginner");
 		expect(prompt).toContain("Requested length: textbook");
+		expect(prompt).toContain(
+			"Target module volume: comprehensive textbook-style treatment",
+		);
 		expect(prompt).toContain("1. Conditionals");
 		expect(prompt).toContain(
 			'Do not use generic headings like "Concept Explanation"',

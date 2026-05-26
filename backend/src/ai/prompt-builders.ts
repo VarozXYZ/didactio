@@ -92,6 +92,18 @@ function contentLengthInstruction(length: DidacticUnitLength): string {
 	}
 }
 
+function moduleContentVolumeInstruction(length: DidacticUnitLength): string {
+	switch (length) {
+		case "intro":
+		case "short":
+			return "Target module volume: concise but complete, roughly 1,400-2,000 words when the lesson outline supports it.";
+		case "long":
+			return "Target module volume: a substantial course module, roughly 3,000-4,500 words when the lesson outline supports it. Develop each lesson through multiple topic-specific subsections, examples, pitfalls, applied practice, and synthesis. Do not stop after a brief overview.";
+		case "textbook":
+			return "Target module volume: comprehensive textbook-style treatment, roughly 5,000-7,000 words when the lesson outline supports it. Develop each lesson with sustained explanation, worked examples, comparisons, edge cases, practice, and synthesis. Do not stop after a brief overview.";
+	}
+}
+
 function buildAuthoringContext(authoring: AuthoringConfig): string[] {
 	return [
 		`Language: ${authoring.language}`,
@@ -705,6 +717,7 @@ export function buildChapterHtmlPrompt(input: {
 			`Course Description: ${input.syllabus.description}`,
 			`Requested length: ${input.length}`,
 			contentLengthInstruction(input.length),
+			moduleContentVolumeInstruction(input.length),
 			"Learner questionnaire context:",
 			formatQuestionnaireContext(input.questionnaireAnswers),
 			input.additionalContext ?

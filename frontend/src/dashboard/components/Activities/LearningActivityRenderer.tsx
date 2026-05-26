@@ -1249,7 +1249,10 @@ function CodePracticeActivity({
 }) {
 	const prompt = asText(content.prompt);
 	const starterCode = asText(content.starterCode);
-	const code = asText(answers.code) || starterCode;
+	const code =
+		Object.prototype.hasOwnProperty.call(answers, "code") ?
+			asText(answers.code)
+		:	starterCode;
 	const language = asText(content.language) || "Code";
 	const expectedOutcome = asText(content.expectedOutcome);
 	const testCases = asArray(content.testCases);
@@ -2592,7 +2595,8 @@ export function LearningActivityRenderer({
 				{}
 			:	answers;
 		const payload =
-			activity.type === "coding_practice" && !asText(currentAnswers.code) ?
+			activity.type === "coding_practice" &&
+			!Object.prototype.hasOwnProperty.call(currentAnswers, "code") ?
 				{
 					...currentAnswers,
 					code: asText(content.starterCode),

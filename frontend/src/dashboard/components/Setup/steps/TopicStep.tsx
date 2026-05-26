@@ -237,9 +237,13 @@ function SegmentedControl<T extends string>({
 						>
 							<span className="inline-flex min-w-0 items-center justify-center gap-2">
 								<span className="truncate">{opt.label}</span>
-								{opt.multiplier && variant !== "cost" ?
+								{opt.multiplier ?
 									<span
-										className="hidden shrink-0 items-center gap-1 text-[11px] font-bold leading-none sm:inline-flex"
+										className={`shrink-0 items-center gap-1 text-[11px] font-bold leading-none ${
+											variant === "cost" ?
+												"hidden sm:inline-flex"
+											:	"inline-flex"
+										}`}
 									>
 										<span
 											className="length-coin-cycle"

@@ -6,6 +6,7 @@ import type {DidacticUnit} from "./create-didactic-unit.js";
 import type {DidacticUnitStore} from "./didactic-unit-store.js";
 import type {DefaultDidacticUnitTemplate} from "./export-default-didactic-unit-template.js";
 import pythonIntroductionTemplate from "./default-templates/e6aa29be-3371-42ce-a33e-4f31fd4207a2.json" with {type: "json"};
+import sportsNutritionTemplate from "./default-templates/a010c81d-49e5-4509-9354-c0ab66960d49.json" with {type: "json"};
 
 export interface DefaultDidacticUnitDefinition {
 	id: string;
@@ -18,6 +19,11 @@ export const DEFAULT_DIDACTIC_UNIT_DEFINITIONS: DefaultDidacticUnitDefinition[] 
 		id: "welcome-unit-e6aa29be",
 		template: pythonIntroductionTemplate as unknown as DefaultDidacticUnitTemplate,
 		folderSlug: "computer-science",
+	},
+	{
+		id: "sports-nutrition-unit-a010c81d",
+		template: sportsNutritionTemplate as unknown as DefaultDidacticUnitTemplate,
+		folderSlug: "biology",
 	},
 ];
 
