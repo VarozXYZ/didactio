@@ -1,8 +1,8 @@
 import type {
-	BackendDidacticUnitNote,
-	BackendDidacticUnitNoteAnchor,
-} from "../api/dashboardApi";
-import type {DidacticUnitEditorChapter, HtmlContentBlock} from "../types";
+	DidacticUnitNoteDto,
+	DidacticUnitNoteAnchorDto,
+} from "@/dashboard/api/dashboardApi";
+import type {UnitEditorChapterViewModel, HtmlContentBlock} from "../types";
 
 const ANNOTATABLE_BLOCK_TYPES = new Set<HtmlContentBlock["type"]>([
 	"heading",
@@ -113,9 +113,9 @@ function areBlocksAnnotatable(
 }
 
 export function getValidUnitNotesForChapter(
-	notes: BackendDidacticUnitNote[],
-	chapter: DidacticUnitEditorChapter,
-): BackendDidacticUnitNote[] {
+	notes: DidacticUnitNoteDto[],
+	chapter: UnitEditorChapterViewModel,
+): DidacticUnitNoteDto[] {
 	return notes.filter((note) => {
 		if (note.chapterIndex !== chapter.chapterIndex) {
 			return false;
@@ -142,8 +142,8 @@ export function buildNoteAnchorFromSelection(input: {
 	range: Range;
 	pageRoot: HTMLElement;
 	pageStartOffset: number;
-	chapter: DidacticUnitEditorChapter;
-}): {anchor: BackendDidacticUnitNoteAnchor; selectedText: string} | null {
+	chapter: UnitEditorChapterViewModel;
+}): {anchor: DidacticUnitNoteAnchorDto; selectedText: string} | null {
 	const selectedText = normalizeSelectionText(input.range.toString());
 	if (!selectedText) {
 		return null;
@@ -197,7 +197,7 @@ export function buildNoteAnchorFromSelection(input: {
 
 function globalOffsetForAnchor(
 	blocks: HtmlContentBlock[],
-	anchor: BackendDidacticUnitNoteAnchor,
+	anchor: DidacticUnitNoteAnchorDto,
 	edge: "start" | "end",
 ): number | null {
 	const block = blocks.find(
@@ -247,8 +247,8 @@ export function applyNoteMarksToPageHtml(input: {
 	html: string;
 	pageStartOffset: number;
 	pageEndOffset: number;
-	chapter: DidacticUnitEditorChapter;
-	notes: BackendDidacticUnitNote[];
+	chapter: UnitEditorChapterViewModel;
+	notes: DidacticUnitNoteDto[];
 }): string {
 	const validNotes = getValidUnitNotesForChapter(input.notes, input.chapter)
 		.map((note) => {
@@ -258,7 +258,7 @@ export function applyNoteMarksToPageHtml(input: {
 			return start === null || end === null ? null : {note, start, end};
 		})
 		.filter(
-			(item): item is {note: BackendDidacticUnitNote; start: number; end: number} =>
+			(item): item is {note: DidacticUnitNoteDto; start: number; end: number} =>
 				item !== null &&
 				item.start >= input.pageStartOffset &&
 				item.start < input.pageEndOffset,

@@ -6,7 +6,7 @@ import {
 } from "@ncdai/react-wheel-picker";
 import "@ncdai/react-wheel-picker/style.css";
 
-import {cn} from "../../lib/utils";
+import {cn} from "@/lib/utils";
 
 type DidactioWheelPickerProps<T extends WheelPickerValue> = {
 	className?: string;

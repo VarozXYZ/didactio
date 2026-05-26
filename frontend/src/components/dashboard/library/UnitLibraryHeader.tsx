@@ -1,0 +1,134 @@
+import {Plus} from "lucide-react";
+import {useState} from "react";
+
+export function CreateUnitButton({onClick, label = "New unit"}: {onClick: () => void; label?: string}) {
+	const [hovered, setHovered] = useState(false);
+	const [pressed, setPressed] = useState(false);
+	const [spinKey, setSpinKey] = useState(0);
+
+	return (
+		<>
+			<style>{`
+                @property --arc-end {
+                    syntax: '<angle>';
+                    inherits: false;
+                    initial-value: 0deg;
+                }
+                @keyframes arcExpand {
+                    from { --arc-end: 0deg; }
+                    to   { --arc-end: 360deg; }
+                }
+                .border-spinner {
+                    animation: arcExpand 1.1s cubic-bezier(0.2, 0.8, 0.4, 1) forwards;
+                }
+            `}</style>
+
+			<button
+				type="button"
+				className="app-create-unit-button"
+				onClick={onClick}
+				onMouseEnter={() => {
+					setHovered(true);
+					setSpinKey((k) => k + 1);
+				}}
+				onMouseLeave={() => {
+					setHovered(false);
+					setPressed(false);
+				}}
+				onMouseDown={() => setPressed(true)}
+				onMouseUp={() => setPressed(false)}
+				style={{
+					position: "relative",
+					overflow: "hidden",
+					padding: "3px",
+					border: "none",
+					borderRadius: "14px",
+					background: "#0f0f12",
+					cursor: "pointer",
+					transform: pressed ? "scale(0.988)" : "none",
+					transition: "transform 0.12s ease, box-shadow 0.22s ease",
+					boxShadow:
+						"inset 0 1px 0 rgba(255,255,255,0.10), inset 0 -2px 8px rgba(0,0,0,0.30)",
+				}}
+			>
+				<div
+					aria-hidden="true"
+					style={{
+						position: "absolute",
+						inset: 0,
+						borderRadius: "14px",
+						pointerEvents: "none",
+						zIndex: 0,
+						transform:
+							hovered ? "translateY(-1px)" : "translateY(0px)",
+						opacity: hovered ? 1 : 0,
+						transition:
+							"opacity 220ms cubic-bezier(0.16, 1, 0.3, 1), transform 220ms cubic-bezier(0.16, 1, 0.3, 1)",
+						boxShadow:
+							"0 20px 52px -22px rgba(0,0,0,0.78), 0 12px 26px -18px rgba(0,0,0,0.58)",
+					}}
+				/>
+
+				{hovered && (
+					<div
+						key={spinKey}
+						className="border-spinner"
+						style={{
+							position: "absolute",
+							width: "300%",
+							height: "500%",
+							top: "50%",
+							left: "50%",
+							transform: "translate(-50%, -50%)",
+							background:
+								"conic-gradient(from 0deg, #3434c3 0deg, #337ECF 45deg, #8DD598 90deg, #11A07D 135deg, #FADF52 180deg, #EFA047 225deg, #E01D50 270deg, #BB2081 315deg, #3434c3 360deg)",
+							WebkitMaskImage:
+								"conic-gradient(from 0deg, black 0deg, black var(--arc-end), transparent calc(var(--arc-end) + 12deg), transparent 360deg)",
+							maskImage:
+								"conic-gradient(from 0deg, black 0deg, black var(--arc-end), transparent calc(var(--arc-end) + 12deg), transparent 360deg)",
+							zIndex: 1,
+						}}
+					/>
+				)}
+
+				<div
+					className="app-create-unit-button-content flex select-none items-center gap-2.5 px-5 py-[11px] text-[15px] font-semibold text-white"
+					style={{
+						position: "relative",
+						zIndex: 2,
+						background: "#0f0f12",
+						borderRadius: "12px",
+					}}
+				>
+					<Plus size={17} strokeWidth={2.5} />
+					{label}
+				</div>
+			</button>
+		</>
+	);
+}
+
+export function UnitLibraryHeader({
+	filteredUnitsCount,
+	onCreateUnit,
+}: {
+	filteredUnitsCount: number;
+	onCreateUnit: () => void;
+}) {
+	return (
+		<header className="app-dashboard-header z-10 flex h-[80px] shrink-0 items-center justify-between border-b border-[#E5E5E7] bg-white/80 px-8 backdrop-blur-md">
+			<div className="mx-auto flex w-full max-w-[1560px] items-center justify-between gap-6">
+				<div>
+					<h1 className="text-[28px] font-bold tracking-tight text-[#1D1D1F]">
+						Library
+					</h1>
+					<p className="mt-0.5 text-[13px] text-[#86868B]">
+						{filteredUnitsCount} library items
+					</p>
+				</div>
+
+				<CreateUnitButton onClick={onCreateUnit} />
+			</div>
+		</header>
+	);
+}

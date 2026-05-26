@@ -1,7 +1,7 @@
-import DashboardApp from "../dashboard/DashboardApp";
+import DashboardShell from "@/components/dashboard/DashboardShell";
 
 function DashboardPage() {
-	return <DashboardApp />;
+	return <DashboardShell />;
 }
 
 export default DashboardPage;

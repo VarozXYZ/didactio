@@ -1,5 +1,5 @@
-import PricingPlans from "../components/PricingPlans";
-import PricingFaq from "../components/PricingFaq";
+import PricingPlans from "@/components/marketing/PricingPlans";
+import PricingFaq from "@/components/marketing/PricingFaq";
 
 function PricingPage() {
 	return (

@@ -1,7 +1,7 @@
-import Features from "../components/Features";
-import Faq from "../components/Faq";
-import Hero from "../components/Hero";
-import Testimonials from "../components/Testimonials";
+import Features from "@/components/marketing/Features";
+import Faq from "@/components/marketing/Faq";
+import Hero from "@/components/marketing/Hero";
+import Testimonials from "@/components/marketing/Testimonials";
 
 function HomePage() {
 	return (

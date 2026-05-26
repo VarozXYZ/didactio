@@ -1,9 +1,9 @@
 import {Suspense, lazy, useEffect} from "react";
 import {Route, Routes, useLocation} from "react-router-dom";
-import {RequireAuth} from "./auth/RequireAuth";
-import Header from "./components/Header";
-import Footer from "./components/Footer";
-import {useAppearance} from "./theme/AppearanceProvider";
+import {RequireAuth} from "@/components/auth/RequireAuth";
+import Header from "@/components/marketing/Header";
+import Footer from "@/components/marketing/Footer";
+import {useAppearance} from "@/theme/useAppearance";
 
 const HomePage = lazy(() => import("./pages/HomePage"));
 const PricingPage = lazy(() => import("./pages/PricingPage"));

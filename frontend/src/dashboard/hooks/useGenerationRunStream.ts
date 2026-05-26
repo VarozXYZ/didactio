@@ -1,15 +1,15 @@
 import {useCallback, useRef, useState} from "react";
 import {
-	type BackendGenerationRun,
-	type BackendHtmlContentBlock,
+	type GenerationRunDto,
+	type HtmlContentBlockDto,
 	dashboardApi,
-} from "../api/dashboardApi";
+} from "@/dashboard/api/dashboardApi";
 
 type GenerationRunStreamState = {
-	blocks: BackendHtmlContentBlock[];
+	blocks: HtmlContentBlockDto[];
 	error: string | null;
 	isStreaming: boolean;
-	run: BackendGenerationRun | null;
+	run: GenerationRunDto | null;
 };
 
 export function useGenerationRunStream() {

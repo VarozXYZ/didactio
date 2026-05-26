@@ -1,4 +1,4 @@
-import AuthScreen from "../components/AuthScreen";
+import AuthScreen from "@/components/auth/AuthScreen";
 
 function RegisterPage() {
 	return <AuthScreen mode="register" />;

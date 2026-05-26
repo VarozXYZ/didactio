@@ -1,5 +1,5 @@
-import type {PresentationTheme} from "../types/presentationTheme";
-import type {StylePresetId} from "./utils/typography";
+import type {PresentationTheme} from "@/shared/presentation/presentationTheme";
+import type {StylePresetId} from "@/shared/presentation/typography";
 
 export type DashboardSection =
 	| "all-units"
@@ -30,7 +30,7 @@ export interface DashboardFolder {
 	unitCount: number;
 }
 
-export interface DashboardListItem {
+export interface UnitLibraryItem {
 	kind: DashboardItemKind;
 	id: string;
 	title: string;
@@ -87,7 +87,7 @@ export interface PlanningSyllabus {
 	chapters: PlanningSyllabusChapter[];
 }
 
-export interface PlanningDetailViewModel {
+export interface UnitSetupViewModel {
 	id: string;
 	topic: string;
 	folder: DashboardFolderSummary;
@@ -127,7 +127,7 @@ export interface EditorTextStyle {
 	sizeProfile: "small" | "regular" | "large";
 }
 
-export interface DidacticUnitEditorChapter {
+export interface UnitEditorChapterViewModel {
 	chapterIndex: number;
 	title: string;
 	status: EditorChapterStatus;
@@ -167,7 +167,7 @@ export interface HtmlContentBlock {
 	textEndOffset: number;
 }
 
-export interface DidacticUnitEditorViewModel {
+export interface UnitEditorViewModel {
 	id: string;
 	title: string;
 	folder: DashboardFolderSummary;
@@ -180,10 +180,10 @@ export interface DidacticUnitEditorViewModel {
 	generationQuality?: "silver" | "gold";
 	length: "intro" | "short" | "long" | "textbook";
 	presentationTheme: PresentationTheme | null;
-	chapters: DidacticUnitEditorChapter[];
+	chapters: UnitEditorChapterViewModel[];
 }
 
-export interface DidacticUnitRevisionViewModel {
+export interface UnitRevisionViewModel {
 	id: string;
 	chapterIndex: number;
 	source: "ai_generation" | "ai_regeneration" | "manual_edit";

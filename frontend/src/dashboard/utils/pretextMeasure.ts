@@ -6,7 +6,7 @@ import {
 	type PreparedTextWithSegments,
 } from "@chenglou/pretext";
 import type {PhrasingContent} from "mdast";
-import type {ResolvedTypography} from "./typography";
+import type {ResolvedTypography} from "@/shared/presentation/typography";
 
 
 export type BlockMeasurement = {

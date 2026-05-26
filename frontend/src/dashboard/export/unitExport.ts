@@ -1,12 +1,12 @@
 import type {
-	BackendDidacticUnitChapterDetail,
-	BackendDidacticUnitDetail,
-	BackendLearningActivity,
-} from "../api/dashboardApi";
-import {dashboardApi} from "../api/dashboardApi";
+	DidacticUnitChapterDetailDto,
+	DidacticUnitDetailDto,
+	LearningActivityDto,
+} from "@/dashboard/api/dashboardApi";
+import {dashboardApi} from "@/dashboard/api/dashboardApi";
 import {normalizeStoredHtml} from "../utils/htmlContent";
 
-export type ExportActivity = BackendLearningActivity;
+export type ExportActivity = LearningActivityDto;
 
 export type ExportActivityAnswerKey = {
 	activityId: string;
@@ -19,17 +19,17 @@ export type ExportModule = {
 	title: string;
 	overview: string;
 	html: string;
-	state: BackendDidacticUnitChapterDetail["state"];
+	state: DidacticUnitChapterDetailDto["state"];
 	activities: ExportActivity[];
 };
 
 export type UnitExportSnapshot = {
-	unit: BackendDidacticUnitDetail;
+	unit: DidacticUnitDetailDto;
 	modules: ExportModule[];
 	skippedModules: Array<{
 		chapterIndex: number;
 		title: string;
-		state: BackendDidacticUnitChapterDetail["state"];
+		state: DidacticUnitChapterDetailDto["state"];
 	}>;
 	exportedAt: string;
 };

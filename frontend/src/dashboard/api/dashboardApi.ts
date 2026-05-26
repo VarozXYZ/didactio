@@ -1,6 +1,23 @@
-import {authClient} from "../../auth/authClient";
+import {authClient} from "@/auth/authClient";
 import type {PlanningQuestion, PlanningSyllabus} from "../types";
-import type {PresentationTheme} from "../../types/presentationTheme";
+import type {PresentationTheme} from "@/shared/presentation/presentationTheme";
+import type {CoinType} from "@/shared/types/credits";
+import type {
+	AiConfigDto,
+	AiModelTierDto,
+	GenerationQualityDto,
+	ModelCatalogDto,
+} from "@/shared/types/aiContracts";
+
+export type {
+	AiConfigDto,
+	AiModelConfigDto,
+	AiModelTierDto,
+	AuthoringConfigDto,
+	GenerationQualityDto,
+	ModelCatalogDto,
+	ModelEntryDto,
+} from "@/shared/types/aiContracts";
 
 export class DashboardApiError extends Error {
 	status: number;
@@ -24,29 +41,27 @@ export function getDashboardErrorMessage(error: unknown, fallback: string): stri
 	return error instanceof Error ? error.message : fallback;
 }
 
-type BackendProvider = string;
-export type BackendGenerationQuality = "silver" | "gold";
-export type BackendCoinType = "bronze" | "silver" | "gold";
-export type BackendAiModelTier = BackendGenerationQuality;
-export type BackendBillingProductKind = "credit_pack" | "subscription";
+type ProviderDto = string;
+export type CoinTypeDto = CoinType;
+export type BillingProductKindDto = "credit_pack" | "subscription";
 
-export interface BackendBillingProduct {
+export interface BillingProductDto {
 	id: string;
-	kind: BackendBillingProductKind;
+	kind: BillingProductKindDto;
 	name: string;
 	description: string;
 	priceLabel: string;
 	interval?: "/month";
 	stripePriceEnvKey: string;
 	stripeConfigured: boolean;
-	credits: Record<BackendCoinType, number>;
+	credits: Record<CoinTypeDto, number>;
 	subscriptionTier?: "teacher" | "teacher_pro";
 	recommended?: boolean;
 	unlimitedBronze?: boolean;
 	features: string[];
 }
 
-export interface BackendBillingSummary {
+export interface BillingSummaryDto {
 	billing?: {
 		stripeCustomerId?: string;
 		stripeSubscriptionId?: string;
@@ -58,14 +73,14 @@ export interface BackendBillingSummary {
 		bronzeFairUseActive?: boolean;
 	};
 	pricing: {
-		products: BackendBillingProduct[];
+		products: BillingProductDto[];
 	};
 }
 
-export type BackendUsageAnalyticsPeriod = "7d" | "30d" | "6m" | "12m";
+export type UsageAnalyticsPeriodDto = "7d" | "30d" | "6m" | "12m";
 
-export interface BackendUsageAnalytics {
-	period: BackendUsageAnalyticsPeriod;
+export interface UsageAnalyticsDto {
+	period: UsageAnalyticsPeriodDto;
 	unitsCreated: number;
 	aiGenerations: number;
 	completionRate: number;
@@ -77,7 +92,7 @@ export interface BackendUsageAnalytics {
 		label: string;
 		count: number;
 	} | null;
-	favoriteTopic: (BackendFolder & {unitCount: number}) | null;
+	favoriteTopic: (FolderDto & {unitCount: number}) | null;
 	chart: Array<{
 		key: string;
 		label: string;
@@ -85,10 +100,10 @@ export interface BackendUsageAnalytics {
 	}>;
 }
 
-export type BackendLearningActivityScope =
+export type LearningActivityScopeDto =
 	| "current_module"
 	| "cumulative_until_module";
-export type BackendLearningActivityType =
+export type LearningActivityTypeDto =
 	| "multiple_choice"
 	| "short_answer"
 	| "coding_practice"
@@ -101,14 +116,14 @@ export type BackendLearningActivityType =
 	| "guided_project"
 	| "freeform_html";
 
-export interface BackendLearningActivity {
+export interface LearningActivityDto {
 	id: string;
 	ownerId: string;
 	didacticUnitId: string;
 	chapterIndex: number;
-	scope: BackendLearningActivityScope;
-	type: BackendLearningActivityType;
-	quality: BackendGenerationQuality;
+	scope: LearningActivityScopeDto;
+	type: LearningActivityTypeDto;
+	quality: GenerationQualityDto;
 	title: string;
 	instructions: string;
 	content: Record<string, unknown>;
@@ -120,7 +135,7 @@ export interface BackendLearningActivity {
 	updatedAt: string;
 }
 
-export interface BackendLearningActivityAttempt {
+export interface LearningActivityAttemptDto {
 	id: string;
 	activityId: string;
 	ownerId: string;
@@ -142,7 +157,7 @@ export interface BackendLearningActivityAttempt {
 	completedAt: string;
 }
 
-export interface BackendActivityProgress {
+export interface ActivityProgressDto {
 	activityId: string;
 	ownerId: string;
 	confirmedAnswers: Record<string, {
@@ -156,7 +171,7 @@ export interface BackendActivityProgress {
 	updatedAt: string;
 }
 
-export interface BackendFolder {
+export interface FolderDto {
 	id: string;
 	name: string;
 	slug: string;
@@ -166,7 +181,7 @@ export interface BackendFolder {
 	unitCount: number;
 }
 
-export interface BackendHtmlContentBlock {
+export interface HtmlContentBlockDto {
 	id: string;
 	type:
 		| "heading"
@@ -182,45 +197,15 @@ export interface BackendHtmlContentBlock {
 	textEndOffset: number;
 }
 
-export type BackendAiModelConfig = {
-	provider: string;
-	model: string;
-};
-
-export type BackendModelEntry = {
-	id: string;
-	label: string;
-	description: string;
-	recommended?: boolean;
-};
-
-export type BackendModelCatalog = {
-	silver: BackendModelEntry[];
-	gold: BackendModelEntry[];
-};
-
-export type BackendAuthoringConfig = {
-	language: string;
-	tone: "friendly" | "neutral" | "professional";
-	learnerLevel: "beginner" | "intermediate" | "advanced";
-	extraInstructions?: string;
-};
-
-export type BackendAiConfig = {
-	silver: BackendAiModelConfig;
-	gold: BackendAiModelConfig;
-	authoring: BackendAuthoringConfig;
-};
-
-export interface BackendDidacticUnitSummary {
+export interface DidacticUnitSummaryDto {
 	id: string;
 	title: string;
 	topic: string;
 	folderId: string;
-	folder: Omit<BackendFolder, "unitCount">;
-	provider: BackendProvider;
+	folder: Omit<FolderDto, "unitCount">;
+	provider: ProviderDto;
 	modelUsed?: {
-		provider: BackendProvider;
+		provider: ProviderDto;
 		model: string;
 		label: string;
 	} | null;
@@ -238,25 +223,25 @@ export interface BackendDidacticUnitSummary {
 	lastActivityAt: string;
 }
 
-export interface BackendQuestionnaire {
+export interface QuestionnaireDto {
 	questions: PlanningQuestion[];
 }
 
-export interface BackendQuestionAnswer {
+export interface QuestionAnswerDto {
 	questionId: string;
 	value: string;
 }
 
-export interface BackendDidacticUnitDetail {
+export interface DidacticUnitDetailDto {
 	id: string;
 	ownerId: string;
 	topic: string;
 	title: string;
 	folderId: string;
 	folderAssignmentMode: "manual" | "auto";
-	folder: Omit<BackendFolder, "unitCount">;
+	folder: Omit<FolderDto, "unitCount">;
 	presentationTheme: PresentationTheme | null;
-	provider: BackendProvider;
+	provider: ProviderDto;
 	status: string;
 	nextAction: string;
 	createdAt: string;
@@ -271,13 +256,13 @@ export interface BackendDidacticUnitDetail {
 	depth: "basic" | "intermediate" | "technical";
 	learningProfile?: "beginner" | "intermediate" | "advanced";
 	length: "intro" | "short" | "long" | "textbook";
-	generationTier?: BackendAiModelTier;
-	generationQuality?: BackendGenerationQuality;
+	generationTier?: AiModelTierDto;
+	generationQuality?: GenerationQualityDto;
 	unitGenerationPaidAt?: string;
 	unitGenerationCreditTransactionId?: string;
 	questionnaireEnabled: boolean;
-	questionnaire?: BackendQuestionnaire;
-	questionnaireAnswers?: BackendQuestionAnswer[];
+	questionnaire?: QuestionnaireDto;
+	questionnaireAnswers?: QuestionAnswerDto[];
 	syllabusPrompt?: string;
 	syllabus?: PlanningSyllabus;
 	overview: string;
@@ -295,7 +280,7 @@ export interface BackendDidacticUnitDetail {
 	};
 }
 
-export interface BackendDidacticUnitChapterSummary {
+export interface DidacticUnitChapterSummaryDto {
 	chapterIndex: number;
 	title: string;
 	overview: string;
@@ -312,13 +297,13 @@ export interface BackendDidacticUnitChapterSummary {
 	completedAt?: string;
 }
 
-export interface BackendDidacticUnitChapterDetail {
+export interface DidacticUnitChapterDetailDto {
 	chapterIndex: number;
 	title: string;
 	planningOverview: string;
 	html: string | null;
 	htmlHash?: string;
-	htmlBlocks: BackendHtmlContentBlock[];
+	htmlBlocks: HtmlContentBlockDto[];
 	htmlBlocksVersion: number;
 	state: "pending" | "ready" | "failed";
 	readBlockIndex: number;
@@ -332,8 +317,8 @@ export interface BackendDidacticUnitChapterDetail {
 	completedAt?: string;
 }
 
-export interface BackendDidacticUnitReadingProgressResponse {
-	module: BackendDidacticUnitChapterDetail | null;
+export interface DidacticUnitReadingProgressResponseDto {
+	module: DidacticUnitChapterDetailDto | null;
 	studyProgress: {
 		moduleCount: number;
 		readBlockCount: number;
@@ -342,7 +327,7 @@ export interface BackendDidacticUnitReadingProgressResponse {
 	};
 }
 
-export interface BackendDidacticUnitChapterRevision {
+export interface DidacticUnitChapterRevisionDto {
 	id: string;
 	chapterIndex: number;
 	source: "ai_generation" | "ai_regeneration" | "manual_edit";
@@ -351,12 +336,12 @@ export interface BackendDidacticUnitChapterRevision {
 		title: string;
 		html: string;
 		htmlHash: string;
-		htmlBlocks: BackendHtmlContentBlock[];
+		htmlBlocks: HtmlContentBlockDto[];
 		htmlBlocksVersion: number;
 	};
 }
 
-export interface BackendDidacticUnitNoteAnchor {
+export interface DidacticUnitNoteAnchorDto {
 	startBlockId: string;
 	startOffset: number;
 	endBlockId: string;
@@ -367,7 +352,7 @@ export interface BackendDidacticUnitNoteAnchor {
 	contextAfter?: string;
 }
 
-export interface BackendDidacticUnitNote {
+export interface DidacticUnitNoteDto {
 	id: string;
 	ownerId: string;
 	didacticUnitId: string;
@@ -376,13 +361,13 @@ export interface BackendDidacticUnitNote {
 	selectedText: string;
 	question?: string;
 	content: string;
-	quality?: BackendGenerationQuality;
-	anchor: BackendDidacticUnitNoteAnchor;
+	quality?: GenerationQualityDto;
+	anchor: DidacticUnitNoteAnchorDto;
 	createdAt: string;
 	updatedAt: string;
 }
 
-export interface BackendGenerationRun {
+export interface GenerationRunDto {
 	id: string;
 	stage: "syllabus" | "chapter";
 	status:
@@ -397,7 +382,7 @@ export interface BackendGenerationRun {
 	unitId?: string;
 	ownerId?: string;
 	userId?: string;
-	provider: BackendProvider;
+	provider: ProviderDto;
 	model: string;
 	prompt: string;
 	createdAt: string;
@@ -406,7 +391,7 @@ export interface BackendGenerationRun {
 	errorMessage?: string;
 	chapterIndex?: number;
 	attempts?: number;
-	emittedBlocks?: BackendHtmlContentBlock[];
+	emittedBlocks?: HtmlContentBlockDto[];
 	finalHtml?: string;
 	finalHash?: string;
 	htmlBlocksVersion?: number;
@@ -480,7 +465,7 @@ export interface BackendGenerationRun {
 
 type NdjsonEvent =
 	| {type: "start"; stage: string; provider: string; model: string}
-	| {type: "partial_html_block"; block: BackendHtmlContentBlock}
+	| {type: "partial_html_block"; block: HtmlContentBlockDto}
 	| {type: "partial_structured"; data: unknown}
 	| {type: "complete"; data: unknown}
 	| {type: "error"; message: string; data?: unknown};
@@ -545,7 +530,8 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
 				code = body.error;
 				message = body.message ?? body.error;
 			}
-		} catch {
+		} catch (parseError) {
+			void parseError;
 		}
 
 		throw new DashboardApiError(message, response.status, code);
@@ -591,7 +577,8 @@ async function streamNdjson<T>(
 				code = body.error;
 				message = body.message ?? body.error;
 			}
-		} catch {
+		} catch (parseError) {
+			void parseError;
 		}
 
 		throw new DashboardApiError(message, response.status, code);
@@ -669,18 +656,18 @@ async function streamNdjson<T>(
 
 export const dashboardApi = {
 	listFolders() {
-		return requestJson<{folders: BackendFolder[]}>("/api/folders");
+		return requestJson<{folders: FolderDto[]}>("/api/folders");
 	},
 	getBillingPricing() {
-		return requestJson<{products: BackendBillingProduct[]}>(
+		return requestJson<{products: BillingProductDto[]}>(
 			"/api/billing/pricing",
 		);
 	},
 	getBillingSummary() {
-		return requestJson<BackendBillingSummary>("/api/billing/me");
+		return requestJson<BillingSummaryDto>("/api/billing/me");
 	},
-	getUsageAnalytics(period: BackendUsageAnalyticsPeriod) {
-		return requestJson<BackendUsageAnalytics>(
+	getUsageAnalytics(period: UsageAnalyticsPeriodDto) {
+		return requestJson<UsageAnalyticsDto>(
 			`/api/analytics/usage?period=${encodeURIComponent(period)}`,
 		);
 	},
@@ -697,7 +684,7 @@ export const dashboardApi = {
 		});
 	},
 	createFolder(input: {name: string; icon?: string; color?: string}) {
-		return requestJson<BackendFolder>("/api/folders", {
+		return requestJson<FolderDto>("/api/folders", {
 			method: "POST",
 			body: JSON.stringify(input),
 		});
@@ -706,7 +693,7 @@ export const dashboardApi = {
 		id: string,
 		patch: {name?: string; icon?: string; color?: string},
 	) {
-		return requestJson<BackendFolder>(`/api/folders/${id}`, {
+		return requestJson<FolderDto>(`/api/folders/${id}`, {
 			method: "PATCH",
 			body: JSON.stringify(patch),
 		});
@@ -717,7 +704,7 @@ export const dashboardApi = {
 		});
 	},
 	listDidacticUnits() {
-		return requestJson<{didacticUnits: BackendDidacticUnitSummary[]}>(
+		return requestJson<{didacticUnits: DidacticUnitSummaryDto[]}>(
 			"/api/didactic-unit",
 		);
 	},
@@ -734,25 +721,25 @@ export const dashboardApi = {
 			folderId?: string;
 		};
 	}) {
-		return requestJson<BackendDidacticUnitDetail>("/api/didactic-unit", {
+		return requestJson<DidacticUnitDetailDto>("/api/didactic-unit", {
 			method: "POST",
 			body: JSON.stringify(input),
 		});
 	},
 	getAiConfig() {
-		return requestJson<BackendAiConfig>("/api/ai-config");
+		return requestJson<AiConfigDto>("/api/ai-config");
 	},
 	getAiConfigCatalog() {
-		return requestJson<BackendModelCatalog>("/api/ai-config/catalog");
+		return requestJson<ModelCatalogDto>("/api/ai-config/catalog");
 	},
-	updateAiConfig(input: Partial<BackendAiConfig>) {
-		return requestJson<BackendAiConfig>("/api/ai-config", {
+	updateAiConfig(input: Partial<AiConfigDto>) {
+		return requestJson<AiConfigDto>("/api/ai-config", {
 			method: "PATCH",
 			body: JSON.stringify(input),
 		});
 	},
 	getDidacticUnit(id: string) {
-		return requestJson<BackendDidacticUnitDetail>(
+		return requestJson<DidacticUnitDetailDto>(
 			`/api/didactic-unit/${id}`,
 		);
 	},
@@ -763,7 +750,7 @@ export const dashboardApi = {
 			folderId?: string;
 		},
 	) {
-		return requestJson<BackendDidacticUnitDetail>(
+		return requestJson<DidacticUnitDetailDto>(
 			`/api/didactic-unit/${id}/folder`,
 			{
 				method: "PATCH",
@@ -775,7 +762,7 @@ export const dashboardApi = {
 		id: string,
 		presentationTheme: PresentationTheme | null,
 	) {
-		return requestJson<BackendDidacticUnitDetail>(
+		return requestJson<DidacticUnitDetailDto>(
 			`/api/didactic-unit/${id}/theme`,
 			{
 				method: "PATCH",
@@ -784,7 +771,7 @@ export const dashboardApi = {
 		);
 	},
 	moderateDidacticUnit(id: string) {
-		return requestJson<BackendDidacticUnitDetail>(
+		return requestJson<DidacticUnitDetailDto>(
 			`/api/didactic-unit/${id}/moderate`,
 			{
 				method: "POST",
@@ -794,9 +781,9 @@ export const dashboardApi = {
 	},
 	answerDidacticUnitQuestionnaire(
 		id: string,
-		answers: BackendQuestionAnswer[],
+		answers: QuestionAnswerDto[],
 	) {
-		return requestJson<BackendDidacticUnitDetail>(
+		return requestJson<DidacticUnitDetailDto>(
 			`/api/didactic-unit/${id}/questionnaire/answers`,
 			{
 				method: "PATCH",
@@ -805,7 +792,7 @@ export const dashboardApi = {
 		);
 	},
 	generateDidacticUnitSyllabusPrompt(id: string) {
-		return requestJson<BackendDidacticUnitDetail>(
+		return requestJson<DidacticUnitDetailDto>(
 			`/api/didactic-unit/${id}/syllabus-prompt/generate`,
 			{
 				method: "POST",
@@ -815,11 +802,11 @@ export const dashboardApi = {
 	},
 	streamDidacticUnitSyllabus(
 		id: string,
-		quality: BackendGenerationQuality,
+		quality: GenerationQualityDto,
 		handlers: StreamHandlers,
 		input?: {context?: string},
 	) {
-		return streamNdjson<BackendDidacticUnitDetail>(
+		return streamNdjson<DidacticUnitDetailDto>(
 			`/api/didactic-unit/${id}/syllabus/generate/stream`,
 			handlers,
 			{
@@ -831,7 +818,7 @@ export const dashboardApi = {
 		);
 	},
 	updateDidacticUnitSyllabus(id: string, syllabus: PlanningSyllabus) {
-		return requestJson<BackendDidacticUnitDetail>(
+		return requestJson<DidacticUnitDetailDto>(
 			`/api/didactic-unit/${id}/syllabus`,
 			{
 				method: "PATCH",
@@ -839,8 +826,8 @@ export const dashboardApi = {
 			},
 		);
 	},
-	approveDidacticUnitSyllabus(id: string, quality: BackendGenerationQuality) {
-		return requestJson<BackendDidacticUnitDetail>(
+	approveDidacticUnitSyllabus(id: string, quality: GenerationQualityDto) {
+		return requestJson<DidacticUnitDetailDto>(
 			`/api/didactic-unit/${id}/approve-syllabus`,
 			{
 				method: "POST",
@@ -849,17 +836,17 @@ export const dashboardApi = {
 		);
 	},
 	listDidacticUnitChapters(id: string) {
-		return requestJson<{chapters: BackendDidacticUnitChapterSummary[]}>(
+		return requestJson<{chapters: DidacticUnitChapterSummaryDto[]}>(
 			`/api/didactic-unit/${id}/modules`,
 		);
 	},
 	getDidacticUnitChapter(id: string, chapterIndex: number) {
-		return requestJson<BackendDidacticUnitChapterDetail>(
+		return requestJson<DidacticUnitChapterDetailDto>(
 			`/api/didactic-unit/${id}/modules/${chapterIndex}`,
 		);
 	},
 	listDidacticUnitNotes(id: string) {
-		return requestJson<{notes: BackendDidacticUnitNote[]}>(
+		return requestJson<{notes: DidacticUnitNoteDto[]}>(
 			`/api/didactic-unit/${id}/notes`,
 		);
 	},
@@ -869,10 +856,10 @@ export const dashboardApi = {
 			chapterIndex: number;
 			selectedText: string;
 			content: string;
-			anchor: BackendDidacticUnitNoteAnchor;
+			anchor: DidacticUnitNoteAnchorDto;
 		},
 	) {
-		return requestJson<{note: BackendDidacticUnitNote}>(
+		return requestJson<{note: DidacticUnitNoteDto}>(
 			`/api/didactic-unit/${id}/notes`,
 			{
 				method: "POST",
@@ -886,11 +873,11 @@ export const dashboardApi = {
 			chapterIndex: number;
 			selectedText: string;
 			question?: string;
-			quality: BackendGenerationQuality;
-			anchor: BackendDidacticUnitNoteAnchor;
+			quality: GenerationQualityDto;
+			anchor: DidacticUnitNoteAnchorDto;
 		},
 	) {
-		return requestJson<{note: BackendDidacticUnitNote}>(
+		return requestJson<{note: DidacticUnitNoteDto}>(
 			`/api/didactic-unit/${id}/notes/generate`,
 			{
 				method: "POST",
@@ -903,7 +890,7 @@ export const dashboardApi = {
 		noteId: string,
 		patch: {question?: string; content?: string},
 	) {
-		return requestJson<{note: BackendDidacticUnitNote}>(
+		return requestJson<{note: DidacticUnitNoteDto}>(
 			`/api/didactic-unit/${id}/notes/${noteId}`,
 			{
 				method: "PATCH",
@@ -918,7 +905,7 @@ export const dashboardApi = {
 		);
 	},
 	listLearningActivities(id: string, chapterIndex: number) {
-		return requestJson<{activities: BackendLearningActivity[]}>(
+		return requestJson<{activities: LearningActivityDto[]}>(
 			`/api/didactic-unit/${id}/modules/${chapterIndex}/activities`,
 		);
 	},
@@ -926,12 +913,12 @@ export const dashboardApi = {
 		id: string,
 		chapterIndex: number,
 		input: {
-			scope: BackendLearningActivityScope;
-			type: BackendLearningActivityType;
-			quality: BackendGenerationQuality;
+			scope: LearningActivityScopeDto;
+			type: LearningActivityTypeDto;
+			quality: GenerationQualityDto;
 		},
 	) {
-		return requestJson<{activity: BackendLearningActivity}>(
+		return requestJson<{activity: LearningActivityDto}>(
 			`/api/didactic-unit/${id}/modules/${chapterIndex}/activities`,
 			{
 				method: "POST",
@@ -946,18 +933,18 @@ export const dashboardApi = {
 		);
 	},
 	listLearningActivityAttempts(activityId: string) {
-		return requestJson<{attempts: BackendLearningActivityAttempt[]}>(
+		return requestJson<{attempts: LearningActivityAttemptDto[]}>(
 			`/api/activities/${activityId}/attempts`,
 		);
 	},
 	refillActivityAttempts(activityId: string) {
-		return requestJson<{activity: BackendLearningActivity}>(
+		return requestJson<{activity: LearningActivityDto}>(
 			`/api/activities/${activityId}/refill`,
 			{method: "POST"},
 		);
 	},
 	createLearningActivityAttempt(activityId: string, answers: unknown) {
-		return requestJson<{attempt: BackendLearningActivityAttempt}>(
+		return requestJson<{attempt: LearningActivityAttemptDto}>(
 			`/api/activities/${activityId}/attempts`,
 			{
 				method: "POST",
@@ -966,19 +953,19 @@ export const dashboardApi = {
 		);
 	},
 	getActivityProgress(activityId: string) {
-		return requestJson<{progress: BackendActivityProgress | null}>(
+		return requestJson<{progress: ActivityProgressDto | null}>(
 			`/api/activities/${activityId}/progress`,
 		);
 	},
 	saveActivityProgress(
 		activityId: string,
 		payload: {
-			confirmedAnswers: BackendActivityProgress["confirmedAnswers"];
-			answers?: BackendActivityProgress["answers"];
+			confirmedAnswers: ActivityProgressDto["confirmedAnswers"];
+			answers?: ActivityProgressDto["answers"];
 			completed: boolean;
 		},
 	) {
-		return requestJson<{progress: BackendActivityProgress}>(
+		return requestJson<{progress: ActivityProgressDto}>(
 			`/api/activities/${activityId}/progress`,
 			{
 				method: "PUT",
@@ -995,7 +982,7 @@ export const dashboardApi = {
 			htmlHash?: string;
 		},
 	) {
-		return requestJson<BackendDidacticUnitChapterDetail>(
+		return requestJson<DidacticUnitChapterDetailDto>(
 			`/api/didactic-unit/${id}/modules/${chapterIndex}`,
 			{
 				method: "PATCH",
@@ -1004,7 +991,7 @@ export const dashboardApi = {
 		);
 	},
 	createGenerationRun(id: string, chapterIndex: number) {
-		return requestJson<{runId: string; run: BackendGenerationRun}>(
+		return requestJson<{runId: string; run: GenerationRunDto}>(
 			`/api/didactic-unit/${id}/modules/${chapterIndex}/generate-run`,
 			{
 				method: "POST",
@@ -1013,7 +1000,7 @@ export const dashboardApi = {
 		);
 	},
 	getGenerationRun(runId: string) {
-		return requestJson<{run: BackendGenerationRun}>(
+		return requestJson<{run: GenerationRunDto}>(
 			`/api/generation-runs/${runId}`,
 		);
 	},
@@ -1023,7 +1010,7 @@ export const dashboardApi = {
 		});
 	},
 	streamGenerationRun(runId: string, handlers: StreamHandlers) {
-		return streamNdjson<{run: BackendGenerationRun}>(
+		return streamNdjson<{run: GenerationRunDto}>(
 			`/api/generation-runs/${runId}/stream`,
 			handlers,
 			{
@@ -1033,7 +1020,7 @@ export const dashboardApi = {
 		);
 	},
 	completeDidacticUnitChapter(id: string, chapterIndex: number) {
-		return requestJson<BackendDidacticUnitDetail>(
+		return requestJson<DidacticUnitDetailDto>(
 			`/api/didactic-unit/${id}/modules/${chapterIndex}/complete`,
 			{
 				method: "POST",
@@ -1042,7 +1029,7 @@ export const dashboardApi = {
 		);
 	},
 	markDidacticUnitChapterUnread(id: string, chapterIndex: number) {
-		return requestJson<BackendDidacticUnitDetail>(
+		return requestJson<DidacticUnitDetailDto>(
 			`/api/didactic-unit/${id}/modules/${chapterIndex}/unread`,
 			{
 				method: "POST",
@@ -1059,7 +1046,7 @@ export const dashboardApi = {
 		},
 		lastVisitedPageIndex?: number,
 	) {
-		return requestJson<BackendDidacticUnitReadingProgressResponse>(
+		return requestJson<DidacticUnitReadingProgressResponseDto>(
 			`/api/didactic-unit/${id}/modules/${chapterIndex}/reading-progress`,
 			{
 				method: "PUT",
@@ -1073,12 +1060,12 @@ export const dashboardApi = {
 		);
 	},
 	listDidacticUnitChapterRevisions(id: string, chapterIndex: number) {
-		return requestJson<{revisions: BackendDidacticUnitChapterRevision[]}>(
+		return requestJson<{revisions: DidacticUnitChapterRevisionDto[]}>(
 			`/api/didactic-unit/${id}/modules/${chapterIndex}/revisions`,
 		);
 	},
 	listDidacticUnitRuns(id: string) {
-		return requestJson<{runs: BackendGenerationRun[]}>(
+		return requestJson<{runs: GenerationRunDto[]}>(
 			`/api/didactic-unit/${id}/runs`,
 		);
 	},

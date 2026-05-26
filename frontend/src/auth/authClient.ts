@@ -1,4 +1,5 @@
-import type {PresentationTheme} from "../types/presentationTheme";
+import type {PresentationTheme} from "@/shared/presentation/presentationTheme";
+import type {CoinType} from "@/shared/types/credits";
 
 export type AuthStatus = "loading" | "authenticated" | "unauthenticated";
 export type AuthUser = {
@@ -13,11 +14,7 @@ export type AuthUser = {
 	locale?: string;
 	role: "admin" | "user";
 	status: "active" | "disabled";
-	credits: {
-		bronze: number;
-		silver: number;
-		gold: number;
-	};
+	credits: Record<CoinType, number>;
 	billing?: {
 		stripeCustomerId?: string;
 		stripeSubscriptionId?: string;
@@ -36,7 +33,7 @@ export type AuthUser = {
 export type CreditTransaction = {
 	id: string;
 	userId: string;
-	coinType: "bronze" | "silver" | "gold";
+	coinType: CoinType;
 	direction: "credit" | "debit";
 	amount: number;
 	reason: string;
