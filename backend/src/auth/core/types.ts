@@ -48,6 +48,7 @@ export interface AuthUser {
 	defaultPresentationTheme?: PresentationTheme;
 	launchGiftGrantedAt?: Date;
 	onboardingCompletedAt?: Date;
+	defaultDidacticUnitTemplateIds?: string[];
 	createdAt: Date;
 	updatedAt: Date;
 	lastLoginAt?: Date;
@@ -213,6 +214,11 @@ export interface UserStore {
 	}): Promise<AuthUser | null>;
 	updateDisplayName(id: string, displayName: string): Promise<AuthUser | null>;
 	completeOnboarding(id: string, at: Date): Promise<AuthUser | null>;
+	markDefaultDidacticUnitTemplateProvisioned(
+		id: string,
+		templateId: string,
+		at: Date,
+	): Promise<AuthUser | null>;
 }
 
 export interface SessionStore {

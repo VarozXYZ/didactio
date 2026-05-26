@@ -23,6 +23,7 @@ import {
 	type SyllabusResult,
 } from "./ai/service.js";
 import {completeDidacticUnitChapter} from "./didactic-unit/complete-didactic-unit-chapter.js";
+import {ensureDefaultDidacticUnits} from "./didactic-unit/default-didactic-units.js";
 import {
 	createDidacticUnit,
 	type DidacticUnit,
@@ -1673,6 +1674,21 @@ export function createApp(options: CreateAppOptions) {
 		sessionStore,
 		creditTransactionStore,
 		authConfig,
+		async (user) => {
+			try {
+				await ensureDefaultDidacticUnits({
+					user,
+					didacticUnitStore,
+					folderStore,
+					userStore,
+				});
+			} catch (error) {
+				appLogger.error("Default didactic unit provisioning failed", {
+					ownerId: user.id,
+					error,
+				});
+			}
+		},
 	);
 	const billingService = new BillingService(
 		authService,

@@ -43,6 +43,8 @@ export type DidacticUnitStatus =
 export interface DidacticUnit {
 	id: string;
 	ownerId: string;
+	defaultTemplateId?: string;
+	defaultTemplateSourceId?: string;
 	title: string;
 	topic: string;
 	provider: DidacticUnitProvider;

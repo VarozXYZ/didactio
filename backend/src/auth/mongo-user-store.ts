@@ -246,6 +246,22 @@ export class MongoUserStore implements UserStore {
 		return stripMongoId(result);
 	}
 
+	async markDefaultDidacticUnitTemplateProvisioned(
+		id: string,
+		templateId: string,
+		at: Date,
+	): Promise<AuthUser | null> {
+		const result = await this.collection.findOneAndUpdate(
+			{id},
+			{
+				$addToSet: {defaultDidacticUnitTemplateIds: templateId},
+				$set: {updatedAt: at},
+			},
+			{returnDocument: "after"},
+		);
+		return stripMongoId(result);
+	}
+
 	async applyCreditDelta(input: {
 		id: string;
 		coinType: keyof CreditBalances;

@@ -68,6 +68,7 @@ export class AuthService {
 		private readonly sessionStore: SessionStore,
 		private readonly creditTransactionStore: CreditTransactionStore,
 		private readonly config: AuthConfig,
+		private readonly onUserAuthenticated?: (user: AuthUser) => Promise<void>,
 	) {}
 
 	resolveRoleForEmail(email: string | null): UserRole {
@@ -99,6 +100,8 @@ export class AuthService {
 		if (user.status !== "active") {
 			throw new AuthError("user_disabled", 403, "User is disabled.");
 		}
+
+		await this.onUserAuthenticated?.(user);
 
 		const sessionId = crypto.randomUUID();
 		const refreshToken = signRefreshToken(user.id, sessionId, this.config);

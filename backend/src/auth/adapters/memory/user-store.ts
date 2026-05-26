@@ -283,6 +283,29 @@ export class InMemoryUserStore implements UserStore {
 		return updated;
 	}
 
+	async markDefaultDidacticUnitTemplateProvisioned(
+		id: string,
+		templateId: string,
+		at: Date,
+	): Promise<AuthUser | null> {
+		const user = this.usersById.get(id);
+		if (!user) {
+			return null;
+		}
+
+		const templateIds = user.defaultDidacticUnitTemplateIds ?? [];
+		const updated: AuthUser = {
+			...user,
+			defaultDidacticUnitTemplateIds:
+				templateIds.includes(templateId) ?
+					templateIds
+				:	[...templateIds, templateId],
+			updatedAt: at,
+		};
+		this.usersById.set(id, updated);
+		return updated;
+	}
+
 	private providerKey(provider: AuthProvider, providerUserId: string): string {
 		return `${provider}:${providerUserId}`;
 	}

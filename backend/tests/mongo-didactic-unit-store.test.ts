@@ -56,6 +56,7 @@ describe("MongoDidacticUnitStore", () => {
 		const store = new MongoDidacticUnitStore(database as never);
 
 		await store.save(didacticUnit);
+		const templateSource = await store.getTemplateSourceById("didactic-unit-1");
 		const didacticUnitById = await store.getById(
 			"mock-user",
 			"didactic-unit-1",
@@ -67,6 +68,7 @@ describe("MongoDidacticUnitStore", () => {
 			{$set: didacticUnit},
 			{upsert: true},
 		);
+		expect(findOne).toHaveBeenCalledWith({id: "didactic-unit-1"});
 		expect(findOne).toHaveBeenCalledWith({
 			id: "didactic-unit-1",
 			ownerId: "mock-user",
@@ -75,6 +77,7 @@ describe("MongoDidacticUnitStore", () => {
 			ownerId: "mock-user",
 		});
 		expect(sort).toHaveBeenCalledWith({updatedAt: -1});
+		expect(templateSource).toEqual(didacticUnit);
 		expect(didacticUnitById).toEqual(didacticUnit);
 		expect(listedDidacticUnits).toEqual([didacticUnit]);
 	});
