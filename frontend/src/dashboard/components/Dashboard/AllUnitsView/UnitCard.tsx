@@ -30,6 +30,7 @@ import {
 } from "../../../../components/ui/dropdown-menu";
 import {getFolderEmoji, getFolderVisuals} from "../../../utils/folderDisplay";
 import {getProviderLogo} from "../../../utils/modelOptions";
+import {useAppearance} from "../../../../theme/AppearanceProvider";
 import {LengthBadge} from "./LengthBadge";
 
 type UnitCardProps = {
@@ -53,7 +54,8 @@ export function UnitCard({
 }: UnitCardProps) {
 	const style = getFolderVisuals(unit.folder);
 	const folderEmoji = getFolderEmoji(unit.folder.icon);
-	const modelLogo = getProviderLogo(unit.modelUsed?.provider);
+	const {resolvedMode} = useAppearance();
+	const modelLogo = getProviderLogo(unit.modelUsed?.provider, resolvedMode);
 	const handleOpenItem = () => onOpenItem(unit.id);
 	const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 

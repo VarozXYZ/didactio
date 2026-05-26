@@ -85,7 +85,7 @@ export function LanguageSelector({value, onChange}: Props) {
 						type="button"
 						role="combobox"
 						aria-expanded={open}
-						className="flex w-full items-center justify-between gap-2 rounded-[10px] border border-black/[0.12] bg-white px-3.5 py-2.5 text-[14px] text-[#1D1D1F] transition hover:border-black/25 focus:outline-none"
+						className="app-onboarding-input flex w-full items-center justify-between gap-2 rounded-[10px] border border-black/[0.12] bg-white px-3.5 py-2.5 text-[14px] text-[#1D1D1F] transition hover:border-black/25 focus:outline-none"
 					>
 						<span className="flex items-center gap-2.5">
 							{selected ?
@@ -113,7 +113,7 @@ export function LanguageSelector({value, onChange}: Props) {
 					</button>
 				</PopoverTrigger>
 
-				<PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
+				<PopoverContent className="app-onboarding-language-menu w-[var(--radix-popover-trigger-width)] p-0">
 					<Command>
 						<CommandInput placeholder="Search language…" />
 						<CommandList>
@@ -173,7 +173,7 @@ export function LanguageSelector({value, onChange}: Props) {
 							}
 						}}
 						placeholder="Type your language…"
-						className="flex-1 rounded-[10px] border border-black/[0.12] bg-white px-3.5 py-2 text-[13.5px] text-[#1D1D1F] outline-none transition placeholder:text-[#AEAEB2] focus:border-[#1D1D1F]/50"
+						className="app-onboarding-input flex-1 rounded-[10px] border border-black/[0.12] bg-white px-3.5 py-2 text-[13.5px] text-[#1D1D1F] outline-none transition placeholder:text-[#AEAEB2] focus:border-[#1D1D1F]/50"
 					/>
 				</div>
 			)}

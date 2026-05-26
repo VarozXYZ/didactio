@@ -34,7 +34,7 @@ export function ProfileStep({
 				</p>
 			</div>
 
-			<div className="flex flex-col gap-4 rounded-[12px] border border-black/[0.07] bg-white/60 px-4 py-3.5 sm:flex-row sm:items-center">
+			<div className="app-onboarding-card flex flex-col gap-4 rounded-[12px] border border-black/[0.07] bg-white/60 px-4 py-3.5 sm:flex-row sm:items-center">
 				<div className="flex shrink-0 flex-col items-center gap-1">
 					{user.pictureUrl && !pictureFailed ?
 						<img
@@ -63,7 +63,7 @@ export function ProfileStep({
 						type="text"
 						value={displayName}
 						onChange={(e) => onDisplayNameChange(e.target.value)}
-						className="w-full rounded-[10px] border border-black/[0.12] bg-white px-3.5 py-2 text-[14px] text-[#1D1D1F] outline-none transition placeholder:text-[#AEAEB2] focus:border-[#1D1D1F]/50"
+						className="app-onboarding-input w-full rounded-[10px] border border-black/[0.12] bg-white px-3.5 py-2 text-[14px] text-[#1D1D1F] outline-none transition placeholder:text-[#AEAEB2] focus:border-[#1D1D1F]/50"
 						placeholder="Your display name"
 						autoFocus
 						onKeyDown={(e) => {
@@ -73,7 +73,7 @@ export function ProfileStep({
 				</div>
 			</div>
 
-			<div className="flex flex-col gap-2.5 rounded-[12px] border border-black/[0.07] bg-white/60 px-4 py-3.5">
+			<div className="app-onboarding-card flex flex-col gap-2.5 rounded-[12px] border border-black/[0.07] bg-white/60 px-4 py-3.5">
 				<div>
 					<p className="text-[13.5px] font-semibold text-[#1D1D1F]">Content language</p>
 					<p className="mt-0.5 text-[12.5px] text-[#6E6E73]">

@@ -76,7 +76,7 @@ export function ChapterStyleMenu({
 				type="button"
 				aria-label={compact || iconOnly ? "Module style" : undefined}
 				onClick={() => setIsOpen((current) => !current)}
-				className={`group flex items-center rounded-full border border-[#D4D7DD] bg-white py-1.5 text-[13px] font-medium text-[#1D1D1F] transition-all hover:border-[#34C759] hover:text-[#34C759] active:border-[#34C759] active:text-[#34C759] ${
+				className={`app-editor-style-menu-button group flex items-center rounded-full border border-[#D4D7DD] bg-white py-1.5 text-[13px] font-medium text-[#1D1D1F] transition-all hover:border-[#34C759] hover:text-[#34C759] active:border-[#34C759] active:text-[#34C759] ${
 					iconOnly ? "h-10 w-10 justify-center px-0"
 					: compact ? "gap-1 px-2"
 					: "gap-2 px-3"
@@ -89,6 +89,7 @@ export function ChapterStyleMenu({
 				<span
 					className={cn(
 						"text-[14px] font-bold transition-colors group-hover:text-[#34C759] group-active:text-[#34C759]",
+						"app-editor-style-menu-icon",
 						isOpen ? "text-[#34C759]" : "text-[#1D1D1F]",
 					)}
 				>

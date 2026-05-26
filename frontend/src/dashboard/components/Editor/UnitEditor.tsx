@@ -1072,14 +1072,12 @@ function MobileUnitEditor({
 	activityAttempts,
 	activityContentScale,
 	canRegenerate,
-	canEdit,
 	isActivityAttemptSubmitting,
 	isActivityLoading,
 	isFinishUnitPending,
 	onBackToDashboard,
 	onCreateActivity,
 	onDeleteActivity,
-	onEdit,
 	onFinishUnit,
 	onOpenExport,
 	onOpenHistory,
@@ -1227,40 +1225,25 @@ function MobileUnitEditor({
 						>
 							{[
 								{
-									ariaLabel: "Notes",
-									icon: <StickyNote size={17} />,
-									onClick: onOpenNotes,
+									ariaLabel: "Back to Dashboard",
+									icon: <Undo2 size={17} />,
+									onClick: onBackToDashboard,
 								},
 								{
-									ariaLabel: "Version history",
-									icon: <History size={17} />,
-									onClick: onOpenHistory,
+									ariaLabel: "Export unit",
+									icon: <Share2 size={17} />,
+									onClick: onOpenExport,
 								},
 								{
-									ariaLabel: "Regenerate module",
-									disabled: !canRegenerate,
-									icon: <RotateCcw size={17} />,
-									onClick: onRegenerate,
-								},
-								{
-									ariaLabel: "Style",
-									icon: (
-										<span className="text-[13px] font-bold">Aa</span>
-									),
-									onClick: () => setIsStyleDialogOpen(true),
-								},
-								{
-									ariaLabel: "Edit",
-									disabled: !canEdit,
-									icon: <Edit3 size={17} />,
-									onClick: onEdit,
+									ariaLabel: "Settings",
+									icon: <Settings size={17} />,
+									onClick: () => setActiveTab("settings"),
 								},
 							].map((action) => (
 								<Motion.button
 									key={action.ariaLabel}
 									aria-label={action.ariaLabel}
-									className="grid h-9 w-9 place-items-center rounded-full border border-black/10 bg-white/90 text-[#1D1D1F] shadow-[0_8px_20px_rgba(17,24,39,0.10)] backdrop-blur-md active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
-									disabled={action.disabled}
+									className="app-mobile-editor-action-button grid h-9 w-9 place-items-center rounded-full border border-black/10 bg-white/90 text-[#1D1D1F] shadow-[0_8px_20px_rgba(17,24,39,0.10)] backdrop-blur-md active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
 									exit={{opacity: 0, scale: 0.8, y: -8}}
 									initial={{opacity: 0, scale: 0.72, y: -12}}
 									animate={{
@@ -1274,7 +1257,6 @@ function MobileUnitEditor({
 										},
 									}}
 									onClick={() => {
-										if (action.disabled) return;
 										setIsFloatingActionsOpen(false);
 										action.onClick();
 									}}
@@ -1739,11 +1721,13 @@ function MobileUnitEditor({
 							</button>
 							<button
 								className="flex w-full items-center gap-3 rounded-[14px] border border-[#E5E5E7] bg-white p-4 text-left text-[14px] font-bold"
-								onClick={onOpenExport}
+								onClick={() => setIsStyleDialogOpen(true)}
 								type="button"
 							>
-								<Share2 size={18} />
-								Export unit
+								<span className="flex h-[18px] w-[18px] items-center justify-center text-[13px] font-extrabold leading-none">
+									Aa
+								</span>
+								Reading style
 							</button>
 							<button
 								className="flex w-full items-center gap-3 rounded-[14px] border border-[#E5E5E7] bg-white p-4 text-left text-[14px] font-bold"
@@ -1838,9 +1822,10 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		useState<BackendLearningActivityType>("multiple_choice");
 	const [activityQuality, setActivityQuality] =
 		useState<BackendGenerationQuality>("silver");
+	const {resolvedMode} = useAppearance();
 	const [generationModelOptions, setGenerationModelOptions] = useState<
 		GenerationModelOption[]
-	>(() => buildGenerationModelOptions(null, null));
+	>(() => buildGenerationModelOptions(null, null, resolvedMode));
 	const [isActivityLoading, setIsActivityLoading] = useState(false);
 	const [isActivityAttemptSubmitting, setIsActivityAttemptSubmitting] =
 		useState(false);
@@ -1862,13 +1847,15 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		])
 			.then(([config, catalog]) => {
 				setGenerationModelOptions(
-					buildGenerationModelOptions(config, catalog),
+					buildGenerationModelOptions(config, catalog, resolvedMode),
 				);
 			})
 			.catch(() => {
-				setGenerationModelOptions(buildGenerationModelOptions(null, null));
+				setGenerationModelOptions(
+					buildGenerationModelOptions(null, null, resolvedMode),
+				);
 			});
-	}, []);
+	}, [resolvedMode]);
 	const [openChapterActionsIndex, setOpenChapterActionsIndex] = useState<
 		number | null
 	>(null);
@@ -1892,7 +1879,6 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	const [unitGenerationTier, setUnitGenerationTier] =
 		useState<BackendGenerationQuality | null>(null);
 	const {user, refreshUser} = useAuth();
-	const {resolvedMode} = useAppearance();
 	const resolvedTheme = useMemo(
 		() =>
 			resolvePresentationTheme(
@@ -4239,6 +4225,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 
 	const postModuleCompletionStyle = resolvePostModuleCompletionStyle(
 		draft.textStyle.stylePreset,
+		resolvedMode === "dark",
 	);
 	const headerIconButtonClass =
 		"flex h-10 w-10 items-center justify-center rounded-full border border-[#D4D7DD] bg-white text-[#1D1D1F] transition-all hover:border-[#34C759] hover:bg-[#F7FFF9] hover:text-[#34C759] active:border-[#34C759] active:text-[#34C759]";
@@ -4268,7 +4255,10 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				>
 					<CheckCircle2 size={22} />
 				</div>
-				<div className="mt-3 text-[11px] font-bold uppercase tracking-[0.24em] text-[#6B7280]">
+				<div
+					className="mt-3 text-[11px] font-bold uppercase tracking-[0.24em]"
+					style={{color: postModuleCompletionStyle.accentText}}
+				>
 					Next steps
 				</div>
 				<h3
@@ -4305,7 +4295,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 							style={{
 								backgroundColor:
 									postModuleCompletionStyle.primaryIconBackground,
-								color: postModuleCompletionStyle.panelBorder,
+								color: postModuleCompletionStyle.accentText,
 							}}
 						>
 							<Dumbbell size={20} />
@@ -4341,7 +4331,11 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 						void handlePostModulePrimaryAction();
 					}}
 					type="button"
-					style={{fontFamily: postModuleCompletionStyle.bodyFamily}}
+					style={{
+						borderColor: postModuleCompletionStyle.panelBorder,
+						color: postModuleCompletionStyle.headingColor,
+						fontFamily: postModuleCompletionStyle.bodyFamily,
+					}}
 				>
 					<span className="flex w-full items-start justify-between gap-3">
 						<span
@@ -4376,7 +4370,10 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 							>
 								{primaryActionLabel}
 							</span>
-							<span className="mt-2 block text-sm font-medium leading-relaxed text-[#4B5563]">
+							<span
+								className="mt-2 block text-sm font-medium leading-relaxed"
+								style={{color: postModuleCompletionStyle.bodyColor}}
+							>
 								{hasNextModule ?
 									"Move forward when you are ready."
 								:	"Finish this unit and return to your dashboard."
@@ -4404,7 +4401,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				Practicing now helps retain the concepts before moving on.
 			</div>
 			<Dialog open={isActivityModalOpen} onOpenChange={setIsActivityModalOpen}>
-				<DialogContent className="max-h-[88vh] overflow-y-auto sm:max-w-[760px]">
+				<DialogContent className="app-activity-create-modal max-h-[88vh] overflow-y-auto sm:max-w-[760px]">
 					<DialogHeader>
 						<DialogTitle>Exercises & Practice</DialogTitle>
 						<DialogDescription>
@@ -4416,7 +4413,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 					</DialogHeader>
 
 					<div className="space-y-6 px-6 py-5">
-						<div className="rounded-[18px] bg-[#F5F5F7] p-1">
+						<div className="app-activity-create-scope rounded-[18px] bg-[#F5F5F7] p-1">
 							<div className="grid grid-cols-2 gap-1">
 								{[
 									{value: "current_module" as const, label: "Current module", icon: BookOpenCheck},
@@ -4430,9 +4427,9 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 											type="button"
 											onClick={() => setActivityScope(option.value)}
 											className={cn(
-												"flex items-center justify-center gap-2 rounded-[14px] px-4 py-2.5 text-sm font-bold transition",
+												"app-activity-create-scope-option flex items-center justify-center gap-2 rounded-[14px] px-4 py-2.5 text-sm font-bold transition",
 												selected ?
-													"bg-white text-[#16A34A] shadow-sm ring-1 ring-[#4ADE80]"
+													"app-activity-create-scope-option-selected bg-white text-[#16A34A] shadow-sm ring-1 ring-[#4ADE80]"
 												:	"text-[#6B7280] hover:text-[#0F0F12]",
 											)}
 										>
@@ -4460,9 +4457,9 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 											type="button"
 											onClick={() => setActivityType(option.type)}
 											className={cn(
-												"relative flex items-start gap-3 rounded-2xl border p-3 text-left transition",
+												"app-activity-create-option relative flex items-start gap-3 rounded-2xl border p-3 text-left transition",
 												selected ?
-													"border-[#4ADE80] bg-[#F0FDF4] text-[#0F0F12]"
+													"app-activity-create-option-selected border-[#4ADE80] bg-[#F0FDF4] text-[#0F0F12]"
 												:	"border-[#E5E5E7] bg-white text-[#0F0F12] hover:border-[#D1D5DB]",
 											)}
 										>
@@ -4475,9 +4472,9 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 											)}
 											<span
 												className={cn(
-													"flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
+													"app-activity-create-option-icon flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
 													selected ?
-														"bg-[#DCFCE7] text-[#16A34A]"
+														"app-activity-create-option-icon-selected bg-[#DCFCE7] text-[#16A34A]"
 													:	"bg-[#F3F4F6] text-[#0F0F12]",
 												)}
 											>
@@ -4510,18 +4507,28 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 											type="button"
 											onClick={() => setActivityQuality(option.quality)}
 											className={cn(
-												"relative flex h-[58px] items-center gap-3 rounded-2xl border px-3 text-left transition",
+												"app-activity-create-model relative flex h-[58px] items-center gap-3 rounded-2xl border px-3 text-left transition",
 												selected ?
-													"border-[#4ADE80] bg-white"
+													"app-activity-create-model-selected border-[#4ADE80] bg-white"
 												:	"border-[#E5E5E7] bg-[#F8F8F9] hover:border-[#D1D5DB]",
 											)}
 										>
 											{selected && (
-												<CheckCircle2
-													size={16}
-													className="absolute right-3 top-3 text-[#16A34A]"
-													fill="white"
-												/>
+												<span className="absolute right-3 top-1/2 -translate-y-1/2">
+													<CoinAmount
+														type={
+															getActivityGenerationCost({
+																quality: option.quality,
+															}).coinType
+														}
+														amount={
+															getActivityGenerationCost({
+																quality: option.quality,
+															}).amount
+														}
+														size={16}
+													/>
+												</span>
 											)}
 											<span className="flex h-9 w-9 shrink-0 items-center justify-center">
 												{option.icon ? (
@@ -4534,7 +4541,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 													<Brain size={18} className="text-[#0F0F12]" />
 												)}
 											</span>
-											<span className="min-w-0">
+											<span className="min-w-0 pr-14">
 												<span className="block truncate text-sm font-bold text-[#0F0F12]">
 													{option.label}
 												</span>
@@ -4543,42 +4550,24 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 									);
 								})}
 							</div>
-							<div className="mt-3 flex items-center justify-between gap-5 text-xs font-bold text-[#0F0F12]">
-								<span className="inline-flex items-center gap-1.5 whitespace-nowrap">
-									Cost:
-									<CoinAmount
-										type={
-											getActivityGenerationCost({
-												quality: activityQuality,
-											}).coinType
-										}
-										amount={
-											getActivityGenerationCost({
-												quality: activityQuality,
-											}).amount
-										}
-										size={16}
-									/>
-								</span>
-								<span className="inline-flex min-w-0 items-center justify-end gap-1.5 whitespace-nowrap">
-									Current balance:
-									<span className="inline-flex items-center gap-2">
-										{VISIBLE_COIN_TYPES.map((coinType) => (
-											<CoinAmount
-												key={coinType}
-												type={coinType}
-												amount={user?.credits[coinType] ?? 0}
-												size={16}
-											/>
-										))}
-									</span>
-								</span>
-							</div>
 						</div>
 
 					</div>
 
-					<DialogFooter>
+					<DialogFooter className="app-activity-create-footer">
+						<span className="mr-auto inline-flex min-w-0 items-center gap-1.5 whitespace-nowrap text-xs font-bold text-[#0F0F12]">
+							Current balance:
+							<span className="inline-flex items-center gap-2">
+								{VISIBLE_COIN_TYPES.map((coinType) => (
+									<CoinAmount
+										key={coinType}
+										type={coinType}
+										amount={user?.credits[coinType] ?? 0}
+										size={16}
+									/>
+								))}
+							</span>
+						</span>
 						<Button
 							type="button"
 							variant="outline"
@@ -4642,7 +4631,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			:	html ?? "";
 		return (
 			<div
-				className={cn("relative overflow-hidden rounded-[16px] border border-[#E5E5E7] md:rounded-[24px]", !extraContent && "shadow-[0_8px_60px_rgba(0,0,0,0.08)]")}
+				className={cn("app-editor-sheet relative overflow-hidden rounded-[16px] border border-[#E5E5E7] md:rounded-[24px]", !extraContent && "shadow-[0_8px_60px_rgba(0,0,0,0.08)]")}
 				style={{
 					height: `${spreadMetrics.pageHeight}px`,
 					width: `${spreadMetrics.pageWidth}px`,
@@ -4748,7 +4737,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 
 		return (
 		<div
-			className="relative overflow-hidden rounded-[16px] border border-[#E5E5E7] shadow-[0_8px_60px_rgba(0,0,0,0.08)] md:rounded-[24px]"
+			className="app-editor-sheet relative overflow-hidden rounded-[16px] border border-[#E5E5E7] shadow-[0_8px_60px_rgba(0,0,0,0.08)] md:rounded-[24px]"
 			style={{
 				height: `${spreadMetrics.pageHeight}px`,
 				width: `${spreadMetrics.pageWidth}px`,
@@ -4897,7 +4886,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			);
 			return (
 				<div
-					className="relative overflow-hidden rounded-[16px] border shadow-[0_8px_60px_rgba(0,0,0,0.08)] md:rounded-[24px]"
+					className="app-editor-sheet relative overflow-hidden rounded-[16px] border shadow-[0_8px_60px_rgba(0,0,0,0.08)] md:rounded-[24px]"
 					style={{
 						height: `${spreadMetrics.pageHeight}px`,
 						width: `${spreadMetrics.pageWidth}px`,
@@ -4928,10 +4917,12 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			if (isActiveChapterStreaming) return null;
 			return (
 				<div
-					className="relative overflow-hidden rounded-[16px] border border-[#E5E5E7] bg-white md:rounded-[24px]"
+					className="app-editor-sheet relative overflow-hidden rounded-[16px] border md:rounded-[24px]"
 					style={{
 						height: `${spreadMetrics.pageHeight}px`,
 						width: `${spreadMetrics.pageWidth}px`,
+						background: postModuleCompletionStyle.panelBackground,
+						borderColor: postModuleCompletionStyle.panelBorder,
 					}}
 				>
 					<div className="flex h-full flex-col overflow-hidden px-5 py-4 md:px-6 md:py-5" style={compactPagePaddingStyle}>
@@ -5155,7 +5146,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 										align="center"
 										side="top"
 										sideOffset={-26}
-										className="w-[112px] overflow-hidden rounded-full border-[#E5E5E7] bg-white/90 px-2.5 py-1 shadow-lg backdrop-blur-sm"
+										className="app-editor-page-picker-popover w-[112px] overflow-hidden rounded-full border-[#E5E5E7] bg-white/90 px-2.5 py-1 shadow-lg backdrop-blur-sm"
 									>
 										<DidactioWheelPicker
 											className="w-full"
@@ -5497,7 +5488,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 					open={isActivityModalOpen}
 					onOpenChange={setIsActivityModalOpen}
 				>
-					<DialogContent className="max-h-[88vh] w-[calc(100vw-32px)] overflow-y-auto rounded-[18px] p-0 sm:max-w-[760px]">
+					<DialogContent className="app-activity-create-modal max-h-[88vh] w-[calc(100vw-32px)] overflow-y-auto rounded-[18px] p-0 sm:max-w-[760px]">
 						<DialogHeader className="px-5 pb-0 pt-5">
 							<DialogTitle>Exercises & Practice</DialogTitle>
 							<DialogDescription>
@@ -5509,7 +5500,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 						</DialogHeader>
 
 						<div className="space-y-5 px-5 py-5">
-							<div className="rounded-[16px] bg-[#F5F5F7] p-1">
+							<div className="app-activity-create-scope rounded-[16px] bg-[#F5F5F7] p-1">
 								<div className="grid grid-cols-2 gap-1">
 									{[
 										{value: "current_module" as const, label: "Current", icon: BookOpenCheck},
@@ -5523,9 +5514,9 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 												type="button"
 												onClick={() => setActivityScope(option.value)}
 												className={cn(
-													"flex items-center justify-center gap-2 rounded-[13px] px-3 py-2.5 text-[12px] font-bold transition",
+													"app-activity-create-scope-option flex items-center justify-center gap-2 rounded-[13px] px-3 py-2.5 text-[12px] font-bold transition",
 													selected ?
-														"bg-white text-[#16A34A] shadow-sm ring-1 ring-[#4ADE80]"
+														"app-activity-create-scope-option-selected bg-white text-[#16A34A] shadow-sm ring-1 ring-[#4ADE80]"
 													:	"text-[#6B7280]",
 												)}
 											>
@@ -5551,24 +5542,24 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 												type="button"
 												onClick={() => setActivityType(option.type)}
 												className={cn(
-													"relative flex items-start gap-3 rounded-[14px] border p-3 text-left transition",
+													"app-activity-create-option relative flex items-start gap-3 rounded-[14px] border p-3 text-left transition",
 													selected ?
-														"border-[#4ADE80] bg-[#F0FDF4] text-[#0F0F12]"
+														"app-activity-create-option-selected border-[#4ADE80] bg-[#F0FDF4] text-[#0F0F12]"
 													:	"border-[#E5E5E7] bg-white text-[#0F0F12]",
 												)}
 											>
 												{selected && (
 													<CheckCircle2
 														size={16}
-														className="absolute right-3 top-3 text-[#16A34A]"
+														className="absolute right-3 top-2.5 text-[#16A34A]"
 														fill="white"
 													/>
 												)}
 												<span
 													className={cn(
-														"flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
+														"app-activity-create-option-icon flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
 														selected ?
-															"bg-[#DCFCE7] text-[#16A34A]"
+															"app-activity-create-option-icon-selected bg-[#DCFCE7] text-[#16A34A]"
 														:	"bg-[#F3F4F6] text-[#0F0F12]",
 													)}
 												>
@@ -5599,18 +5590,28 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 												type="button"
 												onClick={() => setActivityQuality(option.quality)}
 												className={cn(
-													"relative flex h-[54px] items-center gap-3 rounded-[14px] border px-3 text-left transition",
+													"app-activity-create-model relative flex h-[54px] items-center gap-3 rounded-[14px] border px-3 text-left transition",
 													selected ?
-														"border-[#4ADE80] bg-white"
+														"app-activity-create-model-selected border-[#4ADE80] bg-white"
 													:	"border-[#E5E5E7] bg-[#F8F8F9]",
 												)}
 											>
 												{selected && (
-													<CheckCircle2
-														size={16}
-														className="absolute right-3 top-3 text-[#16A34A]"
-														fill="white"
-													/>
+													<span className="absolute right-3 top-1/2 -translate-y-1/2">
+														<CoinAmount
+															type={
+																getActivityGenerationCost({
+																	quality: option.quality,
+																}).coinType
+															}
+															amount={
+																getActivityGenerationCost({
+																	quality: option.quality,
+																}).amount
+															}
+															size={16}
+														/>
+													</span>
 												)}
 												<span className="flex h-9 w-9 shrink-0 items-center justify-center">
 													{option.icon ?
@@ -5622,7 +5623,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 													:	<Brain size={18} className="text-[#0F0F12]" />
 													}
 												</span>
-												<span className="min-w-0 pr-5">
+												<span className="min-w-0 pr-14">
 													<span className="block truncate text-[13px] font-bold text-[#0F0F12]">
 														{option.label}
 													</span>
@@ -5631,41 +5632,23 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 										);
 									})}
 								</div>
-								<div className="mt-3 space-y-2 text-[11px] font-bold text-[#0F0F12]">
-									<span className="flex items-center justify-between gap-2">
-										<span>Cost</span>
-										<CoinAmount
-											type={
-												getActivityGenerationCost({
-													quality: activityQuality,
-												}).coinType
-											}
-											amount={
-												getActivityGenerationCost({
-													quality: activityQuality,
-												}).amount
-											}
-											size={16}
-										/>
-									</span>
-									<span className="flex items-center justify-between gap-2">
-										<span>Current balance</span>
-										<span className="inline-flex items-center gap-2">
-											{VISIBLE_COIN_TYPES.map((coinType) => (
-												<CoinAmount
-													key={coinType}
-													type={coinType}
-													amount={user?.credits[coinType] ?? 0}
-													size={16}
-												/>
-											))}
-										</span>
-									</span>
-								</div>
 							</div>
 						</div>
 
-						<DialogFooter className="grid grid-cols-2 gap-2 border-t border-[#F0F0F2] bg-[#FAFAFB] px-5 py-4">
+						<DialogFooter className="app-activity-create-footer grid grid-cols-2 gap-2 border-t border-[#F0F0F2] bg-[#FAFAFB] px-5 py-4">
+							<span className="col-span-2 mb-1 inline-flex min-w-0 items-center gap-1.5 whitespace-nowrap text-[11px] font-bold text-[#0F0F12]">
+								Current balance:
+								<span className="inline-flex items-center gap-2">
+									{VISIBLE_COIN_TYPES.map((coinType) => (
+										<CoinAmount
+											key={coinType}
+											type={coinType}
+											amount={user?.credits[coinType] ?? 0}
+											size={16}
+										/>
+									))}
+								</span>
+							</span>
 							<Button
 								type="button"
 								variant="outline"
@@ -5738,8 +5721,13 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	return (
 		<div className="flex h-screen overflow-hidden bg-[#F5F5F7] font-sans text-[#1D1D1F]">
 			<Motion.aside
-				className="z-20 flex h-full w-[280px] shrink-0 flex-col overflow-hidden border-r border-[#E5E5E7] bg-white"
+				className="app-editor-sidebar z-20 flex h-full w-[280px] shrink-0 flex-col overflow-hidden border-r border-[#E5E5E7] bg-white"
 				initial={false}
+				style={
+					resolvedMode === "dark" ?
+						{backgroundColor: "#18181B", borderColor: "var(--app-border-subtle)"}
+					:	undefined
+				}
 			>
 				<div className="flex shrink-0 items-center justify-between gap-2 px-4 py-5">
 					<div className="min-w-0 flex-1">
@@ -5823,11 +5811,11 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 									);
 								}}
 								className={cn(
-									"group relative flex w-full flex-col items-stretch gap-2 rounded-[14px] transition-all duration-200",
+									"app-editor-outline-item group relative flex w-full flex-col items-stretch gap-2 rounded-[14px] transition-all duration-200",
 									"px-2 py-2.5",
 									isActive ?
-										"bg-[#F5F5F7] text-[#1D1D1F] shadow-[inset_0_0_0_1px_rgba(0,0,0,0.06)]"
-									:	"text-[#6E6E73] hover:bg-[#FAFAFA] hover:text-[#1D1D1F] hover:shadow-[inset_0_0_0_1px_rgba(0,0,0,0.04)]",
+										"app-editor-outline-item-active bg-[#F5F5F7] text-[#1D1D1F]"
+									:	"text-[#6E6E73] hover:bg-[#FAFAFA] hover:text-[#1D1D1F]",
 								)}
 							>
 								{isActive && (
@@ -6216,7 +6204,14 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			</Motion.aside>
 
 			<main className="relative flex h-full flex-1 flex-col overflow-hidden">
-				<header className="z-10 flex h-[64px] shrink-0 items-center justify-between gap-8 border-b border-[#E5E5E7] bg-white/80 px-6 backdrop-blur-md">
+				<header
+					className="app-editor-header z-10 flex h-[64px] shrink-0 items-center justify-between gap-8 border-b border-[#E5E5E7] bg-white/80 px-6 backdrop-blur-md"
+					style={
+						resolvedMode === "dark" ?
+							{backgroundColor: "#18181B", borderColor: "var(--app-border-subtle)"}
+						:	undefined
+					}
+				>
 					<div className="flex min-w-0 flex-[1_1_auto] items-center gap-4">
 						<div className="flex shrink-0 items-center gap-1.5 border-r border-[#D1D1D6] pr-4">
 							<span className="text-[13px] leading-none">
@@ -7075,7 +7070,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 							}
 							type="button"
 						>
-							<span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] border border-[#D5E4FF] bg-[#EFF6FF] text-[#2563EB]">
+							<span className="app-export-download-icon flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] border border-[#D5E4FF] bg-[#EFF6FF] text-[#2563EB]">
 								<Download size={17} />
 							</span>
 							<span className="min-w-0 flex-1">

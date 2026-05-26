@@ -142,7 +142,7 @@ function PurchasePanel({
 								</div>
 							</div>
 						</div>
-						<div className="grid min-w-[190px] grid-cols-2 gap-1 rounded-[10px] bg-[#F5F5F7] p-1">
+						<div className="app-purchase-price-toggle grid min-w-[190px] grid-cols-2 gap-1 rounded-[10px] bg-[#F5F5F7] p-1">
 							{products.map((product) => {
 								const selected = selectedProduct.id === product.id;
 								return (
@@ -151,9 +151,9 @@ function PurchasePanel({
 										type="button"
 										aria-pressed={selected}
 										onClick={() => setSelectedProductId(product.id)}
-										className={`rounded-[8px] px-3 py-2 text-center text-[18px] font-bold leading-none transition-colors ${
+										className={`app-purchase-price-option rounded-[8px] px-3 py-2 text-center text-[18px] font-bold leading-none transition-colors ${
 											selected ?
-												"bg-white text-[#0F0F12] shadow-sm"
+												"app-purchase-price-option-selected bg-white text-[#0F0F12] shadow-sm"
 											:	"text-[#667085] hover:bg-white/70"
 										}`}
 									>
@@ -306,7 +306,7 @@ export function SubscriptionView() {
 											`${activePlan.name} is currently active.`
 										:	"Choose a plan or buy credits to get started."}
 									</p>
-									<div className="my-5 h-px bg-[#E5E5E7]" />
+									<div className="my-3 h-px bg-[#E5E5E7]" />
 									<div className="mb-5 flex items-center gap-3">
 										<div className="flex h-10 w-10 items-center justify-center rounded-[8px] border border-[#E5E5E7] bg-white text-[#667085]">
 											<CalendarDays size={18} />

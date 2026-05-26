@@ -32,6 +32,10 @@ const PROVIDER_LOGOS: Record<string, string> = {
 	openai: "/assets/brands/chatgpt.png",
 };
 
+const DARK_PROVIDER_LOGOS: Record<string, string> = {
+	openai: "/assets/brands/chatgpt-white.svg",
+};
+
 const TONE_OPTIONS: Array<{
 	value: BackendAuthoringConfig["tone"];
 	label: string;
@@ -96,8 +100,12 @@ function modelConfigFromId(id: string): BackendAiModelConfig {
 	};
 }
 
-function getProviderLogo(modelId: string): string | undefined {
-	return PROVIDER_LOGOS[modelId.split("/")[0]];
+function getProviderLogo(modelId: string, dark: boolean): string | undefined {
+	const provider = modelId.split("/")[0];
+	return (
+		(dark ? DARK_PROVIDER_LOGOS[provider] : undefined) ??
+		PROVIDER_LOGOS[provider]
+	);
 }
 
 function normalizeAiConfig(config: BackendAiConfig): BackendAiConfig {
@@ -199,7 +207,8 @@ function ModelCard({
 	selected: boolean;
 	onSelect: () => void;
 }) {
-	const logo = getProviderLogo(entry.id);
+	const {resolvedMode} = useAppearance();
+	const logo = getProviderLogo(entry.id, resolvedMode === "dark");
 
 	return (
 		<button
@@ -211,15 +220,6 @@ function ModelCard({
 				:	"border-black/[0.1] bg-white hover:border-[#1D1D1F]/40 hover:bg-black/[0.02]"
 			}`}
 		>
-			{entry.recommended ? (
-				<span
-					className="absolute right-2.5 top-2.5 flex items-center gap-1 rounded-full bg-[#EFA047]/15 px-2 py-0.5 text-[9.5px] font-bold text-[#EFA047]"
-				>
-					<Star size={8} fill="currentColor" strokeWidth={0} />
-					Best
-				</span>
-			) : null}
-
 			<span
 				className={`app-preference-icon ${selected ? "app-preference-icon-selected" : ""} flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] ${
 					selected ? "bg-white/15" : "bg-black/[0.04]"
@@ -234,9 +234,19 @@ function ModelCard({
 				) : null}
 			</span>
 
-			<span className="min-w-0 flex-1 pr-8">
-				<span className="block text-[13px] font-semibold leading-tight">
-					{entry.label}
+			<span className="min-w-0 flex-1">
+				<span className="flex min-w-0 items-start justify-between gap-2">
+					<span className="min-w-0 text-[13px] font-semibold leading-tight">
+						{entry.label}
+					</span>
+					{entry.recommended ? (
+						<span
+							className="mt-[-1px] flex shrink-0 items-center gap-1 rounded-full bg-[#EFA047]/15 px-2 py-0.5 text-[9.5px] font-bold text-[#EFA047]"
+						>
+							<Star size={8} fill="currentColor" strokeWidth={0} />
+							Best
+						</span>
+					) : null}
 				</span>
 				<span
 					className={`mt-1 block text-[11.5px] leading-relaxed ${
@@ -444,7 +454,7 @@ export function PreferencesView() {
 								title="Content language"
 								description="All generated lessons and learning materials will use this language by default."
 							>
-								<div className="max-w-[420px]">
+								<div className="w-[260px] max-w-full">
 									<LanguageSelector
 										value={config.authoring.language}
 										onChange={(language) =>

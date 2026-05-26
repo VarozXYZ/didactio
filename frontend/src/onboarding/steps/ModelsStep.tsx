@@ -1,6 +1,8 @@
 import {useEffect, useState} from "react";
 import {Star, ChevronRight, ChevronLeft} from "lucide-react";
 import {dashboardApi, type BackendModelEntry} from "../../dashboard/api/dashboardApi";
+import {getProviderLogo} from "../../dashboard/utils/modelOptions";
+import {useAppearance} from "../../theme/AppearanceProvider";
 
 type Props = {
 	silverModelId: string;
@@ -11,36 +13,31 @@ type Props = {
 	onBack: () => void;
 };
 
-const PROVIDER_LOGOS: Record<string, string> = {
-	deepseek: "/assets/brands/deepseek-reduced.svg",
-	openai: "/assets/brands/chatgpt.png",
-	google: "/assets/brands/gemini.png",
-	anthropic: "/assets/brands/claude-reduced.svg",
-};
-
-function getProviderLogo(modelId: string): string | undefined {
+function getModelLogo(modelId: string, darkMode: boolean): string | undefined {
 	const provider = modelId.split("/")[0];
-	return PROVIDER_LOGOS[provider];
+	return getProviderLogo(provider, darkMode ? "dark" : "light");
 }
 
 function ModelCard({
 	entry,
 	selected,
 	onSelect,
+	darkMode,
 }: {
 	entry: BackendModelEntry;
 	selected: boolean;
 	onSelect: () => void;
+	darkMode: boolean;
 }) {
-	const logo = getProviderLogo(entry.id);
+	const logo = getModelLogo(entry.id, darkMode);
 
 	return (
 		<button
 			type="button"
 			onClick={onSelect}
-			className={`relative flex min-h-[94px] w-full flex-col gap-2 rounded-[12px] border p-3.5 text-left transition-all md:min-h-[96px] ${
+			className={`app-onboarding-model-card relative flex min-h-[94px] w-full flex-col gap-2 rounded-[12px] border p-3.5 text-left transition-all md:min-h-[96px] ${
 				selected ?
-					"border-[#1D1D1F] bg-[#1D1D1F] text-white"
+					"app-onboarding-model-card-selected border-[#1D1D1F] bg-[#1D1D1F] text-white"
 				:	"border-black/[0.1] bg-white hover:border-[#1D1D1F]/40 hover:bg-black/[0.02]"
 			}`}
 		>
@@ -58,7 +55,11 @@ function ModelCard({
 					<img
 						src={logo}
 						alt=""
-						className={`h-5 w-5 shrink-0 object-contain ${selected ? "brightness-0 invert" : ""}`}
+						className={`h-5 w-5 shrink-0 object-contain ${
+							selected && !darkMode && !entry.id.startsWith("google/") ?
+								"brightness-0 invert"
+							:	""
+						}`}
 					/>
 				:	null}
 				<span className="text-[13px] font-semibold leading-tight">
@@ -85,6 +86,8 @@ export function ModelsStep({
 	onNext,
 	onBack,
 }: Props) {
+	const {resolvedMode} = useAppearance();
+	const darkMode = resolvedMode === "dark";
 	const [silverModels, setSilverModels] = useState<BackendModelEntry[]>([]);
 	const [goldModels, setGoldModels] = useState<BackendModelEntry[]>([]);
 	const [loading, setLoading] = useState(true);
@@ -132,6 +135,7 @@ export function ModelsStep({
 									entry={model}
 									selected={silverModelId === model.id}
 									onSelect={() => onSilverChange(model.id)}
+									darkMode={darkMode}
 								/>
 							))}
 						</div>
@@ -147,6 +151,7 @@ export function ModelsStep({
 									entry={model}
 									selected={goldModelId === model.id}
 									onSelect={() => onGoldChange(model.id)}
+									darkMode={darkMode}
 								/>
 							))}
 						</div>

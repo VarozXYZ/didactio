@@ -12,8 +12,21 @@ export const PROVIDER_LOGOS: Record<string, string> = {
 	openai: "/assets/brands/chatgpt.png",
 };
 
-export function getProviderLogo(provider: string | null | undefined) {
-	return provider ? PROVIDER_LOGOS[provider] : undefined;
+const DARK_PROVIDER_LOGOS: Record<string, string> = {
+	openai: "/assets/brands/chatgpt-white.svg",
+};
+
+type ProviderLogoMode = "light" | "dark";
+
+export function getProviderLogo(
+	provider: string | null | undefined,
+	mode: ProviderLogoMode = "light",
+) {
+	if (!provider) return undefined;
+	return (
+		(mode === "dark" ? DARK_PROVIDER_LOGOS[provider] : undefined) ??
+		PROVIDER_LOGOS[provider]
+	);
 }
 
 export type GenerationModelOption = {
@@ -37,6 +50,7 @@ function fallbackModelLabel(modelId: string) {
 export function buildGenerationModelOptions(
 	config: BackendAiConfig | null,
 	catalog: BackendModelCatalog | null,
+	mode: ProviderLogoMode = "light",
 ): GenerationModelOption[] {
 	return (["silver", "gold"] as const).map((quality) => {
 		const current = config?.[quality];
@@ -49,7 +63,7 @@ export function buildGenerationModelOptions(
 			label: entry?.label ?? fallbackModelLabel(modelId),
 			provider,
 			model: current?.model ?? quality,
-			icon: PROVIDER_LOGOS[provider],
+			icon: getProviderLogo(provider, mode),
 		};
 	});
 }

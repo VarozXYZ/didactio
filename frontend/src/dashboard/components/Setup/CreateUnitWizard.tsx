@@ -8,6 +8,7 @@ import {
 	getDashboardErrorMessage,
 } from "../../api/dashboardApi";
 import {useAuth} from "../../../auth/AuthProvider";
+import {useAppearance} from "../../../theme/AppearanceProvider";
 import {adaptDidacticUnitPlanning} from "../../adapters";
 import type {PlanningDetailViewModel, PlanningSyllabus} from "../../types";
 import {TopicStep} from "./steps/TopicStep";
@@ -235,9 +236,10 @@ export function CreateUnitWizard({
 	const [availableFolders, setAvailableFolders] = useState<BackendFolder[]>(
 		[],
 	);
+	const {resolvedMode} = useAppearance();
 	const [generationModelOptions, setGenerationModelOptions] = useState<
 		GenerationModelOption[]
-	>(() => buildGenerationModelOptions(null, null));
+	>(() => buildGenerationModelOptions(null, null, resolvedMode));
 
 	const [draftTopic, setDraftTopic] = useState("");
 	const [draftAdditionalContext, setDraftAdditionalContext] = useState("");
@@ -300,7 +302,7 @@ export function CreateUnitWizard({
 				]);
 				setAvailableFolders(response.folders);
 				setGenerationModelOptions(
-					buildGenerationModelOptions(config, catalog),
+					buildGenerationModelOptions(config, catalog, resolvedMode),
 				);
 			} catch (e) {
 				toastError(
@@ -308,7 +310,7 @@ export function CreateUnitWizard({
 				);
 			}
 		})();
-	}, []);
+	}, [resolvedMode]);
 
 	useEffect(() => {
 		if (!didacticUnitId) return;
@@ -691,12 +693,12 @@ export function CreateUnitWizard({
 									/>
 
 									<span
-										className={`mb-3.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-[7px] text-[11px] font-bold transition-all ${
+										className={`app-wizard-step-badge mb-3.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-[7px] text-[11px] font-bold transition-all ${
 											isCompleted ?
-												"bg-[#11A07D] text-white"
+												"app-wizard-step-badge-completed bg-[#11A07D] text-white"
 											: isCurrent ?
-												"bg-[#1D1D1F] text-white"
-											:	"bg-black/[0.06] text-[#C7C7CC]"
+												"app-wizard-step-badge-current bg-[#1D1D1F] text-white"
+											:	"app-wizard-step-badge-idle bg-black/[0.06] text-[#C7C7CC]"
 										}`}
 									>
 										{isCompleted ?
@@ -796,7 +798,9 @@ export function CreateUnitWizard({
 					</div>
 					<div
 						className={`min-h-0 w-full min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-5 pb-5 pt-4 md:px-6 md:pt-4 ${
-							currentStep === 2 ? "pt-4" : ""
+							currentStep === 0 ? "pt-7 md:pt-7"
+							: currentStep === 2 ? "pt-4"
+							: ""
 						}`}
 					>
 						{currentStep === 0 && (

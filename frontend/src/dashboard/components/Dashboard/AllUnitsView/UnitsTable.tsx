@@ -31,6 +31,7 @@ import {
 import {getFolderEmoji, getFolderVisuals} from "../../../utils/folderDisplay";
 import {getMoveTargetFolders} from "../../../utils/folderTargets";
 import {getProviderLogo} from "../../../utils/modelOptions";
+import {useAppearance} from "../../../../theme/AppearanceProvider";
 import {LengthBadge} from "./LengthBadge";
 
 type UnitsTableProps = {
@@ -54,6 +55,7 @@ export function UnitsTable({
 }: UnitsTableProps) {
 	const [unitPendingDelete, setUnitPendingDelete] =
 		useState<DashboardListItem | null>(null);
+	const {resolvedMode} = useAppearance();
 
 	return (
 		<>
@@ -89,6 +91,7 @@ export function UnitsTable({
 							);
 							const modelLogo = getProviderLogo(
 								unit.modelUsed?.provider,
+								resolvedMode,
 							);
 							const moveTargetFolders = getMoveTargetFolders(
 								allFolders,

@@ -92,7 +92,7 @@ export function CreateUnitButton({onClick, label = "New unit"}: {onClick: () => 
 				)}
 
 				<div
-					className="app-create-unit-button-content flex select-none items-center gap-2.5 px-5 py-[11px] text-[14px] font-semibold text-white"
+					className="app-create-unit-button-content flex select-none items-center gap-2.5 px-5 py-[11px] text-[15px] font-semibold text-white"
 					style={{
 						position: "relative",
 						zIndex: 2,

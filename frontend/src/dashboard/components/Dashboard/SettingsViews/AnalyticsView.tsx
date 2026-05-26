@@ -34,6 +34,10 @@ const PROVIDER_LOGOS: Record<string, string> = {
 	openai: "/assets/brands/chatgpt.png",
 };
 
+const DARK_PROVIDER_LOGOS: Record<string, string> = {
+	openai: "/assets/brands/chatgpt-white.svg",
+};
+
 function formatNumber(value: number): string {
 	return new Intl.NumberFormat("en").format(value);
 }
@@ -49,7 +53,13 @@ function ProviderIcon({
 	provider?: string;
 	label: string;
 }) {
-	const logo = provider ? PROVIDER_LOGOS[provider] : undefined;
+	const {resolvedMode} = useAppearance();
+	const logo =
+		provider ?
+			((resolvedMode === "dark" ?
+				DARK_PROVIDER_LOGOS[provider]
+			:	undefined) ?? PROVIDER_LOGOS[provider])
+		:	undefined;
 
 	if (!logo) {
 		return <Bot size={20} />;

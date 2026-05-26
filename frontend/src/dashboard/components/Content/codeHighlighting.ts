@@ -3,10 +3,10 @@ import type {StylePresetId} from "../../utils/typography";
 export const CODE_THEME_MAP: Record<StylePresetId, string> = {
 	modern: "slack-ochin",
 	classic: "everforest-light",
-	plain: "github-light",
+	plain: "github-light-default",
 };
 
-export const DARK_CODE_THEME = "github-dark";
+export const DARK_CODE_THEME = "github-dark-default";
 
 export const CODE_LANGUAGE_ALIASES: Record<string, string> = {
 	bash: "bash",
@@ -52,9 +52,9 @@ export async function getCodeHighlighter() {
 			import("@shikijs/langs/tsx"),
 			import("@shikijs/langs/typescript"),
 			import("@shikijs/themes/everforest-light"),
-			import("@shikijs/themes/github-light"),
+			import("@shikijs/themes/github-light-default"),
 			import("@shikijs/themes/slack-ochin"),
-			import("@shikijs/themes/github-dark"),
+			import("@shikijs/themes/github-dark-default"),
 		]).then(
 			([
 				{createHighlighterCore},
@@ -73,9 +73,9 @@ export async function getCodeHighlighter() {
 				tsx,
 				typescript,
 				everforestLight,
-				githubLight,
+				githubLightDefault,
 				slackOchin,
-				githubDark,
+				githubDarkDefault,
 			]) =>
 				createHighlighterCore({
 					engine: createJavaScriptRegexEngine(),
@@ -96,9 +96,9 @@ export async function getCodeHighlighter() {
 					],
 					themes: [
 						everforestLight.default,
-						githubLight.default,
+						githubLightDefault.default,
 						slackOchin.default,
-						githubDark.default,
+						githubDarkDefault.default,
 					],
 				}),
 		);

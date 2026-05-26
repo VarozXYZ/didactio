@@ -31,7 +31,7 @@ export function DidactioWheelPicker<T extends WheelPickerValue>({
 	const wheelHeight = Math.round(wheelRadius * 2 + optionItemHeight * 0.25);
 
 	return (
-		<div className={cn("relative", className)}>
+		<div className={cn("app-wheel-picker relative", className)}>
 			<div style={{height: `${wheelHeight}px`}}>
 				<WheelPickerWrapper className="h-full w-full">
 					<WheelPicker
@@ -45,21 +45,21 @@ export function DidactioWheelPicker<T extends WheelPickerValue>({
 						scrollSensitivity={0.9}
 						classNames={{
 							optionItem:
-								"text-[12px] font-medium tabular-nums text-[#8E8E93]",
-							highlightWrapper: "rounded-full bg-white shadow-none",
+								"app-wheel-picker-option text-[12px] font-medium tabular-nums text-[#8E8E93]",
+							highlightWrapper: "app-wheel-picker-highlight rounded-full bg-white shadow-none",
 							highlightItem:
-								"text-[13px] font-medium tabular-nums text-[#1D1D1F]",
+								"app-wheel-picker-highlight-item text-[13px] font-medium tabular-nums text-[#1D1D1F]",
 						}}
 					/>
 				</WheelPickerWrapper>
 			</div>
 			<div
 				aria-hidden
-				className="pointer-events-none absolute inset-x-0 top-0 h-3 bg-gradient-to-b from-white/80 to-transparent"
+				className="app-wheel-picker-fade-top pointer-events-none absolute inset-x-0 top-0 h-3 bg-gradient-to-b from-white/80 to-transparent"
 			/>
 			<div
 				aria-hidden
-				className="pointer-events-none absolute inset-x-0 bottom-0 h-3 bg-gradient-to-t from-white/80 to-transparent"
+				className="app-wheel-picker-fade-bottom pointer-events-none absolute inset-x-0 bottom-0 h-3 bg-gradient-to-t from-white/80 to-transparent"
 			/>
 		</div>
 	);

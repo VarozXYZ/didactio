@@ -171,9 +171,9 @@ export function OnboardingWizard() {
 							return (
 								<div
 									key={step.label}
-									className={`relative flex flex-1 flex-col px-6 py-6 transition-all ${
+									className={`app-onboarding-step relative flex flex-1 flex-col px-6 py-6 transition-all ${
 										index < STEPS.length - 1 ? "border-b border-black/[0.05]" : ""
-									} ${isCurrent ? "bg-white/60" : ""}`}
+									} ${isCurrent ? "app-onboarding-step-current bg-white/60" : ""}`}
 								>
 									<div
 										className={`absolute left-0 top-0 bottom-0 w-[3px] transition-all ${
@@ -184,12 +184,12 @@ export function OnboardingWizard() {
 									/>
 
 									<span
-										className={`mb-3.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-[7px] text-[11px] font-bold transition-all ${
+										className={`app-wizard-step-badge mb-3.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-[7px] text-[11px] font-bold transition-all ${
 											isCompleted ?
-												"bg-[#11A07D] text-white"
+												"app-wizard-step-badge-completed bg-[#11A07D] text-white"
 											: isCurrent ?
-												"bg-[#1D1D1F] text-white"
-											:	"bg-black/[0.06] text-[#C7C7CC]"
+												"app-wizard-step-badge-current bg-[#1D1D1F] text-white"
+											:	"app-wizard-step-badge-idle bg-black/[0.06] text-[#C7C7CC]"
 										}`}
 									>
 										{isCompleted ? <Check size={11} strokeWidth={3} /> : index + 1}
@@ -234,7 +234,7 @@ export function OnboardingWizard() {
 					</div>
 
 					<div className="w-full min-w-0 shrink-0 overflow-hidden px-5 pb-4 pt-2 md:hidden">
-						<div className="grid grid-cols-3 overflow-hidden rounded-[16px] border border-black/[0.08] bg-black/[0.05] p-0.5">
+						<div className="app-onboarding-mobile-steps grid grid-cols-3 overflow-hidden rounded-[16px] border border-black/[0.08] bg-black/[0.05] p-0.5">
 							{STEPS.map((step, index) => {
 								const isCompleted = index < currentStep;
 								const isCurrent = index === currentStep;
@@ -245,9 +245,9 @@ export function OnboardingWizard() {
 										key={step.label}
 										onClick={() => handleSelectStep(index)}
 										disabled={!canSelectStep(index)}
-										className={`flex min-w-0 items-center justify-center gap-1.5 px-2 py-2 text-[11px] font-bold transition ${
+										className={`app-onboarding-mobile-step flex min-w-0 items-center justify-center gap-1.5 px-2 py-2 text-[11px] font-bold transition ${
 											isCurrent ?
-												"rounded-[13px] bg-[#1D1D1F] text-white"
+												"app-onboarding-mobile-step-current rounded-[13px] bg-[#1D1D1F] text-white"
 											: isCompleted ?
 												"text-[#0A9068]"
 											:	"text-[#AEAEB2]"

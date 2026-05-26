@@ -33,7 +33,10 @@ function App() {
 	const isDashboardRoute = location.pathname.startsWith("/dashboard");
 	const isOnboardingRoute = location.pathname.startsWith("/onboarding");
 	const hideMainChrome = isAuthRoute || isDashboardRoute || isOnboardingRoute;
-	const usesAppAppearance = isAuthRoute || isDashboardRoute || isOnboardingRoute;
+	const usesAppAppearance =
+		(isAuthRoute && location.pathname !== "/login") ||
+		isDashboardRoute ||
+		isOnboardingRoute;
 
 	useEffect(() => {
 		const nextTheme = usesAppAppearance ? resolvedMode : "light";

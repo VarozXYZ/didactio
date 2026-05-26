@@ -51,7 +51,7 @@ function CoinCard({
 	const animated = useCountUp(amount, COIN_DURATIONS[type] ?? 1000);
 
 	return (
-		<div className="flex flex-col items-center gap-2 rounded-[14px] border border-black/[0.08] bg-white px-4 py-5 text-center shadow-sm">
+		<div className="app-onboarding-coin-card flex flex-col items-center gap-2 rounded-[14px] border border-black/[0.08] bg-white px-4 py-5 text-center shadow-sm">
 			<CoinIcon type={type} size={40} />
 			<div className="font-sora text-[28px] font-bold tabular-nums text-[#1D1D1F]">
 				{animated}
@@ -97,7 +97,7 @@ export function WelcomeCoinsStep({user, onComplete, isSubmitting, onBack}: Props
 				/>
 			</div>
 
-			<div className="rounded-[12px] border border-black/[0.07] bg-white/60 px-4 py-3.5">
+			<div className="app-onboarding-card rounded-[12px] border border-black/[0.07] bg-white/60 px-4 py-3.5">
 				<p className="text-[13px] leading-relaxed text-[#6E6E73]">
 					<strong className="text-[#1D1D1F]">How it works:</strong> Each time you generate
 					content, a specified number of coins are spent based on the quality and length you

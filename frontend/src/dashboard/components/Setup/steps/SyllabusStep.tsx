@@ -219,7 +219,7 @@ function ChapterAccordion({
 
 	return (
 		<div
-			className="group/chapter overflow-hidden rounded-[16px] transition-shadow duration-300"
+			className="app-syllabus-chapter-card group/chapter overflow-hidden rounded-[16px] transition-shadow duration-300"
 			style={{
 				background: "rgba(255,255,255,0.55)",
 				border: "1px solid rgba(0,0,0,0.06)",

@@ -68,6 +68,7 @@ import {getActivityFeedbackRefillCost} from "../../utils/coinPricing";
 import {
 	CODE_LANGUAGE_ALIASES,
 	CODE_THEME_MAP,
+	DARK_CODE_THEME,
 	getCodeHighlighter,
 } from "../Content/codeHighlighting";
 import {STYLE_PRESETS} from "../../utils/typography";
@@ -127,7 +128,7 @@ function resolveActivityColorTheme(stylePreset?: string, dark = false): Activity
 				border: "#49392D",
 				borderStrong: "#765D46",
 				text: "#E0D7CF",
-				muted: "#B7A89B",
+				muted: "#FFFFFF",
 				primary: "#765D46",
 				primaryHover: "#936F4F",
 				accent: "#D8AF82",
@@ -145,7 +146,7 @@ function resolveActivityColorTheme(stylePreset?: string, dark = false): Activity
 				border: "#313C4D",
 				borderStrong: "#4D6894",
 				text: "#D4DAE4",
-				muted: "#A1A8B3",
+				muted: "#FFFFFF",
 				primary: "#356BCE",
 				primaryHover: "#477CDD",
 				accent: "#73A7FF",
@@ -162,7 +163,7 @@ function resolveActivityColorTheme(stylePreset?: string, dark = false): Activity
 			border: "#29453C",
 			borderStrong: "#2B725D",
 			text: "#D7E4E1",
-			muted: "#A1A8B3",
+			muted: "#FFFFFF",
 			primary: "#237D4A",
 			primaryHover: "#2D995C",
 			accent: "#4ADE80",
@@ -859,9 +860,9 @@ function ShortAnswerActivity({
 		:	undefined
 	);
 	const scoreClass =
-		scoreLabel === "Perfect" || scoreLabel === "Good" ? "border-[#BBF7D0] bg-[#F0FDF4] text-[#166534]"
-		: scoreLabel === "Almost there" ? "border-[#FDE68A] bg-[#FFFBEB] text-[#92400E]"
-		:	"border-[#FECACA] bg-[#FEF2F2] text-[#991B1B]";
+		scoreLabel === "Perfect" || scoreLabel === "Good" ? "app-activity-feedback-badge-success border-[#BBF7D0] bg-[#F0FDF4] text-[#166534]"
+		: scoreLabel === "Almost there" ? "app-activity-feedback-badge-warning border-[#FDE68A] bg-[#FFFBEB] text-[#92400E]"
+		:	"app-activity-feedback-badge-error border-[#FECACA] bg-[#FEF2F2] text-[#991B1B]";
 	const scoreAccentClass =
 		scoreLabel === "Perfect" || scoreLabel === "Good" ? "text-[#16A34A]"
 		: scoreLabel === "Almost there" ? "text-[#D97706]"
@@ -1012,41 +1013,6 @@ function CaseStudyActivity({
 		:	[]),
 	].filter(Boolean);
 	const response = asText(answers.response);
-	const attemptRecord =
-		latestAttempt as unknown as Record<string, unknown> | undefined;
-	const legacyFeedback = parseLegacyFeedbackSections(latestAttempt?.feedback);
-	const strengths = uniqueStrings([
-		...asStringArray(attemptRecord?.strengths),
-		...legacyFeedback.strengths,
-	]);
-	const improvements = uniqueStrings([
-		...asStringArray(attemptRecord?.improvements),
-		...legacyFeedback.improvements,
-	]);
-	const feedbackScore = latestAttempt?.score;
-	const feedbackTone =
-		feedbackScore === undefined ? "neutral"
-		: feedbackScore >= 80 ? "good"
-		: feedbackScore >= 50 ? "partial"
-		:	"bad";
-	const feedbackPanelClass =
-		feedbackTone === "good" ?
-			"border-[#BBF7D0] bg-[#F0FDF4] text-[#065F46]"
-		: feedbackTone === "partial" ?
-			"border-[#FDE68A] bg-[#FFFBEB] text-[#92400E]"
-		: feedbackTone === "bad" ?
-			"border-[#FECACA] bg-[#FEF2F2] text-[#991B1B]"
-		:	"border-[#E5E5E7] bg-[#F8F8F9] text-[#374151]";
-	const feedbackAccentClass =
-		feedbackTone === "good" ? "text-[#15803D]"
-		: feedbackTone === "partial" ? "text-[#D97706]"
-		: feedbackTone === "bad" ? "text-[#DC2626]"
-		:	"text-[#6E6E73]";
-	const FeedbackIcon =
-		feedbackTone === "good" ? CheckCircle2
-		: feedbackTone === "partial" ? CircleAlert
-		: feedbackTone === "bad" ? XCircle
-		:	MessageSquareText;
 	const tabButtonClass = (selected: boolean) =>
 		cn(
 			"-mb-px min-w-[112px] border border-b-2 px-4 py-3 text-center text-[12px] font-bold transition",
@@ -1123,43 +1089,8 @@ function CaseStudyActivity({
 							placeholder="Write your analysis and proposed solution..."
 						/>
 					) : latestAttempt ? (
-						<div className={cn("max-h-[360px] overflow-y-auto rounded-[10px] border p-3", feedbackPanelClass)}>
-							<div className="flex items-center gap-2 text-[12px] font-bold">
-								<FeedbackIcon size={14} />
-								{latestAttempt.score !== undefined ?
-									`Score: ${latestAttempt.score}%`
-								:	"Feedback"}
-							</div>
-							<FeedbackHtml
-								className="mt-2 whitespace-pre-line text-[12.5px] leading-relaxed"
-								html={legacyFeedback.feedback}
-							/>
-							{strengths.length > 0 && (
-								<div className="mt-3">
-									<div className={cn("flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.12em]", feedbackAccentClass)}>
-										<Trophy size={13} />
-										<span>Puntos fuertes</span>
-									</div>
-									<ul className="mt-1 list-disc space-y-1 pl-4 text-[12px] leading-relaxed">
-										{strengths.map((strength) => (
-											<li key={strength}>{strength}</li>
-										))}
-									</ul>
-								</div>
-							)}
-							{improvements.length > 0 && (
-								<div className="mt-3">
-									<div className={cn("flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.12em]", feedbackAccentClass)}>
-										<CircleAlert size={13} />
-										<span>Como mejorar</span>
-									</div>
-									<ul className="mt-1 list-disc space-y-1 pl-4 text-[12px] leading-relaxed">
-										{improvements.map((improvement) => (
-											<li key={improvement}>{improvement}</li>
-										))}
-									</ul>
-								</div>
-							)}
+						<div className="max-h-[360px] overflow-y-auto">
+							<ActivityFeedbackPanel attempt={latestAttempt} />
 						</div>
 					) : (
 						<div className="flex h-full min-h-[260px] items-center justify-center text-center text-[12px] font-medium leading-relaxed text-[var(--activity-muted)]">
@@ -1208,19 +1139,24 @@ function CodePracticeEditor({
 	code,
 	language,
 	stylePreset,
+	darkDisplay,
 	onChange,
 }: {
 	code: string;
 	language: string;
 	stylePreset: ActivityStylePresetId;
+	darkDisplay: boolean;
 	onChange: (value: string) => void;
 }) {
 	const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null);
 	const highlightScrollRef = useRef<HTMLDivElement | null>(null);
 	const lineScrollRef = useRef<HTMLDivElement | null>(null);
 	const lineCount = useMemo(() => Math.max(12, code.split("\n").length), [code]);
-	const codeTheme = CODE_THEME_MAP[stylePreset];
+	const codeTheme = darkDisplay ? DARK_CODE_THEME : CODE_THEME_MAP[stylePreset];
 	const codePreset = STYLE_PRESETS[stylePreset];
+	const codeHeaderBackground = darkDisplay ? "var(--activity-surface-alt)" : codePreset.codeHeaderBackground;
+	const codeBorderColor = darkDisplay ? "var(--activity-border)" : codePreset.codeBorderColor;
+	const codeAccentColor = darkDisplay ? "var(--activity-accent)" : codePreset.codeAccentColor;
 
 	useEffect(() => {
 		let cancelled = false;
@@ -1265,9 +1201,9 @@ function CodePracticeEditor({
 				ref={lineScrollRef}
 				className="select-none overflow-hidden border-r px-2 py-3 text-right font-mono text-[11px] leading-[1.65]"
 				style={{
-					backgroundColor: codePreset.codeHeaderBackground,
-					borderColor: codePreset.codeBorderColor,
-					color: codePreset.codeAccentColor,
+					backgroundColor: codeHeaderBackground,
+					borderColor: codeBorderColor,
+					color: codeAccentColor,
 					opacity: 0.62,
 				}}
 			>
@@ -1285,7 +1221,7 @@ function CodePracticeEditor({
 				/>
 				<textarea
 					className="absolute inset-0 h-full w-full resize-none overflow-auto bg-transparent p-3 font-mono text-[12.5px] leading-[1.65] text-transparent outline-none placeholder:text-[#8E8E93] selection:bg-[#2563EB]"
-					style={{caretColor: codePreset.codeAccentColor}}
+					style={{caretColor: codeAccentColor}}
 					value={code}
 					onChange={(event) => onChange(event.target.value)}
 					onScroll={syncScroll}
@@ -1322,7 +1258,14 @@ function CodePracticeActivity({
 		stylePreset === "classic" || stylePreset === "plain" || stylePreset === "modern" ?
 			stylePreset
 		:	"modern";
+	const {resolvedMode} = useAppearance();
+	const darkDisplay = resolvedMode === "dark";
 	const codePreset = STYLE_PRESETS[resolvedStylePreset];
+	const codeBackground = darkDisplay ? "var(--activity-surface)" : codePreset.codeBackground;
+	const codeHeaderBackground = darkDisplay ? "var(--activity-surface-alt)" : codePreset.codeHeaderBackground;
+	const codeBorderColor = darkDisplay ? "var(--activity-border)" : codePreset.codeBorderColor;
+	const codeAccentColor = darkDisplay ? "var(--activity-accent)" : codePreset.codeAccentColor;
+	const codeAccentBackground = darkDisplay ? "var(--activity-accent-softer)" : codePreset.codeBorderColor;
 
 	useEffect(() => {
 		if (latestAttemptId) {
@@ -1366,8 +1309,8 @@ function CodePracticeActivity({
 					style={
 						visibleTab === "code" ?
 							{
-								backgroundColor: codePreset.codeBackground,
-								borderColor: codePreset.codeBorderColor,
+								backgroundColor: codeBackground,
+								borderColor: codeBorderColor,
 							}
 						:	undefined
 					}
@@ -1444,16 +1387,16 @@ function CodePracticeActivity({
 							<div
 								className="flex shrink-0 items-center justify-between gap-3 border-b px-3 py-2.5"
 								style={{
-									backgroundColor: codePreset.codeHeaderBackground,
-									borderColor: codePreset.codeBorderColor,
+									backgroundColor: codeHeaderBackground,
+									borderColor: codeBorderColor,
 								}}
 							>
 								<div className="flex min-w-0 items-center gap-2">
 									<span
 										className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[8px]"
 										style={{
-											backgroundColor: codePreset.codeBorderColor,
-											color: codePreset.codeAccentColor,
+											backgroundColor: codeAccentBackground,
+											color: codeAccentColor,
 										}}
 									>
 										<Code2 size={14} />
@@ -1464,7 +1407,7 @@ function CodePracticeActivity({
 										</div>
 										<div
 											className="text-[10px] font-semibold uppercase tracking-[0.12em]"
-											style={{color: codePreset.codeAccentColor}}
+											style={{color: codeAccentColor}}
 										>
 											{language}
 										</div>
@@ -1473,8 +1416,8 @@ function CodePracticeActivity({
 								<div
 									className="shrink-0 rounded-full px-2 py-1 text-[10px] font-semibold"
 									style={{
-										backgroundColor: codePreset.codeBackground,
-										color: codePreset.codeAccentColor,
+										backgroundColor: codeBackground,
+										color: codeAccentColor,
 									}}
 								>
 									{code.length.toLocaleString()} chars
@@ -1484,6 +1427,7 @@ function CodePracticeActivity({
 								code={code}
 								language={language}
 								stylePreset={resolvedStylePreset}
+								darkDisplay={darkDisplay}
 								onChange={(value) => setAnswer("code", value)}
 							/>
 						</section>
@@ -1631,56 +1575,67 @@ function ActivityFeedbackPanel({
 	className?: string;
 }) {
 	const legacyFeedback = parseLegacyFeedbackSections(attempt.feedback);
-	const strengths = [
+	const strengths = uniqueStrings([
 		...(attempt.strengths ?? []),
 		...legacyFeedback.strengths,
-	].map(cleanLegacyFeedbackItem).filter(Boolean);
-	const improvements = [
+	].map(cleanLegacyFeedbackItem).filter(Boolean));
+	const improvements = uniqueStrings([
 		...(attempt.improvements ?? []),
 		...legacyFeedback.improvements,
-	].map(cleanLegacyFeedbackItem).filter(Boolean);
+	].map(cleanLegacyFeedbackItem).filter(Boolean));
 	const feedbackScore = attempt.score;
 	const feedbackTone =
 		feedbackScore === undefined ? "neutral"
 		: feedbackScore >= 80 ? "good"
 		: feedbackScore >= 50 ? "partial"
 		:	"bad";
-	const feedbackPanelClass =
+	const scoreClass =
 		feedbackTone === "good" ?
-			"border-[#86EFAC] bg-[#F0FDF4] text-[#166534]"
+			"app-activity-feedback-badge-success border-[#BBF7D0] bg-[#F0FDF4] text-[#166534]"
 		: feedbackTone === "partial" ?
-			"border-[#FDE68A] bg-[#FFFBEB] text-[#92400E]"
+			"app-activity-feedback-badge-warning border-[#FDE68A] bg-[#FFFBEB] text-[#92400E]"
 		: feedbackTone === "bad" ?
-			"border-[#FCA5A5] bg-[#FEF2F2] text-[#B91C1C]"
-		:	"border-[#E5E5E7] bg-[#FCFCFD] text-[#374151]";
+			"app-activity-feedback-badge-error border-[#FECACA] bg-[#FEF2F2] text-[#991B1B]"
+		:	"border-[var(--activity-border)] bg-[var(--activity-surface-alt)] text-[var(--activity-muted)]";
 	const feedbackAccentClass =
 		feedbackTone === "good" ? "text-[#15803D]"
 		: feedbackTone === "partial" ? "text-[#D97706]"
 		: feedbackTone === "bad" ? "text-[#DC2626]"
-		:	"text-[#6E6E73]";
+		:	"text-[var(--activity-muted)]";
 	const FeedbackIcon =
 		feedbackTone === "good" ? CheckCircle2
 		: feedbackTone === "partial" ? CircleAlert
 		: feedbackTone === "bad" ? XCircle
 		:	MessageCircleQuestionMark;
+	const scoreText =
+		feedbackTone === "good" ? "Good"
+		: feedbackTone === "partial" ? "Almost there"
+		: feedbackTone === "bad" ? "Wrong"
+		:	"Feedback";
 
 	return (
-		<div className={cn("rounded-[10px] border p-3", feedbackPanelClass, className)}>
-			<div className="flex items-center gap-2 text-[12px] font-bold">
+		<div className={cn("app-activity-feedback-panel space-y-3 text-[12px] leading-relaxed text-[var(--activity-muted)]", className)}>
+			<span className={cn("inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold", scoreClass)}>
 				<FeedbackIcon size={14} />
-				{attempt.score !== undefined ? `Score: ${attempt.score}%` : "Feedback"}
-			</div>
-			<FeedbackHtml
-				className="mt-2 whitespace-pre-line text-[12.5px] leading-relaxed"
-				html={legacyFeedback.feedback}
-			/>
-			{strengths.length > 0 && (
-				<div className="mt-3">
-					<div className={cn("flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.12em]", feedbackAccentClass)}>
-						<Trophy size={13} />
-						<span>Puntos fuertes</span>
+				{scoreText}
+			</span>
+			{legacyFeedback.feedback && (
+				<div>
+					<div className={cn("text-[11px] font-bold uppercase tracking-[0.12em]", feedbackAccentClass)}>
+						Feedback
 					</div>
-					<ul className="mt-1 list-disc space-y-1 pl-4 text-[12px] leading-relaxed">
+					<FeedbackHtml
+						className="mt-1 whitespace-pre-line text-[var(--activity-text)]"
+						html={legacyFeedback.feedback}
+					/>
+				</div>
+			)}
+			{strengths.length > 0 && (
+				<div>
+					<div className={cn("text-[11px] font-bold uppercase tracking-[0.12em]", feedbackAccentClass)}>
+						What went well
+					</div>
+					<ul className="mt-1 list-disc space-y-1 pl-4 text-[var(--activity-text)]">
 						{strengths.map((strength) => (
 							<li key={strength}>{strength}</li>
 						))}
@@ -1688,12 +1643,11 @@ function ActivityFeedbackPanel({
 				</div>
 			)}
 			{improvements.length > 0 && (
-				<div className="mt-3">
-					<div className={cn("flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.12em]", feedbackAccentClass)}>
-						<CircleAlert size={13} />
-						<span>Como mejorar</span>
+				<div>
+					<div className={cn("text-[11px] font-bold uppercase tracking-[0.12em]", feedbackAccentClass)}>
+						Why and how to improve
 					</div>
-					<ul className="mt-1 list-disc space-y-1 pl-4 text-[12px] leading-relaxed">
+					<ul className="mt-1 list-disc space-y-1 pl-4 text-[var(--activity-text)]">
 						{improvements.map((improvement) => (
 							<li key={improvement}>{improvement}</li>
 						))}
@@ -2350,7 +2304,7 @@ function FlashcardsActivity({activity}: {activity: BackendLearningActivity}) {
 								handleCardClick();
 							}
 						}}
-							className="w-full max-w-[560px] cursor-pointer rounded-[10px] outline-none focus-visible:ring-2 focus-visible:ring-[#86EFAC]"
+							className="app-activity-flashcard w-full max-w-[560px] cursor-pointer rounded-[10px] outline-none focus-visible:ring-2 focus-visible:ring-[#86EFAC]"
 							aria-label={isCurrentRevealed ? "Show card front" : "Reveal card back"}
 						>
 						<Flashcard
@@ -2358,7 +2312,7 @@ function FlashcardsActivity({activity}: {activity: BackendLearningActivity}) {
 							style={cardStyle}
 							front={{
 								html: (
-									<div className="flex h-full flex-col justify-between p-5 text-left">
+									<div className="app-activity-flashcard-front flex h-full flex-col justify-between p-5 text-left">
 										<div className="flex items-center justify-between gap-3">
 											<span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#A1A1AA]">
 												Front
@@ -2369,7 +2323,7 @@ function FlashcardsActivity({activity}: {activity: BackendLearningActivity}) {
 												onClick={(event) =>
 													handleCopyCardText(event, "front", currentCard?.front)
 												}
-												className="inline-flex items-center gap-1 rounded-md border border-[#E5E5E7] bg-white px-2 py-1 text-[10px] font-bold text-[#6E6E73] transition hover:border-[#BBF7D0] hover:text-[#16A34A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#86EFAC]"
+												className="app-activity-flashcard-copy inline-flex items-center gap-1 rounded-md border border-[#E5E5E7] bg-white px-2 py-1 text-[10px] font-bold text-[#6E6E73] transition hover:border-[#BBF7D0] hover:text-[#16A34A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#86EFAC]"
 												aria-label="Copy front text"
 											>
 												<Copy size={12} />
@@ -2377,11 +2331,11 @@ function FlashcardsActivity({activity}: {activity: BackendLearningActivity}) {
 											</button>
 										</div>
 										<div className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto py-4 text-center">
-											<p className="w-full max-w-[480px] whitespace-pre-wrap break-words text-[18px] font-semibold leading-relaxed text-[#1D1D1F]">
+											<p className="app-activity-flashcard-text w-full max-w-[480px] whitespace-pre-wrap break-words text-[18px] font-semibold leading-relaxed text-[#1D1D1F]">
 												{currentCard?.front}
 											</p>
 										</div>
-										<span className="text-center text-[11px] font-medium text-[#AEAEB2]">
+										<span className="app-activity-flashcard-hint text-center text-[11px] font-medium text-[#AEAEB2]">
 											Click the card or use the button to reveal the back.
 										</span>
 									</div>
@@ -2389,7 +2343,7 @@ function FlashcardsActivity({activity}: {activity: BackendLearningActivity}) {
 							}}
 							back={{
 								html: (
-									<div className="flex h-full flex-col justify-between p-5 text-left">
+									<div className="app-activity-flashcard-back flex h-full flex-col justify-between p-5 text-left">
 										<div className="flex items-center justify-between gap-3">
 											<span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#16A34A]">
 												Back
@@ -2400,7 +2354,7 @@ function FlashcardsActivity({activity}: {activity: BackendLearningActivity}) {
 												onClick={(event) =>
 													handleCopyCardText(event, "back", currentCard?.back)
 												}
-												className="inline-flex items-center gap-1 rounded-md border border-[#BBF7D0] bg-[#F8FFF9] px-2 py-1 text-[10px] font-bold text-[#15803D] transition hover:bg-[#F0FDF4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#86EFAC]"
+												className="app-activity-flashcard-copy app-activity-flashcard-copy-back inline-flex items-center gap-1 rounded-md border border-[#BBF7D0] bg-[#F8FFF9] px-2 py-1 text-[10px] font-bold text-[#15803D] transition hover:bg-[#F0FDF4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#86EFAC]"
 												aria-label="Copy back text"
 											>
 												<Copy size={12} />
@@ -2408,11 +2362,11 @@ function FlashcardsActivity({activity}: {activity: BackendLearningActivity}) {
 											</button>
 										</div>
 										<div className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto py-4 text-center">
-											<p className="w-full max-w-[480px] whitespace-pre-wrap break-words text-[16px] leading-relaxed text-[#1D1D1F]">
+											<p className="app-activity-flashcard-text w-full max-w-[480px] whitespace-pre-wrap break-words text-[16px] leading-relaxed text-[#1D1D1F]">
 												{currentCard?.back}
 											</p>
 										</div>
-										<span className="text-center text-[11px] font-medium text-[#15803D]">
+										<span className="app-activity-flashcard-hint app-activity-flashcard-hint-back text-center text-[11px] font-medium text-[#15803D]">
 											Click the card again to see the front.
 										</span>
 									</div>
@@ -2851,7 +2805,7 @@ export function LearningActivityRenderer({
 
 	return (
 		<div
-			className="group/activity flex h-full min-h-0 flex-col font-[Inter] text-[var(--activity-text)]"
+			className="app-learning-activity group/activity flex h-full min-h-0 flex-col font-[Inter] text-[var(--activity-text)]"
 			style={{
 				backgroundColor: activitySurface,
 				color: activityTheme.text,
@@ -2941,9 +2895,9 @@ export function LearningActivityRenderer({
 						/>
 					)}
 
-					<div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-[#F0F0F2] pt-3">
-						{!isObjective && (
-							<span className="group relative inline-flex items-center gap-1.5 text-[11px] text-[#AEAEB2]">
+					<div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-t border-[#F0F0F2] pt-3">
+						{!isObjective ? (
+							<span className="group relative inline-flex items-center gap-1.5 justify-self-start text-[11px] text-[#AEAEB2]">
 								<button
 									type="button"
 									className="flex h-4 w-4 cursor-help items-center justify-center text-[var(--activity-accent)] outline-none transition hover:text-[var(--activity-accent-text)] focus-visible:ring-2 focus-visible:ring-[var(--activity-focus)]"
@@ -2963,12 +2917,12 @@ export function LearningActivityRenderer({
 									AI feedback uses 1 attempt. You get 3 attempts per paid feedback refill.
 								</span>
 							</span>
-						)}
+						) : <span />}
 						<button
 							type="button"
 							disabled={!canSubmit}
 							onClick={handleSubmit}
-							className="ml-auto inline-flex items-center gap-2 rounded-xl bg-[var(--activity-primary)] px-4 py-2 text-xs font-bold text-white transition hover:bg-[var(--activity-primary-hover)] disabled:cursor-not-allowed disabled:opacity-40 sm:mr-8"
+							className="col-start-2 inline-flex items-center gap-2 rounded-xl bg-[var(--activity-primary)] px-4 py-2 text-xs font-bold text-white transition hover:bg-[var(--activity-primary-hover)] disabled:cursor-not-allowed disabled:opacity-40"
 						>
 							{isSubmitting ? "Checking..." : submitLabel}
 							<Send size={12} />

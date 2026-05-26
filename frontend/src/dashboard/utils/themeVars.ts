@@ -115,6 +115,42 @@ function tableBorder(stylePreset?: string): string {
 	}
 }
 
+function darkTableSurface(stylePreset?: string): string {
+	switch (stylePreset) {
+		case "modern":
+			return "#172C28";
+		case "plain":
+			return "#1B2230";
+		case "classic":
+		default:
+			return "#2A211B";
+	}
+}
+
+function darkTableHeaderSurface(stylePreset?: string): string {
+	switch (stylePreset) {
+		case "modern":
+			return "#1E3A34";
+		case "plain":
+			return "#263142";
+		case "classic":
+		default:
+			return "#3A2B20";
+	}
+}
+
+function darkTableBorder(stylePreset?: string): string {
+	switch (stylePreset) {
+		case "modern":
+			return "#2E5F53";
+		case "plain":
+			return "#3B4A60";
+		case "classic":
+		default:
+			return "#5A4433";
+	}
+}
+
 function darkDisplayTheme(theme: PresentationTheme): PresentationTheme {
 	switch (theme.stylePreset) {
 		case "modern":
@@ -191,10 +227,10 @@ export function themeVars(theme: PresentationTheme, darkDisplay = false): CSSPro
 		"--unit-code-border": displayTheme.codeBorderColor ?? "#E4D0BC",
 		"--unit-code-header-bg": displayTheme.codeHeaderBackground ?? "#EEE1D0",
 		"--unit-table-bg":
-			darkDisplay ? "#20262D" : tableSurface(displayTheme.stylePreset),
+			darkDisplay ? darkTableSurface(displayTheme.stylePreset) : tableSurface(displayTheme.stylePreset),
 		"--unit-table-header-bg":
-			darkDisplay ? "#29313C" : tableHeaderSurface(displayTheme.stylePreset),
+			darkDisplay ? darkTableHeaderSurface(displayTheme.stylePreset) : tableHeaderSurface(displayTheme.stylePreset),
 		"--unit-table-border":
-			darkDisplay ? "#36404D" : tableBorder(displayTheme.stylePreset),
+			darkDisplay ? darkTableBorder(displayTheme.stylePreset) : tableBorder(displayTheme.stylePreset),
 	} as CSSProperties;
 }

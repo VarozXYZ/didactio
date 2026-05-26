@@ -209,7 +209,7 @@ function SegmentedControl<T extends string>({
 				</div>
 			</div>
 			<div
-				className={`grid w-full gap-0.5 rounded-[14px] p-0.5 ${cols}`}
+				className={`app-wizard-segmented-control grid w-full gap-0.5 rounded-[14px] p-0.5 ${cols}`}
 				style={{
 					background: "rgba(0,0,0,0.06)",
 					border: "1px solid rgba(0,0,0,0.07)",
@@ -229,7 +229,8 @@ function SegmentedControl<T extends string>({
 								:	segIdleStyle()
 							}
 							className={`min-w-0 rounded-[10px] px-2 py-2 text-center text-[13px] font-semibold ${
-								selected ? "" : (
+								selected ? "app-wizard-segmented-option-selected" : (
+									"app-wizard-segmented-option " +
 									"text-[#6E6E73] hover:text-[#1D1D1F]"
 								)
 							}`}
@@ -299,9 +300,9 @@ export function TopicStep({
 	};
 
 	return (
-		<form onSubmit={(e) => void handleSubmit(e)} className="w-full min-w-0 space-y-4 overflow-x-hidden">
-			<div>
-				<label className="mb-1.5 hidden text-[13px] font-semibold text-[#1D1D1F] md:block">
+		<form onSubmit={(e) => void handleSubmit(e)} className="w-full min-w-0 space-y-5 overflow-x-hidden">
+			<div className="pb-1">
+				<label className="mb-2.5 hidden text-[13px] font-semibold text-[#1D1D1F] md:block">
 					What do you want to learn?
 				</label>
 				<input
@@ -360,7 +361,7 @@ export function TopicStep({
 							onClick={() =>
 								setShowFolderDropdown((prev) => !prev)
 							}
-							className="flex w-full items-center justify-between rounded-[10px] px-3 py-2.5 text-[13px] transition-all hover:opacity-80"
+							className="app-wizard-folder-trigger flex w-full items-center justify-between rounded-[10px] px-3 py-2.5 text-[13px] transition-all hover:opacity-80"
 							style={{
 								background: "rgba(255,255,255,0.65)",
 								border: "1px solid rgba(0,0,0,0.10)",
@@ -402,7 +403,7 @@ export function TopicStep({
 									onClick={() => setShowFolderDropdown(false)}
 								/>
 								<div
-									className="absolute left-0 top-full z-20 mt-1.5 max-h-[220px] w-full overflow-y-auto rounded-[10px] py-1"
+									className="app-wizard-folder-menu absolute left-0 top-full z-20 mt-1.5 max-h-[220px] w-full overflow-y-auto rounded-[10px] py-1"
 									style={{
 										background: "rgba(255,255,255,0.88)",
 										backdropFilter: "blur(24px)",
@@ -455,7 +456,7 @@ export function TopicStep({
 						type="button"
 						onClick={() => setShowFolderModal(true)}
 						title="New folder"
-						className="flex shrink-0 items-center justify-center rounded-[10px] p-2.5 text-[#6E6E73] transition-all hover:text-[#11A07D]"
+						className="app-wizard-folder-create flex shrink-0 items-center justify-center rounded-[10px] p-2.5 text-[#6E6E73] transition-all hover:text-[#11A07D]"
 						style={{
 							background: "rgba(255,255,255,0.65)",
 							border: "1px solid rgba(0,0,0,0.10)",
@@ -477,7 +478,7 @@ export function TopicStep({
 				}}
 			/>
 
-			<div className="flex flex-col gap-4">
+			<div className="flex flex-col gap-5">
 				<SegmentedControl
 					label="Level & depth"
 					tooltip="Sets the learner experience and technical depth assumed by the unit."
@@ -506,7 +507,7 @@ export function TopicStep({
 				</div>
 			)}
 
-			<div className="flex justify-end gap-3 pt-2">
+			<div className="flex justify-end gap-3 pt-3">
 				<button
 					type="button"
 					onClick={onCancel}
