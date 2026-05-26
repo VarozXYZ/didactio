@@ -405,6 +405,83 @@ html[data-app-theme="dark"][data-app-themed="true"] .app-activity-feedback-panel
 	border-color: transparent !important;
 }
 
+html[data-app-theme="dark"][data-app-themed="true"] .app-learning-activity .app-mcq-option-idle {
+	background-color: var(--activity-surface-alt) !important;
+	border-color: var(--activity-border) !important;
+}
+
+html[data-app-theme="dark"][data-app-themed="true"] .app-learning-activity .app-mcq-option-idle:hover {
+	background-color: var(--activity-accent-softer) !important;
+	border-color: var(--activity-border-strong) !important;
+}
+
+html[data-app-theme="dark"][data-app-themed="true"] .app-learning-activity .app-mcq-option-selected,
+html[data-app-theme="dark"][data-app-themed="true"] .app-learning-activity .app-mcq-option-correct {
+	background-color: rgba(34, 197, 94, 0.14) !important;
+	border-color: #22c55e !important;
+}
+
+html[data-app-theme="dark"][data-app-themed="true"] .app-learning-activity .app-mcq-option-wrong {
+	background-color: rgba(239, 68, 68, 0.14) !important;
+	border-color: #ef4444 !important;
+}
+
+html[data-app-theme="dark"][data-app-themed="true"] .app-learning-activity .app-mcq-option-muted {
+	background-color: var(--activity-surface-alt) !important;
+	border-color: var(--activity-border) !important;
+	opacity: 0.52 !important;
+}
+
+html[data-app-theme="dark"][data-app-themed="true"] .app-learning-activity .app-mcq-option-correct .app-mcq-option-text,
+html[data-app-theme="dark"][data-app-themed="true"] .app-learning-activity .app-mcq-option-selected .app-mcq-option-text {
+	color: #86efac !important;
+}
+
+html[data-app-theme="dark"][data-app-themed="true"] .app-learning-activity .app-mcq-option-wrong .app-mcq-option-text {
+	color: #fca5a5 !important;
+}
+
+html[data-app-theme="dark"][data-app-themed="true"] .app-learning-activity .app-mcq-option-idle .app-mcq-option-text,
+html[data-app-theme="dark"][data-app-themed="true"] .app-learning-activity .app-mcq-option-muted .app-mcq-option-text {
+	color: var(--activity-text) !important;
+}
+
+html[data-app-theme="dark"][data-app-themed="true"] .app-learning-activity .app-mcq-feedback-correct {
+	background-color: rgba(34, 197, 94, 0.14) !important;
+	border-color: rgba(74, 222, 128, 0.45) !important;
+}
+
+html[data-app-theme="dark"][data-app-themed="true"] .app-learning-activity .app-mcq-feedback-wrong {
+	background-color: rgba(239, 68, 68, 0.14) !important;
+	border-color: rgba(248, 113, 113, 0.45) !important;
+}
+
+html[data-app-theme="dark"][data-app-themed="true"] .app-learning-activity .app-mcq-feedback-correct .app-mcq-feedback-title {
+	color: #86efac !important;
+}
+
+html[data-app-theme="dark"][data-app-themed="true"] .app-learning-activity .app-mcq-feedback-wrong .app-mcq-feedback-title {
+	color: #fca5a5 !important;
+}
+
+html[data-app-theme="dark"][data-app-themed="true"] .app-learning-activity .app-mcq-feedback-copy {
+	color: var(--activity-text) !important;
+}
+
+html[data-app-theme="dark"][data-app-themed="true"] .app-learning-activity .app-mcq-button {
+	border-color: var(--activity-border) !important;
+}
+
+html[data-app-theme="dark"][data-app-themed="true"] .app-learning-activity .app-mcq-button:is(.bg-white) {
+	background-color: var(--activity-surface-alt) !important;
+	color: var(--activity-text) !important;
+}
+
+html[data-app-theme="dark"][data-app-themed="true"] .app-learning-activity .app-mcq-button:is(.bg-white):hover {
+	background-color: var(--activity-accent-softer) !important;
+	border-color: var(--activity-border-strong) !important;
+}
+
 html[data-app-theme="dark"][data-app-themed="true"] .app-activity-flashcard .flashcard-wrapper {
 	--front-bg: var(--activity-surface) !important;
 	--back-bg: var(--activity-surface-alt) !important;
@@ -438,6 +515,17 @@ html[data-app-theme="dark"][data-app-themed="true"] .app-activity-flashcard-copy
 html[data-app-theme="dark"][data-app-themed="true"] .app-activity-flashcard-copy:hover {
 	background-color: var(--activity-accent-softer) !important;
 	color: var(--activity-accent) !important;
+}
+
+html[data-app-theme="dark"][data-app-themed="true"] .app-activity-flashcard-not-yet {
+	background-color: rgba(245, 158, 11, 0.12) !important;
+	border-color: rgba(251, 191, 36, 0.42) !important;
+	color: #fcd34d !important;
+}
+
+html[data-app-theme="dark"][data-app-themed="true"] .app-activity-flashcard-not-yet:hover {
+	background-color: rgba(245, 158, 11, 0.2) !important;
+	border-color: rgba(251, 191, 36, 0.62) !important;
 }
 
 html[data-app-theme="dark"][data-app-themed="true"] .app-learning-activity .text-\[\#4B5563\],
@@ -691,6 +779,36 @@ html[data-app-theme="dark"][data-app-themed="true"] .app-syllabus-review-separat
 html[data-app-theme="dark"][data-app-themed="true"] .app-syllabus-review-change:hover {
 	background-color: #2a2a2a !important;
 	color: var(--app-text-primary) !important;
+}
+
+html[data-app-theme="dark"][data-app-themed="true"] .app-editor-guide-dialog {
+	background-color: #1c1c1e !important;
+	border-color: var(--app-border-primary) !important;
+}
+
+html[data-app-theme="dark"][data-app-themed="true"] .app-editor-guide-dialog h2,
+html[data-app-theme="dark"][data-app-themed="true"] .app-editor-guide-item-title {
+	color: var(--app-text-primary) !important;
+}
+
+html[data-app-theme="dark"][data-app-themed="true"] .app-editor-guide-dialog p,
+html[data-app-theme="dark"][data-app-themed="true"] .app-editor-guide-item-copy {
+	color: var(--app-text-secondary) !important;
+}
+
+html[data-app-theme="dark"][data-app-themed="true"] .app-editor-guide-item {
+	background-color: #242424 !important;
+	border-color: var(--app-border-subtle) !important;
+}
+
+html[data-app-theme="dark"][data-app-themed="true"] .app-editor-guide-icon {
+	background-color: rgba(74, 222, 128, 0.12) !important;
+	color: #86efac !important;
+}
+
+html[data-app-theme="dark"][data-app-themed="true"] .app-editor-guide-footer {
+	background-color: #18181b !important;
+	border-color: var(--app-border-subtle) !important;
 }
 
 html[data-app-theme="dark"][data-app-themed="true"] .app-wizard-folder-trigger,

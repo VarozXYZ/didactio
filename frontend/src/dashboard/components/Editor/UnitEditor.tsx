@@ -157,6 +157,7 @@ import {
 } from "../../utils/unitNotes";
 
 const VISIBLE_COIN_TYPES = ["bronze", "silver", "gold"] as const;
+const EDITOR_GUIDE_STORAGE_KEY = "didactio.editor.guide.v1";
 
 function HeaderCoinBalance({
 	credits,
@@ -205,6 +206,272 @@ function HeaderControlTooltip({
 			{children}
 			<div className="pointer-events-none absolute left-1/2 top-[calc(100%+8px)] z-[80] -translate-x-1/2 whitespace-nowrap rounded-md border border-[#E5E5E7] bg-white px-2.5 py-1.5 text-[11px] font-semibold text-[#1D1D1F] opacity-0 shadow-[0_8px_24px_rgba(0,0,0,0.12)] transition-opacity group-hover/header-control:opacity-100 group-focus-within/header-control:opacity-100">
 				{label}
+			</div>
+		</div>
+	);
+}
+
+function EditorFirstRunGuide({
+	open,
+	onOpenChange,
+	isMobile,
+}: {
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+	isMobile: boolean;
+}) {
+	const steps = useMemo(
+		() =>
+			isMobile ?
+				[
+					{
+						selector: "[data-editor-tour='mobile-content']",
+						title: "Read the module",
+						description:
+							"This is the current module content. Scroll naturally and use the tabs below when you need another tool.",
+					},
+					{
+						selector: "[data-editor-tour='mobile-nav']",
+						title: "Switch sections",
+						description:
+							"Use these tabs to move between modules, content, exercises, and settings.",
+					},
+					{
+						selector: "[data-editor-tour='mobile-actions']",
+						title: "Module actions",
+						description:
+							"Open notes, version history, regenerate the module, or change the reading style from here.",
+					},
+					{
+						selector: "[data-editor-tour='mobile-exercises-tab']",
+						title: "Practice",
+						description:
+							"Create exercises for the module and review your attempts from the Exercises tab.",
+					},
+				]
+			:	[
+					{
+						selector: "[data-editor-tour='modules']",
+						title: "Module outline",
+						description:
+							"Use the sidebar to jump between modules and sections. Progress is tracked as you read.",
+					},
+					{
+						selector: "[data-editor-tour='content']",
+						title: "Learning pages",
+						description:
+							"This sheet is the generated lesson. Select text to create notes or ask AI for help.",
+					},
+					{
+						selector: "[data-editor-tour='page-controls']",
+						title: "Page controls",
+						description:
+							"Move through pages here. The page picker also lets you jump directly to another page.",
+					},
+					{
+						selector: "[data-editor-tour='header-actions']",
+						title: "Tools",
+						description:
+							"Use these controls for notes, version history, regeneration, reading style, and editing.",
+					},
+					{
+						selector: "[data-editor-tour='sidebar-actions']",
+						title: "Unit actions",
+						description:
+							"Return to the dashboard, export the unit, reopen this tutorial, or go to settings.",
+					},
+				],
+		[isMobile],
+	);
+	const [stepIndex, setStepIndex] = useState(0);
+	const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
+	const cardRef = useRef<HTMLDivElement | null>(null);
+	const [cardSize, setCardSize] = useState({height: 196, width: 320});
+	const activeStep = steps[Math.min(stepIndex, steps.length - 1)];
+
+	useEffect(() => {
+		if (!open) {
+			return;
+		}
+
+		setStepIndex(0);
+	}, [open, isMobile]);
+
+	useEffect(() => {
+		if (!open) {
+			return;
+		}
+
+		const updateTargetRect = () => {
+			const element = document.querySelector(activeStep.selector);
+			setTargetRect(element?.getBoundingClientRect() ?? null);
+			const card = cardRef.current;
+			if (card) {
+				setCardSize({
+					height: card.offsetHeight,
+					width: card.offsetWidth,
+				});
+			}
+		};
+
+		updateTargetRect();
+		window.addEventListener("resize", updateTargetRect);
+		window.addEventListener("scroll", updateTargetRect, true);
+		return () => {
+			window.removeEventListener("resize", updateTargetRect);
+			window.removeEventListener("scroll", updateTargetRect, true);
+		};
+	}, [activeStep.selector, open]);
+
+	if (!open) {
+		return null;
+	}
+
+	const fallbackRect = {
+		bottom: window.innerHeight / 2 + 80,
+		height: 160,
+		left: 24,
+		right: window.innerWidth - 24,
+		top: window.innerHeight / 2 - 80,
+		width: window.innerWidth - 48,
+	} as DOMRect;
+	const rect = targetRect ?? fallbackRect;
+	const padding = 8;
+	const spotlightStyle: CSSProperties = {
+		height: rect.height + padding * 2,
+		left: rect.left - padding,
+		top: rect.top - padding,
+		width: rect.width + padding * 2,
+	};
+	const viewportMargin = 16;
+	const tooltipGap = 18;
+	const target = {
+		bottom: rect.bottom + padding,
+		left: rect.left - padding,
+		right: rect.right + padding,
+		top: rect.top - padding,
+	};
+	const positions = [
+		{
+			fits: target.bottom + tooltipGap + cardSize.height <= window.innerHeight - viewportMargin,
+			left: Math.min(
+				Math.max(viewportMargin, target.left),
+				window.innerWidth - cardSize.width - viewportMargin,
+			),
+			top: target.bottom + tooltipGap,
+		},
+		{
+			fits: target.top - tooltipGap - cardSize.height >= viewportMargin,
+			left: Math.min(
+				Math.max(viewportMargin, target.left),
+				window.innerWidth - cardSize.width - viewportMargin,
+			),
+			top: target.top - tooltipGap - cardSize.height,
+		},
+		{
+			fits: target.right + tooltipGap + cardSize.width <= window.innerWidth - viewportMargin,
+			left: target.right + tooltipGap,
+			top: Math.min(
+				Math.max(viewportMargin, target.top),
+				window.innerHeight - cardSize.height - viewportMargin,
+			),
+		},
+		{
+			fits: target.left - tooltipGap - cardSize.width >= viewportMargin,
+			left: target.left - tooltipGap - cardSize.width,
+			top: Math.min(
+				Math.max(viewportMargin, target.top),
+				window.innerHeight - cardSize.height - viewportMargin,
+			),
+		},
+	];
+	const cardPosition =
+		positions.find((position) => position.fits) ??
+		{
+			left: viewportMargin,
+			top: Math.max(
+				viewportMargin,
+				Math.min(window.innerHeight - cardSize.height - viewportMargin, target.top),
+			),
+		};
+	const isLastStep = stepIndex === steps.length - 1;
+	const closeGuide = () => onOpenChange(false);
+
+	return (
+		<div className="fixed inset-0 z-[90]">
+			<div
+				className="pointer-events-none absolute rounded-[22px] border-2 border-[#4ADE80] bg-transparent shadow-[0_0_0_9999px_rgba(0,0,0,0.55),0_18px_70px_rgba(0,0,0,0.35)] transition-all duration-200"
+				style={spotlightStyle}
+			/>
+			<div
+				ref={cardRef}
+				className="app-editor-guide-dialog absolute w-[min(320px,calc(100vw-32px))] rounded-[18px] border border-[#E5E5E7] bg-white p-4 shadow-[0_24px_70px_rgba(0,0,0,0.26)]"
+				style={{left: cardPosition.left, top: cardPosition.top}}
+			>
+				<button
+					aria-label="Close tutorial"
+					className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full text-[#86868B] transition hover:bg-[#F5F5F7] hover:text-[#1D1D1F]"
+					onClick={closeGuide}
+					type="button"
+				>
+					<X size={14} />
+				</button>
+				<div className="pr-8">
+					<div className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#16A34A]">
+						Editor guide
+					</div>
+					<h2 className="mt-2 text-[18px] font-bold tracking-tight text-[#0F0F12]">
+						{activeStep.title}
+					</h2>
+					<p className="mt-2 text-[13px] leading-relaxed text-[#6B7280]">
+						{activeStep.description}
+					</p>
+				</div>
+				<div className="mt-4 flex items-center justify-between gap-3">
+					<div className="flex items-center gap-1.5">
+						{steps.map((step, index) => (
+							<span
+								key={step.title}
+								className={cn(
+									"h-1.5 rounded-full transition-all",
+									index === stepIndex ?
+										"w-5 bg-[#16A34A]"
+									:	"w-1.5 bg-[#D1D5DB]",
+								)}
+							/>
+						))}
+					</div>
+					<div className="flex items-center gap-2">
+						<button
+							className="rounded-full px-3 py-2 text-[12px] font-bold text-[#6B7280] transition hover:bg-[#F5F5F7] disabled:opacity-40"
+							disabled={stepIndex === 0}
+							onClick={() => setStepIndex((value) => Math.max(0, value - 1))}
+							type="button"
+						>
+							Back
+						</button>
+						<button
+							className="rounded-full bg-[#0F0F12] px-4 py-2 text-[12px] font-bold text-white transition hover:bg-[#2A2A2D]"
+							onClick={() => {
+								if (isLastStep) {
+									closeGuide();
+									return;
+								}
+								setStepIndex((value) => value + 1);
+							}}
+							type="button"
+						>
+							{isLastStep ? "Done" : "Next"}
+						</button>
+					</div>
+				</div>
+				<button
+					className="mt-3 text-[12px] font-bold text-[#86868B] transition hover:text-[#1D1D1F]"
+					onClick={closeGuide}
+					type="button"
+				>
+					Skip tutorial
+				</button>
 			</div>
 		</div>
 	);
@@ -1018,6 +1285,7 @@ type MobileUnitEditorProps = {
 	onOpenHistory: () => void;
 	onOpenNotes: () => void;
 	onOpenPreferences: () => void;
+	onOpenTutorial: () => void;
 	onTextStyleChange: (textStyle: EditorTextStyle) => void;
 	onRegenerate: () => void;
 	onRefillActivityAttempts: (activityId: string) => Promise<void>;
@@ -1083,6 +1351,7 @@ function MobileUnitEditor({
 	onOpenHistory,
 	onOpenNotes,
 	onOpenPreferences,
+	onOpenTutorial,
 	onTextStyleChange,
 	onRegenerate,
 	onRefillActivityAttempts,
@@ -1198,6 +1467,7 @@ function MobileUnitEditor({
 			<div
 				ref={floatingActionsRef}
 				className="fixed right-4 top-4 z-40 flex flex-col items-end"
+				data-editor-tour="mobile-actions"
 			>
 				<button
 					aria-label="More actions"
@@ -1475,7 +1745,10 @@ function MobileUnitEditor({
 						className="h-full overflow-y-auto px-5 pb-24 pt-16"
 						style={{backgroundColor: mobileSurface}}
 					>
-						<div className="mb-5 flex items-start justify-between gap-4">
+						<div
+							className="mb-5 flex items-start justify-between gap-4"
+							data-editor-tour="mobile-content"
+						>
 							<div className="min-w-0">
 								<div className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#8E8E93]">
 									Module {activeChapterNumber}
@@ -1551,7 +1824,7 @@ function MobileUnitEditor({
 				{activeTab === "exercises" && (
 					<div className="h-full overflow-y-auto px-4 pb-24 pt-16">
 						{selectedActivity ?
-							<div>
+							<div className="overflow-x-auto">
 								<button
 									className="mb-3 flex items-center gap-1 text-[13px] font-semibold text-[#6E6E73]"
 									onClick={() => setSelectedActivityId(null)}
@@ -1732,7 +2005,20 @@ function MobileUnitEditor({
 							</button>
 							<button
 								className="flex w-full items-center gap-3 rounded-[14px] border border-[#E5E5E7] bg-white p-4 text-left text-[14px] font-bold"
-								onClick={() => setActiveTab("settings")}
+								onClick={() => {
+									setSelectedActivityId(null);
+									setSelectedExerciseChapterIndex(null);
+									setActiveTab("content");
+									onOpenTutorial();
+								}}
+								type="button"
+							>
+								<WandSparkles size={18} />
+								Show tutorial
+							</button>
+							<button
+								className="flex w-full items-center gap-3 rounded-[14px] border border-[#E5E5E7] bg-white p-4 text-left text-[14px] font-bold"
+								onClick={onOpenPreferences}
 								type="button"
 							>
 								<Settings size={18} />
@@ -1743,7 +2029,10 @@ function MobileUnitEditor({
 				)}
 			</main>
 
-			<nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-[#E5E5E7] bg-white/95 px-2 pb-[max(env(safe-area-inset-bottom),8px)] pt-2 backdrop-blur">
+			<nav
+				className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-[#E5E5E7] bg-white/95 px-2 pb-[max(env(safe-area-inset-bottom),8px)] pt-2 backdrop-blur"
+				data-editor-tour="mobile-nav"
+			>
 				{navItems.map((item) => {
 					const Icon = item.icon;
 					const selected = activeTab === item.value;
@@ -1754,6 +2043,11 @@ function MobileUnitEditor({
 								"flex flex-col items-center gap-1 rounded-[12px] py-1.5 text-[11px] font-semibold transition",
 								selected ? "text-[#16A34A]" : "text-[#8E8E93]",
 							)}
+							data-editor-tour={
+								item.value === "exercises" ?
+									"mobile-exercises-tab"
+								:	undefined
+							}
 							onClick={() => {
 								setSelectedActivityId(null);
 								setActiveTab(item.value);
@@ -1830,6 +2124,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	const [isActivityLoading, setIsActivityLoading] = useState(false);
 	const [isActivityAttemptSubmitting, setIsActivityAttemptSubmitting] =
 		useState(false);
+	const [isEditorGuideOpen, setIsEditorGuideOpen] = useState(false);
 	const [isEditMode, setIsEditMode] = useState(false);
 	const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 	const [regenerateConfirmOpen, setRegenerateConfirmOpen] = useState(false);
@@ -1857,6 +2152,37 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				);
 			});
 	}, [resolvedMode]);
+
+	useEffect(() => {
+		if (editorGuideCheckedRef.current || !workspace) {
+			return;
+		}
+
+		editorGuideCheckedRef.current = true;
+
+		try {
+			if (
+				typeof window !== "undefined" &&
+				window.localStorage.getItem(EDITOR_GUIDE_STORAGE_KEY) !== "seen"
+			) {
+				setIsEditorGuideOpen(true);
+			}
+		} catch {
+			setIsEditorGuideOpen(true);
+		}
+	}, [workspace]);
+
+	const handleEditorGuideOpenChange = useCallback((open: boolean) => {
+		setIsEditorGuideOpen(open);
+
+		if (!open) {
+			try {
+				window.localStorage.setItem(EDITOR_GUIDE_STORAGE_KEY, "seen");
+			} catch {
+				// Ignore storage errors; the guide can reappear if persistence fails.
+			}
+		}
+	}, []);
 	const [openChapterActionsIndex, setOpenChapterActionsIndex] = useState<
 		number | null
 	>(null);
@@ -1919,6 +2245,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	const generationQueueBlockedRef = useRef(false);
 	const isGenerationQueueRunningRef = useRef(false);
 	const readingProgressRequestIdRef = useRef(0);
+	const editorGuideCheckedRef = useRef(false);
 	const lastVisitedPageByChapterRef = useRef<Record<number, number | undefined>>(
 		{},
 	);
@@ -4657,6 +4984,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		return (
 			<div
 				className={cn("app-editor-sheet relative overflow-hidden rounded-[16px] border border-[#E5E5E7] md:rounded-[24px]", !extraContent && "shadow-[0_8px_60px_rgba(0,0,0,0.08)]")}
+				data-editor-tour="content"
 				style={{
 					height: `${spreadMetrics.pageHeight}px`,
 					width: `${spreadMetrics.pageWidth}px`,
@@ -4722,7 +5050,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 						:	null}
 					</div>
 
-					<div className="absolute bottom-4 right-6 text-[10px] font-medium text-[#86868B] md:bottom-6 md:right-10">
+					<div className="absolute bottom-3 right-5 text-[10px] font-medium text-[#86868B] md:bottom-5 md:right-8">
 						{pageNumber}
 					</div>
 				</div>
@@ -4763,6 +5091,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		return (
 		<div
 			className="app-editor-sheet relative overflow-hidden rounded-[16px] border border-[#E5E5E7] shadow-[0_8px_60px_rgba(0,0,0,0.08)] md:rounded-[24px]"
+			data-editor-tour="content"
 			style={{
 				height: `${spreadMetrics.pageHeight}px`,
 				width: `${spreadMetrics.pageWidth}px`,
@@ -4881,7 +5210,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 					:	null}
 				</div>
 
-				<div className="absolute bottom-4 right-6 text-[10px] font-medium text-[#86868B] md:bottom-6 md:right-10">
+				<div className="absolute bottom-3 right-5 text-[10px] font-medium text-[#86868B] md:bottom-5 md:right-8">
 					{pageNumber}
 				</div>
 			</div>
@@ -4930,7 +5259,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 							onDeleteActivity={handleDeleteLearningActivity}
 							stylePreset={draft.textStyle.stylePreset ?? "modern"}
 						/>
-						<div className="pointer-events-none absolute bottom-4 right-6 text-[10px] font-medium text-[#86868B] md:bottom-6 md:right-10">
+						<div className="pointer-events-none absolute bottom-3 right-5 text-[10px] font-medium text-[#86868B] md:bottom-5 md:right-8">
 							{pageNumber}
 						</div>
 					</div>
@@ -4957,7 +5286,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 								primaryActionLabel: page.primaryActionLabel,
 							})}
 						</div>
-						<div className="pointer-events-none absolute bottom-4 right-6 text-[10px] font-medium text-[#86868B] md:bottom-6 md:right-10">
+						<div className="pointer-events-none absolute bottom-3 right-5 text-[10px] font-medium text-[#86868B] md:bottom-5 md:right-8">
 							{pageNumber}
 						</div>
 					</div>
@@ -5079,6 +5408,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 					isPagePickerOpen &&
 						"pointer-events-none translate-y-1 scale-95 opacity-0",
 				)}
+				data-editor-tour="page-controls"
 				style={{marginTop: `${spreadMetrics.indicatorGap}px`}}
 			>
 				{!editable && (
@@ -5208,10 +5538,18 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			</div>
 		</>
 	);
+	const editorGuideDialog = (
+		<EditorFirstRunGuide
+			open={isEditorGuideOpen}
+			onOpenChange={handleEditorGuideOpenChange}
+			isMobile={spreadMetrics.isMobile}
+		/>
+	);
 
 	if (spreadMetrics.isMobile) {
 		return (
 			<>
+				{editorGuideDialog}
 				<MobileUnitEditor
 					workspace={workspace}
 					activeChapter={activeChapter}
@@ -5244,6 +5582,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 					onOpenPreferences={() =>
 						navigate("/dashboard?section=preferences")
 					}
+					onOpenTutorial={() => setIsEditorGuideOpen(true)}
 					onTextStyleChange={(textStyle) => {
 						setDraft((previous) =>
 							previous ?
@@ -5294,6 +5633,88 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 					stylePreset={draft.textStyle.stylePreset}
 					textStyle={draft.textStyle}
 				/>
+				<Dialog
+					open={isExportDialogOpen}
+					onOpenChange={setIsExportDialogOpen}
+				>
+					<DialogContent className="w-[calc(100vw-32px)] overflow-hidden rounded-[18px] p-0 sm:max-w-[430px]">
+						<DialogHeader className="border-0 px-6 pb-3 pt-6">
+							<DialogTitle className="text-[16px] font-bold">
+								Export unit
+							</DialogTitle>
+							<DialogDescription className="mt-1 max-w-[340px] text-[13px] leading-relaxed text-[#6E6E73]">
+								Choose the format you need for this unit.
+							</DialogDescription>
+						</DialogHeader>
+						<div className="px-3 pb-3">
+							<button
+								className="group flex w-full items-center gap-3 rounded-[10px] px-3 py-3 text-left transition hover:bg-[#F5F5F7] disabled:cursor-not-allowed disabled:opacity-60"
+								disabled={isPrintingTheory}
+								onClick={() => void handlePrintTheoryExport()}
+								type="button"
+							>
+								<span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] border border-[#CFEFDB] bg-[#F0FDF4] text-[#15803D]">
+									<Printer size={17} />
+								</span>
+								<span className="min-w-0 flex-1">
+									<span className="block text-[14px] font-semibold text-[#1D1D1F]">
+										{isPrintingTheory ?
+											"Preparing theory..."
+										:	"Print theory PDF"}
+									</span>
+									<span className="mt-0.5 block text-[12px] leading-snug text-[#6E6E73]">
+										Clean A4 print view with generated modules.
+									</span>
+								</span>
+								<ChevronRight
+									className="shrink-0 text-[#C7C7CC]"
+									size={16}
+								/>
+							</button>
+							<div className="mx-3 h-px bg-[#F0F0F2]" />
+							<button
+								className="group flex w-full items-center gap-3 rounded-[10px] px-3 py-3 text-left transition hover:bg-[#F5F5F7] disabled:cursor-not-allowed disabled:opacity-60"
+								disabled={isDownloadingActivities}
+								onClick={() => void handleDownloadActivitiesExport()}
+								type="button"
+							>
+								<span className="app-export-download-icon flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] border border-[#D5E4FF] bg-[#EFF6FF] text-[#2563EB]">
+									<Download size={17} />
+								</span>
+								<span className="min-w-0 flex-1">
+									<span className="block text-[14px] font-semibold text-[#1D1D1F]">
+										{isDownloadingActivities ?
+											"Preparing activities..."
+										:	"Download activities HTML"}
+									</span>
+									<span className="mt-0.5 block text-[12px] leading-snug text-[#6E6E73]">
+										Offline activities with local checks and keys.
+									</span>
+								</span>
+								<ChevronRight
+									className="shrink-0 text-[#C7C7CC]"
+									size={16}
+								/>
+							</button>
+						</div>
+						<DialogFooter className="border-0 bg-[#FAFAFB] px-6 py-3">
+							<button
+								className="rounded-full border border-[#D4D7DD] bg-white px-4 py-2 text-[13px] font-semibold text-[#374151] transition hover:border-[#C7C7CC] hover:bg-[#F5F5F7]"
+								onClick={() => setIsExportDialogOpen(false)}
+								type="button"
+							>
+								Cancel
+							</button>
+						</DialogFooter>
+					</DialogContent>
+				</Dialog>
+				{printSnapshot && (
+					<UnitExportPrintView
+						onClose={() => setPrintSnapshot(null)}
+						onPrint={requestPrint}
+						snapshot={printSnapshot}
+					/>
+				)}
 				{isMobileEditOpen && (
 					<div
 						className="fixed inset-0 z-[70] flex flex-col overflow-hidden font-sans text-[#1D1D1F]"
@@ -5787,7 +6208,10 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 					</div>
 				</div>
 
-				<nav className="flex-1 space-y-2 overflow-y-auto px-2 pb-2">
+				<nav
+					className="flex-1 space-y-2 overflow-y-auto px-2 pb-2"
+					data-editor-tour="modules"
+				>
 					{workspace.chapters.map((chapter, index) => {
 						const isActive =
 							activeChapterIndex === chapter.chapterIndex;
@@ -6200,7 +6624,10 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 					})}
 				</nav>
 
-				<div className="shrink-0 space-y-0.5 border-t border-[#E5E5E7] p-3">
+				<div
+					className="shrink-0 space-y-0.5 border-t border-[#E5E5E7] p-3"
+					data-editor-tour="sidebar-actions"
+				>
 					<button
 						className="flex w-full items-center gap-2 rounded-[10px] px-2 py-1.5 text-[13px] text-[#86868B] transition-all hover:bg-[#F5F5F7] hover:text-[#1D1D1F]"
 						onClick={() => navigate("/dashboard")}
@@ -6216,6 +6643,14 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 					>
 						<Share2 size={16} />
 						<span>Export Unit</span>
+					</button>
+					<button
+						className="flex w-full items-center gap-2 rounded-[10px] px-2 py-1.5 text-[13px] text-[#86868B] transition-all hover:bg-[#F5F5F7] hover:text-[#1D1D1F]"
+						onClick={() => setIsEditorGuideOpen(true)}
+						type="button"
+					>
+						<WandSparkles size={16} />
+						<span>Show Tutorial</span>
 					</button>
 					<button
 						className="flex w-full items-center gap-2 rounded-[10px] px-2 py-1.5 text-[13px] text-[#86868B] transition-all hover:bg-[#F5F5F7] hover:text-[#1D1D1F]"
@@ -6259,7 +6694,10 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 						}
 					/>
 
-					<div className="flex shrink-0 items-center gap-6">
+					<div
+						className="flex shrink-0 items-center gap-6"
+						data-editor-tour="header-actions"
+					>
 						<div className="flex items-center gap-1.5">
 							<HeaderControlTooltip label="Notes">
 								<button
@@ -7194,6 +7632,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 					</AlertDialogFooter>
 				</AlertDialogContent>
 			</AlertDialog>
+			{editorGuideDialog}
 		</div>
 	);
 }

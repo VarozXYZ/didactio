@@ -596,12 +596,12 @@ function MultipleChoiceActivity({
 					/>
 				</div>
 				<div>
-					<h3 className="text-[17px] font-bold text-[#1D1D1F]">Actividad finalizada</h3>
+					<h3 className="text-[17px] font-bold text-[#1D1D1F]">Activity complete</h3>
 					<p className="mt-1 text-[14px] text-[#6B7280]">
 						<span className="font-semibold text-[#1D1D1F]">{correctCount}</span>
-						{" de "}
+						{" of "}
 						<span className="font-semibold text-[#1D1D1F]">{questions.length}</span>
-						{" respuestas correctas"}
+						{" correct answers"}
 					</p>
 				</div>
 
@@ -630,10 +630,10 @@ function MultipleChoiceActivity({
 				<button
 					type="button"
 					onClick={handleRepeat}
-					className="mt-2 inline-flex items-center gap-2 rounded-xl border border-[#E5E5E7] bg-white px-5 py-2.5 text-[13px] font-semibold text-[#374151] transition hover:border-[#C7C7CC] hover:bg-[#F9F9FB]"
+					className="app-mcq-button mt-2 inline-flex w-fit items-center gap-2 rounded-xl border border-[#E5E5E7] bg-white px-5 py-2.5 text-[13px] font-semibold text-[#374151] transition hover:border-[#C7C7CC] hover:bg-[#F9F9FB]"
 				>
 					<RotateCcw size={14} />
-					Repetir actividad
+					Repeat activity
 				</button>
 			</div>
 		);
@@ -669,14 +669,14 @@ function MultipleChoiceActivity({
 
 			<div className="mb-[calc(8px*var(--activity-scale,1))] flex items-center justify-between">
 				<span className="text-[calc(11px*var(--activity-scale,1))] font-bold uppercase tracking-[0.14em] text-[#AEAEB2]">
-					Pregunta {viewIndex + 1} de {questions.length}
+					Question {viewIndex + 1} of {questions.length}
 				</span>
 				<div className="flex items-center gap-1">
 					<button
 						type="button"
 						disabled={viewIndex === 0}
 						onClick={() => setViewIndex(viewIndex - 1)}
-						className="flex h-6 w-6 items-center justify-center rounded-lg border border-[#E8E8EA] text-[#6B7280] transition hover:border-[#C7C7CC] disabled:opacity-30"
+						className="app-mcq-button flex h-6 w-6 items-center justify-center rounded-lg border border-[#E8E8EA] text-[#6B7280] transition hover:border-[#C7C7CC] disabled:opacity-30"
 					>
 						<ChevronLeft size={13} />
 					</button>
@@ -684,7 +684,7 @@ function MultipleChoiceActivity({
 						type="button"
 						disabled={viewIndex >= activeQuestionIndex}
 						onClick={() => setViewIndex(viewIndex + 1)}
-						className="flex h-6 w-6 items-center justify-center rounded-lg border border-[#E8E8EA] text-[#6B7280] transition hover:border-[#C7C7CC] disabled:opacity-30"
+						className="app-mcq-button flex h-6 w-6 items-center justify-center rounded-lg border border-[#E8E8EA] text-[#6B7280] transition hover:border-[#C7C7CC] disabled:opacity-30"
 					>
 						<ChevronRight size={13} />
 					</button>
@@ -711,13 +711,13 @@ function MultipleChoiceActivity({
 									<label
 										key={optionId}
 										className={cn(
-											"flex cursor-pointer items-center gap-[calc(12px*var(--activity-scale,1))] rounded-lg border px-[calc(16px*var(--activity-scale,1))] py-[calc(12px*var(--activity-scale,1))] transition-all",
+											"app-mcq-option flex cursor-pointer items-center gap-[calc(12px*var(--activity-scale,1))] rounded-lg border px-[calc(16px*var(--activity-scale,1))] py-[calc(12px*var(--activity-scale,1))] transition-all",
 											confirmed ?
-												isCorrectOption ? "border-[#4ADE80] bg-[#F0FDF4]"
-												: isWrongSelected ? "border-[#F87171] bg-[#FEF2F2]"
-												: "border-[#E8E8EA] bg-white opacity-50"
-											: isSelected ? "border-[#4ADE80] bg-[#F0FDF4]"
-											: "border-[#E8E8EA] bg-white hover:border-[#C7C7CC] hover:bg-[#FAFAFA]",
+												isCorrectOption ? "app-mcq-option-correct border-[#4ADE80] bg-[#F0FDF4]"
+												: isWrongSelected ? "app-mcq-option-wrong border-[#F87171] bg-[#FEF2F2]"
+												: "app-mcq-option-muted border-[#E8E8EA] bg-white opacity-50"
+											: isSelected ? "app-mcq-option-selected border-[#4ADE80] bg-[#F0FDF4]"
+											: "app-mcq-option-idle border-[#E8E8EA] bg-white hover:border-[#C7C7CC] hover:bg-[#FAFAFA]",
 										)}
 									>
 										<input
@@ -754,6 +754,7 @@ function MultipleChoiceActivity({
 											)}
 										</span>
 										<span className={cn(
+											"app-mcq-option-text",
 											"text-[calc(13.5px*var(--activity-scale,1))] leading-snug",
 											confirmed ?
 												isCorrectOption ? "font-medium text-[#166534]"
@@ -771,23 +772,23 @@ function MultipleChoiceActivity({
 
 						{confirmed && (
 							<div className={cn(
-								"mt-[calc(12px*var(--activity-scale,1))] rounded-md border p-[calc(12px*var(--activity-scale,1))]",
+								"app-mcq-feedback mt-[calc(12px*var(--activity-scale,1))] rounded-md border p-[calc(12px*var(--activity-scale,1))]",
 								confirmed.isCorrect ?
-									"border-[#BBF7D0] bg-[#F0FDF4]"
-								:	"border-[#FECACA] bg-[#FEF2F2]",
+									"app-mcq-feedback-correct border-[#BBF7D0] bg-[#F0FDF4]"
+								:	"app-mcq-feedback-wrong border-[#FECACA] bg-[#FEF2F2]",
 							)}>
 								<div className={cn(
-									"flex items-center gap-1.5 text-[calc(12px*var(--activity-scale,1))] font-bold",
+									"app-mcq-feedback-title flex items-center gap-1.5 text-[calc(12px*var(--activity-scale,1))] font-bold",
 									confirmed.isCorrect ? "text-[#166534]" : "text-[#991B1B]",
 								)}>
 									{confirmed.isCorrect ?
 										<CheckCircle2 size={13} />
 									:	<XCircle size={13} />
 									}
-									{confirmed.isCorrect ? "¡Correcto!" : "Incorrecto"}
+									{confirmed.isCorrect ? "Correct!" : "Incorrect"}
 								</div>
 								{confirmed.explanation && (
-									<p className="mt-1.5 text-[calc(12px*var(--activity-scale,1))] leading-relaxed text-[#374151]">
+									<p className="app-mcq-feedback-copy mt-1.5 text-[calc(12px*var(--activity-scale,1))] leading-relaxed text-[#374151]">
 										{confirmed.explanation}
 									</p>
 								)}
@@ -803,7 +804,7 @@ function MultipleChoiceActivity({
 						type="button"
 						disabled={!pendingAnswer}
 						onClick={handleConfirm}
-						className="w-full rounded-xl bg-[#1D1D1F] py-[calc(10px*var(--activity-scale,1))] text-[calc(13px*var(--activity-scale,1))] font-bold text-white transition hover:bg-[#1F2937] disabled:cursor-not-allowed disabled:opacity-40"
+						className="app-mcq-button mx-auto flex w-fit items-center justify-center rounded-xl bg-[#1D1D1F] px-[calc(18px*var(--activity-scale,1))] py-[calc(10px*var(--activity-scale,1))] text-[calc(13px*var(--activity-scale,1))] font-bold text-white transition hover:bg-[#1F2937] disabled:cursor-not-allowed disabled:opacity-40"
 					>
 						Confirm answer
 					</button>
@@ -812,9 +813,9 @@ function MultipleChoiceActivity({
 					<button
 						type="button"
 						onClick={handleNext}
-						className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#1D1D1F] py-[calc(10px*var(--activity-scale,1))] text-[calc(13px*var(--activity-scale,1))] font-bold text-white transition hover:bg-[#1F2937]"
+						className="app-mcq-button mx-auto flex w-fit items-center justify-center gap-2 rounded-xl bg-[#1D1D1F] px-[calc(18px*var(--activity-scale,1))] py-[calc(10px*var(--activity-scale,1))] text-[calc(13px*var(--activity-scale,1))] font-bold text-white transition hover:bg-[#1F2937]"
 					>
-						Siguiente pregunta
+						Next question
 						<ChevronRight size={15} />
 					</button>
 				)}
@@ -1023,7 +1024,7 @@ function CaseStudyActivity({
 
 	return (
 		<div className="flex min-h-0 flex-1 flex-col gap-3">
-			<div className="flex min-h-0 flex-1 flex-col">
+			<div className="flex min-h-0 min-w-[336px] flex-1 flex-col">
 				<div className="flex items-end border-b border-[var(--activity-border)]">
 					{(["case", "analysis", ...(latestAttempt ? ["feedback" as const] : [])] as const).map((tab) => {
 						const selected = activeTab === tab;
@@ -1284,7 +1285,7 @@ function CodePracticeActivity({
 
 	return (
 		<div className="flex min-h-0 flex-1 flex-col gap-3">
-			<div className="flex min-h-0 flex-1 flex-col">
+			<div className="flex min-h-0 min-w-[336px] flex-1 flex-col">
 				<div className="flex items-end overflow-x-auto border-b border-[var(--activity-border)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
 					{(["info", "code", ...(latestAttempt ? ["feedback" as const] : [])] as const).map((tab) => {
 						const selected = visibleTab === tab;
@@ -2382,7 +2383,7 @@ function FlashcardsActivity({activity}: {activity: BackendLearningActivity}) {
 									event.stopPropagation();
 									handleNotYet();
 								}}
-								className="rounded-md border border-[#FDBA74] bg-[#FFF7ED] px-3 py-1.5 text-[12px] font-bold text-[#C2410C] transition hover:bg-[#FFEDD5]"
+								className="app-activity-flashcard-not-yet rounded-md border border-[#FDBA74] bg-[#FFF7ED] px-3 py-1.5 text-[12px] font-bold text-[#C2410C] transition hover:bg-[#FFEDD5]"
 							>
 								Not yet
 							</button>
