@@ -36,6 +36,8 @@ describe("folder api", () => {
 			"General",
 			"Computer Science",
 			"Mathematics",
+			"Finance",
+			"Arts",
 			"Biology",
 			"History",
 			"Literature",
@@ -78,8 +80,8 @@ describe("folder api", () => {
 		expect(didacticUnitsResponse.status).toBe(200);
 
 		const folders = await listFolders(app);
-		expect(folders).toHaveLength(9);
-		expect(new Set(folders.map((folder) => folder.name)).size).toBe(9);
+		expect(folders).toHaveLength(11);
+		expect(new Set(folders.map((folder) => folder.name)).size).toBe(11);
 	});
 
 	it("creates custom folders and rejects duplicates", async () => {

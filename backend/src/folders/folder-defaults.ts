@@ -21,6 +21,8 @@ const DEFAULT_FOLDER_DEFINITIONS: DefaultFolderDefinition[] = [
 		icon: "calculator",
 		color: "#F59E0B",
 	},
+	{name: "Finance", slug: "finance", icon: "landmark", color: "#14B8A6"},
+	{name: "Arts", slug: "arts", icon: "palette", color: "#EC4899"},
 	{name: "Biology", slug: "biology", icon: "microscope", color: "#22C55E"},
 	{name: "History", slug: "history", icon: "scroll-text", color: "#EF4444"},
 	{

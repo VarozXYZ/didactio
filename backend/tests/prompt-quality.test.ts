@@ -162,6 +162,9 @@ describe("prompt quality helpers", () => {
 		expect(prompt).toContain(
 			"Each module must include lessons with action-oriented content outlines.",
 		);
+		expect(prompt).toContain(
+			"For course-length units, each lesson contentOutline must contain 5-7 detailed teaching points",
+		);
 	});
 
 	it("maps unit length to different syllabus chapter counts", () => {
@@ -249,7 +252,13 @@ describe("prompt quality helpers", () => {
 		expect(prompt).toContain("Learning profile: beginner");
 		expect(prompt).toContain("Requested length: textbook");
 		expect(prompt).toContain(
-			"Target module volume: comprehensive textbook-style treatment",
+			"Module volume contract: comprehensive textbook-style treatment",
+		);
+		expect(prompt).toContain(
+			"roughly 5,500-7,500 learner-facing words",
+		);
+		expect(prompt).toContain(
+			"Treat the module volume contract as mandatory",
 		);
 		expect(prompt).toContain("1. Conditionals");
 		expect(prompt).toContain(

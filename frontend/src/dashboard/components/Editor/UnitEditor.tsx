@@ -4329,58 +4329,6 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		return () => window.removeEventListener("keydown", handleKeyDown);
 	}, [goToNextSpread, goToPrevSpread]);
 
-	if (isLoading) {
-		return (
-			<div className="flex h-screen w-full items-center justify-center bg-[#F5F5F7]">
-				<Loader2 size={32} className="animate-spin text-[#86868B]" />
-			</div>
-		);
-	}
-
-	if (!workspace || !activeChapter || !draft) {
-		return (
-			<div className="flex h-screen w-full items-center justify-center bg-[#F5F5F7]">
-				<Loader2 size={32} className="animate-spin text-[#86868B]" />
-			</div>
-		);
-	}
-
-	const getStatusIcon = (chapter: DidacticUnitEditorChapter) => {
-		const isGenerating =
-			isStreamingGeneration &&
-			activeGeneratingChapterIndex !== null &&
-			activeGeneratingChapterIndex === chapter.chapterIndex;
-		const readProgress =
-			chapter.totalBlocks > 0 ?
-				Math.min(
-					1,
-					Math.max(0, (chapter.readBlockIndex + 1) / chapter.totalBlocks),
-				)
-			:	0;
-		return (
-			<ChapterStatusIcon
-				status={chapter.status}
-				isCompleted={chapter.isCompleted}
-				isGenerating={isGenerating}
-				progress={readProgress}
-			/>
-		);
-	};
-
-	const isPendingChapter = activeChapter.status === "pending";
-	const isFailedChapter = activeChapter.status === "failed";
-	const hasConfiguredGenerationTier = unitGenerationTier !== null;
-	const regenerationCost =
-		unitGenerationTier ?
-			getModuleRegenerationCost({
-				quality: unitGenerationTier,
-				length: workspace?.length ?? "short",
-			})
-		:	null;
-	const canPayRegeneration =
-		!regenerationCost ||
-		(user?.credits[regenerationCost.coinType] ?? 0) >=
-			regenerationCost.amount;
 	const handleTextStyleChange = useCallback(
 		(textStyle: EditorTextStyle) => {
 			const userChangedSize =
@@ -4442,6 +4390,57 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			shouldUseCompactDesktopTextSizeDefault,
 		],
 	);
+
+	const loadingFallback = (
+		<div className="flex h-screen w-full items-center justify-center bg-[#F5F5F7]">
+			<Loader2 size={32} className="animate-spin text-[#86868B]" />
+		</div>
+	);
+
+	if (isLoading) {
+		return loadingFallback;
+	}
+
+	if (!workspace || !activeChapter || !draft) {
+		return loadingFallback;
+	}
+
+	const getStatusIcon = (chapter: DidacticUnitEditorChapter) => {
+		const isGenerating =
+			isStreamingGeneration &&
+			activeGeneratingChapterIndex !== null &&
+			activeGeneratingChapterIndex === chapter.chapterIndex;
+		const readProgress =
+			chapter.totalBlocks > 0 ?
+				Math.min(
+					1,
+					Math.max(0, (chapter.readBlockIndex + 1) / chapter.totalBlocks),
+				)
+			:	0;
+		return (
+			<ChapterStatusIcon
+				status={chapter.status}
+				isCompleted={chapter.isCompleted}
+				isGenerating={isGenerating}
+				progress={readProgress}
+			/>
+		);
+	};
+
+	const isPendingChapter = activeChapter.status === "pending";
+	const isFailedChapter = activeChapter.status === "failed";
+	const hasConfiguredGenerationTier = unitGenerationTier !== null;
+	const regenerationCost =
+		unitGenerationTier ?
+			getModuleRegenerationCost({
+				quality: unitGenerationTier,
+				length: workspace.length,
+			})
+		:	null;
+	const canPayRegeneration =
+		!regenerationCost ||
+		(user?.credits[regenerationCost.coinType] ?? 0) >=
+			regenerationCost.amount;
 	const contentPageOffset = currentSpread * pagesPerSpread;
 	const leftReadPage = readPages[contentPageOffset];
 	const rightReadPage =

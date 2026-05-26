@@ -5,6 +5,8 @@ import type {FolderStore} from "../folders/folder-store.js";
 import type {DidacticUnit} from "./create-didactic-unit.js";
 import type {DidacticUnitStore} from "./didactic-unit-store.js";
 import type {DefaultDidacticUnitTemplate} from "./export-default-didactic-unit-template.js";
+import investingTemplate from "./default-templates/01c78e7a-0288-4bc2-981b-c93e1b4f118d.json" with {type: "json"};
+import animeDrawingTemplate from "./default-templates/c5de6495-3297-4c72-bbcf-a97fe65ede04.json" with {type: "json"};
 import pythonIntroductionTemplate from "./default-templates/e6aa29be-3371-42ce-a33e-4f31fd4207a2.json" with {type: "json"};
 import sportsNutritionTemplate from "./default-templates/a010c81d-49e5-4509-9354-c0ab66960d49.json" with {type: "json"};
 
@@ -24,6 +26,16 @@ export const DEFAULT_DIDACTIC_UNIT_DEFINITIONS: DefaultDidacticUnitDefinition[] 
 		id: "sports-nutrition-unit-a010c81d",
 		template: sportsNutritionTemplate as unknown as DefaultDidacticUnitTemplate,
 		folderSlug: "biology",
+	},
+	{
+		id: "investing-unit-01c78e7a",
+		template: investingTemplate as unknown as DefaultDidacticUnitTemplate,
+		folderSlug: "finance",
+	},
+	{
+		id: "anime-drawing-unit-c5de6495",
+		template: animeDrawingTemplate as unknown as DefaultDidacticUnitTemplate,
+		folderSlug: "arts",
 	},
 ];
 

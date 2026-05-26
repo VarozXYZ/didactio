@@ -83,24 +83,39 @@ function contentLengthInstruction(length: DidacticUnitLength): string {
 		case "intro":
 			return "Keep the scope compact and introductory. This changes how concise each module is, not the required module count.";
 		case "long":
-			return "Provide substantial coverage with room for explanation, examples, and guided practice.";
+			return "Provide substantial course-level coverage. Long means each module must be much deeper than an introduction, not just more modules.";
 		case "textbook":
-			return "Aim for comprehensive, textbook-like coverage with robust progression and substantial examples.";
+			return "Provide comprehensive textbook-like coverage. Textbook means each module must be expansive, sustained, and significantly deeper than a standard course module.";
 		case "short":
 		default:
 			return "Keep the material focused but genuinely useful. Short means concise module content, not fewer modules.";
 	}
 }
 
+function syllabusOutlineDepthInstruction(length: DidacticUnitLength): string {
+	switch (length) {
+		case "intro":
+			return "For introductory units, each lesson contentOutline should contain 2-3 focused teaching points.";
+		case "long":
+			return "For course-length units, each lesson contentOutline must contain 5-7 detailed teaching points that demand explanation, examples, practice, and synthesis.";
+		case "textbook":
+			return "For textbook-length units, each lesson contentOutline must contain 7-10 detailed teaching points, including conceptual depth, worked examples, edge cases, misconceptions, practice, and synthesis.";
+		case "short":
+		default:
+			return "For short units, each lesson contentOutline should contain 3-4 focused teaching points.";
+	}
+}
+
 function moduleContentVolumeInstruction(length: DidacticUnitLength): string {
 	switch (length) {
 		case "intro":
+			return "Module volume contract: compact introductory module, roughly 900-1,400 learner-facing words after HTML tags are removed. Use at least 3 substantive lesson sections, with examples and a short practice task.";
 		case "short":
-			return "Target module volume: concise but complete, roughly 1,400-2,000 words when the lesson outline supports it.";
+			return "Module volume contract: focused but complete module, roughly 1,400-2,000 learner-facing words after HTML tags are removed. Use at least 3 substantive lesson sections, with examples, pitfalls, and a short practice task.";
 		case "long":
-			return "Target module volume: a substantial course module, roughly 3,000-4,500 words when the lesson outline supports it. Develop each lesson through multiple topic-specific subsections, examples, pitfalls, applied practice, and synthesis. Do not stop after a brief overview.";
+			return "Module volume contract: substantial course module, roughly 3,200-4,800 learner-facing words after HTML tags are removed. Use at least 4 substantive lesson sections. Each lesson must include multiple topic-specific subsections, sustained explanation, concrete examples, common pitfalls, applied practice, and synthesis. Do not compress this into an overview.";
 		case "textbook":
-			return "Target module volume: comprehensive textbook-style treatment, roughly 5,000-7,000 words when the lesson outline supports it. Develop each lesson with sustained explanation, worked examples, comparisons, edge cases, practice, and synthesis. Do not stop after a brief overview.";
+			return "Module volume contract: comprehensive textbook-style treatment, roughly 5,500-7,500 learner-facing words after HTML tags are removed. Use at least 5 substantive lesson sections. Each lesson must include sustained explanation, worked examples, comparisons, edge cases, misconceptions, practice, and synthesis. Do not compress this into an overview.";
 	}
 }
 
@@ -658,6 +673,7 @@ export function buildSyllabusMarkdownPrompt(input: {
 			`Requested length: ${input.length}`,
 			`Target module count: ${targetModuleCount}`,
 			contentLengthInstruction(input.length),
+			syllabusOutlineDepthInstruction(input.length),
 		]),
 		buildSection(
 			"Authoring Profile",
@@ -681,6 +697,7 @@ export function buildSyllabusMarkdownPrompt(input: {
 			"Do not include durations or time estimates anywhere.",
 			"Use a keywords string, not a keywords array.",
 			"Each module must include lessons with action-oriented content outlines.",
+			syllabusOutlineDepthInstruction(input.length),
 			"Ensure modules build logically on one another and the final module emphasizes synthesis or independent creation.",
 			"Make titles and section phrasing natural, specific, and human. Avoid generic educational boilerplate.",
 			"Use sentence case for titles and headings, not title case. Capitalize only the first word and proper nouns.",
@@ -767,6 +784,7 @@ export function buildChapterHtmlPrompt(input: {
 		buildSection("Pedagogical Requirements", [
 			previousBridge,
 			"Each lesson must be written as a cohesive mini-module section, not a list of tips.",
+			"Treat the module volume contract as mandatory. If the lesson outline is thin, expand it with relevant teaching detail instead of shortening the module.",
 			"Use a 70/30 balance of conceptual depth and applied practice.",
 			"Include all of these organically, not as a repetitive checklist:",
 			"1. A detailed conceptual explanation",
