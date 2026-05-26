@@ -45,6 +45,10 @@ export interface DidacticUnit {
 	ownerId: string;
 	defaultTemplateId?: string;
 	defaultTemplateSourceId?: string;
+	modelAttribution?: {
+		provider: string;
+		model: string;
+	};
 	title: string;
 	topic: string;
 	provider: DidacticUnitProvider;

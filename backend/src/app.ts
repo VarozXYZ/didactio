@@ -527,18 +527,19 @@ async function buildDidacticUnitSummaryResponses(
 		const modelRun = resolveDidacticUnitModelRun(
 			runsByUnitId.get(didacticUnit.id) ?? [],
 		);
+		const modelAttribution = modelRun ?? didacticUnit.modelAttribution;
 
 		return {
 			...summary,
 			folder: buildFolderResponse(folder),
 			modelUsed:
-				modelRun ?
+				modelAttribution ?
 					{
-						provider: modelRun.provider,
-						model: modelRun.model,
+						provider: modelAttribution.provider,
+						model: modelAttribution.model,
 						label: getModelDisplayName(
-							modelRun.provider,
-							modelRun.model,
+							modelAttribution.provider,
+							modelAttribution.model,
 						),
 					}
 				:	null,

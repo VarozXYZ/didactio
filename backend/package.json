@@ -9,7 +9,8 @@
     "start": "node dist/server.js",
     "test": "vitest run --exclude tests/**/*.live.test.ts",
     "test:live": "vitest run tests/didactic-unit.live.test.ts",
-    "export:default-unit": "node scripts/export-default-didactic-unit-template.mjs"
+    "reset:onboarding": "tsx src/commands/reset-onboarding.ts",
+    "export:default-unit": "tsx src/commands/export-default-didactic-unit-template.ts"
   },
   "dependencies": {
     "@types/cookie-parser": "^1.4.10",

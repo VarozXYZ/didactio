@@ -4,6 +4,7 @@ import {ensureDefaultFolders} from "../folders/folder-defaults.js";
 import type {FolderStore} from "../folders/folder-store.js";
 import type {DidacticUnit} from "./create-didactic-unit.js";
 import type {DidacticUnitStore} from "./didactic-unit-store.js";
+import type {DefaultDidacticUnitTemplate} from "./export-default-didactic-unit-template.js";
 import pythonIntroductionTemplate from "./default-templates/e6aa29be-3371-42ce-a33e-4f31fd4207a2.json" with {type: "json"};
 
 export interface DefaultDidacticUnitDefinition {
@@ -11,18 +12,6 @@ export interface DefaultDidacticUnitDefinition {
 	template: DefaultDidacticUnitTemplate;
 	folderSlug: string;
 }
-
-type DefaultDidacticUnitTemplate = Omit<
-	DidacticUnit,
-	| "ownerId"
-	| "folderId"
-	| "createdAt"
-	| "updatedAt"
-	| "moduleReadProgress"
-	| "completedChapters"
-	| "unitGenerationPaidAt"
-	| "unitGenerationCreditTransactionId"
->;
 
 export const DEFAULT_DIDACTIC_UNIT_DEFINITIONS: DefaultDidacticUnitDefinition[] = [
 	{

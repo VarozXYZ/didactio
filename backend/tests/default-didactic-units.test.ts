@@ -26,16 +26,30 @@ describe("default didactic units", () => {
 		expect(firstList.body.didacticUnits[0].folder.name).toBe(
 			"Computer Science",
 		);
+		expect(firstList.body.didacticUnits[0].modelUsed).toMatchObject({
+			provider: "openai",
+			model: "gpt-5.5",
+		});
 
 		const cloned = await didacticUnitStore.getById(login.user.id, clonedId);
 		expect(cloned).toMatchObject({
 			ownerId: login.user.id,
 			defaultTemplateId: "welcome-unit-e6aa29be",
 			defaultTemplateSourceId: SOURCE_UNIT_ID,
+			modelAttribution: {
+				provider: "openai",
+				model: "gpt-5.5",
+			},
 		});
 		expect(cloned?.moduleReadProgress).toBeUndefined();
 		expect(cloned?.unitGenerationPaidAt).toBeUndefined();
 		expect(cloned?.unitGenerationCreditTransactionId).toBeUndefined();
+
+		const analytics = await request(app)
+			.get("/api/analytics/usage")
+			.set("Authorization", `Bearer ${login.accessToken}`);
+		expect(analytics.status).toBe(200);
+		expect(analytics.body.aiGenerations).toBe(0);
 
 		const removed = await request(app)
 			.delete(`/api/didactic-unit/${clonedId}`)

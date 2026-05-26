@@ -6960,5 +6960,9 @@
 			"generatedAt": "2026-05-08T08:47:43.605Z",
 			"updatedAt": null
 		}
-	]
+	],
+	"modelAttribution": {
+		"provider": "openai",
+		"model": "gpt-5.5"
+	}
 }
