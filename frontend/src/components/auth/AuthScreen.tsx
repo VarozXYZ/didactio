@@ -82,7 +82,7 @@ function AuthScreen({mode}: AuthScreenProps) {
 					</div>
 
 					<h1 className="max-w-[550px] font-sora text-5xl font-bold leading-[1.18] text-dark">
-						Design smarter curricula in seconds
+						Learn anything, without paywall.
 					</h1>
 				</div>
 			</aside>
@@ -114,6 +114,15 @@ function AuthScreen({mode}: AuthScreenProps) {
 							iconSrc="/assets/brands/microsoft.png"
 							disabled
 						/>
+					</div>
+
+					<div className="mt-4 rounded-sm border border-accent/30 bg-accent/10 px-4 py-3 font-inter text-base leading-relaxed text-dark/75">
+						<span className="font-semibold text-dark">
+							Temporary sign-in notice:
+						</span>{" "}
+						Email/password login and Microsoft login are currently
+						disabled. Please continue with Google while we finish
+						enabling the other methods.
 					</div>
 
 					<div className="my-12 flex items-center gap-5">
