@@ -49,6 +49,9 @@ import {getFolderEmoji} from "@/dashboard/utils/folderDisplay";
 import {getMoveTargetFolders} from "@/dashboard/utils/folderTargets";
 import {useAuth} from "@/auth/useAuth";
 
+const SIDEBAR_OPEN_WIDTH = 304;
+const SIDEBAR_COLLAPSED_WIDTH = 80;
+
 type SidebarProps = {
 	isSidebarOpen: boolean;
 	activeSection: DashboardSection;
@@ -143,7 +146,11 @@ export function Sidebar({
 		<>
 			<motion.aside
 				initial={false}
-				animate={{width: isSidebarOpen ? 280 : 80}}
+				animate={{
+					width: isSidebarOpen ?
+						SIDEBAR_OPEN_WIDTH
+					:	SIDEBAR_COLLAPSED_WIDTH,
+				}}
 				transition={{type: "spring", stiffness: 300, damping: 30}}
 				className="app-dashboard-sidebar z-20 flex h-screen flex-col overflow-hidden border-r border-[#E5E5E7] bg-white"
 			>
@@ -168,7 +175,7 @@ export function Sidebar({
 					}
 				</div>
 
-				<div className="flex-1 overflow-y-auto px-3">
+				<div className="app-dashboard-sidebar-scroll flex-1 overflow-y-auto px-3">
 					<div className="mb-4 mt-4 space-y-0.5">
 						<button
 							type="button"
@@ -181,13 +188,13 @@ export function Sidebar({
 						>
 							<LayoutGrid size={18} />
 							{isSidebarOpen && (
-								<span className="text-[14px] font-medium">Library</span>
+								<span className="text-[15px] font-medium">Library</span>
 							)}
 						</button>
 					</div>
 
 					{isSidebarOpen && (
-						<div className="mb-2 px-3 text-[10px] font-bold uppercase tracking-widest text-[#86868B]">
+						<div className="app-dashboard-sidebar-section-label mb-2 px-3 text-[11px] font-bold uppercase tracking-widest text-[#86868B]">
 							MY FOLDERS
 						</div>
 					)}
@@ -224,7 +231,7 @@ export function Sidebar({
 														folder.icon,
 													)}
 												</span>
-												<span className="flex-1 truncate text-left text-[14px] font-medium">
+												<span className="flex-1 truncate text-left text-[15px] font-medium">
 													{folder.name}
 												</span>
 												<span className="text-[12px] text-[#86868B] tabular-nums">
@@ -316,7 +323,7 @@ export function Sidebar({
 												return (
 													<div
 														key={unitId}
-														className="group flex items-center gap-1 rounded-[6px] px-3 py-1.5 text-[13px] text-[#86868B] transition-all hover:bg-[#F5F5F7]/50 hover:text-[#1D1D1F]"
+														className="group flex items-center gap-1 rounded-[6px] px-3 py-1.5 text-[14px] text-[#86868B] transition-all hover:bg-[#F5F5F7]/50 hover:text-[#1D1D1F]"
 													>
 														<button
 															type="button"
@@ -450,7 +457,7 @@ export function Sidebar({
 												);
 											})}
 											{folder.units.length === 0 && (
-												<div className="px-3 py-1.5 text-[12px] italic text-[#86868B]">
+												<div className="px-3 py-1.5 text-[13px] italic text-[#86868B]">
 													No units yet
 												</div>
 											)}
@@ -467,7 +474,7 @@ export function Sidebar({
 								onClick={() =>
 									setFolderModal({open: true, mode: "create"})
 								}
-								className="flex w-full items-center gap-3 rounded-[10px] px-3 py-2 text-[13px] text-[#86868B] transition-all hover:bg-[#F5F5F7]/50 hover:text-[#1D1D1F]"
+								className="flex w-full items-center gap-3 rounded-[10px] px-3 py-2 text-[14px] text-[#86868B] transition-all hover:bg-[#F5F5F7]/50 hover:text-[#1D1D1F]"
 							>
 								<Plus size={16} />
 								<span>Create Folder</span>
@@ -476,7 +483,7 @@ export function Sidebar({
 					)}
 
 					{isSidebarOpen && (
-						<div className="mb-2 mt-6 px-3 text-[10px] font-bold uppercase tracking-widest text-[#86868B]">
+						<div className="app-dashboard-sidebar-section-label mb-2 mt-6 px-3 text-[11px] font-bold uppercase tracking-widest text-[#86868B]">
 							Settings
 						</div>
 					)}
@@ -495,7 +502,7 @@ export function Sidebar({
 							>
 								<item.icon size={18} />
 								{isSidebarOpen && (
-									<span className="text-[14px] font-medium">
+									<span className="text-[15px] font-medium">
 										{item.label}
 									</span>
 								)}
@@ -525,10 +532,10 @@ export function Sidebar({
 										</div>
 									}
 									<div className="min-w-0 flex-1">
-										<div className="truncate text-[13px] font-semibold text-[#1D1D1F]">
+										<div className="truncate text-[14px] font-semibold text-[#1D1D1F]">
 											{user?.displayName ?? "Didactio User"}
 										</div>
-										<div className="text-[11px] text-[#86868B]">
+										<div className="text-[12px] text-[#86868B]">
 											{user?.email ?? "Signed in with Google"}
 										</div>
 									</div>

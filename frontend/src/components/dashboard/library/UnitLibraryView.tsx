@@ -45,12 +45,12 @@ export function UnitLibraryView({
 	void averageProgress;
 
 	return (
-		<div className="flex min-w-0 flex-1 flex-col">
+		<div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
 			<UnitLibraryHeader
 				filteredUnitsCount={filteredUnits.length}
 				onCreateUnit={onCreateUnit}
 			/>
-			<div className="app-dashboard-canvas min-h-0 flex-1 overflow-y-auto bg-[#F5F5F7] p-8">
+			<div className="app-dashboard-canvas app-library-scroll min-h-0 flex-1 overflow-y-auto bg-[#F5F5F7] p-8">
 				<div className="mx-auto w-full max-w-[1560px]">
 					<div className="mb-6 flex items-center justify-between gap-4">
 						<div className="relative">

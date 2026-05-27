@@ -161,6 +161,70 @@ html[data-app-theme="dark"][data-app-themed="true"] .app-dashboard-sidebar.bg-wh
 	background-color: #18181b !important;
 }
 
+.app-dashboard-sidebar-scroll {
+	scrollbar-color: rgba(113, 113, 122, 0.38) transparent;
+	scrollbar-width: thin;
+}
+
+.app-dashboard-sidebar-scroll::-webkit-scrollbar {
+	width: 3px;
+}
+
+.app-dashboard-sidebar-scroll::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+.app-dashboard-sidebar-scroll::-webkit-scrollbar-thumb {
+	background-color: rgba(113, 113, 122, 0.38);
+	border-radius: 999px;
+}
+
+.app-dashboard-sidebar-scroll::-webkit-scrollbar-thumb:hover {
+	background-color: rgba(52, 199, 89, 0.55);
+}
+
+html[data-app-theme="dark"][data-app-themed="true"] .app-dashboard-sidebar-scroll {
+	scrollbar-color: rgba(82, 82, 91, 0.58) transparent;
+}
+
+html[data-app-theme="dark"][data-app-themed="true"] .app-dashboard-sidebar-scroll::-webkit-scrollbar-thumb {
+	background-color: rgba(82, 82, 91, 0.58);
+}
+
+html[data-app-theme="dark"][data-app-themed="true"] .app-dashboard-sidebar-scroll::-webkit-scrollbar-thumb:hover {
+	background-color: rgba(52, 199, 89, 0.62);
+}
+
+html[data-app-theme="dark"][data-app-themed="true"] .app-dashboard-sidebar .app-dashboard-sidebar-section-label {
+	color: #34c759 !important;
+}
+
+.app-library-scroll {
+	scrollbar-color: rgba(142, 142, 147, 0.45) transparent;
+	scrollbar-width: thin;
+}
+
+.app-library-scroll::-webkit-scrollbar {
+	width: 6px;
+}
+
+.app-library-scroll::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+.app-library-scroll::-webkit-scrollbar-thumb {
+	background-color: rgba(142, 142, 147, 0.45);
+	border-radius: 999px;
+}
+
+html[data-app-theme="dark"][data-app-themed="true"] .app-library-scroll {
+	scrollbar-color: rgba(82, 82, 91, 0.62) transparent;
+}
+
+html[data-app-theme="dark"][data-app-themed="true"] .app-library-scroll::-webkit-scrollbar-thumb {
+	background-color: rgba(82, 82, 91, 0.62);
+}
+
 html[data-app-theme="dark"][data-app-themed="true"] .app-editor-sidebar,
 html[data-app-theme="dark"][data-app-themed="true"] .app-editor-header {
 	background-color: #18181b !important;
