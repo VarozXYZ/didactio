@@ -244,6 +244,25 @@ export function EditorFirstRunGuide({
 		};
 	const isLastStep = stepIndex === steps.length - 1;
 	const closeGuide = () => onOpenChange(false);
+	const goToAvailableStep = (direction: -1 | 1) => {
+		for (
+			let nextIndex = stepIndex + direction;
+			nextIndex >= 0 && nextIndex < steps.length;
+			nextIndex += direction
+		) {
+			if (document.querySelector(steps[nextIndex].selector)) {
+				setStepIndex(nextIndex);
+				return;
+			}
+		}
+
+		if (direction === 1) {
+			closeGuide();
+		}
+	};
+	const hasNextAvailableStep = steps
+		.slice(stepIndex + 1)
+		.some((step) => document.querySelector(step.selector));
 
 	return (
 		<div className="fixed inset-0 z-[90]">
@@ -293,7 +312,7 @@ export function EditorFirstRunGuide({
 						<button
 							className="rounded-full px-3 py-2 text-[12px] font-bold text-[#6B7280] transition hover:bg-[#F5F5F7] disabled:opacity-40"
 							disabled={stepIndex === 0}
-							onClick={() => setStepIndex((value) => Math.max(0, value - 1))}
+							onClick={() => goToAvailableStep(-1)}
 							type="button"
 						>
 							Back
@@ -301,15 +320,15 @@ export function EditorFirstRunGuide({
 						<button
 							className="rounded-full bg-[#0F0F12] px-4 py-2 text-[12px] font-bold text-white transition hover:bg-[#2A2A2D]"
 							onClick={() => {
-								if (isLastStep) {
+								if (isLastStep || !hasNextAvailableStep) {
 									closeGuide();
 									return;
 								}
-								setStepIndex((value) => value + 1);
+								goToAvailableStep(1);
 							}}
 							type="button"
 						>
-							{isLastStep ? "Done" : "Next"}
+							{isLastStep || !hasNextAvailableStep ? "Done" : "Next"}
 						</button>
 					</div>
 				</div>

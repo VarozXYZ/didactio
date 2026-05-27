@@ -6580,12 +6580,15 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 					)}
 					{(
 						activeChapter.status === "ready" ||
-						isActiveChapterStreaming
+						(isActiveChapterStreaming && readPages.length > 0)
 					) ?
 						renderEditorSpread(isEditMode)
 					:	<>
 							{isPendingChapter ?
-								<div className="flex flex-col items-center justify-center space-y-6 text-center">
+								<div
+									className="flex flex-col items-center justify-center space-y-6 text-center"
+									data-editor-tour="content"
+								>
 									<div className="relative">
 										<Loader2
 											size={56}
