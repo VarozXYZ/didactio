@@ -1,6 +1,9 @@
 <div align="center">
 
-<img src="frontend/assets/logos/logo-horizontal.png" alt="Didactio" width="260" />
+<p>
+  <img src="frontend/assets/logos/logo-horizontal.png" alt="Didactio logo for light backgrounds" width="240" />
+  <img src="frontend/assets/logos/logo-white-horizontal.png" alt="Didactio logo for dark backgrounds" width="240" />
+</p>
 
 ### An AI-assisted workspace for learning
 
