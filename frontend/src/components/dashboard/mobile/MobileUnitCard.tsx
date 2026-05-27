@@ -134,7 +134,7 @@ export function MobileUnitCard({
 					className="block w-full text-left"
 				>
 					<div
-						className="relative flex aspect-[1.35] min-h-[116px] items-center justify-center overflow-hidden"
+						className="relative flex aspect-[1.55] min-h-[102px] items-center justify-center overflow-hidden"
 						style={{backgroundColor: style.bgColor}}
 					>
 						<div
@@ -142,13 +142,13 @@ export function MobileUnitCard({
 							style={{backgroundColor: style.accentColor}}
 						/>
 						<span
-							className="select-none text-[58px] leading-none drop-shadow-sm"
+							className="select-none text-[52px] leading-none drop-shadow-sm"
 							style={{opacity: 0.52}}
 						>
 							{folderEmoji}
 						</span>
 						{unit.canOpenEditor && (
-							<div className="absolute bottom-0 left-0 right-0 h-1.5 bg-[#DDEFE5]">
+							<div className="absolute bottom-0 left-0 right-0 h-1.5 bg-[#34C759]/20">
 								<div
 									className="h-full bg-[#2ED866]"
 									style={{
@@ -159,12 +159,12 @@ export function MobileUnitCard({
 						)}
 					</div>
 
-					<div className="flex min-h-[188px] flex-col px-3.5 pb-3.5 pt-3">
-						<h3 className="line-clamp-3 text-[15px] font-bold leading-snug text-[#111113]">
+					<div className="flex flex-col px-3.5 pb-3.5 pt-3">
+						<h3 className="line-clamp-2 text-center text-[16px] font-bold leading-snug text-[#111113]">
 							{unit.title}
 						</h3>
 
-						<div className="mt-3 flex flex-wrap items-center gap-1.5">
+						<div className="mt-3 flex justify-center">
 							<span
 								className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase leading-none"
 								style={{
@@ -179,19 +179,9 @@ export function MobileUnitCard({
 									{unit.folder.name}
 								</span>
 							</span>
-							{unit.canOpenEditor ?
-								<LengthBadge
-									length={unit.length}
-									className="px-2.5 text-[10px]"
-								/>
-							:	<span className="inline-flex items-center gap-1.5 rounded-full border border-[#E5E5E7] bg-white px-2.5 py-1 text-[10px] font-semibold leading-none text-[#6E6E73]">
-									<span className="h-1.5 w-1.5 rounded-full bg-[#FF9F0A]" />
-									Setup needed
-								</span>
-							}
 						</div>
 
-						<div className="mt-auto flex items-end justify-between gap-2 pt-4">
+						<div className="mt-4 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
 							{unit.canOpenEditor ?
 								<span className="text-[15px] font-bold text-[#00B84A]">
 									{unit.primaryProgressPercent}%
@@ -200,14 +190,20 @@ export function MobileUnitCard({
 									Setup
 								</span>
 							}
+							<LengthBadge
+								length={unit.length}
+								className="px-2.5 text-[10px]"
+							/>
 							{modelLogo ?
-								<img
-									src={modelLogo}
-									alt={unit.modelUsed?.label ?? "Model used"}
-									title={unit.modelUsed?.label}
-									className="h-5 w-5 rounded-full object-contain"
-								/>
-							:	<span className="text-[10px] font-semibold text-[#C7C7CC]">
+								<span className="flex justify-end">
+									<img
+										src={modelLogo}
+										alt={unit.modelUsed?.label ?? "Model used"}
+										title={unit.modelUsed?.label}
+										className="h-5 w-5 rounded-full object-contain"
+									/>
+								</span>
+							:	<span className="text-right text-[10px] font-semibold text-[#C7C7CC]">
 									No model
 								</span>
 							}

@@ -263,7 +263,7 @@ function PlanCard({
 }) {
 	const cardStyle =
 		plan.featured ?
-			"border-2 border-accent shadow-elevated -mt-6 -mb-6 min-h-[580px]"
+			"border-2 border-accent shadow-elevated min-h-[580px] lg:-mt-6 lg:-mb-6"
 		:	"border border-accent shadow-card min-h-[520px]";
 
 	const buttonStyle =
@@ -290,14 +290,14 @@ function PlanCard({
 
 	return (
 		<div
-			className={`bg-dark rounded-sm px-8 py-7 flex flex-col ${cardStyle}`}
+			className={`bg-dark rounded-sm px-6 py-7 flex flex-col sm:px-8 ${cardStyle}`}
 		>
 			<div>
 				<h3 className="font-sora text-2xl font-semibold text-white">
 					{plan.name}
 				</h3>
 				<div className="mt-3 flex items-end gap-3">
-					<span className="font-sora text-5xl font-bold text-accent">
+					<span className="font-sora text-4xl font-bold text-accent sm:text-5xl">
 						{price}
 					</span>
 					<span className="font-inter text-lg text-white/50">
@@ -352,13 +352,13 @@ function PricingPlans() {
 	const isAuthenticated = status === "authenticated";
 
 	return (
-		<section className="w-full flex flex-col items-center py-16">
-			<div className="w-[1120px] max-w-[95vw]">
-				<h1 className="font-sora text-5xl font-bold text-dark text-center">
+		<section className="flex w-full flex-col items-center py-10 md:py-16">
+			<div className="w-[1120px] max-w-[calc(100%_-_2rem)]">
+				<h1 className="text-center font-sora text-[2rem] font-bold leading-tight text-dark md:text-5xl">
 					Flexible Plans for Every Need
 				</h1>
 
-				<div className="mt-14 grid grid-cols-3 gap-6 items-start">
+				<div className="mt-9 grid grid-cols-1 items-start gap-6 md:mt-14 lg:grid-cols-3">
 					{plans.map((plan) => (
 						<PlanCard
 							key={plan.name}

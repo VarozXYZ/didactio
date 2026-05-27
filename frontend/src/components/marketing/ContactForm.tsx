@@ -3,9 +3,9 @@ const accentFilter =
 
 function ContactForm() {
 	return (
-		<section className="w-[1040px] max-w-[95vw] py-16">
+		<section className="w-[1040px] max-w-[calc(100%_-_2rem)] py-10 md:py-16">
 			<div className="flex flex-col items-center text-center">
-				<h1 className="font-sora text-5xl font-bold text-dark">
+				<h1 className="font-sora text-[2rem] font-bold leading-tight text-dark md:text-5xl">
 					Get in touch with us
 				</h1>
 				<p className="mt-4 max-w-[720px] font-inter text-base text-dark/70 leading-relaxed">
@@ -14,8 +14,8 @@ function ContactForm() {
 				</p>
 			</div>
 
-			<div className="mt-10 flex justify-center">
-				<form className="w-[500px] max-w-full rounded-md border border-accent bg-dark px-9 py-9 shadow-card">
+			<div className="mt-8 flex justify-center md:mt-10">
+				<form className="w-[500px] max-w-full rounded-md border border-accent bg-dark px-5 py-6 shadow-card sm:px-9 sm:py-9">
 					<div className="mb-6 flex items-center gap-3">
 						<div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10">
 							<img
@@ -25,12 +25,12 @@ function ContactForm() {
 								style={{filter: accentFilter}}
 							/>
 						</div>
-						<h2 className="font-sora text-2xl font-semibold text-white">
+						<h2 className="font-sora text-xl font-semibold text-white sm:text-2xl">
 							Send us a message
 						</h2>
 					</div>
 
-					<div className="grid grid-cols-2 gap-5">
+					<div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
 						<label className="flex flex-col gap-2 font-inter text-base text-white/80">
 							First name
 							<input
@@ -52,7 +52,7 @@ function ContactForm() {
 							/>
 						</label>
 
-						<label className="col-span-2 flex flex-col gap-2 font-inter text-base text-white/80">
+						<label className="sm:col-span-2 flex flex-col gap-2 font-inter text-base text-white/80">
 							Email Address
 							<input
 								type="email"
@@ -63,7 +63,7 @@ function ContactForm() {
 							/>
 						</label>
 
-						<label className="col-span-2 flex flex-col gap-2 font-inter text-base text-white/80">
+						<label className="sm:col-span-2 flex flex-col gap-2 font-inter text-base text-white/80">
 							Subject
 							<div className="relative">
 								<select
@@ -84,7 +84,7 @@ function ContactForm() {
 							</div>
 						</label>
 
-						<label className="col-span-2 flex flex-col gap-2 font-inter text-base text-white/80">
+						<label className="sm:col-span-2 flex flex-col gap-2 font-inter text-base text-white/80">
 							Message
 							<textarea
 								name="message"

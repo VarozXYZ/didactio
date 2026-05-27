@@ -21,6 +21,22 @@ export function CreateUnitButton({onClick, label = "New unit"}: {onClick: () => 
                 .border-spinner {
                     animation: arcExpand 1.1s cubic-bezier(0.2, 0.8, 0.4, 1) forwards;
                 }
+                @media (max-width: 340px) {
+                    .app-create-unit-button {
+                        padding: 2px !important;
+                    }
+
+                    .app-create-unit-button-content {
+                        gap: 0.35rem !important;
+                        padding: 9px 12px !important;
+                        font-size: 13px !important;
+                    }
+
+                    .app-create-unit-button-content svg {
+                        width: 15px !important;
+                        height: 15px !important;
+                    }
+                }
             `}</style>
 
 			<button
@@ -92,7 +108,7 @@ export function CreateUnitButton({onClick, label = "New unit"}: {onClick: () => 
 				)}
 
 				<div
-					className="app-create-unit-button-content flex select-none items-center gap-2.5 px-5 py-[11px] text-[15px] font-semibold text-white"
+					className="app-create-unit-button-content flex select-none items-center gap-2.5 whitespace-nowrap px-5 py-[11px] text-[15px] font-semibold text-white"
 					style={{
 						position: "relative",
 						zIndex: 2,

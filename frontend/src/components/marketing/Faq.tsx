@@ -40,13 +40,13 @@ function Faq() {
 	const [openIndex, setOpenIndex] = useState<number | null>(1);
 
 	return (
-		<section className="w-[1040px] py-16">
-			<h2 className="font-sora font-bold text-4xl text-dark mb-12">
+		<section className="w-[1040px] max-w-[calc(100%_-_2rem)] py-10 md:py-16">
+			<h2 className="mb-8 font-sora text-2xl font-bold text-dark md:mb-12 md:text-4xl">
 				Frequently asked questions
 			</h2>
 
-			<div className="flex gap-6 items-stretch">
-				<div className="w-[470px] rounded-md overflow-hidden shadow-card border border-dark/10">
+			<div className="flex flex-col gap-6 items-stretch lg:flex-row">
+				<div className="h-[260px] w-full overflow-hidden rounded-md border border-dark/10 shadow-card lg:h-auto lg:w-[470px]">
 					<img
 						src="/assets/props/faq-prop.png"
 						alt=""
@@ -62,7 +62,7 @@ function Faq() {
 						return (
 							<div
 								key={faq.question}
-								className="bg-dark rounded-md px-6 py-5 shadow-card border border-white/10"
+								className="bg-dark rounded-md px-5 py-4 shadow-card border border-white/10 md:px-6 md:py-5"
 							>
 								<button
 									type="button"
@@ -75,7 +75,7 @@ function Faq() {
 									aria-expanded={isOpen}
 									aria-controls={contentId}
 								>
-									<span className="font-sora font-semibold text-xl text-white">
+									<span className="font-sora text-base font-semibold text-white md:text-xl">
 										{faq.question}
 									</span>
 									<img

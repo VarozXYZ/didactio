@@ -67,9 +67,9 @@ function PricingFaq() {
 	const [openId, setOpenId] = useState<string | null>(null);
 
 	return (
-		<section className="w-[1120px] max-w-[95vw] py-16">
+		<section className="w-[1120px] max-w-[calc(100%_-_2rem)] py-10 md:py-16">
 			<div className="flex flex-col items-center text-center">
-				<h2 className="font-sora text-4xl font-bold text-dark">
+				<h2 className="font-sora text-2xl font-bold text-dark md:text-4xl">
 					Still got questions?
 				</h2>
 				<p className="mt-4 max-w-[760px] font-inter text-base text-dark/70 leading-relaxed">
@@ -78,7 +78,7 @@ function PricingFaq() {
 				</p>
 			</div>
 
-			<div className="mt-10 grid grid-cols-2 gap-8">
+			<div className="mt-8 grid grid-cols-1 gap-4 md:mt-10 lg:grid-cols-2 lg:gap-8">
 				{faqColumns.map((column, columnIndex) => (
 					<div key={columnIndex} className="flex flex-col gap-4">
 						{column.map((faq, rowIndex) => {
@@ -88,7 +88,7 @@ function PricingFaq() {
 							return (
 								<div
 									key={faq.question}
-									className="w-full rounded-md bg-dark px-6 py-4 text-left shadow-card"
+									className="w-full rounded-md bg-dark px-5 py-4 text-left shadow-card md:px-6"
 								>
 									<button
 										type="button"
@@ -102,7 +102,7 @@ function PricingFaq() {
 										aria-expanded={isOpen}
 										className="w-full flex items-center justify-between gap-4"
 									>
-										<span className="font-sora text-lg font-semibold text-white leading-snug">
+										<span className="font-sora text-base font-semibold text-white leading-snug md:text-lg">
 											{faq.question}
 										</span>
 										<img

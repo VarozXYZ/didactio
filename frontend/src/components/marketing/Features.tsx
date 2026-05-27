@@ -62,14 +62,14 @@ const features = [
 
 function BrandBubble({brand}: {brand: {logo: string; name?: string}}) {
 	return (
-		<div className="bg-white rounded-full px-4 py-3 mx-2 flex items-center gap-2 shadow-sm">
+		<div className="mx-1.5 flex items-center gap-1.5 rounded-full bg-white px-3 py-2 shadow-sm md:mx-2 md:gap-2 md:px-4 md:py-3">
 			<img
 				src={brand.logo}
 				alt=""
-				className="h-7 w-auto object-contain"
+				className="h-6 w-auto object-contain md:h-7"
 			/>
 			{brand.name && (
-				<span className="font-sora font-semibold text-xl text-dark">
+				<span className="font-sora text-base font-semibold text-dark md:text-xl">
 					{brand.name}
 				</span>
 			)}
@@ -79,14 +79,14 @@ function BrandBubble({brand}: {brand: {logo: string; name?: string}}) {
 
 function Features() {
 	return (
-		<section className="w-[1040px] py-16">
-			<h2 className="font-sora font-bold text-4xl text-dark mb-12">
+		<section className="w-[1040px] max-w-[calc(100%_-_2rem)] py-10 md:py-16">
+			<h2 className="mb-8 text-center font-sora text-2xl font-bold text-dark md:mb-12 md:text-left md:text-4xl">
 				Why students and educators chose us
 			</h2>
 
-			<div className="flex gap-6">
-				<div className="w-[340px] bg-dark rounded-md overflow-hidden flex items-center">
-					<div className="flex flex-col gap-5">
+			<div className="flex flex-col gap-6 lg:flex-row">
+				<div className="flex h-[320px] w-full items-center overflow-hidden rounded-md bg-dark sm:h-[340px] lg:h-auto lg:w-[340px]">
+					<div className="flex w-full min-w-0 flex-col gap-4 md:gap-5">
 						<Marquee direction="left" speed={30} autoFill>
 							{row1.map((brand, i) => (
 								<BrandBubble key={i} brand={brand} />
@@ -115,7 +115,7 @@ function Features() {
 					</div>
 				</div>
 
-				<div className="flex-1 grid grid-cols-2 gap-4">
+				<div className="grid flex-1 grid-cols-1 gap-4 sm:grid-cols-2">
 					{features.map((feature, index) => (
 						<div
 							key={index}

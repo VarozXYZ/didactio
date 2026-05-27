@@ -123,9 +123,9 @@ export function MobileDashboardView({
 						<button
 							type="button"
 							onClick={() => setActiveFolderId(null)}
-							className={`inline-flex h-12 items-center gap-2 rounded-[16px] border px-4 text-[15px] font-semibold transition ${
+							className={`app-mobile-folder-chip inline-flex h-12 items-center gap-2 rounded-[16px] border px-4 text-[15px] font-semibold transition ${
 								activeFolderId === null ?
-									"border-[#CFEFDB] bg-[#DDF8E8] text-[#111113]"
+									"app-mobile-folder-chip-active border-[#CFEFDB] bg-[#DDF8E8] text-[#111113]"
 								:	"border-[#E1E1E4] bg-white text-[#3A3A3C]"
 							}`}
 						>
@@ -153,7 +153,7 @@ export function MobileDashboardView({
 							onClick={() =>
 								setFolderModal({open: true, mode: "create"})
 							}
-							className="inline-flex h-12 items-center gap-2 rounded-[16px] border border-dashed border-[#D1D1D6] bg-white px-4 text-[15px] font-semibold text-[#6E6E73] transition hover:border-[#34C759] hover:text-[#1D1D1F]"
+							className="app-mobile-folder-chip inline-flex h-12 items-center gap-2 rounded-[16px] border border-dashed border-[#D1D1D6] bg-white px-4 text-[15px] font-semibold text-[#6E6E73] transition hover:border-[#34C759] hover:text-[#1D1D1F]"
 						>
 							<FolderPlus size={20} />
 							Create new folder
@@ -326,9 +326,9 @@ function MobileFolderChip({
 	return (
 		<DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
 			<div
-				className={`inline-flex h-12 items-center overflow-hidden rounded-[16px] border text-[15px] font-semibold transition ${
+				className={`app-mobile-folder-chip inline-flex h-12 items-center overflow-hidden rounded-[16px] border text-[15px] font-semibold transition ${
 					isActive ?
-						"border-[#CFEFDB] bg-[#DDF8E8] text-[#111113]"
+						"app-mobile-folder-chip-active border-[#CFEFDB] bg-[#DDF8E8] text-[#111113]"
 					:	"border-[#E1E1E4] bg-white text-[#3A3A3C]"
 				}`}
 			>
@@ -379,7 +379,7 @@ function MobileFolderChip({
 				<DropdownMenuTrigger asChild>
 					<button
 						type="button"
-						className="flex h-full w-9 shrink-0 items-center justify-center border-l border-black/[0.04] text-[#8E8E93]"
+						className="app-mobile-folder-chip-action flex h-full w-9 shrink-0 items-center justify-center border-l border-black/[0.04] text-[#8E8E93]"
 						aria-label={`${folder.name} actions`}
 						onClick={(event) => event.stopPropagation()}
 					>

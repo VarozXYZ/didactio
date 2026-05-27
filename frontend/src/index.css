@@ -311,6 +311,23 @@ html[data-app-theme="dark"][data-app-themed="true"] .app-library-search:focus {
 	border-color: #34c759 !important;
 }
 
+html[data-app-theme="dark"][data-app-themed="true"] .app-mobile-folder-chip {
+	background-color: transparent !important;
+	border-color: var(--app-border-subtle) !important;
+	color: var(--app-text-primary) !important;
+	box-shadow: none !important;
+}
+
+html[data-app-theme="dark"][data-app-themed="true"] .app-mobile-folder-chip-active {
+	background-color: rgba(52, 199, 89, 0.12) !important;
+	border-color: rgba(52, 199, 89, 0.45) !important;
+}
+
+html[data-app-theme="dark"][data-app-themed="true"] .app-mobile-folder-chip-action {
+	border-color: var(--app-border-subtle) !important;
+	color: var(--app-text-secondary) !important;
+}
+
 html[data-app-theme="dark"][data-app-themed="true"] .app-library-view-toggle {
 	background-color: transparent !important;
 	border-color: var(--app-border-subtle) !important;
