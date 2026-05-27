@@ -73,19 +73,20 @@ export function getFolderVisuals(folder: {color: string; icon: string}) {
 }
 
 const folderEmojiMap: Record<string, string> = {
-	atom: "⚛️",
-	binary: "💻",
-	"book-open": "📚",
-	calculator: "📐",
-	"flask-conical": "🧪",
-	folder: "📁",
-	globe: "🌍",
-	landmark: "🏛️",
-	microscope: "🔬",
-	"pen-line": "✍️",
-	"scroll-text": "📜",
+	atom: "\u269b\ufe0f",
+	binary: "\ud83d\udcbb",
+	"book-open": "\ud83d\udcda",
+	calculator: "\ud83d\udcd0",
+	"flask-conical": "\ud83e\uddea",
+	folder: "\ud83d\udcc1",
+	globe: "\ud83c\udf0d",
+	landmark: "\ud83c\udfdb\ufe0f",
+	microscope: "\ud83d\udd2c",
+	palette: "\ud83c\udfa8",
+	"pen-line": "\u270d\ufe0f",
+	"scroll-text": "\ud83d\udcdc",
 };
 
 export function getFolderEmoji(iconName: string): string {
-	return folderEmojiMap[iconName] ?? iconName ?? "📁";
+	return folderEmojiMap[iconName] ?? "\ud83d\udcc1";
 }
