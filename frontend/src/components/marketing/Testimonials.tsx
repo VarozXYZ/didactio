@@ -45,7 +45,7 @@ function StarRating({rating}: {rating: number}) {
 					key={index}
 					src={
 						index < stars ?
-							"/assets/icons/star.png"
+							"/assets/icons/Star.png"
 						:	"/assets/icons/star-empty.png"
 					}
 					alt=""
