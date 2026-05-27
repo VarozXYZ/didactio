@@ -199,6 +199,12 @@ html[data-app-theme="dark"][data-app-themed="true"] .app-dashboard-sidebar .app-
 	color: #34c759 !important;
 }
 
+html[data-app-theme="dark"][data-app-themed="true"] .app-dashboard-sidebar .app-sidebar-item-actions:hover,
+html[data-app-theme="dark"][data-app-themed="true"] .app-dashboard-sidebar .app-sidebar-item-actions[data-state="open"] {
+	background-color: var(--app-surface-active) !important;
+	color: var(--app-text-primary) !important;
+}
+
 .app-library-scroll {
 	scrollbar-color: rgba(142, 142, 147, 0.45) transparent;
 	scrollbar-width: thin;

@@ -110,7 +110,7 @@ export function ProfileView() {
 								onClick={() => {
 									void logout();
 								}}
-								className="inline-flex items-center justify-center gap-2 rounded-[8px] border border-[#E5E5E7] bg-white px-4 py-2.5 text-[14px] font-semibold text-[#1D1D1F] transition-all hover:border-[#D1D1D6] hover:bg-[#F5F5F7] sm:w-auto"
+								className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-[8px] border border-[#E5E5E7] bg-white px-4 py-2.5 text-[14px] font-semibold text-[#1D1D1F] transition-all hover:border-[#D1D1D6] hover:bg-[#F5F5F7] sm:w-auto"
 							>
 								<LogOut size={16} />
 								Sign out
