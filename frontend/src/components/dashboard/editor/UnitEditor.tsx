@@ -2708,9 +2708,12 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		[viewport.height, viewport.width],
 	);
 	const compactModuleTitle = viewport.width < 1600;
-	const moduleTitleSizePx = compactModuleTitle ?
+	const baseModuleTitleSizePx = compactModuleTitle ?
 		Math.min(27, Math.max(20, viewport.width * 0.02))
 	:	Math.min(36, Math.max(24, viewport.width * 0.035));
+	const moduleTitleSizePx =
+		baseModuleTitleSizePx +
+		(activeDraftSettings?.stylePreset === "classic" ? 2 : 0);
 	const pageMeasureKey = [
 		activeChapterLayoutSnapshot?.chapterIndex ?? "none",
 		activeTextStyleKey,
@@ -5577,7 +5580,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 					</DialogContent>
 				</Dialog>
 				<Dialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
-					<DialogContent className="max-h-[82vh] w-[calc(100vw-32px)] overflow-y-auto rounded-[18px] p-0">
+					<DialogContent className="app-history-dialog max-h-[82vh] w-[calc(100vw-32px)] overflow-y-auto rounded-[18px] p-0">
 						<DialogHeader className="border-b border-[#E5E5E7] px-5 pb-4 pt-5">
 							<DialogTitle>Version history</DialogTitle>
 							<DialogDescription>
@@ -5586,7 +5589,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 						</DialogHeader>
 						<div className="space-y-3 px-5 py-4">
 							{revisions.length === 0 ?
-								<div className="rounded-[14px] border border-[#E5E5E7] bg-[#F5F5F7] p-4 text-[13px] text-[#86868B]">
+								<div className="app-history-empty rounded-[14px] border border-[#E5E5E7] bg-[#F5F5F7] p-4 text-[13px] text-[#86868B]">
 									No revisions yet for this module.
 								</div>
 							:	revisions.map((revision) => {
@@ -5595,25 +5598,25 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 									return (
 										<div
 											key={revision.id}
-											className="rounded-[14px] border border-[#E5E5E7] p-4"
+											className="app-history-card rounded-[14px] border border-[#E5E5E7] p-4"
 										>
 											<div className="flex items-center justify-between gap-3">
-												<span className="text-[12px] font-semibold text-[#1D1D1F]">
+												<span className="app-history-title text-[12px] font-semibold text-[#1D1D1F]">
 													{sourceLabel(revision.source)}
 												</span>
-												<span className="text-[11px] text-[#86868B]">
+												<span className="app-history-muted text-[11px] text-[#86868B]">
 													{revision.createdAt}
 												</span>
 											</div>
-											<div className="mt-1 text-[13px] text-[#5A5A60]">
+											<div className="app-history-copy mt-1 text-[13px] text-[#5A5A60]">
 												{revision.title}
 											</div>
 											<button
 												className={cn(
-													"mt-3 rounded-full px-3 py-1.5 text-[12px] font-medium transition-all",
+													"app-history-action mt-3 rounded-full px-3 py-1.5 text-[12px] font-medium transition-all",
 													isCurrentRevision ?
-														"bg-[#F5F5F7] text-[#86868B]"
-													:	"bg-[#1D1D1F] text-white",
+														"app-history-action-current bg-[#F5F5F7] text-[#86868B]"
+													:	"app-history-action-restore bg-[#1D1D1F] text-white",
 												)}
 												disabled={
 													isCurrentRevision || isSubmitting
@@ -6711,23 +6714,33 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 
 				<AnimatePresence>
 					{isHistoryOpen && (
-						<Motion.div
-							animate={{opacity: 1, x: 0}}
-							className="absolute inset-y-0 right-0 z-30 w-[360px] border-l border-[#E5E5E7] bg-white/98 p-6 shadow-2xl backdrop-blur-md"
-							exit={{opacity: 0, x: 24}}
-							initial={{opacity: 0, x: 24}}
-						>
+						<>
+							<Motion.button
+								aria-label="Close version history"
+								animate={{opacity: 1}}
+								className="absolute inset-0 z-20 cursor-default bg-transparent"
+								exit={{opacity: 0}}
+								initial={{opacity: 0}}
+								onClick={() => setIsHistoryOpen(false)}
+								type="button"
+							/>
+							<Motion.div
+								animate={{opacity: 1, x: 0}}
+								className="app-history-drawer absolute inset-y-0 right-0 z-30 w-[360px] border-l border-[#E5E5E7] bg-white/98 p-6 shadow-2xl backdrop-blur-md"
+								exit={{opacity: 0, x: 24}}
+								initial={{opacity: 0, x: 24}}
+							>
 							<div className="mb-6 flex items-center justify-between">
 								<div>
-									<div className="text-[11px] font-medium uppercase tracking-wide text-[#86868B]">
+									<div className="app-history-muted text-[11px] font-medium uppercase tracking-wide text-[#86868B]">
 										Module history
 									</div>
-									<h3 className="mt-1 text-[20px] font-bold text-[#1D1D1F]">
+									<h3 className="app-history-title mt-1 text-[20px] font-bold text-[#1D1D1F]">
 										{activeChapter.title}
 									</h3>
 								</div>
 								<button
-									className="rounded-full p-2 text-[#86868B] transition-all hover:bg-[#F5F5F7]"
+									className="app-history-close rounded-full p-2 text-[#86868B] transition-all hover:bg-[#F5F5F7]"
 									onClick={() => setIsHistoryOpen(false)}
 									type="button"
 								>
@@ -6737,7 +6750,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 
 							<div className="space-y-3">
 								{revisions.length === 0 && (
-									<div className="rounded-2xl border border-[#E5E5E7] bg-[#F5F5F7] p-4 text-[13px] text-[#86868B]">
+									<div className="app-history-empty rounded-2xl border border-[#E5E5E7] bg-[#F5F5F7] p-4 text-[13px] text-[#86868B]">
 										No revisions yet for this module.
 									</div>
 								)}
@@ -6748,33 +6761,33 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 									return (
 										<div
 											key={revision.id}
-											className="rounded-2xl border border-[#E5E5E7] p-4"
+											className="app-history-card rounded-2xl border border-[#E5E5E7] p-4"
 										>
 											<div className="flex items-center justify-between gap-3">
-												<span className="text-[12px] font-semibold text-[#1D1D1F]">
+												<span className="app-history-title text-[12px] font-semibold text-[#1D1D1F]">
 													{sourceLabel(
 														revision.source,
 													)}
 												</span>
-												<span className="text-[11px] text-[#86868B]">
+												<span className="app-history-muted text-[11px] text-[#86868B]">
 													{revision.createdAt}
 												</span>
 											</div>
-											<div className="mt-1 text-[13px] text-[#5A5A60]">
+											<div className="app-history-copy mt-1 text-[13px] text-[#5A5A60]">
 												{revision.title}
 											</div>
 											<div className="mt-4 flex items-center justify-between gap-3">
-												<div className="text-[11px] text-[#86868B]">
+												<div className="app-history-muted text-[11px] text-[#86868B]">
 													{isCurrentRevision ?
 														"Current version"
 													:	"Restore this snapshot"}
 												</div>
 												<button
 													className={cn(
-														"rounded-full px-3 py-1.5 text-[12px] font-medium transition-all",
+														"app-history-action rounded-full px-3 py-1.5 text-[12px] font-medium transition-all",
 														isCurrentRevision ?
-															"bg-[#F5F5F7] text-[#86868B]"
-														:	"bg-[#1D1D1F] text-white hover:bg-[#333333]",
+															"app-history-action-current bg-[#F5F5F7] text-[#86868B]"
+														:	"app-history-action-restore bg-[#1D1D1F] text-white hover:bg-[#333333]",
 													)}
 													disabled={
 														isCurrentRevision ||
@@ -6793,7 +6806,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 												</button>
 											</div>
 											{!isCurrentRevision && (
-												<div className="mt-2 text-[11px] text-[#86868B]">
+												<div className="app-history-muted mt-2 text-[11px] text-[#86868B]">
 													You can switch back to this
 													version at any time.
 												</div>
@@ -6804,8 +6817,8 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 							</div>
 
 							{activeRuns.length > 0 && (
-								<div className="mt-8 border-t border-[#E5E5E7] pt-6">
-									<div className="mb-3 flex items-center gap-2 text-[12px] font-medium uppercase tracking-wide text-[#86868B]">
+								<div className="app-history-runs mt-8 border-t border-[#E5E5E7] pt-6">
+									<div className="app-history-muted mb-3 flex items-center gap-2 text-[12px] font-medium uppercase tracking-wide text-[#86868B]">
 										<WandSparkles size={14} />
 										Recent runs
 									</div>
@@ -6813,16 +6826,16 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 										{activeRuns.map((run) => (
 											<div
 												key={run.id}
-												className="rounded-2xl border border-[#E5E5E7] p-4"
+												className="app-history-card rounded-2xl border border-[#E5E5E7] p-4"
 											>
-												<div className="text-[12px] font-semibold text-[#1D1D1F]">
+												<div className="app-history-title text-[12px] font-semibold text-[#1D1D1F]">
 													{formatRunLabel(run)}
 												</div>
-												<div className="mt-1 text-[11px] text-[#86868B]">
+												<div className="app-history-muted mt-1 text-[11px] text-[#86868B]">
 													{run.provider.toUpperCase()}{" "}
 													· {run.model}
 												</div>
-												<div className="mt-1 text-[11px] text-[#86868B]">
+												<div className="app-history-muted mt-1 text-[11px] text-[#86868B]">
 													{formatRelativeTimestamp(
 														run.createdAt,
 													)}
@@ -6837,7 +6850,8 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 									</div>
 								</div>
 							)}
-						</Motion.div>
+							</Motion.div>
+						</>
 					)}
 				</AnimatePresence>
 				<AnimatePresence>

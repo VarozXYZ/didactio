@@ -80,6 +80,7 @@ const folderEmojiMap: Record<string, string> = {
 	"flask-conical": "🧪",
 	folder: "📁",
 	globe: "🌍",
+	landmark: "🏛️",
 	microscope: "🔬",
 	"pen-line": "✍️",
 	"scroll-text": "📜",

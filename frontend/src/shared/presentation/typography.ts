@@ -102,9 +102,9 @@ export type StylePresetId = "modern" | "classic" | "plain";
 export type SizeProfile = "small" | "regular" | "large";
 
 export const CLASSIC_BODY_SIZES: Record<SizeProfile, {mobile: number; desktop: number}> = {
-	small:   {mobile: 14, desktop: 15},
-	regular: {mobile: 15, desktop: 17},
-	large:   {mobile: 17, desktop: 19},
+	small:   {mobile: 15, desktop: 16},
+	regular: {mobile: 16, desktop: 17},
+	large:   {mobile: 18, desktop: 19},
 };
 
 const SIZE_PROFILES: Record<
@@ -139,6 +139,7 @@ const SIZE_PROFILES: Record<
 const LINE_HEIGHT_BODY = 1.9;
 const PLAIN_LINE_HEIGHT_BODY = 2;
 const CLASSIC_LINE_HEIGHT_BODY = 1.9;
+const CLASSIC_HEADING_SIZE_ADJUST_PX = 2;
 const LINE_HEIGHT_HEADING = 1.25;
 const MARGIN_BOTTOM_BODY_EM = 0.8;
 const MARGIN_TOP_H1_EM = 1.2;
@@ -234,9 +235,11 @@ export function resolveTypography(settings: {
 				CLASSIC_BODY_SIZES[sizeProfile].mobile
 			:	CLASSIC_BODY_SIZES[sizeProfile].desktop)
 		:	rawBodySz;
-	const h1Sz = isMobile ? profile.h1.mobile : profile.h1.desktop;
-	const h2Sz = isMobile ? profile.h2.mobile : profile.h2.desktop;
-	const h3Sz = isMobile ? profile.h3.mobile : profile.h3.desktop;
+	const headingSizeAdjust =
+		stylePreset === "classic" ? CLASSIC_HEADING_SIZE_ADJUST_PX : 0;
+	const h1Sz = (isMobile ? profile.h1.mobile : profile.h1.desktop) + headingSizeAdjust;
+	const h2Sz = (isMobile ? profile.h2.mobile : profile.h2.desktop) + headingSizeAdjust;
+	const h3Sz = (isMobile ? profile.h3.mobile : profile.h3.desktop) + headingSizeAdjust;
 
 	const bodyFamily = FONT_CATALOG[bodyFontId].family;
 	const headingFamily = FONT_CATALOG[headingFontId].family;

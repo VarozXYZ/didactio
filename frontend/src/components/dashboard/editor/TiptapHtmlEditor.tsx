@@ -114,6 +114,7 @@ export function TiptapHtmlEditor({
 			headingFontId: preset.heading as FontId,
 			isMobile: false,
 			sizeProfile: baseTextStyle?.sizeProfile ?? "regular",
+			stylePreset: baseTextStyle?.stylePreset ?? "classic",
 		}),
 	);
 

@@ -65,6 +65,10 @@ function headingScale(scale: PresentationTheme["headingScale"]): string {
 	}
 }
 
+function headingSizeAdjust(stylePreset?: string): string {
+	return stylePreset === "classic" ? "2px" : "0px";
+}
+
 function paragraphMargin(
 	spacing: PresentationTheme["paragraphSpacing"],
 ): string {
@@ -221,6 +225,7 @@ export function themeVars(theme: PresentationTheme, darkDisplay = false): CSSPro
 		"--unit-page-bg": displayTheme.pageBackground,
 		"--unit-paragraph-align": displayTheme.paragraphAlign,
 		"--unit-heading-scale": headingScale(displayTheme.headingScale),
+		"--unit-heading-size-adjust": headingSizeAdjust(displayTheme.stylePreset),
 		"--unit-paragraph-margin": paragraphMargin(displayTheme.paragraphSpacing),
 		"--unit-number-color": displayTheme.numberColor ?? "#D4B896",
 		"--unit-code-accent": displayTheme.codeAccentColor ?? "#7A4E28",

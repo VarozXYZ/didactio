@@ -120,6 +120,7 @@ describe("presentation and selection utilities", () => {
 		expect(getFolderVisuals({color: "#102030", icon: "atom"}).bgColor).toBe("rgba(16, 32, 48, 0.16)");
 		expect(getFolderVisuals({color: "var(--x)", icon: "unknown"}).bgColor).toBe("var(--x)");
 		expect(getFolderIcon("missing")).toBeDefined();
+		expect(getFolderEmoji("landmark")).toBe("🏛️");
 		expect(getFolderEmoji("unknown")).toBe("unknown");
 	});
 
@@ -133,15 +134,22 @@ describe("presentation and selection utilities", () => {
 			isMobile: false,
 			stylePreset: "classic",
 		});
-		expect(classic.body.sizePx).toBe(19);
-		expect(defaultTypography(true).body.sizePx).toBe(15);
-		expect(makeTypographyVars(classic)["--typo-body-size"]).toBe("19px");
+		expect(classic.body.sizePx).toBe(20);
+		expect(classic.h1.sizePx).toBe(29);
+		expect(classic.h2.sizePx).toBe(25);
+		expect(classic.h3.sizePx).toBe(22);
+		expect(defaultTypography(true).body.sizePx).toBe(16);
+		expect(makeTypographyVars(classic)["--typo-body-size"]).toBe("20px");
+		expect(makeTypographyVars(classic)["--typo-h2-size"]).toBe("25px");
 		const element = document.createElement("div");
 		applyTypographyVars(element, classic);
-		expect(element.style.fontSize).toBe("19px");
+		expect(element.style.fontSize).toBe("20px");
 
 		expect(resolvePresentationTheme(null, null)).toEqual(SYSTEM_DEFAULT_THEME);
+		expect(themeVars(SYSTEM_DEFAULT_THEME, false)["--unit-body-size"]).toBe("18px");
+		expect(themeVars(SYSTEM_DEFAULT_THEME, false)["--unit-heading-size-adjust"]).toBe("2px");
 		expect(themeVars({...SYSTEM_DEFAULT_THEME, stylePreset: "modern"}, true)["--unit-page-bg"]).toBe("#17201F");
+		expect(themeVars({...SYSTEM_DEFAULT_THEME, stylePreset: "modern"}, true)["--unit-heading-size-adjust"]).toBe("0px");
 		expect(themeVars({...SYSTEM_DEFAULT_THEME, stylePreset: "plain"}, false)["--unit-table-bg"]).toBe("#FAFBFC");
 	});
 

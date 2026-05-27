@@ -1192,13 +1192,13 @@ export function measurePages({
 	const pageNumberReserve = compactModuleTitle ? 16 : 0;
 	const firstPageNumberReserve = compactModuleTitle ? 6 : pageNumberReserve;
 	const primaryActionLabel = hasNextModule ? "Next module" : "Finish unit 🎉";
+	const stylePresetId = textStyle?.stylePreset ?? "classic";
 	const measuredModuleTitleSizePx =
 		moduleTitleSizePx ??
 		(compactModuleTitle ?
 			Math.min(27, Math.max(20, 24))
-		:	Math.min(36, Math.max(24, 32)));
-
-	const stylePresetId = textStyle?.stylePreset ?? "classic";
+		:	Math.min(36, Math.max(24, 32))) +
+			(stylePresetId === "classic" ? 2 : 0);
 	const typography =
 		textStyle ?
 			(() => {
