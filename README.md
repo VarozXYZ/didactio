@@ -2,13 +2,13 @@
 
 # Didactio
 
-### An AI-assisted workspace for learning anything
+### An AI-assisted workspace for learning
 
-Didactio turns an idea, syllabus, or teaching plan into editable, navigable, classroom-ready didactic units. On the backend, it combines AI generation with research-oriented prompt chaining to create educationaly sound learning content. On the frontend, it serves a user friendly content creation process and a book-like view to enhance the user experience of reading on computer.
+Didactio turns an idea into a structured teaching plan. On the backend, it combines AI generation with research-oriented prompt chaining to create educationally sound learning content. On the frontend, it provides a user-friendly content creation process and a book-like reading experience designed for working on a computer.
 
 <br />
 
-<img src="frontend/assets/screenshots/editor-dark.png" alt="Didactio dashboard in light mode" width="96%" />
+<img src="frontend/assets/screenshots/editor-dark.png" alt="Didactio editor in dark mode" width="96%" />
 
 <br />
 
@@ -18,9 +18,9 @@ Didactio turns an idea, syllabus, or teaching plan into editable, navigable, cla
 
 ## The Idea
 
-The emanated from the frustration of working with trational chatbots to learn about any desired topic. If you have tried this before, you might have discovered that tradional chatbots stay in the surface, and barely go deep into subjects, making learning and practicing very hard unless you already have access to learning material.
+The idea comes from the frustration of working with traditional chatbots to learn about a new topic. If you have tried this before, you may have found that traditional chatbots often stay on the surface and rarely go deep into a subject, making learning and practice difficult unless you already have access to structured learning material.
 
-Didactio was built to leverage the power of generative IA along with guardrail based on education theory to produce didactic units that make sense. This evolved into an entire learning suite, with a user-friendly UI that sets the entire learning process inside of the Didactio platform. 
+Didactio was built to combine generative AI with guardrails based on educational theory, producing didactic units that are coherent, structured, and useful. Over time, it evolved into a broader learning suite with a user-friendly UI that keeps the learning process inside the Didactio platform.
 
 ---
 
@@ -35,9 +35,9 @@ The dashboard brings together units, folders, progress, creation actions, and fa
   <img src="frontend/assets/screenshots/dashboard-dark.png" alt="Didactio dashboard in dark mode" width="48%" />
 </div>
 
-### Unit Viewer
+### Unit Viewer and Editor
 
-The editor is the main workspace: reading, chapter navigation, rich editing, formatting tools, export views, and continuation of generated content.
+The viewer/editor is the main workspace: reading, chapter navigation, rich editing, formatting tools, export views, and continuation of generated content.
 
 <div align="center">
   <img src="frontend/assets/screenshots/editor-light.png" alt="Didactio editor in light mode" width="48%" />
@@ -125,7 +125,7 @@ This is where Didactio behaves less like a chat wrapper and more like an authori
 
 ## Exporting Content and Exercises
 
-Users can export the didactic unit content after editing it, but they can also export the generated learning activities attached to the unit. That matters because the material is not locked inside the app: chapters, explanations, and exercises can move into the formats teachers actually use for delivery, review, or classroom preparation.
+Users can export didactic unit content after editing it, and they can also export the generated learning activities attached to the unit. That matters because the material is not locked inside the app: chapters, explanations, and exercises can move into the formats teachers actually use for delivery, review, or classroom preparation.
 
 
 <div align="center">
