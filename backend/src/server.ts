@@ -7,10 +7,10 @@ import {MongoBillingEventStore} from "./billing/billing-event-store.js";
 import {createApp} from "./app.js";
 import {MongoAiConfigStore} from "./ai/config.js";
 import {MongoDidacticUnitStore} from "./didactic-unit/mongo-didactic-unit-store.js";
-import {MongoDidacticUnitNoteStore} from "./didactic-unit-notes/mongo-didactic-unit-note-store.js";
+import {MongoDidacticUnitNoteStore} from "./didactic-unit/notes/mongo-note-store.js";
 import {MongoFolderStore} from "./folders/mongo-folder-store.js";
 import {MongoGenerationRunStore} from "./generation-runs/mongo-generation-run-store.js";
-import {MongoLearningActivityStore} from "./activities/mongo-learning-activity-store.js";
+import {MongoLearningActivityStore} from "./learning-activities/mongo-learning-activity-store.js";
 import {createLogger} from "./logging/logger.js";
 import {connectMongo, getMongoHealthStatus} from "./mongo/mongo-connection.js";
 

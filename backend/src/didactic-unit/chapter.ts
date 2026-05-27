@@ -4,7 +4,7 @@ import {sanitizeChapterHtml} from "../html/sanitize.js";
 import {
 	HTML_BLOCKS_VERSION,
 	extractHtmlBlocks,
-} from "../html/extractBlocks.js";
+} from "../html/extract-blocks.js";
 
 export interface HtmlContentBlock {
 	id: string;

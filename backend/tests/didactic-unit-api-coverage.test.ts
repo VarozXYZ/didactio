@@ -1,6 +1,10 @@
 import request from "supertest";
 import {describe, expect, it} from "vitest";
 import type {AiService} from "../src/ai/service.js";
+import {
+	createQueuedChapterGenerationRunRecord,
+	InMemoryGenerationRunStore,
+} from "../src/generation-runs/generation-run-store.js";
 import {createTestApp} from "./helpers/create-test-app.js";
 import {
 	createApprovedDidacticUnit,
@@ -197,6 +201,31 @@ describe("didactic-unit API coverage", () => {
 		expect(partialIndex).toBeGreaterThan(-1);
 		expect(completeIndex).toBeGreaterThan(-1);
 		expect(partialIndex).toBeLessThan(completeIndex);
+	});
+
+	it("cancels a pending generation run and streams its failed terminal state", async () => {
+		const generationRunStore = new InMemoryGenerationRunStore();
+		const run = createQueuedChapterGenerationRunRecord({
+			didacticUnitId: "unit-to-cancel",
+			ownerId: "mock-user",
+			chapterIndex: 0,
+			provider: "test-provider",
+			model: "test-model",
+		});
+		await generationRunStore.save(run);
+		const app = createTestApp({generationRunStore});
+
+		const cancelResponse = await request(app).post(
+			`/api/generation-runs/${run.id}/cancel`,
+		);
+		expect(cancelResponse.status).toBe(200);
+
+		const streamResponse = await request(app).get(
+			`/api/generation-runs/${run.id}/stream`,
+		);
+		expect(streamResponse.status).toBe(200);
+		expect(streamResponse.text).toContain('"type":"error"');
+		expect(streamResponse.text).toContain("Cancelled by user.");
 	});
 
 	it("updates module reading progress monotonically and returns weighted study progress", async () => {

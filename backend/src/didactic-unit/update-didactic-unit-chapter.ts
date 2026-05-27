@@ -1,13 +1,13 @@
-import type {DidacticUnit} from "./create-didactic-unit.js";
+import type {DidacticUnit} from "./didactic-unit.js";
 import type {
 	DidacticUnitGeneratedChapter,
 	UpdateDidacticUnitChapterInput,
-} from "./didactic-unit-chapter.js";
+} from "./chapter.js";
 import {
 	createCanonicalDidacticUnitChapter,
 	createDidacticUnitChapterRevision,
-} from "./didactic-unit-chapter.js";
-import {resetDidacticUnitModuleReadProgress} from "./module-reading-progress.js";
+} from "./chapter.js";
+import {resetDidacticUnitModuleReadProgress} from "./reading-progress.js";
 
 export function updateDidacticUnitChapter(
 	didacticUnit: DidacticUnit,

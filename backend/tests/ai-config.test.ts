@@ -48,4 +48,13 @@ describe("AI config API", () => {
 			tone: "professional",
 		});
 	});
+
+	it("rejects invalid configuration updates", async () => {
+		const response = await request(createTestApp())
+			.patch("/api/ai-config")
+			.send({silver: {provider: ""}});
+
+		expect(response.status).toBe(400);
+		expect(response.body.error).toContain("silver.provider");
+	});
 });

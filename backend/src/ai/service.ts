@@ -1,7 +1,7 @@
 import {createGateway, generateObject, generateText, streamObject, streamText} from "ai";
 import {z} from "zod";
 import {getAppEnv} from "../config/env.js";
-import type {DidacticUnitGeneratedChapter} from "../didactic-unit/didactic-unit-chapter.js";
+import type {DidacticUnitGeneratedChapter} from "../didactic-unit/chapter.js";
 import {createLogger, type Logger} from "../logging/logger.js";
 import type {
 	DidacticUnitDepth,
@@ -37,13 +37,13 @@ import {
 	summarizeAiCallTelemetry,
 	type AiCallTelemetry,
 } from "./telemetry.js";
-import {createCanonicalDidacticUnitChapter} from "../didactic-unit/didactic-unit-chapter.js";
-import {extractContinuitySummary} from "../html/extractContinuity.js";
+import {createCanonicalDidacticUnitChapter} from "../didactic-unit/chapter.js";
+import {extractContinuitySummary} from "../html/extract-continuity.js";
 import {sanitizeSimpleFeedbackHtml} from "../html/sanitize.js";
 import type {
 	LearningActivityScope,
 	LearningActivityType,
-} from "../activities/learning-activity.js";
+} from "../learning-activities/learning-activity.js";
 
 export class AiGatewayConfigurationError extends Error {}
 

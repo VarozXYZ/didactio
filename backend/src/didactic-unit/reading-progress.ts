@@ -1,5 +1,5 @@
-import type {DidacticUnit} from "./create-didactic-unit.js";
-import type {DidacticUnitGeneratedChapter} from "./didactic-unit-chapter.js";
+import type {DidacticUnit} from "./didactic-unit.js";
+import type {DidacticUnitGeneratedChapter} from "./chapter.js";
 
 export interface DidacticUnitModuleReadProgress {
 	moduleIndex: number;

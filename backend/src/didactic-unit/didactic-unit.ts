@@ -16,13 +16,13 @@ import type {
 	DidacticUnitSyllabus,
 	DidacticUnitSyllabusChapter,
 } from "./planning.js";
-import type {GenerationQuality} from "../credits/generation-pricing.js";
+import type {GenerationQuality} from "../credits/generation-costs.js";
 import type {
 	DidacticUnitChapterCompletion,
 	DidacticUnitChapterRevision,
 	DidacticUnitGeneratedChapter,
-} from "./didactic-unit-chapter.js";
-import type {DidacticUnitModuleReadProgress} from "./module-reading-progress.js";
+} from "./chapter.js";
+import type {DidacticUnitModuleReadProgress} from "./reading-progress.js";
 import type {PresentationTheme} from "../presentation-theme/types.js";
 
 export type DidacticUnitStatus =

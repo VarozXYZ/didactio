@@ -9,8 +9,8 @@ import {
 	adaptDidacticUnitSyllabusToReferenceSyllabus,
 	adaptReferenceSyllabusToDidacticUnitSyllabus,
 } from "./planning.js";
-import type {DidacticUnit} from "./create-didactic-unit.js";
-import type {GenerationQuality} from "../credits/generation-pricing.js";
+import type {DidacticUnit} from "./didactic-unit.js";
+import type {GenerationQuality} from "../credits/generation-costs.js";
 import type {AuthoringConfig} from "../ai/config.js";
 import {resolveTargetChapterCount} from "../ai/prompt-builders.js";
 

@@ -1,4 +1,4 @@
-import type {DidacticUnit} from "./create-didactic-unit.js";
+import type {DidacticUnit} from "./didactic-unit.js";
 
 export interface DidacticUnitStore {
 	save(didacticUnit: DidacticUnit): Promise<void>;

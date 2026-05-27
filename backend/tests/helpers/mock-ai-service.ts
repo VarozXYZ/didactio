@@ -13,7 +13,7 @@ import type {
 } from "../../src/ai/service.js";
 import type {AiCallTelemetry} from "../../src/ai/telemetry.js";
 import type {DidacticUnitQuestionAnswer} from "../../src/didactic-unit/planning.js";
-import {createCanonicalDidacticUnitChapter} from "../../src/didactic-unit/didactic-unit-chapter.js";
+import {createCanonicalDidacticUnitChapter} from "../../src/didactic-unit/chapter.js";
 import {resolveTargetChapterCount} from "../../src/ai/prompt-builders.js";
 
 function referenceSyllabusForLength(

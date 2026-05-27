@@ -1,6 +1,6 @@
 import {createHash} from "node:crypto";
 import * as parse5 from "parse5";
-import type {HtmlContentBlock} from "../didactic-unit/didactic-unit-chapter.js";
+import type {HtmlContentBlock} from "../didactic-unit/chapter.js";
 
 export const HTML_BLOCKS_VERSION = 1;
 

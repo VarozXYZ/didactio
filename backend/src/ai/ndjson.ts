@@ -1,5 +1,5 @@
 import type express from "express";
-import type {HtmlContentBlock} from "../didactic-unit/didactic-unit-chapter.js";
+import type {HtmlContentBlock} from "../didactic-unit/chapter.js";
 
 export type NdjsonEvent =
 	| {type: "start"; stage: string; provider: string; model: string}

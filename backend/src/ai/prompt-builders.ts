@@ -14,7 +14,7 @@ import type {
 import type {
 	LearningActivityScope,
 	LearningActivityType,
-} from "../activities/learning-activity.js";
+} from "../learning-activities/learning-activity.js";
 
 export const TARGET_CHAPTER_COUNT_BY_LENGTH: Record<
 	DidacticUnitLength,

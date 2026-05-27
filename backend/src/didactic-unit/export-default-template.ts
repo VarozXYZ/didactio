@@ -1,7 +1,7 @@
 import path from "node:path";
 import {mkdir, writeFile} from "node:fs/promises";
 import type {Db} from "mongodb";
-import type {DidacticUnit} from "./create-didactic-unit.js";
+import type {DidacticUnit} from "./didactic-unit.js";
 import type {GenerationRun} from "../generation-runs/generation-run-store.js";
 
 export type DefaultDidacticUnitTemplate = Omit<

@@ -1,7 +1,7 @@
 import {describe, expect, it, vi} from "vitest";
 import {resetUserOnboarding} from "../src/auth/reset-onboarding.js";
-import type {DidacticUnit} from "../src/didactic-unit/create-didactic-unit.js";
-import {createDefaultDidacticUnitTemplate} from "../src/didactic-unit/export-default-didactic-unit-template.js";
+import type {DidacticUnit} from "../src/didactic-unit/didactic-unit.js";
+import {createDefaultDidacticUnitTemplate} from "../src/didactic-unit/export-default-template.js";
 import type {GenerationRun} from "../src/generation-runs/generation-run-store.js";
 
 function createSourceUnit(): DidacticUnit {

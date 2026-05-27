@@ -1,6 +1,6 @@
 import request from "supertest";
 import {describe, expect, it} from "vitest";
-import type {DidacticUnit} from "../src/didactic-unit/create-didactic-unit.js";
+import type {DidacticUnit} from "../src/didactic-unit/didactic-unit.js";
 import {
 	InMemoryDidacticUnitStore,
 } from "../src/didactic-unit/didactic-unit-store.js";

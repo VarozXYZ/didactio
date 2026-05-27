@@ -1,5 +1,5 @@
 import type {Db, Document} from "mongodb";
-import type {DidacticUnit} from "./create-didactic-unit.js";
+import type {DidacticUnit} from "./didactic-unit.js";
 import type {DidacticUnitStore} from "./didactic-unit-store.js";
 
 type DidacticUnitDocument = DidacticUnit & Document;

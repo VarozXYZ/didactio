@@ -1,4 +1,4 @@
-import type {DidacticUnit} from "./create-didactic-unit.js";
+import type {DidacticUnit} from "./didactic-unit.js";
 import type {DidacticUnitFolderSelectionInput} from "./planning.js";
 
 export function updateDidacticUnitFolder(

@@ -2,7 +2,7 @@ import {randomUUID} from "node:crypto";
 import type {
 	DidacticUnitGeneratedChapter,
 	HtmlContentBlock,
-} from "../didactic-unit/didactic-unit-chapter.js";
+} from "../didactic-unit/chapter.js";
 import type {DidacticUnitSyllabus} from "../didactic-unit/planning.js";
 import type {AiCallTelemetry} from "../ai/telemetry.js";
 

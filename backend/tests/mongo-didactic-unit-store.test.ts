@@ -1,6 +1,6 @@
 import {describe, expect, it, vi} from "vitest";
 import {MongoDidacticUnitStore} from "../src/didactic-unit/mongo-didactic-unit-store.js";
-import type {DidacticUnit} from "../src/didactic-unit/create-didactic-unit.js";
+import type {DidacticUnit} from "../src/didactic-unit/didactic-unit.js";
 
 function createStoredDidacticUnit(): DidacticUnit {
 	return {

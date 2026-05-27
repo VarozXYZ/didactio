@@ -1,8 +1,8 @@
-import type {DidacticUnit} from "./create-didactic-unit.js";
+import type {DidacticUnit} from "./didactic-unit.js";
 import {
 	completeDidacticUnitModuleReadProgress,
 	getModuleTotalBlockCount,
-} from "./module-reading-progress.js";
+} from "./reading-progress.js";
 
 export function completeDidacticUnitChapter(
 	didacticUnit: DidacticUnit,

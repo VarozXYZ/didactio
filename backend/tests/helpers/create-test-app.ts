@@ -17,7 +17,7 @@ import {
 import {
 	InMemoryDidacticUnitNoteStore,
 	type DidacticUnitNoteStore,
-} from "../../src/didactic-unit-notes/didactic-unit-note-store.js";
+} from "../../src/didactic-unit/notes/note-store.js";
 import {
 	InMemoryGenerationRunStore,
 	type GenerationRunStore,
@@ -25,7 +25,7 @@ import {
 import {
 	InMemoryLearningActivityStore,
 	type LearningActivityStore,
-} from "../../src/activities/learning-activity-store.js";
+} from "../../src/learning-activities/learning-activity-store.js";
 import {createApp, type CreateAppOptions} from "../../src/app.js";
 import {
 	InMemoryAiConfigStore,

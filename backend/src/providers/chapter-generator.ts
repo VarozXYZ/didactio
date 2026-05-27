@@ -1,4 +1,4 @@
-import type {DidacticUnitGeneratedChapter} from "../didactic-unit/didactic-unit-chapter.js";
+import type {DidacticUnitGeneratedChapter} from "../didactic-unit/chapter.js";
 import type {
 	DidacticUnitLevel,
 	DidacticUnitQuestionAnswer,
