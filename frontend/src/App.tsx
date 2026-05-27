@@ -8,6 +8,8 @@ import {useAppearance} from "@/theme/useAppearance";
 const HomePage = lazy(() => import("./pages/HomePage"));
 const PricingPage = lazy(() => import("./pages/PricingPage"));
 const ContactPage = lazy(() => import("./pages/ContactPage"));
+const PrivacyPolicyPage = lazy(() => import("./pages/PrivacyPolicyPage"));
+const TermsOfServicePage = lazy(() => import("./pages/TermsOfServicePage"));
 const LoginPage = lazy(() => import("./pages/LoginPage"));
 const RegisterPage = lazy(() => import("./pages/RegisterPage"));
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
@@ -68,6 +70,8 @@ function App() {
 						<Route path="/" element={<HomePage />} />
 						<Route path="/pricing" element={<PricingPage />} />
 						<Route path="/contact" element={<ContactPage />} />
+						<Route path="/privacy" element={<PrivacyPolicyPage />} />
+						<Route path="/terms" element={<TermsOfServicePage />} />
 						<Route path="/login" element={<LoginPage />} />
 						<Route path="/register" element={<RegisterPage />} />
 						<Route path="/auth/callback" element={<AuthCallbackPage />} />

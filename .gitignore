@@ -13,3 +13,5 @@ reference
 output
 .claude
 .auth/
+.env
+.env.production

@@ -166,6 +166,22 @@ function Footer() {
 									Contact Us
 								</Link>
 							</li>
+							<li>
+								<Link
+									to="/privacy"
+									className="font-inter text-md text-dark/70 hover:text-dark transition-colors"
+								>
+									Privacy Policy
+								</Link>
+							</li>
+							<li>
+								<Link
+									to="/terms"
+									className="font-inter text-md text-dark/70 hover:text-dark transition-colors"
+								>
+									Terms of Service
+								</Link>
+							</li>
 						</ul>
 					</div>
 				</div>
