@@ -8,6 +8,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "test": "vitest run --exclude tests/**/*.live.test.ts",
+    "test:coverage": "vitest run --exclude tests/**/*.live.test.ts --coverage",
     "test:live": "vitest run tests/didactic-unit.live.test.ts",
     "reset:onboarding": "tsx src/commands/reset-onboarding.ts",
     "export:default-unit": "tsx src/commands/export-default-didactic-unit-template.ts"
@@ -38,6 +39,7 @@
     "@types/node": "^24.5.2",
     "@types/sanitize-html": "^2.16.0",
     "@types/supertest": "^6.0.3",
+    "@vitest/coverage-v8": "^3.2.4",
     "supertest": "^7.1.4",
     "tsx": "^4.20.5",
     "typescript": "^5.9.3",

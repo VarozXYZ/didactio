@@ -1,9 +1,19 @@
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react-swc'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'path'
 
 export default defineConfig({
+  test: {
+    environment: 'jsdom',
+    maxWorkers: 4,
+    coverage: {
+      provider: 'v8',
+      all: true,
+      include: ['src/**/*.{ts,tsx}'],
+      reporter: ['text', 'json-summary'],
+    },
+  },
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
