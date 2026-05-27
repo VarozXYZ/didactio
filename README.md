@@ -246,14 +246,79 @@ didactio/
 
 ## Technical Stack
 
-| Layer | Technologies |
-| --- | --- |
-| Frontend | React 19, Vite 7, TypeScript, Tailwind CSS 4, Radix UI, lucide-react, Motion |
-| Editor | Tiptap 3, ProseMirror, lowlight, Shiki, unified/remark/rehype |
-| Backend | Node.js, Express 5, TypeScript, MongoDB, Passport, JWT, Zod |
-| AI | AI SDK, configurable providers, NDJSON streaming, generation telemetry |
-| Payments | Stripe |
-| Quality | Vitest, Testing Library, ESLint, V8 coverage |
+Didactio is structured as a TypeScript npm workspace with two private packages: `frontend` and `backend`. The root workspace owns cross-project commands for development, build, tests, coverage, and linting, while each package keeps its own runtime dependencies and build configuration.
+
+### Frontend Runtime
+
+| Area | Stack | How it is used |
+| --- | --- | --- |
+| Application shell | React 19, React DOM, React Router 7 | Page routing, authenticated dashboard views, marketing pages, onboarding, pricing, and account flows. |
+| Build system | Vite 7, `@vitejs/plugin-react-swc`, TypeScript 5.9 | Fast local development, SWC-powered React compilation, type checking through `tsc -b`, and production bundling. |
+| Styling | Tailwind CSS 4, `@tailwindcss/vite`, `tailwind-merge`, `clsx`, `class-variance-authority` | Utility-first styling, variant-driven component classes, theme-aware composition, and conflict-free class merging. |
+| UI primitives | Radix UI Dialog, Dropdown Menu, Popover, Hover Card, Alert Dialog, Progress, Toast | Accessible primitives for menus, modals, feedback, overlays, and dashboard interactions. |
+| Interaction | Motion, lucide-react, cmdk, React Wheel Picker | Animated transitions, iconography, command-style interactions, and compact selection controls. |
+| Data visualization | Recharts | Dashboard and analytics charts. |
+
+Vite also proxies API and auth routes to the backend during development, so the frontend can call `/api`, `/auth/me`, `/auth/google`, `/auth/refresh`, and related endpoints without hardcoding backend URLs in UI code.
+
+### Editor and Content Rendering
+
+| Area | Stack | How it is used |
+| --- | --- | --- |
+| Rich editor | Tiptap 3, ProseMirror, `@tiptap/react`, StarterKit | The editable unit surface: headings, paragraphs, lists, rich formatting, structured document state, and extension-driven behavior. |
+| Editor extensions | Tiptap underline, highlight, link, table, subscript, superscript, code block lowlight | Teaching-oriented formatting, tables, inline emphasis, links, academic notation, and code-aware material. |
+| Code rendering | lowlight, Shiki | Syntax highlighting for generated and edited technical content. |
+| Markdown/HTML pipeline | unified, remark-parse, remark-gfm, remark-breaks, remark-rehype, rehype-stringify, html-react-parser | Conversion and rendering between generated markdown-like content, HTML, and React-rendered educational blocks. |
+| Text measurement | `@chenglou/pretext` | Layout-sensitive text measurement used by dashboard presentation utilities. |
+| Activity UI | react-quizlet-flashcard, canvas-confetti | Interactive learning activities and feedback moments. |
+
+The editor is not isolated from the rest of the product. Generated chapters are rendered, edited, cleaned after paste operations, assigned heading IDs, highlighted when they contain code, tracked for reading progress, and prepared for export. That is why the stack includes both document editing libraries and lower-level content parsing utilities.
+
+### Backend Runtime
+
+| Area | Stack | How it is used |
+| --- | --- | --- |
+| HTTP server | Node.js, Express 5, TypeScript, tsx | API routes, auth routes, health checks, local watch mode, and compiled production output. |
+| Persistence | MongoDB driver 7 | Users, sessions, units, folders, notes, learning activities, generation runs, credit transactions, and billing events. |
+| Configuration | dotenv, typed environment parsing | Runtime configuration for MongoDB, AI providers, auth secrets, cookies, CORS, Stripe, and public app URLs. |
+| Validation | Zod | Runtime validation for API payloads, AI contracts, presentation theme data, and feature boundaries. |
+| HTML processing | parse5, sanitize-html | Parsing, extracting, normalizing, hashing, and sanitizing generated or edited HTML before it is reused. |
+| Security middleware | Helmet, CORS, cookie-parser, jsonwebtoken | HTTP hardening, origin control, signed/parsed cookies, access tokens, and refresh-token session flows. |
+
+The backend is organized by domain rather than by generic MVC folders. Units, chapters, notes, folders, activities, credits, billing, analytics, generation runs, and auth each have their own route/store/service boundaries, with Mongo-backed implementations where persistence is needed.
+
+### AI and Generation
+
+| Area | Stack | How it is used |
+| --- | --- | --- |
+| AI runtime | Vercel AI SDK (`ai`) | Provider-agnostic generation calls and model integration. |
+| Model strategy | Model configuration through environment variables and frontend | Lets the product route different generation tasks through different cost/quality profiles. |
+| Streaming | NDJSON generation routes | Long-running generation can stream progress and partial results instead of blocking the UI. |
+| Contracts | Shared AI types, backend schemas, prompt builders | Keeps generated syllabi, chapters, activities, and continuation flows closer to expected shapes. |
+| Telemetry | Generation telemetry and run stores | Tracks generation behavior, costs, and long-running operation state. |
+
+The AI layer is separated from the HTTP layer. Routes receive requests and resolve users; prompt builders and providers shape the generation task; schemas validate the result; generation runs preserve state; credits account for cost. That separation keeps AI behavior inspectable instead of burying it inside controller code.
+
+### Auth, Billing, and Product Infrastructure
+
+| Area | Stack | How it is used |
+| --- | --- | --- |
+| Authentication | Passport, Google OAuth 2.0, JWT, refresh cookies | Google sign-in, backend-owned sessions, short-lived access tokens, and cookie-backed refresh flows. |
+| Authorization | Authenticated route helpers and admin route separation | Domain routes resolve the current user before accessing private units, notes, credits, billing, or admin behavior. |
+| Billing | Stripe | Pricing, checkout, subscription/payment flows, and webhook-backed billing events. |
+| Credits | Internal credit cost and reservation modules | Makes generation usage explicit and ties AI work to account balance and plan state. |
+| Analytics | Backend analytics routes plus Recharts on the frontend | Usage reporting and visual account/product insights. |
+
+### Testing and Quality
+
+| Area | Stack | How it is used |
+| --- | --- | --- |
+| Unit/integration tests | Vitest | Frontend and backend test execution through workspace scripts. |
+| React tests | Testing Library, user-event, jsdom | Component behavior and user interaction tests. |
+| Backend HTTP tests | Supertest | API route testing without needing a real browser client. |
+| Coverage | `@vitest/coverage-v8` | Coverage reporting across both workspaces. |
+| Linting | ESLint 9, TypeScript ESLint, React Hooks, React Refresh | Static checks for TypeScript and React code. |
+| Build validation | `tsc -b`, Vite build, backend `tsc -p` | Separate type/build validation for frontend and backend packages. |
 
 ---
 
