@@ -7,6 +7,7 @@ import {
 	measurePages,
 	paginateHtmlContent,
 } from "@/dashboard/readerPagination";
+import {buildDashboardFolders} from "@/dashboard/viewModelMappers";
 import {
 	getActivityFeedbackRefillCost,
 	getActivityGenerationCost,
@@ -120,8 +121,31 @@ describe("presentation and selection utilities", () => {
 		expect(getFolderVisuals({color: "#102030", icon: "atom"}).bgColor).toBe("rgba(16, 32, 48, 0.16)");
 		expect(getFolderVisuals({color: "var(--x)", icon: "unknown"}).bgColor).toBe("var(--x)");
 		expect(getFolderIcon("missing")).toBeDefined();
-		expect(getFolderEmoji("landmark")).toBe("🏛️");
-		expect(getFolderEmoji("unknown")).toBe("unknown");
+    expect(getFolderEmoji("landmark")).toBe("🏛️");
+    expect(getFolderEmoji("🎵")).toBe("🎵");
+    expect(getFolderEmoji("unknown")).toBe("📁");
+	});
+
+	it("keeps user-created folders visible even when empty", () => {
+		const folders = buildDashboardFolders(
+			[
+				{id: "default-empty", name: "Default", slug: "default", icon: "folder", color: "#888888", kind: "default", unitCount: 0},
+				{id: "custom-empty", name: "Custom", slug: "custom", icon: "folder", color: "#34C759", kind: "custom", unitCount: 0},
+				{id: "default-used", name: "Used", slug: "used", icon: "book", color: "#111111", kind: "default", unitCount: 1},
+			],
+			[
+				{
+					id: "unit-1",
+					folder: {id: "default-used", name: "Used", slug: "used", icon: "book", color: "#111111", kind: "default"},
+				},
+			] as never,
+		);
+
+		expect(folders.map((folder) => folder.id)).toEqual([
+			"custom-empty",
+			"default-used",
+		]);
+		expect(folders.find((folder) => folder.id === "custom-empty")?.unitCount).toBe(0);
 	});
 
 	it("resolves typography and theme CSS variables across presets", () => {

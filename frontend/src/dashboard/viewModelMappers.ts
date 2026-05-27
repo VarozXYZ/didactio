@@ -201,7 +201,7 @@ export function buildDashboardFolders(
 				unitCount: units.length,
 			};
 		})
-		.filter((folder) => folder.unitCount > 0);
+		.filter((folder) => folder.kind === "custom" || folder.unitCount > 0);
 }
 
 export function mapDidacticUnitToSetupViewModel(

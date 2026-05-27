@@ -88,5 +88,12 @@ const folderEmojiMap: Record<string, string> = {
 };
 
 export function getFolderEmoji(iconName: string): string {
-	return folderEmojiMap[iconName] ?? "\ud83d\udcc1";
+  const normalizedIcon = iconName.trim();
+
+  return (
+    folderEmojiMap[normalizedIcon] ??
+    (/\p{Extended_Pictographic}/u.test(normalizedIcon)
+      ? normalizedIcon
+      : "\ud83d\udcc1")
+  );
 }

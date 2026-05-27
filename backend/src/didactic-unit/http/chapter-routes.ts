@@ -633,11 +633,19 @@ export function createChapterRouter(
                 },
               );
 
+              const unitAtCompletion = await didacticUnitStore.getById(
+                ownerId,
+                didacticUnit.id,
+              );
+              if (!unitAtCompletion) {
+                throw new Error("Didactic unit not found.");
+              }
+
               const updatedDidacticUnit = applyGeneratedDidacticUnitChapter(
-                latestUnit,
+                unitAtCompletion,
                 chapterIndex,
                 result.chapter,
-                hasGeneratedDidacticUnitChapter(latestUnit, chapterIndex)
+                hasGeneratedDidacticUnitChapter(unitAtCompletion, chapterIndex)
                   ? "ai_regeneration"
                   : "ai_generation",
                 result.continuitySummary,

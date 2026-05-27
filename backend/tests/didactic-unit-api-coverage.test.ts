@@ -5,6 +5,7 @@ import {
 	createQueuedChapterGenerationRunRecord,
 	InMemoryGenerationRunStore,
 } from "../src/generation-runs/generation-run-store.js";
+import {SYSTEM_DEFAULT_THEME} from "../src/presentation-theme/types.js";
 import {createTestApp} from "./helpers/create-test-app.js";
 import {
 	createApprovedDidacticUnit,
@@ -201,6 +202,58 @@ describe("didactic-unit API coverage", () => {
 		expect(partialIndex).toBeGreaterThan(-1);
 		expect(completeIndex).toBeGreaterThan(-1);
 		expect(partialIndex).toBeLessThan(completeIndex);
+	});
+
+	it("keeps a unit theme selected while module generation is in progress", async () => {
+		const baseAiService = createMockAiService();
+		let notifyChapterStarted!: () => void;
+		const chapterStarted = new Promise<void>((resolve) => {
+			notifyChapterStarted = resolve;
+		});
+		let finishChapterGeneration!: () => void;
+		const canFinishChapterGeneration = new Promise<void>((resolve) => {
+			finishChapterGeneration = resolve;
+		});
+		const aiService: AiService = {
+			...baseAiService,
+			async streamChapter(input, callbacks) {
+				notifyChapterStarted();
+				await canFinishChapterGeneration;
+				return baseAiService.streamChapter(input, callbacks);
+			},
+		};
+		const app = createTestApp({aiService});
+		const approved = await createApprovedDidacticUnit(app);
+
+		const createRunResponse = await request(app)
+			.post(`/api/didactic-unit/${approved.id}/modules/0/generate-run`)
+			.send({});
+		expect(createRunResponse.status).toBe(202);
+		await chapterStarted;
+
+		const themeResponse = await request(app)
+			.patch(`/api/didactic-unit/${approved.id}/theme`)
+			.send({
+				presentationTheme: {
+					...SYSTEM_DEFAULT_THEME,
+					stylePreset: "plain",
+				},
+			});
+		expect(themeResponse.status).toBe(200);
+		expect(themeResponse.body.presentationTheme.stylePreset).toBe("plain");
+
+		finishChapterGeneration();
+		const streamResponse = await request(app).get(
+			`/api/generation-runs/${createRunResponse.body.runId}/stream`,
+		);
+		expect(streamResponse.status).toBe(200);
+		parseStreamComplete(streamResponse.text);
+
+		const unitResponse = await request(app).get(
+			`/api/didactic-unit/${approved.id}`,
+		);
+		expect(unitResponse.status).toBe(200);
+		expect(unitResponse.body.presentationTheme.stylePreset).toBe("plain");
 	});
 
 	it("cancels a pending generation run and streams its failed terminal state", async () => {

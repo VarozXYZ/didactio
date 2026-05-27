@@ -103,8 +103,8 @@ export type SizeProfile = "small" | "regular" | "large";
 
 export const CLASSIC_BODY_SIZES: Record<SizeProfile, {mobile: number; desktop: number}> = {
 	small:   {mobile: 15, desktop: 16},
-	regular: {mobile: 16, desktop: 17},
-	large:   {mobile: 18, desktop: 19},
+	regular: {mobile: 16, desktop: 18},
+	large:   {mobile: 18, desktop: 20},
 };
 
 const SIZE_PROFILES: Record<

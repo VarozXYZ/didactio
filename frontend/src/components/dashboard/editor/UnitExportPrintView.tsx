@@ -14,6 +14,9 @@ function resolvePrintVars(snapshot: UnitExportSnapshot): CSSProperties {
 		: theme?.headingFont === "crimson-pro" ? "Crimson Pro"
 		: theme?.headingFont === "dm-sans" ? "DM Sans"
 		: "Sora";
+	const bodyColor = theme?.bodyColor ?? "#2F3137";
+	const headingColor = theme?.headingColor ?? "#1D1D1F";
+	const accentColor = theme?.accentColor ?? "#15803D";
 	return {
 		"--unit-print-body":
 			theme?.bodyFont === "eb-garamond" ? "EB Garamond"
@@ -21,9 +24,18 @@ function resolvePrintVars(snapshot: UnitExportSnapshot): CSSProperties {
 			: theme?.bodyFont === "dm-sans" ? "DM Sans"
 			: "Inter",
 		"--unit-print-heading": headingFont,
-		"--unit-print-accent": theme?.accentColor ?? "#15803D",
-		"--unit-print-heading-color": theme?.headingColor ?? "#1D1D1F",
-		"--unit-print-body-color": theme?.bodyColor ?? "#2F3137",
+		"--unit-print-accent": accentColor,
+		"--unit-print-heading-color": headingColor,
+		"--unit-print-body-color": bodyColor,
+		"--unit-page-bg": "#FFFFFF",
+		"--unit-body-color": bodyColor,
+		"--unit-heading-color": headingColor,
+		"--unit-accent-color": accentColor,
+		"--unit-blockquote-accent": theme?.blockquoteAccent ?? "#C4A070",
+		"--unit-code-bg": "#F6F8FA",
+		"--unit-table-bg": "#FFFFFF",
+		"--unit-table-header-bg": "#F3F4F6",
+		"--unit-table-border": "#E5E5E7",
 	} as CSSProperties;
 }
 
