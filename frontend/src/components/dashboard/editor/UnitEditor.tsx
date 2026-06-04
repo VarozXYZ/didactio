@@ -2047,19 +2047,24 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			:	[],
 		[activeChapter, learningActivities],
 	);
+	const shouldBuildUnitSearchIndex =
+		isSearchOpen && searchQuery.trim().length > 0;
 	const unitSearchIndex = useMemo(
 		() =>
-			workspace ?
+			workspace && shouldBuildUnitSearchIndex ?
 				buildUnitSearchIndex({
 					chapters: workspace.chapters,
 					chapterDetails,
 				})
 			:	{chapters: [], totalTextLength: 0},
-		[chapterDetails, workspace],
+		[chapterDetails, shouldBuildUnitSearchIndex, workspace],
 	);
 	const unitSearchResults = useMemo(
-		() => searchUnitIndex(unitSearchIndex, searchQuery),
-		[searchQuery, unitSearchIndex],
+		() =>
+			shouldBuildUnitSearchIndex ?
+				searchUnitIndex(unitSearchIndex, searchQuery)
+			:	[],
+		[searchQuery, shouldBuildUnitSearchIndex, unitSearchIndex],
 	);
 
 	useEffect(() => {
@@ -3892,6 +3897,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				startOffset: result.matchOffsetInModule,
 				endOffset: result.matchEndOffsetInModule,
 				key: Date.now(),
+				text: result.match,
 			});
 			searchHighlightTimeoutRef.current = window.setTimeout(() => {
 				setActiveSearchHighlight(null);

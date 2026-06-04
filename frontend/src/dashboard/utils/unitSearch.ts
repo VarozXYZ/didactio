@@ -47,6 +47,7 @@ export type ActiveSearchHighlight = {
 	endOffset: number;
 	key: number;
 	startOffset: number;
+	text?: string;
 };
 
 function stripDiacritics(value: string): string {
@@ -274,6 +275,37 @@ export function searchUnitIndex(
 	return results;
 }
 
+function closestNormalizedOccurrence(input: {
+	expectedOffset: number;
+	search: string;
+	text: string;
+}): number | null {
+	if (!input.search) {
+		return null;
+	}
+
+	let bestOffset: number | null = null;
+	let bestDistance = Number.POSITIVE_INFINITY;
+	let searchFrom = 0;
+
+	while (searchFrom <= input.text.length) {
+		const offset = input.text.indexOf(input.search, searchFrom);
+		if (offset < 0) {
+			break;
+		}
+
+		const distance = Math.abs(offset - input.expectedOffset);
+		if (distance < bestDistance) {
+			bestOffset = offset;
+			bestDistance = distance;
+		}
+
+		searchFrom = offset + Math.max(1, input.search.length);
+	}
+
+	return bestOffset;
+}
+
 type TextPosition = {
 	node: Text;
 	offset: number;
@@ -422,8 +454,20 @@ export function applySearchHighlightToPageHtml(input: {
 	const parser = new DOMParser();
 	const document = parser.parseFromString(input.html, "text/html");
 	const root = document.body;
-	const start = findTextPositionForNormalizedOffset(root, localStart);
-	const end = findTextPositionForNormalizedOffset(root, localEnd);
+	const searchText = normalizeUnitSearchText(input.highlight.text ?? "");
+	const matchedLocalStart =
+		searchText ?
+			closestNormalizedOccurrence({
+				text: buildNormalizedTextIndex(root.textContent ?? "").text,
+				search: searchText,
+				expectedOffset: localStart,
+			})
+		:	null;
+	const resolvedLocalStart = matchedLocalStart ?? localStart;
+	const resolvedLocalEnd =
+		matchedLocalStart !== null ? matchedLocalStart + searchText.length : localEnd;
+	const start = findTextPositionForNormalizedOffset(root, resolvedLocalStart);
+	const end = findTextPositionForNormalizedOffset(root, resolvedLocalEnd);
 	if (!start || !end) {
 		return input.html;
 	}

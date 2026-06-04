@@ -109,6 +109,29 @@ describe("unit search", () => {
 		expect(searchUnitIndex(index, "match")).toHaveLength(50);
 	});
 
+	it("uses result text to align the active highlight to the visible word", () => {
+		const html = "<h2>The efficient frontier and capital market line</h2>";
+		const highlighted = applySearchHighlightToPageHtml({
+			html,
+			pageStartOffset: 0,
+			pageEndOffset: 46,
+			highlight: {
+				chapterIndex: 0,
+				startOffset: 6,
+				endOffset: 14,
+				key: 1,
+				text: "frontier",
+			},
+		});
+
+		expect(highlighted).toContain(
+			'The efficient <mark class="didactio-search-hit" data-search-hit="true">frontier</mark> and capital market line',
+		);
+		expect(highlighted).not.toContain(
+			'<mark class="didactio-search-hit" data-search-hit="true">icient f</mark>',
+		);
+	});
+
 	it("highlights search hits without wrapping table or code structure", () => {
 		const highlight: ActiveSearchHighlight = {
 			chapterIndex: 0,
