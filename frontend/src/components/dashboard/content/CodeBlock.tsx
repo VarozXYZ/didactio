@@ -191,6 +191,18 @@ export function CodeBlock({
 	const {resolvedMode} = useAppearance();
 	const lineCount = useMemo(() => Math.max(1, code.split("\n").length), [code]);
 	const theme = resolvedMode === "dark" ? DARK_CODE_THEME : CODE_THEME_MAP[stylePreset];
+	const searchHighlightsKey = useMemo(
+		() =>
+			searchHighlights
+				.map((highlight) => `${highlight.startOffset}:${highlight.endOffset}`)
+				.join("|"),
+		[searchHighlights],
+	);
+	const stableSearchHighlights = useMemo(
+		() => searchHighlights,
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+		[searchHighlightsKey],
+	);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -206,7 +218,7 @@ export function CodeBlock({
 			.then((html) => {
 				if (!cancelled) {
 					setHighlightedHtml(
-						applyCodeSearchHighlights(html, searchHighlights),
+						applyCodeSearchHighlights(html, stableSearchHighlights),
 					);
 				}
 			})
@@ -215,7 +227,7 @@ export function CodeBlock({
 					setHighlightedHtml(
 						applyCodeSearchHighlights(
 							`<pre><code>${escapeHtml(code)}</code></pre>`,
-							searchHighlights,
+							stableSearchHighlights,
 						),
 					);
 				}
@@ -224,7 +236,7 @@ export function CodeBlock({
 		return () => {
 			cancelled = true;
 		};
-	}, [code, language, searchHighlights, theme]);
+	}, [code, language, stableSearchHighlights, theme]);
 
 	const handleCopy = () => {
 		void navigator.clipboard.writeText(code).then(() => {

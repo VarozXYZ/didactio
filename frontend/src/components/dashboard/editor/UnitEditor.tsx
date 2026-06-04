@@ -2444,6 +2444,10 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	);
 
 	const handleNoteContentClick = useCallback((event: React.MouseEvent) => {
+		const selection = window.getSelection();
+		if (selection && !selection.isCollapsed) {
+			return;
+		}
 		const target = event.target;
 		if (!(target instanceof Element)) {
 			return;

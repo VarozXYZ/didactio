@@ -4,7 +4,7 @@ import parse, {
 	type DOMNode,
 	type HTMLReactParserOptions,
 } from "html-react-parser";
-import {Children, type CSSProperties, type ReactNode} from "react";
+import {Children, memo, useMemo, type CSSProperties, type ReactNode} from "react";
 import {motion as Motion, useReducedMotion} from "motion/react";
 import type {StylePresetId} from "@/shared/presentation/typography";
 import {CodeBlock} from "./CodeBlock";
@@ -117,7 +117,7 @@ function stableChildKey(child: ReactNode, index: number, seed: string): string {
 	return `${seed}:${index}`;
 }
 
-export function ChapterRenderer({
+function ChapterRendererComponent({
 	html,
 	className,
 	style,
@@ -126,59 +126,64 @@ export function ChapterRenderer({
 	stylePreset = "classic",
 }: ChapterRendererProps) {
 	const prefersReducedMotion = useReducedMotion();
-	const options: HTMLReactParserOptions = {
-		replace(node) {
-			if (!(node instanceof Element)) {
-				return undefined;
-			}
+	const {content, shouldAnimate} = useMemo(() => {
+		const options: HTMLReactParserOptions = {
+			replace(node) {
+				if (!(node instanceof Element)) {
+					return undefined;
+				}
 
-			if (node.name === "pre") {
-				const codeChild = node.children.find(
-					(child): child is Element =>
-						child instanceof Element && child.name === "code",
-				);
-				const language = getLanguage(codeChild?.attribs.class);
-				const continuation =
-					node.attribs["data-code-continuation"] === "continued" ?
-						"continued"
-					: node.attribs["data-code-continues-next"] === "true" ?
-						"continues-next"
-					:	undefined;
-				return (
-					<CodeBlock
-						code={getText(codeChild ?? node)}
-						language={language}
-						continuation={continuation}
-						noteIds={collectNoteIds(node)}
-						searchHighlights={collectSearchHighlights(node)}
-						stylePreset={stylePreset}
-					/>
-				);
-			}
+				if (node.name === "pre") {
+					const codeChild = node.children.find(
+						(child): child is Element =>
+							child instanceof Element && child.name === "code",
+					);
+					const language = getLanguage(codeChild?.attribs.class);
+					const continuation =
+						node.attribs["data-code-continuation"] === "continued" ?
+							"continued"
+						: node.attribs["data-code-continues-next"] === "true" ?
+							"continues-next"
+						:	undefined;
+					return (
+						<CodeBlock
+							code={getText(codeChild ?? node)}
+							language={language}
+							continuation={continuation}
+							noteIds={collectNoteIds(node)}
+							searchHighlights={collectSearchHighlights(node)}
+							stylePreset={stylePreset}
+						/>
+					);
+				}
 
-			if (node.name === "a") {
-				return (
-					<a {...node.attribs}>
-						{domToReact(node.children as DOMNode[], options)}
-					</a>
-				);
-			}
-
-			if (node.name === "table") {
-				return (
-					<div className="unit-table-scroll">
-						<table {...node.attribs}>
+				if (node.name === "a") {
+					return (
+						<a {...node.attribs}>
 							{domToReact(node.children as DOMNode[], options)}
-						</table>
-					</div>
-				);
-			}
+						</a>
+					);
+				}
 
-			return undefined;
-		},
-	};
-	const content = parse(html, options);
-	const shouldAnimate = animateBlocks && !prefersReducedMotion;
+				if (node.name === "table") {
+					return (
+						<div className="unit-table-scroll">
+							<table {...node.attribs}>
+								{domToReact(node.children as DOMNode[], options)}
+							</table>
+						</div>
+					);
+				}
+
+				return undefined;
+			},
+		};
+
+		return {
+			content: parse(html, options),
+			shouldAnimate: animateBlocks && !prefersReducedMotion,
+		};
+	}, [animateBlocks, html, prefersReducedMotion, stylePreset]);
 
 	return (
 		<div className={className} style={style}>
@@ -201,3 +206,5 @@ export function ChapterRenderer({
 		</div>
 	);
 }
+
+export const ChapterRenderer = memo(ChapterRendererComponent);
