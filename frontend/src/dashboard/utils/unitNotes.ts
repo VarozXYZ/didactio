@@ -4,18 +4,15 @@ import type {
 } from "@/dashboard/api/dashboardApi";
 import type {UnitEditorChapterViewModel, HtmlContentBlock} from "../types";
 
-const ANNOTATABLE_BLOCK_TYPES = new Set<HtmlContentBlock["type"]>([
-	"heading",
-	"paragraph",
-	"blockquote",
-	"list",
-]);
-
 type TextPosition = {
 	node: Text;
 	offset: number;
 	normalizedOffset: number;
 };
+
+function isAnnotatableBlock(block: HtmlContentBlock): boolean {
+	return block.type !== "divider" && block.textLength > 0;
+}
 
 function normalizeSelectionText(value: string): string {
 	return value.replace(/\s+/g, " ").trim();
@@ -31,6 +28,11 @@ function walkTextPositions(
 
 	while (walker.nextNode()) {
 		const node = walker.currentNode as Text;
+		if (
+			node.parentElement?.closest("[data-unit-note-ignore='true']")
+		) {
+			continue;
+		}
 		const value = node.data;
 
 		for (let offset = 0; offset <= value.length; offset += 1) {
@@ -109,7 +111,7 @@ function areBlocksAnnotatable(
 	}
 	return blocks
 		.slice(startIndex, endIndex + 1)
-		.every((block) => ANNOTATABLE_BLOCK_TYPES.has(block.type));
+		.every((block) => isAnnotatableBlock(block));
 }
 
 export function getValidUnitNotesForChapter(
@@ -243,6 +245,81 @@ function closestTextOccurrence(input: {
 	return bestOffset;
 }
 
+function createNoteMark(document: Document, noteId: string): HTMLElement {
+	const mark = document.createElement("mark");
+	mark.dataset.noteId = noteId;
+	mark.className = "didactio-note-mark";
+	return mark;
+}
+
+function wrapTextNodeSegment(input: {
+	node: Text;
+	startOffset: number;
+	endOffset: number;
+	noteId: string;
+	document: Document;
+}): void {
+	const parent = input.node.parentNode;
+	const startOffset = Math.max(0, Math.min(input.startOffset, input.node.length));
+	const endOffset = Math.max(
+		startOffset,
+		Math.min(input.endOffset, input.node.length),
+	);
+
+	if (!parent || endOffset <= startOffset) {
+		return;
+	}
+
+	let target = input.node;
+	if (endOffset < target.length) {
+		target.splitText(endOffset);
+	}
+	if (startOffset > 0) {
+		target = target.splitText(startOffset);
+	}
+	if (!target.data.trim()) {
+		return;
+	}
+
+	const mark = createNoteMark(input.document, input.noteId);
+	target.parentNode?.insertBefore(mark, target);
+	mark.appendChild(target);
+}
+
+function wrapTextPositions(input: {
+	root: HTMLElement;
+	start: {node: Text; offset: number};
+	end: {node: Text; offset: number};
+	noteId: string;
+	document: Document;
+}): void {
+	const textNodes: Text[] = [];
+	const walker = input.document.createTreeWalker(
+		input.root,
+		NodeFilter.SHOW_TEXT,
+	);
+	while (walker.nextNode()) {
+		textNodes.push(walker.currentNode as Text);
+	}
+
+	const startIndex = textNodes.indexOf(input.start.node);
+	const endIndex = textNodes.indexOf(input.end.node);
+	if (startIndex < 0 || endIndex < startIndex) {
+		return;
+	}
+
+	for (let index = endIndex; index >= startIndex; index -= 1) {
+		const node = textNodes[index];
+		wrapTextNodeSegment({
+			node,
+			startOffset: index === startIndex ? input.start.offset : 0,
+			endOffset: index === endIndex ? input.end.offset : node.length,
+			noteId: input.noteId,
+			document: input.document,
+		});
+	}
+}
+
 export function applyNoteMarksToPageHtml(input: {
 	html: string;
 	pageStartOffset: number;
@@ -293,15 +370,14 @@ export function applyNoteMarksToPageHtml(input: {
 		if (!start || !end) {
 			continue;
 		}
-		const range = document.createRange();
 		try {
-			range.setStart(start.node, start.offset);
-			range.setEnd(end.node, end.offset);
-			const mark = document.createElement("mark");
-			mark.dataset.noteId = item.note.id;
-			mark.className = "didactio-note-mark";
-			mark.appendChild(range.extractContents());
-			range.insertNode(mark);
+			wrapTextPositions({
+				root,
+				start,
+				end,
+				noteId: item.note.id,
+				document,
+			});
 		} catch {
 			continue;
 		}

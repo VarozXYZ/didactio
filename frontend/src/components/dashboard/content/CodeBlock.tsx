@@ -13,6 +13,7 @@ type CodeBlockProps = {
 	code: string;
 	language?: string;
 	continuation?: "continued" | "continues-next";
+	noteIds?: string[];
 	stylePreset?: StylePresetId;
 };
 
@@ -27,6 +28,7 @@ export function CodeBlock({
 	code,
 	language,
 	continuation,
+	noteIds = [],
 	stylePreset = "classic",
 }: CodeBlockProps) {
 	const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null);
@@ -75,12 +77,25 @@ export function CodeBlock({
 
 	return (
 		<div className="code-block-wrapper">
-			<div className="code-block-header">
+			<div className="code-block-header" data-unit-note-ignore="true">
 				<div className="flex items-center gap-2">
 					<span className="code-block-lang">{langLabel}</span>
 					{continuation === "continued" ?
 						<span className="code-block-continuation">
 							continued
+						</span>
+					:	null}
+					{noteIds.length > 0 ?
+						<span className="code-block-notes" aria-label="Code notes">
+							{noteIds.map((noteId) => (
+								<button
+									key={noteId}
+									aria-label="Open code note"
+									className="code-block-note-dot"
+									data-note-id={noteId}
+									type="button"
+								/>
+							))}
 						</span>
 					:	null}
 				</div>
@@ -110,7 +125,9 @@ export function CodeBlock({
 				</pre>
 			}
 			{continuation === "continues-next" ?
-				<div className="code-block-continues-next">next page</div>
+				<div className="code-block-continues-next" data-unit-note-ignore="true">
+					next page
+				</div>
 			:	null}
 		</div>
 	);

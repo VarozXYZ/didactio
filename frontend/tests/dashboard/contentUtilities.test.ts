@@ -194,8 +194,8 @@ describe("unit note anchors", () => {
 		htmlHash: "hash",
 		htmlBlocksVersion: 1,
 		htmlBlocks: [
-			{id: "a", type: "paragraph", textStartOffset: 0, textEndOffset: 11},
-			{id: "b", type: "paragraph", textStartOffset: 12, textEndOffset: 23},
+			{id: "a", type: "paragraph", textLength: 11, textStartOffset: 0, textEndOffset: 11},
+			{id: "b", type: "paragraph", textLength: 11, textStartOffset: 12, textEndOffset: 23},
 		],
 	} as never;
 	const note = {
@@ -234,6 +234,25 @@ describe("unit note anchors", () => {
 			anchor: {startBlockId: "a", startOffset: 0, endOffset: 5},
 		});
 
+		const pageRootWithChrome = document.createElement("div");
+		pageRootWithChrome.innerHTML =
+			'<span data-unit-note-ignore="true">typescript Copy</span><p>hello world</p>';
+		const contentText = pageRootWithChrome.querySelector("p")!.firstChild!;
+		const contentRange = document.createRange();
+		contentRange.setStart(contentText, 0);
+		contentRange.setEnd(contentText, 5);
+		expect(
+			buildNoteAnchorFromSelection({
+				range: contentRange,
+				pageRoot: pageRootWithChrome,
+				pageStartOffset: 0,
+				chapter,
+			}),
+		).toMatchObject({
+			selectedText: "hello",
+			anchor: {startBlockId: "a", startOffset: 0, endOffset: 5},
+		});
+
 		const empty = document.createRange();
 		empty.setStart(text, 0);
 		empty.setEnd(text, 0);
@@ -259,5 +278,75 @@ describe("unit note anchors", () => {
 				notes: [],
 			}),
 		).toBe("<p>hello world</p>");
+	});
+
+	it("allows notes on table and code blocks without wrapping block structure", () => {
+		const richChapter = {
+			chapterIndex: 0,
+			htmlHash: "hash",
+			htmlBlocksVersion: 1,
+			htmlBlocks: [
+				{
+					id: "table",
+					type: "table",
+					textLength: 11,
+					textStartOffset: 0,
+					textEndOffset: 11,
+				},
+				{
+					id: "code",
+					type: "code",
+					textLength: 13,
+					textStartOffset: 11,
+					textEndOffset: 24,
+				},
+			],
+		} as never;
+		const tableNote = {
+			...note,
+			id: "table-note",
+			selectedText: "Cell",
+			anchor: {
+				...(note as {anchor: object}).anchor,
+				startBlockId: "table",
+				startOffset: 0,
+				endBlockId: "table",
+				endOffset: 4,
+			},
+		} as never;
+		const codeNote = {
+			...note,
+			id: "code-note",
+			selectedText: "const",
+			anchor: {
+				...(note as {anchor: object}).anchor,
+				startBlockId: "code",
+				startOffset: 0,
+				endBlockId: "code",
+				endOffset: 5,
+			},
+		} as never;
+
+		expect(getValidUnitNotesForChapter([tableNote, codeNote], richChapter)).toHaveLength(2);
+		const tableHtml = applyNoteMarksToPageHtml({
+			html: "<table><tbody><tr><td>Cell value</td></tr></tbody></table>",
+			pageStartOffset: 0,
+			pageEndOffset: 11,
+			chapter: richChapter,
+			notes: [tableNote],
+		});
+		const codeHtml = applyNoteMarksToPageHtml({
+			html: '<pre><code class="language-ts">const x = 1;</code></pre>',
+			pageStartOffset: 11,
+			pageEndOffset: 24,
+			chapter: richChapter,
+			notes: [codeNote],
+		});
+
+		expect(tableHtml).toContain("<td><mark");
+		expect(tableHtml).not.toContain("<mark data-note-id=\"table-note\"><table");
+		expect(codeHtml).toContain("<code");
+		expect(codeHtml).toContain('data-note-id="code-note"');
+		expect(codeHtml).not.toContain("<mark data-note-id=\"code-note\"><pre");
 	});
 });

@@ -1,4 +1,4 @@
-import {cleanup, fireEvent, render, screen} from "@testing-library/react";
+import {cleanup, fireEvent, render, screen, waitFor} from "@testing-library/react";
 import {MemoryRouter} from "react-router-dom";
 import {afterEach, beforeEach, describe, expect, it, vi} from "vitest";
 import {AuthContext} from "@/auth/authContext";
@@ -11,9 +11,9 @@ vi.mock("canvas-confetti", () => ({default: vi.fn()}));
 vi.mock("motion/react", () => ({
 	AnimatePresence: ({children}: {children: React.ReactNode}) => <>{children}</>,
 	motion: {
-		div: ({children, animate: _animate, exit: _exit, initial: _initial, transition: _transition, whileTap: _whileTap, ...props}: React.HTMLAttributes<HTMLDivElement> & Record<string, unknown>) => <div {...props}>{children}</div>,
-		aside: ({children, animate: _animate, exit: _exit, initial: _initial, transition: _transition, ...props}: React.HTMLAttributes<HTMLElement> & Record<string, unknown>) => <aside {...props}>{children}</aside>,
-		button: ({children, animate: _animate, exit: _exit, initial: _initial, transition: _transition, whileTap: _whileTap, ...props}: React.ButtonHTMLAttributes<HTMLButtonElement> & Record<string, unknown>) => <button {...props}>{children}</button>,
+		div: ({children, ...props}: React.HTMLAttributes<HTMLDivElement> & Record<string, unknown>) => <div {...withoutMotionProps(props)}>{children}</div>,
+		aside: ({children, ...props}: React.HTMLAttributes<HTMLElement> & Record<string, unknown>) => <aside {...withoutMotionProps(props)}>{children}</aside>,
+		button: ({children, ...props}: React.ButtonHTMLAttributes<HTMLButtonElement> & Record<string, unknown>) => <button {...withoutMotionProps(props)}>{children}</button>,
 	},
 }));
 vi.mock("@/hooks/use-toast", () => ({toastError: vi.fn()}));
@@ -58,7 +58,7 @@ vi.mock("@/components/dashboard/editor/TiptapHtmlEditor", () => ({
 		placeholder: string;
 	}) => (
 		<textarea
-			defaultValue={initialHtml}
+			value={initialHtml}
 			placeholder={placeholder}
 			onChange={(event) => onHtmlChange(event.target.value)}
 		/>
@@ -70,6 +70,16 @@ vi.mock("@/components/dashboard/content/ChapterRenderer", () => ({
 vi.mock("@/components/dashboard/activities/LearningActivityRenderer", () => ({
 	LearningActivityRenderer: ({activity}: {activity: LearningActivityDto}) => <div>{activity.title}</div>,
 }));
+
+function withoutMotionProps<TProps extends Record<string, unknown>>(props: TProps) {
+	const {animate, exit, initial, transition, whileTap, ...domProps} = props;
+	void animate;
+	void exit;
+	void initial;
+	void transition;
+	void whileTap;
+	return domProps;
+}
 
 const chapter: DidacticUnitChapterDetailDto = {
 	chapterIndex: 0,
@@ -238,6 +248,23 @@ describe("UnitEditor", () => {
 		expect(screen.getByLabelText("Notes")).toBeTruthy();
 		expect(screen.getByLabelText("Version history")).toBeTruthy();
 		expect(screen.getByLabelText("Edit")).toBeTruthy();
+	});
+
+	it("keeps editable page drafts stable while typing", async () => {
+		display();
+
+		fireEvent.click(await screen.findByLabelText("Edit"));
+		const editor = await screen.findByPlaceholderText(
+			"Write the module content here...",
+		);
+
+		fireEvent.change(editor, {target: {value: "<p>Measured page!</p>"}});
+
+		await waitFor(() => {
+			expect((editor as HTMLTextAreaElement).value).toBe(
+				"<p>Measured page!</p>",
+			);
+		});
 	});
 
 	it("renders the mobile navigation, actions, style dialog, and export dialog", async () => {

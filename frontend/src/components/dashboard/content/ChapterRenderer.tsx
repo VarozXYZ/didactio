@@ -34,6 +34,23 @@ function getLanguage(className: string | undefined): string | undefined {
 	return className?.match(/\blanguage-([a-z0-9+#-]+)/)?.[1];
 }
 
+function collectNoteIds(node: DOMNode): string[] {
+	const noteIds = new Set<string>();
+
+	function visit(current: DOMNode): void {
+		if (current instanceof Element) {
+			const noteId = current.attribs["data-note-id"];
+			if (noteId) {
+				noteIds.add(noteId);
+			}
+			current.children.forEach((child) => visit(child as DOMNode));
+		}
+	}
+
+	visit(node);
+	return [...noteIds];
+}
+
 function stableChildKey(child: ReactNode, index: number, seed: string): string {
 	if (
 		typeof child === "object" &&
@@ -79,6 +96,7 @@ export function ChapterRenderer({
 						code={getText(codeChild ?? node)}
 						language={language}
 						continuation={continuation}
+						noteIds={collectNoteIds(node)}
 						stylePreset={stylePreset}
 					/>
 				);

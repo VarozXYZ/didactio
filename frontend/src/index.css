@@ -1765,6 +1765,30 @@ button[aria-disabled="true"],
 	line-height: 1;
 }
 
+.code-block-notes {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.code-block-note-dot {
+	width: 8px;
+	height: 8px;
+	border: 1px solid #ffffff;
+	border-radius: 999px;
+	background: #34c759;
+	box-shadow: 0 1px 4px rgba(52, 199, 89, 0.45);
+	cursor: pointer;
+	padding: 0;
+	transition: background 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.code-block-note-dot:hover {
+	background: #22a848;
+	box-shadow: 0 1px 6px rgba(52, 199, 89, 0.65);
+	transform: scale(1.18);
+}
+
 .code-block-continues-next {
 	position: absolute;
 	right: 10px;

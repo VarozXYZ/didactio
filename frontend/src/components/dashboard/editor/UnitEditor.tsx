@@ -1786,6 +1786,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		number | null
 	>(null);
 	const [contentPageDrafts, setContentPageDrafts] = useState<string[]>([]);
+	const contentPageDraftsKeyRef = useRef<string | null>(null);
 	const [activeHtmlEditor, setActiveHtmlEditor] = useState<Editor | null>(
 		null,
 	);
@@ -2803,19 +2804,27 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 
 	useEffect(() => {
 		if (!isEditMode) {
+			contentPageDraftsKeyRef.current = null;
 			setContentPageDrafts([]);
 			return;
 		}
 
-		setContentPageDrafts(
-			paginatedContentPages.length > 0 ? paginatedContentPages : [""],
-		);
+		const nextDraftsKey = String(activeChapter?.chapterIndex ?? "none");
+		setContentPageDrafts((previous) => {
+			if (
+				contentPageDraftsKeyRef.current === nextDraftsKey &&
+				previous.length > 0
+			) {
+				return previous;
+			}
+
+			contentPageDraftsKeyRef.current = nextDraftsKey;
+			return paginatedContentPages.length > 0 ? paginatedContentPages : [""];
+		});
 	}, [
 		isEditMode,
 		activeChapter?.chapterIndex,
 		paginatedContentPages,
-		spreadMetrics.pageHeight,
-		spreadMetrics.pageWidth,
 	]);
 
 	useEffect(() => {
