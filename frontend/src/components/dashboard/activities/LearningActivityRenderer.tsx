@@ -5,8 +5,33 @@ import {
 	useState,
 	type CSSProperties,
 	type MouseEvent,
-	type UIEvent,
 } from "react";
+import {EditorState} from "@codemirror/state";
+import {
+	EditorView,
+	crosshairCursor,
+	drawSelection,
+	dropCursor,
+	highlightActiveLine,
+	highlightActiveLineGutter,
+	keymap,
+	lineNumbers,
+	rectangularSelection,
+} from "@codemirror/view";
+import {
+	defaultKeymap,
+	history,
+	historyKeymap,
+	indentWithTab,
+} from "@codemirror/commands";
+import {
+	bracketMatching,
+	foldGutter,
+	foldKeymap,
+	indentUnit,
+	indentOnInput,
+} from "@codemirror/language";
+import {search, searchKeymap} from "@codemirror/search";
 import {
 	Flashcard,
 	useFlashcard,
@@ -66,11 +91,11 @@ import {
 import {CoinAmount} from "@/components/shared/Coin";
 import {getActivityFeedbackRefillCost} from "@/dashboard/utils/generationCosts";
 import {
-	CODE_LANGUAGE_ALIASES,
-	CODE_THEME_MAP,
-	DARK_CODE_THEME,
-	getCodeHighlighter,
-} from "@/dashboard/utils/codeHighlighting";
+	createCodePracticeLayoutTheme,
+	getCodePracticeLanguageExtensions,
+	getCodePracticeThemeExtension,
+	stopCodeEditorKeyPropagation,
+} from "@/dashboard/utils/codePracticeEditor";
 import {STYLE_PRESETS} from "@/shared/presentation/typography";
 import {useAppearance} from "@/theme/useAppearance";
 
@@ -1129,13 +1154,6 @@ function VirtualFileFormatIcon({format}: {format: string}) {
 	);
 }
 
-function escapeCodeHtml(value: string): string {
-	return value
-		.replace(/&/g, "&amp;")
-		.replace(/</g, "&lt;")
-		.replace(/>/g, "&gt;");
-}
-
 function CodePracticeEditor({
 	code,
 	language,
@@ -1149,88 +1167,109 @@ function CodePracticeEditor({
 	darkDisplay: boolean;
 	onChange: (value: string) => void;
 }) {
-	const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null);
-	const highlightScrollRef = useRef<HTMLDivElement | null>(null);
-	const lineScrollRef = useRef<HTMLDivElement | null>(null);
-	const lineCount = useMemo(() => Math.max(12, code.split("\n").length), [code]);
-	const codeTheme = darkDisplay ? DARK_CODE_THEME : CODE_THEME_MAP[stylePreset];
+	const editorHostRef = useRef<HTMLDivElement | null>(null);
+	const editorViewRef = useRef<EditorView | null>(null);
+	const onChangeRef = useRef(onChange);
 	const codePreset = STYLE_PRESETS[stylePreset];
-	const codeHeaderBackground = darkDisplay ? "var(--activity-surface-alt)" : codePreset.codeHeaderBackground;
 	const codeBorderColor = darkDisplay ? "var(--activity-border)" : codePreset.codeBorderColor;
 	const codeAccentColor = darkDisplay ? "var(--activity-accent)" : codePreset.codeAccentColor;
+	const codeBackground = darkDisplay ? "var(--activity-surface)" : codePreset.codeBackground;
 
 	useEffect(() => {
-		let cancelled = false;
-		const normalizedLanguage = language.toLowerCase().trim();
-		const lang = CODE_LANGUAGE_ALIASES[normalizedLanguage] ?? "text";
+		onChangeRef.current = onChange;
+	}, [onChange]);
 
-		void getCodeHighlighter()
-			.then((highlighter) => highlighter.codeToHtml(code || " ", {
-				lang,
-				theme: codeTheme,
-			}))
-			.then((html) => {
-				if (!cancelled) {
-					setHighlightedHtml(html);
+	useEffect(() => {
+		const host = editorHostRef.current;
+		if (!host) {
+			return;
+		}
+
+		const editorExtensions = [
+			lineNumbers(),
+			highlightActiveLineGutter(),
+			foldGutter(),
+			drawSelection(),
+			dropCursor(),
+			rectangularSelection(),
+			crosshairCursor(),
+			highlightActiveLine(),
+			history(),
+			EditorState.tabSize.of(4),
+			indentUnit.of("    "),
+			indentOnInput(),
+			bracketMatching(),
+			search(),
+			getCodePracticeThemeExtension(darkDisplay),
+			createCodePracticeLayoutTheme({
+				codeBackground,
+				codeBorderColor,
+				focusColor: codeAccentColor,
+			}),
+			EditorView.domEventHandlers({
+				keydown: stopCodeEditorKeyPropagation,
+			}),
+			keymap.of([
+				indentWithTab,
+				...defaultKeymap,
+				...historyKeymap,
+				...foldKeymap,
+				...searchKeymap,
+			]),
+			...getCodePracticeLanguageExtensions(language),
+			EditorView.updateListener.of((update) => {
+				if (!update.docChanged) {
+					return;
 				}
-			})
-			.catch(() => {
-				if (!cancelled) {
-					setHighlightedHtml(`<pre><code>${escapeCodeHtml(code)}</code></pre>`);
-				}
-			});
+
+				onChangeRef.current(update.state.doc.toString());
+			}),
+		];
+
+		const view = new EditorView({
+			parent: host,
+			state: EditorState.create({
+				doc: code,
+				extensions: editorExtensions,
+			}),
+		});
+
+		editorViewRef.current = view;
 
 		return () => {
-			cancelled = true;
+			view.destroy();
+			if (editorViewRef.current === view) {
+				editorViewRef.current = null;
+			}
 		};
-	}, [code, codeTheme, language]);
+	}, [codeAccentColor, codeBackground, codeBorderColor, darkDisplay, language]);
 
-	const syncScroll = (event: UIEvent<HTMLTextAreaElement>) => {
-		const target = event.currentTarget;
-		if (highlightScrollRef.current) {
-			highlightScrollRef.current.scrollTop = target.scrollTop;
-			highlightScrollRef.current.scrollLeft = target.scrollLeft;
+	useEffect(() => {
+		const view = editorViewRef.current;
+		if (!view) {
+			return;
 		}
-		if (lineScrollRef.current) {
-			lineScrollRef.current.scrollTop = target.scrollTop;
+
+		const currentCode = view.state.doc.toString();
+		if (currentCode === code) {
+			return;
 		}
-	};
+
+		view.dispatch({
+			changes: {
+				from: 0,
+				to: currentCode.length,
+				insert: code,
+			},
+		});
+	}, [code]);
 
 	return (
-		<div className="grid min-h-0 flex-1 grid-cols-[38px_minmax(0,1fr)]">
-			<div
-				ref={lineScrollRef}
-				className="select-none overflow-hidden border-r px-2 py-3 text-right font-mono text-[11px] leading-[1.65]"
-				style={{
-					backgroundColor: codeHeaderBackground,
-					borderColor: codeBorderColor,
-					color: codeAccentColor,
-					opacity: 0.62,
-				}}
-			>
-				{Array.from({length: lineCount}).map((_, index) => (
-					<div key={index}>{index + 1}</div>
-				))}
-			</div>
-			<div className="relative min-h-[260px] min-w-0 flex-1 overflow-hidden">
-				<div
-					ref={highlightScrollRef}
-					className="pointer-events-none absolute inset-0 overflow-hidden p-3 font-mono text-[12.5px] leading-[1.65] [&_code]:font-mono [&_pre]:!m-0 [&_pre]:!bg-transparent [&_pre]:!p-0 [&_pre]:font-mono [&_pre]:text-[12.5px] [&_pre]:leading-[1.65]"
-					dangerouslySetInnerHTML={{
-						__html: highlightedHtml ?? `<pre><code>${escapeCodeHtml(code)}</code></pre>`,
-					}}
-				/>
-				<textarea
-					className="absolute inset-0 h-full w-full resize-none overflow-auto bg-transparent p-3 font-mono text-[12.5px] leading-[1.65] text-transparent outline-none placeholder:text-[#8E8E93] selection:bg-[#2563EB]"
-					style={{caretColor: codeAccentColor}}
-					value={code}
-					onChange={(event) => onChange(event.target.value)}
-					onScroll={syncScroll}
-					spellCheck={false}
-					placeholder="Write your code here..."
-				/>
-			</div>
-		</div>
+		<div
+			ref={editorHostRef}
+			className="min-h-0 flex-1 overflow-hidden"
+			data-testid="code-practice-editor"
+		/>
 	);
 }
 

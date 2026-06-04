@@ -141,8 +141,8 @@ describe("LearningActivityRenderer", () => {
 			testCases: [{input: "1", expected: "1"}],
 		}), [attempt({score: 90})]);
 		fireEvent.click(await screen.findByText("Code"));
-		const editor = coding.container.querySelector("textarea")!;
-		fireEvent.change(editor, {target: {value: "const x = 2;"}});
+		const editor = coding.container.querySelector("[data-testid='code-practice-editor'] .cm-content");
+		expect(editor).toBeTruthy();
 		fireEvent.click(screen.getByText("Check answer"));
 		coding.unmount();
 

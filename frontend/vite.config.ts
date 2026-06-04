@@ -32,6 +32,18 @@ export default defineConfig({
             return 'editor-vendor'
           }
 
+          if (id.includes('/@ddietr/codemirror-themes/')) {
+            return 'codemirror-themes-vendor'
+          }
+
+          if (id.includes('/@lezer/')) {
+            return 'lezer-vendor'
+          }
+
+          if (id.includes('/@codemirror/')) {
+            return 'codemirror-vendor'
+          }
+
           if (
             id.includes('/unified/') ||
             id.includes('/remark-') ||

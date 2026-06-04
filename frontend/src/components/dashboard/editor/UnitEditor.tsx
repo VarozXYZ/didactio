@@ -4017,8 +4017,22 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	]);
 
 	useEffect(() => {
+		const isTextEditingTarget = (target: EventTarget | null) => {
+			if (!(target instanceof HTMLElement)) {
+				return false;
+			}
+
+			return (
+				target instanceof HTMLInputElement ||
+				target instanceof HTMLTextAreaElement ||
+				target instanceof HTMLSelectElement ||
+				target.isContentEditable ||
+				Boolean(target.closest("[contenteditable='true']"))
+			);
+		};
+
 		const handleKeyDown = (event: KeyboardEvent) => {
-			if (isEditModeRef.current) {
+			if (isEditModeRef.current || isTextEditingTarget(event.target)) {
 				return;
 			}
 
@@ -4707,198 +4721,6 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				</span>{" "}
 				Practicing now helps retain the concepts before moving on.
 			</div>
-			<Dialog open={isActivityModalOpen} onOpenChange={setIsActivityModalOpen}>
-				<DialogContent className="app-activity-create-modal max-h-[88vh] overflow-x-hidden overflow-y-auto sm:max-w-[760px]">
-					<DialogHeader className="max-[1599px]:px-5 max-[1599px]:pb-3 max-[1599px]:pt-4">
-						<DialogTitle>Exercises & Practice</DialogTitle>
-						<DialogDescription>
-							{hasNextModule ?
-								"Create a structured activity before moving to the next module."
-							:	"Create a structured activity to close out this unit."
-							}
-						</DialogDescription>
-					</DialogHeader>
-
-					<div className="space-y-6 px-6 py-5 max-[1599px]:space-y-3 max-[1599px]:px-5 max-[1599px]:py-3">
-						<div className="app-activity-create-scope rounded-[18px] bg-[#F5F5F7] p-1 max-[1599px]:rounded-[15px]">
-							<div className="grid grid-cols-2 gap-1">
-								{[
-									{value: "current_module" as const, label: "Current module", icon: BookOpenCheck},
-									{value: "cumulative_until_module" as const, label: "All past modules", icon: History},
-								].map((option) => {
-									const TabIcon = option.icon;
-									const selected = activityScope === option.value;
-									return (
-										<button
-											key={option.value}
-											type="button"
-											onClick={() => setActivityScope(option.value)}
-											className={cn(
-												"app-activity-create-scope-option flex items-center justify-center gap-2 rounded-[14px] px-4 py-2.5 text-sm font-bold transition max-[1599px]:rounded-[12px] max-[1599px]:py-2",
-												selected ?
-													"app-activity-create-scope-option-selected bg-white text-[#16A34A] shadow-sm ring-1 ring-[#4ADE80]"
-												:	"text-[#6B7280] hover:text-[#0F0F12]",
-											)}
-										>
-											<TabIcon size={15} />
-											{option.label}
-										</button>
-									);
-								})}
-							</div>
-						</div>
-
-						<div className="-mx-6 border-t border-[#F0F0F2] max-[1599px]:-mx-5" />
-
-						<div>
-							<div className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-[#86868B] max-[1599px]:mb-2">
-								Activity type
-							</div>
-							<div className="grid gap-2 sm:grid-cols-2">
-								{ACTIVITY_OPTIONS.map((option) => {
-									const Icon = option.icon;
-									const selected = activityType === option.type;
-									return (
-										<button
-											key={option.type}
-											type="button"
-											onClick={() => setActivityType(option.type)}
-											className={cn(
-												"app-activity-create-option relative flex items-start gap-3 rounded-2xl border p-3 text-left transition max-[1599px]:gap-2.5 max-[1599px]:rounded-[13px] max-[1599px]:p-2",
-												selected ?
-													"app-activity-create-option-selected border-[#4ADE80] bg-[#F0FDF4] text-[#0F0F12]"
-												:	"border-[#E5E5E7] bg-white text-[#0F0F12] hover:border-[#D1D5DB]",
-											)}
-										>
-											{selected && (
-												<CheckCircle2
-													size={16}
-													className="absolute right-3 top-3 text-[#16A34A]"
-													fill="white"
-												/>
-											)}
-											<span
-												className={cn(
-													"app-activity-create-option-icon flex h-9 w-9 shrink-0 items-center justify-center rounded-xl max-[1599px]:h-8 max-[1599px]:w-8 max-[1599px]:rounded-[10px]",
-													selected ?
-														"app-activity-create-option-icon-selected bg-[#DCFCE7] text-[#16A34A]"
-													:	"bg-[#F3F4F6] text-[#0F0F12]",
-												)}
-											>
-												<Icon size={17} />
-											</span>
-											<span>
-												<span className="block text-sm font-bold">{option.label}</span>
-												<span className="mt-1 block text-xs leading-relaxed text-[#6B7280] max-[1599px]:mt-0.5 max-[1599px]:leading-snug">
-													{option.description}
-												</span>
-											</span>
-										</button>
-									);
-								})}
-							</div>
-						</div>
-
-						<div className="-mx-6 border-t border-[#F0F0F2] max-[1599px]:-mx-5" />
-
-						<div>
-							<div className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-[#86868B] max-[1599px]:mb-2">
-								Model
-							</div>
-							<div className="grid gap-2 sm:grid-cols-2">
-								{generationModelOptions.map((option) => {
-									const selected = activityQuality === option.quality;
-									return (
-										<button
-											key={option.quality}
-											type="button"
-											onClick={() => setActivityQuality(option.quality)}
-											className={cn(
-												"app-activity-create-model relative flex h-[58px] items-center gap-3 rounded-2xl border px-3 text-left transition max-[1599px]:h-[48px] max-[1599px]:rounded-[13px]",
-												selected ?
-													"app-activity-create-model-selected border-[#4ADE80] bg-white"
-												:	"border-[#E5E5E7] bg-[#F8F8F9] hover:border-[#D1D5DB]",
-											)}
-										>
-											{selected && (
-												<span className="absolute right-3 top-1/2 -translate-y-1/2">
-													<CoinAmount
-														type={
-															getActivityGenerationCost({
-																quality: option.quality,
-															}).coinType
-														}
-														amount={
-															getActivityGenerationCost({
-																quality: option.quality,
-															}).amount
-														}
-														size={16}
-													/>
-												</span>
-											)}
-											<span className="flex h-9 w-9 shrink-0 items-center justify-center max-[1599px]:h-8 max-[1599px]:w-8">
-												{option.icon ? (
-													<img
-														src={option.icon}
-														alt=""
-														className="h-6 w-6 object-contain"
-													/>
-												) : (
-													<Brain size={18} className="text-[#0F0F12]" />
-												)}
-											</span>
-											<span className="min-w-0 pr-14">
-												<span className="block truncate text-sm font-bold text-[#0F0F12]">
-													{option.label}
-												</span>
-											</span>
-										</button>
-									);
-								})}
-							</div>
-						</div>
-
-					</div>
-
-					<DialogFooter className="app-activity-create-footer max-[1599px]:px-5 max-[1599px]:py-3">
-						<span className="mr-auto inline-flex min-w-0 items-center gap-1.5 whitespace-nowrap text-xs font-bold text-[#0F0F12]">
-							Current balance:
-							<span className="inline-flex items-center gap-2">
-								{VISIBLE_COIN_TYPES.map((coinType) => (
-									<CoinAmount
-										key={coinType}
-										type={coinType}
-										amount={user?.credits[coinType] ?? 0}
-										size={16}
-									/>
-								))}
-							</span>
-						</span>
-						<Button
-							type="button"
-							variant="outline"
-							onClick={() => setIsActivityModalOpen(false)}
-						>
-							Cancel
-						</Button>
-						<Button
-							type="button"
-							disabled={isActivityLoading}
-							onClick={() => {
-								void handleCreateLearningActivity();
-							}}
-							className="gap-2 bg-[#4ADE80] text-[#0F0F12] hover:bg-[#3BCD6F]"
-						>
-							{isActivityLoading ?
-								<Loader2 size={16} className="animate-spin" />
-							:	<CirclePlus size={16} />
-							}
-							{isActivityLoading ? "Creating..." : "Create activity"}
-						</Button>
-					</DialogFooter>
-				</DialogContent>
-			</Dialog>
 		</div>
 	);
 	const unitPageBackground =
@@ -6231,6 +6053,195 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 
 	return (
 		<div className="flex h-screen overflow-hidden bg-[#F5F5F7] font-sans text-[#1D1D1F]">
+			<Dialog
+				open={isActivityModalOpen}
+				onOpenChange={setIsActivityModalOpen}
+			>
+				<DialogContent className="app-activity-create-modal max-h-[88vh] w-[calc(100vw-32px)] overflow-y-auto rounded-[18px] p-0 sm:max-w-[760px]">
+					<DialogHeader className="px-5 pb-0 pt-5">
+						<DialogTitle>Exercises & Practice</DialogTitle>
+						<DialogDescription>
+							{hasNextActiveModule ?
+								"Create a structured activity before moving to the next module."
+							:	"Create a structured activity to close out this unit."
+							}
+						</DialogDescription>
+					</DialogHeader>
+
+					<div className="space-y-5 px-5 py-5">
+						<div className="app-activity-create-scope rounded-[16px] bg-[#F5F5F7] p-1">
+							<div className="grid grid-cols-2 gap-1">
+								{[
+									{value: "current_module" as const, label: "Current", icon: BookOpenCheck},
+									{value: "cumulative_until_module" as const, label: "Past modules", icon: History},
+								].map((option) => {
+									const TabIcon = option.icon;
+									const selected = activityScope === option.value;
+									return (
+										<button
+											key={option.value}
+											type="button"
+											onClick={() => setActivityScope(option.value)}
+											className={cn(
+												"app-activity-create-scope-option flex items-center justify-center gap-2 rounded-[13px] px-3 py-2.5 text-[12px] font-bold transition",
+												selected ?
+													"app-activity-create-scope-option-selected bg-white text-[#16A34A] shadow-sm ring-1 ring-[#4ADE80]"
+												:	"text-[#6B7280]",
+											)}
+										>
+											<TabIcon size={15} />
+											{option.label}
+										</button>
+									);
+								})}
+							</div>
+						</div>
+
+						<div>
+							<div className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#86868B]">
+								Activity type
+							</div>
+							<div className="grid gap-2 sm:grid-cols-2">
+								{ACTIVITY_OPTIONS.map((option) => {
+									const Icon = option.icon;
+									const selected = activityType === option.type;
+									return (
+										<button
+											key={option.type}
+											type="button"
+											onClick={() => setActivityType(option.type)}
+											className={cn(
+												"app-activity-create-option relative flex items-start gap-3 rounded-[14px] border p-3 text-left transition",
+												selected ?
+													"app-activity-create-option-selected border-[#4ADE80] bg-[#F0FDF4] text-[#0F0F12]"
+												:	"border-[#E5E5E7] bg-white text-[#0F0F12]",
+											)}
+										>
+											{selected && (
+												<CheckCircle2
+													size={16}
+													className="absolute right-3 top-2.5 text-[#16A34A]"
+													fill="white"
+												/>
+											)}
+											<span
+												className={cn(
+													"app-activity-create-option-icon flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
+													selected ?
+														"app-activity-create-option-icon-selected bg-[#DCFCE7] text-[#16A34A]"
+													:	"bg-[#F3F4F6] text-[#0F0F12]",
+												)}
+											>
+												<Icon size={17} />
+											</span>
+											<span className="pr-5">
+												<span className="block text-[13px] font-bold">{option.label}</span>
+												<span className="mt-1 block text-[11px] leading-relaxed text-[#6B7280]">
+													{option.description}
+												</span>
+											</span>
+										</button>
+									);
+								})}
+							</div>
+						</div>
+
+						<div>
+							<div className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#86868B]">
+								Model
+							</div>
+							<div className="grid gap-2 sm:grid-cols-2">
+								{generationModelOptions.map((option) => {
+									const selected = activityQuality === option.quality;
+									return (
+										<button
+											key={option.quality}
+											type="button"
+											onClick={() => setActivityQuality(option.quality)}
+											className={cn(
+												"app-activity-create-model relative flex h-[54px] items-center gap-3 rounded-[14px] border px-3 text-left transition",
+												selected ?
+													"app-activity-create-model-selected border-[#4ADE80] bg-white"
+												:	"border-[#E5E5E7] bg-[#F8F8F9]",
+											)}
+										>
+											{selected && (
+												<span className="absolute right-3 top-1/2 -translate-y-1/2">
+													<CoinAmount
+														type={
+															getActivityGenerationCost({
+																quality: option.quality,
+															}).coinType
+														}
+														amount={
+															getActivityGenerationCost({
+																quality: option.quality,
+															}).amount
+														}
+														size={16}
+													/>
+												</span>
+											)}
+											<span className="flex h-9 w-9 shrink-0 items-center justify-center">
+												{option.icon ?
+													<img
+														src={option.icon}
+														alt=""
+														className="h-6 w-6 object-contain"
+													/>
+												:	<Brain size={18} className="text-[#0F0F12]" />
+												}
+											</span>
+											<span className="min-w-0 pr-14">
+												<span className="block truncate text-[13px] font-bold text-[#0F0F12]">
+													{option.label}
+												</span>
+											</span>
+										</button>
+									);
+								})}
+							</div>
+						</div>
+					</div>
+
+					<DialogFooter className="app-activity-create-footer grid grid-cols-2 gap-2 border-t border-[#F0F0F2] bg-[#FAFAFB] px-5 py-4">
+						<span className="col-span-2 mb-1 inline-flex min-w-0 items-center gap-1.5 whitespace-nowrap text-[11px] font-bold text-[#0F0F12]">
+							Current balance:
+							<span className="inline-flex items-center gap-2">
+								{VISIBLE_COIN_TYPES.map((coinType) => (
+									<CoinAmount
+										key={coinType}
+										type={coinType}
+										amount={user?.credits[coinType] ?? 0}
+										size={16}
+									/>
+								))}
+							</span>
+						</span>
+						<Button
+							type="button"
+							variant="outline"
+							onClick={() => setIsActivityModalOpen(false)}
+						>
+							Cancel
+						</Button>
+						<Button
+							type="button"
+							disabled={isActivityLoading}
+							onClick={() => {
+								void handleCreateLearningActivity();
+							}}
+							className="gap-2 bg-[#4ADE80] text-[#0F0F12] hover:bg-[#3BCD6F]"
+						>
+							{isActivityLoading ?
+								<Loader2 size={16} className="animate-spin" />
+							:	<CirclePlus size={16} />
+							}
+							{isActivityLoading ? "Creating..." : "Create"}
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
 			<Motion.aside
 				className="app-editor-sidebar z-20 flex h-full w-[280px] shrink-0 flex-col overflow-hidden border-r border-[#E5E5E7] bg-white"
 				initial={false}
