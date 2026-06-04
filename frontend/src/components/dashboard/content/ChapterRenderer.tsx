@@ -51,6 +51,59 @@ function collectNoteIds(node: DOMNode): string[] {
 	return [...noteIds];
 }
 
+function collectSearchHighlights(
+	node: DOMNode,
+): Array<{endOffset: number; startOffset: number}> {
+	const highlights: Array<{endOffset: number; startOffset: number}> = [];
+	let normalizedOffset = 0;
+	let inWhitespace = false;
+
+	function visitText(value: string): void {
+		for (const char of value) {
+			if (/\s/.test(char)) {
+				if (inWhitespace) {
+					continue;
+				}
+				inWhitespace = true;
+			} else {
+				inWhitespace = false;
+			}
+			normalizedOffset += 1;
+		}
+	}
+
+	function visit(current: DOMNode, insideHighlight: boolean): void {
+		if ("data" in current && typeof current.data === "string") {
+			visitText(current.data);
+			return;
+		}
+
+		if (!(current instanceof Element)) {
+			return;
+		}
+
+		const isHighlight =
+			current.attribs.class?.split(/\s+/).includes("didactio-search-hit") ??
+			false;
+		const startsHighlight = isHighlight && !insideHighlight;
+		const startOffset = normalizedOffset;
+
+		current.children.forEach((child) =>
+			visit(child as DOMNode, insideHighlight || isHighlight),
+		);
+
+		if (startsHighlight && normalizedOffset > startOffset) {
+			highlights.push({
+				startOffset,
+				endOffset: normalizedOffset,
+			});
+		}
+	}
+
+	visit(node, false);
+	return highlights;
+}
+
 function stableChildKey(child: ReactNode, index: number, seed: string): string {
 	if (
 		typeof child === "object" &&
@@ -97,6 +150,7 @@ export function ChapterRenderer({
 						language={language}
 						continuation={continuation}
 						noteIds={collectNoteIds(node)}
+						searchHighlights={collectSearchHighlights(node)}
 						stylePreset={stylePreset}
 					/>
 				);

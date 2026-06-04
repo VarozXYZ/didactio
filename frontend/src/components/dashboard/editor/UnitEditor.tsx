@@ -30,6 +30,7 @@ import {
 	PartyPopper,
 	Undo2,
 	RotateCcw,
+	Search,
 	Settings,
 	Share2,
 	StickyNote,
@@ -161,6 +162,13 @@ import {
 	buildNoteAnchorFromSelection,
 	getValidUnitNotesForChapter,
 } from "@/dashboard/utils/unitNotes";
+import {
+	applySearchHighlightToPageHtml,
+	buildUnitSearchIndex,
+	searchUnitIndex,
+	type ActiveSearchHighlight,
+	type UnitSearchResult,
+} from "@/dashboard/utils/unitSearch";
 
 const VISIBLE_COIN_TYPES = ["bronze", "silver", "gold"] as const;
 const EDITOR_GUIDE_STORAGE_KEY = "didactio.editor.guide.v1";
@@ -183,6 +191,12 @@ type PendingNoteSelection = {
 	anchor: DidacticUnitNoteAnchorDto;
 	x: number;
 	y: number;
+};
+
+type PendingSearchJump = {
+	chapterIndex: number;
+	matchEndOffsetInModule: number;
+	matchOffsetInModule: number;
 };
 
 function cn(...inputs: Array<string | false | null | undefined>) {
@@ -873,6 +887,7 @@ type MobileUnitEditorProps = {
 	onOpenExport: () => void;
 	onOpenHistory: () => void;
 	onOpenNotes: () => void;
+	onOpenSearch: () => void;
 	onOpenPreferences: () => void;
 	onOpenTutorial: () => void;
 	onTextStyleChange: (textStyle: EditorTextStyle) => void;
@@ -881,6 +896,7 @@ type MobileUnitEditorProps = {
 	onSelectChapter: (chapterIndex: number) => void;
 	onSubmitActivityAttempt: (activityId: string, answers: unknown) => Promise<void>;
 	resolvedThemeVars: CSSProperties;
+	searchNavigationSignal: number;
 	stylePreset: EditorTextStyle["stylePreset"];
 	textStyle: EditorTextStyle;
 };
@@ -939,6 +955,7 @@ function MobileUnitEditor({
 	onOpenExport,
 	onOpenHistory,
 	onOpenNotes,
+	onOpenSearch,
 	onOpenPreferences,
 	onOpenTutorial,
 	onTextStyleChange,
@@ -947,6 +964,7 @@ function MobileUnitEditor({
 	onSelectChapter,
 	onSubmitActivityAttempt,
 	resolvedThemeVars,
+	searchNavigationSignal,
 	stylePreset,
 	textStyle,
 }: MobileUnitEditorProps) {
@@ -1002,6 +1020,21 @@ function MobileUnitEditor({
 		if (activeTab !== "content") return;
 		contentScrollRef.current?.scrollTo({top: 0, left: 0});
 	}, [activeChapterIndex, activeTab]);
+
+	useEffect(() => {
+		if (searchNavigationSignal <= 0) {
+			return;
+		}
+
+		const frame = window.requestAnimationFrame(() => {
+			setSelectedActivityId(null);
+			setSelectedExerciseChapterIndex(null);
+			setActiveTab("content");
+			contentScrollRef.current?.scrollTo({top: 0, left: 0});
+		});
+
+		return () => window.cancelAnimationFrame(frame);
+	}, [searchNavigationSignal]);
 
 	useEffect(() => {
 		if (!isFloatingActionsOpen) return;
@@ -1087,6 +1120,11 @@ function MobileUnitEditor({
 							initial={{opacity: 0}}
 						>
 							{[
+								{
+									ariaLabel: "Search unit",
+									icon: <Search size={17} />,
+									onClick: onOpenSearch,
+								},
 								{
 									ariaLabel: "Notes",
 									icon: <StickyNote size={17} />,
@@ -1687,6 +1725,14 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		useState(false);
 	const [unitNotes, setUnitNotes] = useState<DidacticUnitNoteDto[]>([]);
 	const [isNotesPanelOpen, setIsNotesPanelOpen] = useState(false);
+	const [isSearchOpen, setIsSearchOpen] = useState(false);
+	const [searchQuery, setSearchQuery] = useState("");
+	const [pendingSearchJump, setPendingSearchJump] =
+		useState<PendingSearchJump | null>(null);
+	const [activeSearchHighlight, setActiveSearchHighlight] =
+		useState<ActiveSearchHighlight | null>(null);
+	const [mobileSearchNavigationSignal, setMobileSearchNavigationSignal] =
+		useState(0);
 	const [pendingNoteSelection, setPendingNoteSelection] =
 		useState<PendingNoteSelection | null>(null);
 	const [isNoteDialogOpen, setIsNoteDialogOpen] = useState(false);
@@ -1700,6 +1746,8 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	const [noteEditContent, setNoteEditContent] = useState("");
 	const [noteEditQuestion, setNoteEditQuestion] = useState("");
 	const noteAutoSaveRequestRef = useRef(0);
+	const searchHighlightTimeoutRef = useRef<number | null>(null);
+	const searchInputRef = useRef<HTMLInputElement | null>(null);
 	const [activityScope, setActivityScope] =
 		useState<LearningActivityScopeDto>("current_module");
 	const [activityType, setActivityType] =
@@ -1741,6 +1789,32 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				);
 			});
 	}, [resolvedMode]);
+
+	useEffect(() => {
+		const handleSearchShortcut = (event: KeyboardEvent) => {
+			if (!event.ctrlKey || event.key.toLowerCase() !== "s") {
+				return;
+			}
+
+			event.preventDefault();
+			setIsSearchOpen(true);
+		};
+
+		window.addEventListener("keydown", handleSearchShortcut);
+		return () => window.removeEventListener("keydown", handleSearchShortcut);
+	}, []);
+
+	useEffect(() => {
+		if (!isSearchOpen) {
+			return;
+		}
+
+		const frame = window.requestAnimationFrame(() => {
+			searchInputRef.current?.focus();
+		});
+
+		return () => window.cancelAnimationFrame(frame);
+	}, [isSearchOpen]);
 
 	useEffect(() => {
 		if (editorGuideCheckedRef.current || !workspace) {
@@ -1972,6 +2046,20 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 				learningActivities[activeChapter.chapterIndex] ?? []
 			:	[],
 		[activeChapter, learningActivities],
+	);
+	const unitSearchIndex = useMemo(
+		() =>
+			workspace ?
+				buildUnitSearchIndex({
+					chapters: workspace.chapters,
+					chapterDetails,
+				})
+			:	{chapters: [], totalTextLength: 0},
+		[chapterDetails, workspace],
+	);
+	const unitSearchResults = useMemo(
+		() => searchUnitIndex(unitSearchIndex, searchQuery),
+		[searchQuery, unitSearchIndex],
 	);
 
 	useEffect(() => {
@@ -2665,6 +2753,9 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			}
 			if (streamingHtmlFlushTimeoutRef.current) {
 				window.clearTimeout(streamingHtmlFlushTimeoutRef.current);
+			}
+			if (searchHighlightTimeoutRef.current) {
+				window.clearTimeout(searchHighlightTimeoutRef.current);
 			}
 		},
 		[],
@@ -3786,6 +3877,79 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		[pagesPerSpread, persistVisitedSpread, totalSpreads],
 	);
 
+	const activateSearchHighlight = useCallback(
+		(result: UnitSearchResult) => {
+			if (searchHighlightTimeoutRef.current) {
+				window.clearTimeout(searchHighlightTimeoutRef.current);
+			}
+
+			setActiveSearchHighlight({
+				chapterIndex: result.chapterIndex,
+				startOffset: result.matchOffsetInModule,
+				endOffset: result.matchEndOffsetInModule,
+				key: Date.now(),
+			});
+			searchHighlightTimeoutRef.current = window.setTimeout(() => {
+				setActiveSearchHighlight(null);
+				searchHighlightTimeoutRef.current = null;
+			}, 4200);
+		},
+		[],
+	);
+
+	const handleSelectSearchResult = useCallback(
+		(result: UnitSearchResult) => {
+			setIsSearchOpen(false);
+			setPendingNoteSelection(null);
+			setActiveNoteId(null);
+			setIsEditMode(false);
+			activateSearchHighlight(result);
+			setPendingSearchJump({
+				chapterIndex: result.chapterIndex,
+				matchOffsetInModule: result.matchOffsetInModule,
+				matchEndOffsetInModule: result.matchEndOffsetInModule,
+			});
+			setMobileSearchNavigationSignal((value) => value + 1);
+
+			if (result.chapterIndex !== activeChapterIndexRef.current) {
+				setActiveChapterIndex(result.chapterIndex);
+			}
+		},
+		[activateSearchHighlight],
+	);
+
+	useEffect(() => {
+		if (
+			!pendingSearchJump ||
+			!activeChapter ||
+			activeChapter.chapterIndex !== pendingSearchJump.chapterIndex ||
+			measuredReadPages.length === 0
+		) {
+			return;
+		}
+
+		const exactPageIndex = measuredReadPages.findIndex(
+			(page) =>
+				isMeasuredContentPage(page) &&
+				pendingSearchJump.matchOffsetInModule >= page.startCharacterOffset &&
+				pendingSearchJump.matchOffsetInModule < page.endCharacterOffset,
+		);
+		const fallbackPageIndex = measuredReadPages.findIndex(
+			(page) =>
+				isMeasuredContentPage(page) &&
+				pendingSearchJump.matchOffsetInModule <= page.endCharacterOffset,
+		);
+		const pageIndex = Math.max(0, exactPageIndex >= 0 ? exactPageIndex : fallbackPageIndex);
+
+		goToPageIndex(pageIndex);
+		setPendingSearchJump(null);
+	}, [
+		activeChapter,
+		goToPageIndex,
+		measuredReadPages,
+		pendingSearchJump,
+	]);
+
 	const goToNextSpread = useCallback(() => {
 		if (!canGoNext) {
 			return;
@@ -4764,12 +4928,21 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 	}) => {
 		const renderedHtml =
 			!editable && activeChapter && pageEndOffset > pageStartOffset ?
-				applyNoteMarksToPageHtml({
-					html: html ?? "",
+				applySearchHighlightToPageHtml({
+					html: applyNoteMarksToPageHtml({
+						html: html ?? "",
+						pageStartOffset,
+						pageEndOffset,
+						chapter: activeChapter,
+						notes: activeChapterNotes,
+					}),
 					pageStartOffset,
 					pageEndOffset,
-					chapter: activeChapter,
-					notes: activeChapterNotes,
+					highlight:
+						activeSearchHighlight?.chapterIndex ===
+						activeChapter.chapterIndex ?
+							activeSearchHighlight
+						:	null,
 				})
 			:	html ?? "";
 		return (
@@ -4870,12 +5043,21 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 		const titleBodyFamily = FONT_CATALOG[titlePreset.body].family;
 		const renderedHtml =
 			!editable && activeChapter && pageEndOffset > pageStartOffset ?
-				applyNoteMarksToPageHtml({
-					html: html ?? "",
+				applySearchHighlightToPageHtml({
+					html: applyNoteMarksToPageHtml({
+						html: html ?? "",
+						pageStartOffset,
+						pageEndOffset,
+						chapter: activeChapter,
+						notes: activeChapterNotes,
+					}),
 					pageStartOffset,
 					pageEndOffset,
-					chapter: activeChapter,
-					notes: activeChapterNotes,
+					highlight:
+						activeSearchHighlight?.chapterIndex ===
+						activeChapter.chapterIndex ?
+							activeSearchHighlight
+						:	null,
 				})
 			:	html ?? "";
 
@@ -5336,16 +5518,143 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 			isMobile={spreadMetrics.isMobile}
 		/>
 	);
+	const mobileActiveContentHtml =
+		activeSearchHighlight?.chapterIndex === activeChapter.chapterIndex ?
+			applySearchHighlightToPageHtml({
+				html: activeDraftContent,
+				pageStartOffset: 0,
+				pageEndOffset:
+					activeChapter.htmlBlocks.at(-1)?.textEndOffset ??
+					activeDraftContent.length,
+				highlight: activeSearchHighlight,
+			})
+		:	activeDraftContent;
+	const searchDialog = isSearchOpen ? (
+		<div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+			<button
+				aria-label="Close search"
+				className="absolute inset-0 cursor-default bg-black/20 backdrop-blur-[2px]"
+				onClick={() => setIsSearchOpen(false)}
+				type="button"
+			/>
+			<div
+				aria-modal="true"
+				className="relative z-10 max-h-[82vh] w-[calc(100vw-32px)] overflow-hidden rounded-[18px] border border-black/[0.06] bg-white shadow-[0_20px_60px_rgba(0,0,0,0.15)] sm:max-w-[640px]"
+				role="dialog"
+			>
+				<button
+					aria-label="Close search"
+					className="absolute right-4 top-4 z-10 flex h-7 w-7 items-center justify-center rounded-lg border border-[#E5E5E7] bg-[#F5F5F7] text-[#86868B] transition hover:bg-[#EBEBEB] hover:text-[#1D1D1F] focus:outline-none"
+					onClick={() => setIsSearchOpen(false)}
+					type="button"
+				>
+					<X size={14} />
+				</button>
+				<div className="border-b border-[#E5E5E7] px-5 pb-4 pt-5 text-left">
+					<div className="flex items-center gap-3">
+						<span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-[#34C759]/10 text-[#34C759]">
+							<Search size={18} />
+						</span>
+						<div className="min-w-0">
+							<div className="text-[17px] font-bold text-[#0F0F12]">
+								Search unit
+							</div>
+							<div className="mt-0.5 text-[13px] text-[#6E6E73]">
+								Find text across generated modules.
+							</div>
+						</div>
+					</div>
+				</div>
+				<div className="border-b border-[#F0F0F2] bg-white px-5 py-4">
+					<label className="relative block">
+						<Search
+							aria-hidden
+							className="absolute left-3 top-1/2 -translate-y-1/2 text-[#8E8E93]"
+							size={16}
+						/>
+						<input
+							ref={searchInputRef}
+							className="h-11 w-full rounded-[12px] border border-[#D4D7DD] bg-[#FAFAFA] pl-9 pr-3 text-[14px] font-medium text-[#0F0F12] outline-none transition focus:border-[#34C759] focus:bg-white focus:ring-3 focus:ring-[#34C759]/10"
+							onChange={(event) => setSearchQuery(event.target.value)}
+							placeholder="Search modules..."
+							type="search"
+							value={searchQuery}
+						/>
+					</label>
+					<div className="mt-2 text-[11px] font-medium text-[#86868B]">
+						{searchQuery.trim() ?
+							`${unitSearchResults.length} result${unitSearchResults.length === 1 ? "" : "s"}`
+						:	"Type to search generated module content"}
+					</div>
+				</div>
+				<div className="max-h-[52vh] overflow-y-auto bg-white p-3">
+					{!searchQuery.trim() ?
+						<div className="rounded-[14px] border border-dashed border-[#D4D7DD] p-6 text-center">
+							<Search
+								size={24}
+								className="mx-auto mb-2 text-[#34C759]"
+							/>
+							<div className="text-[13px] font-semibold text-[#1D1D1F]">
+								Search all modules
+							</div>
+							<div className="mt-1 text-[12px] leading-relaxed text-[#86868B]">
+								Results include the module, unit position, and surrounding text.
+							</div>
+						</div>
+					: unitSearchResults.length === 0 ?
+						<div className="rounded-[14px] border border-dashed border-[#D4D7DD] p-6 text-center">
+							<div className="text-[13px] font-semibold text-[#1D1D1F]">
+								No results
+							</div>
+							<div className="mt-1 text-[12px] leading-relaxed text-[#86868B]">
+								Try a shorter term or a different spelling.
+							</div>
+						</div>
+					:	<div className="space-y-2">
+							{unitSearchResults.map((result) => (
+								<button
+									key={result.id}
+									className="group w-full rounded-[12px] border border-[#E5E5E7] bg-[#FAFAFA] p-3 text-left transition hover:border-[#34C759]/50 hover:bg-[#FBFFFC]"
+									onClick={() => handleSelectSearchResult(result)}
+									type="button"
+								>
+									<div className="flex items-start justify-between gap-3">
+										<div className="min-w-0">
+											<div className="text-[11px] font-bold uppercase tracking-wide text-[#34C759]">
+												Module {result.moduleIndex} · {result.unitPercent}% of unit
+											</div>
+										</div>
+										<ChevronRight
+											size={16}
+											className="mt-1 shrink-0 text-[#C7C7CC] transition group-hover:translate-x-0.5 group-hover:text-[#34C759]"
+										/>
+									</div>
+									<div className="mt-2 text-[13px] leading-relaxed text-white">
+										<span>{result.before}</span>
+										<mark className="bg-transparent px-0 text-[#34C759]">
+											{result.match}
+										</mark>
+										<span>{result.after}</span>
+									</div>
+								</button>
+							))}
+						</div>
+					}
+				</div>
+			</div>
+		</div>
+	) : null;
 
 	if (spreadMetrics.isMobile) {
 		return (
 			<>
 				{editorGuideDialog}
+				{searchDialog}
 				<MobileUnitEditor
 					workspace={workspace}
 					activeChapter={activeChapter}
 					activeChapterIndex={activeChapterIndex}
-					activeContentHtml={activeDraftContent}
+					activeContentHtml={mobileActiveContentHtml}
 					learningActivitiesByChapter={learningActivities}
 					activityAttempts={activityAttempts}
 					activityContentScale={Math.min(
@@ -5370,6 +5679,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 					onOpenExport={() => setIsExportDialogOpen(true)}
 					onOpenHistory={() => setIsHistoryOpen(true)}
 					onOpenNotes={() => setIsNotesPanelOpen(true)}
+					onOpenSearch={() => setIsSearchOpen(true)}
 					onOpenPreferences={() =>
 						navigate("/dashboard?section=preferences")
 					}
@@ -5384,6 +5694,7 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 					}}
 					onSubmitActivityAttempt={handleLearningActivityAttempt}
 					resolvedThemeVars={resolvedThemeVars}
+					searchNavigationSignal={mobileSearchNavigationSignal}
 					stylePreset={draft.textStyle.stylePreset}
 					textStyle={displayTextStyle ?? draft.textStyle}
 				/>
@@ -6453,6 +6764,23 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 						data-editor-tour="header-actions"
 					>
 						<div className="flex items-center gap-1.5">
+							<HeaderControlTooltip label="Search unit">
+								<button
+									aria-label="Search unit"
+									className={cn(
+										headerIconButtonClass,
+										isSearchOpen ?
+											"border-[#34C759] text-[#34C759]"
+										:	"border-[#D4D7DD]",
+									)}
+									onClick={() =>
+										setIsSearchOpen((value) => !value)
+									}
+									type="button"
+								>
+									<Search size={18} />
+								</button>
+							</HeaderControlTooltip>
 							<HeaderControlTooltip label="Notes">
 								<button
 									aria-label="Notes"
@@ -7005,6 +7333,8 @@ export function UnitEditor({didacticUnitId, onDataChanged}: UnitEditorProps) {
 					)}
 				</AnimatePresence>
 			</main>
+
+			{searchDialog}
 
 			<Dialog
 				open={isUnitCompleteModalOpen}

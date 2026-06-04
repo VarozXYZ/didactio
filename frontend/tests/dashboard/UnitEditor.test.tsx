@@ -247,7 +247,20 @@ describe("UnitEditor", () => {
 		expect(screen.getAllByText("Module one").length).toBeGreaterThan(0);
 		expect(screen.getByLabelText("Notes")).toBeTruthy();
 		expect(screen.getByLabelText("Version history")).toBeTruthy();
+		expect(screen.getByLabelText("Search unit")).toBeTruthy();
 		expect(screen.getByLabelText("Edit")).toBeTruthy();
+	});
+
+	it("opens unit search and shows module results", async () => {
+		display();
+
+		fireEvent.click(await screen.findByLabelText("Search unit"));
+		const input = await screen.findByPlaceholderText("Search modules...");
+		fireEvent.change(input, {target: {value: "body"}});
+
+		expect(await screen.findByText("Module 1 · 0% of unit")).toBeTruthy();
+		expect(screen.getByText("Module one")).toBeTruthy();
+		expect(screen.getByText("Body")).toBeTruthy();
 	});
 
 	it("keeps editable page drafts stable while typing", async () => {
@@ -277,6 +290,7 @@ describe("UnitEditor", () => {
 		fireEvent.click(screen.getByText("Content"));
 
 		fireEvent.click(screen.getByLabelText("More actions"));
+		expect(await screen.findByLabelText("Search unit")).toBeTruthy();
 		fireEvent.click(await screen.findByLabelText("Reading style"));
 		expect(await screen.findByText("Adjust how this unit reads.")).toBeTruthy();
 		fireEvent.click(screen.getByText("Large"));

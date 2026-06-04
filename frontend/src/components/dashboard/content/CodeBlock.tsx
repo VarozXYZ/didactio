@@ -14,6 +14,7 @@ type CodeBlockProps = {
 	language?: string;
 	continuation?: "continued" | "continues-next";
 	noteIds?: string[];
+	searchHighlights?: Array<{endOffset: number; startOffset: number}>;
 	stylePreset?: StylePresetId;
 };
 
@@ -24,11 +25,165 @@ function escapeHtml(value: string): string {
 		.replace(/>/g, "&gt;");
 }
 
+type TextPosition = {
+	node: Text;
+	offset: number;
+	normalizedOffset: number;
+};
+
+function walkTextPositions(
+	root: HTMLElement,
+	visit: (position: TextPosition) => boolean | void,
+): void {
+	const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+	let normalizedOffset = 0;
+	let inWhitespace = false;
+
+	while (walker.nextNode()) {
+		const node = walker.currentNode as Text;
+		const value = node.data;
+
+		for (let offset = 0; offset <= value.length; offset += 1) {
+			if (visit({node, offset, normalizedOffset}) === false) {
+				return;
+			}
+			if (offset === value.length) {
+				continue;
+			}
+			const char = value[offset];
+			if (/\s/.test(char)) {
+				if (inWhitespace) {
+					continue;
+				}
+				inWhitespace = true;
+			} else {
+				inWhitespace = false;
+			}
+			normalizedOffset += 1;
+		}
+	}
+}
+
+function findTextPositionForNormalizedOffset(
+	root: HTMLElement,
+	targetOffset: number,
+): {node: Text; offset: number} | null {
+	let result: {node: Text; offset: number} | null = null;
+	walkTextPositions(root, ({node, offset, normalizedOffset}) => {
+		result = {node, offset};
+		if (normalizedOffset >= targetOffset) {
+			return false;
+		}
+		return undefined;
+	});
+	return result;
+}
+
+function wrapTextNodeSegment(input: {
+	document: Document;
+	endOffset: number;
+	node: Text;
+	startOffset: number;
+}): void {
+	const startOffset = Math.max(0, Math.min(input.startOffset, input.node.length));
+	const endOffset = Math.max(
+		startOffset,
+		Math.min(input.endOffset, input.node.length),
+	);
+
+	if (!input.node.parentNode || endOffset <= startOffset) {
+		return;
+	}
+
+	let target = input.node;
+	if (endOffset < target.length) {
+		target.splitText(endOffset);
+	}
+	if (startOffset > 0) {
+		target = target.splitText(startOffset);
+	}
+	if (!target.data.trim()) {
+		return;
+	}
+
+	const mark = input.document.createElement("mark");
+	mark.className = "didactio-search-hit";
+	mark.dataset.searchHit = "true";
+	target.parentNode?.insertBefore(mark, target);
+	mark.appendChild(target);
+}
+
+function wrapTextPositions(input: {
+	document: Document;
+	end: {node: Text; offset: number};
+	root: HTMLElement;
+	start: {node: Text; offset: number};
+}): void {
+	const textNodes: Text[] = [];
+	const walker = input.document.createTreeWalker(
+		input.root,
+		NodeFilter.SHOW_TEXT,
+	);
+	while (walker.nextNode()) {
+		textNodes.push(walker.currentNode as Text);
+	}
+
+	const startIndex = textNodes.indexOf(input.start.node);
+	const endIndex = textNodes.indexOf(input.end.node);
+	if (startIndex < 0 || endIndex < startIndex) {
+		return;
+	}
+
+	for (let index = endIndex; index >= startIndex; index -= 1) {
+		const node = textNodes[index];
+		wrapTextNodeSegment({
+			node,
+			startOffset: index === startIndex ? input.start.offset : 0,
+			endOffset: index === endIndex ? input.end.offset : node.length,
+			document: input.document,
+		});
+	}
+}
+
+function applyCodeSearchHighlights(
+	html: string,
+	highlights: Array<{endOffset: number; startOffset: number}>,
+): string {
+	if (highlights.length === 0) {
+		return html;
+	}
+
+	const parser = new DOMParser();
+	const document = parser.parseFromString(html, "text/html");
+	const root = document.body;
+
+	for (const highlight of [...highlights].sort(
+		(left, right) => right.startOffset - left.startOffset,
+	)) {
+		const start = findTextPositionForNormalizedOffset(
+			root,
+			highlight.startOffset,
+		);
+		const end = findTextPositionForNormalizedOffset(root, highlight.endOffset);
+		if (!start || !end) {
+			continue;
+		}
+		try {
+			wrapTextPositions({root, start, end, document});
+		} catch {
+			continue;
+		}
+	}
+
+	return root.innerHTML;
+}
+
 export function CodeBlock({
 	code,
 	language,
 	continuation,
 	noteIds = [],
+	searchHighlights = [],
 	stylePreset = "classic",
 }: CodeBlockProps) {
 	const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null);
@@ -50,13 +205,18 @@ export function CodeBlock({
 			.then((highlighter) => highlighter.codeToHtml(code, {lang, theme}))
 			.then((html) => {
 				if (!cancelled) {
-					setHighlightedHtml(html);
+					setHighlightedHtml(
+						applyCodeSearchHighlights(html, searchHighlights),
+					);
 				}
 			})
 			.catch(() => {
 				if (!cancelled) {
 					setHighlightedHtml(
-						`<pre><code>${escapeHtml(code)}</code></pre>`,
+						applyCodeSearchHighlights(
+							`<pre><code>${escapeHtml(code)}</code></pre>`,
+							searchHighlights,
+						),
 					);
 				}
 			});
@@ -64,7 +224,7 @@ export function CodeBlock({
 		return () => {
 			cancelled = true;
 		};
-	}, [code, language, theme]);
+	}, [code, language, searchHighlights, theme]);
 
 	const handleCopy = () => {
 		void navigator.clipboard.writeText(code).then(() => {

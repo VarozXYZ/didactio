@@ -1,4 +1,4 @@
-import {cleanup, render, screen} from "@testing-library/react";
+import {cleanup, render, screen, waitFor} from "@testing-library/react";
 import {afterEach, describe, expect, it, vi} from "vitest";
 import {ChapterRenderer} from "@/components/dashboard/content/ChapterRenderer";
 import {AppearanceContext} from "@/theme/appearanceContext";
@@ -44,5 +44,17 @@ describe("ChapterRenderer", () => {
 		expect(screen.getByLabelText("Open code note").dataset.noteId).toBe(
 			"note-code",
 		);
+	});
+
+	it("keeps search highlights visible when rendering highlighted code blocks", async () => {
+		const {container} = display(
+			'<pre><code class="language-ts"><mark class="didactio-search-hit">const</mark> x = 1;</code></pre>',
+		);
+
+		await waitFor(() => {
+			expect(container.querySelector(".didactio-search-hit")?.textContent).toBe(
+				"const",
+			);
+		});
 	});
 });
