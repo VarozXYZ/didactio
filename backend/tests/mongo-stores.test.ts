@@ -106,7 +106,20 @@ describe("Mongo auth stores", () => {
 		const sessionStore = new MongoSessionStore(database({authSessions: sessions}));
 		await sessionStore.createSession({id: "new", userId: "user", refreshTokenHash: "hash", expiresAt: new Date()});
 		expect(await sessionStore.findByRefreshTokenHash("old")).toMatchObject({id: "session"});
-		expect(await sessionStore.rotateSession("session", "new", new Date())).toMatchObject({id: "session"});
+		expect(await sessionStore.rotateSession("session", "new", new Date(), {
+			ipAddress: "127.0.0.1",
+			userAgent: "test-agent",
+		})).toMatchObject({id: "session"});
+		expect(sessions.findOneAndUpdate).toHaveBeenCalledWith(
+			{id: "session", revokedAt: {$exists: false}},
+			expect.objectContaining({
+				$set: expect.objectContaining({
+					ipAddress: "127.0.0.1",
+					userAgent: "test-agent",
+				}),
+			}),
+			expect.any(Object),
+		);
 		await sessionStore.revokeSession("session");
 		await sessionStore.revokeAllForUser("user");
 		sessions.findOne.mockResolvedValueOnce({...sessionDoc, revokedAt: new Date()});

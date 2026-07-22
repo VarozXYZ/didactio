@@ -1,5 +1,5 @@
 import type {Db, Document} from "mongodb";
-import type {SessionRecord, SessionStore} from "./core/types.js";
+import type {SessionContext, SessionRecord, SessionStore} from "./core/types.js";
 
 type SessionDocument = SessionRecord & Document;
 
@@ -61,6 +61,7 @@ export class MongoSessionStore implements SessionStore {
 		sessionId: string,
 		nextRefreshTokenHash: string,
 		nextExpiresAt: Date,
+		context: SessionContext = {},
 	): Promise<SessionRecord | null> {
 		const session = await stripMongoId(
 			await this.collection.findOne({id: sessionId}),
@@ -74,6 +75,10 @@ export class MongoSessionStore implements SessionStore {
 			...session.previousRefreshTokenHashes,
 		].slice(0, 5);
 
+		const sessionContext = {
+			...(context.ipAddress ? {ipAddress: context.ipAddress} : {}),
+			...(context.userAgent ? {userAgent: context.userAgent} : {}),
+		};
 		const result = await this.collection.findOneAndUpdate(
 			{id: sessionId, revokedAt: {$exists: false}},
 			{
@@ -82,6 +87,7 @@ export class MongoSessionStore implements SessionStore {
 					previousRefreshTokenHashes,
 					expiresAt: nextExpiresAt,
 					updatedAt: new Date(),
+					...sessionContext,
 				},
 			},
 			{returnDocument: "after"},
