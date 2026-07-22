@@ -13,6 +13,10 @@ export function openNdjsonStream(response: express.Response): void {
 	response.setHeader("Content-Type", "application/x-ndjson; charset=utf-8");
 	response.setHeader("Cache-Control", "no-store");
 	response.setHeader("X-Accel-Buffering", "no");
+	// Send the headers before the first model token arrives. This keeps fetch()
+	// consumers subscribed to the body while the upstream model is generating.
+	response.flushHeaders?.();
+	response.socket?.setNoDelay(true);
 }
 
 export function writeNdjsonEvent(

@@ -1,5 +1,6 @@
 import {AIMessage, AIMessageChunk, HumanMessage, SystemMessage} from "@langchain/core/messages";
 import {LangChainTracer} from "@langchain/core/tracers/tracer_langchain";
+import {parsePartialJson} from "@langchain/core/output_parsers";
 import {Annotation, END, START, StateGraph} from "@langchain/langgraph";
 import {ChatOpenAI} from "@langchain/openai";
 import {Client} from "langsmith";
@@ -230,6 +231,7 @@ export function streamObject<T>(
 
 	void (async () => {
 		let raw = "";
+		let lastPartial = "";
 		let lastMessage: AIMessageChunk | undefined;
 		try {
 			const stream = await options.model.stream(
@@ -239,12 +241,19 @@ export function streamObject<T>(
 			for await (const chunk of stream) {
 				lastMessage = chunk;
 				raw += contentToText(chunk.content);
-				try {
-					const partial = JSON.parse(raw) as Partial<T>;
-					await partialQueue.push(partial);
-				} catch {
-					// Structured JSON is incomplete until a later chunk.
+
+				// JSON.parse only succeeds once the model has emitted the closing
+				// brace. LangChain's partial parser keeps incomplete objects and
+				// strings usable, so structured consumers can render progress while
+				// the model is still generating the response.
+				const partial = parsePartialJson(raw);
+				if (!partial || typeof partial !== "object" || Array.isArray(partial)) {
+					continue;
 				}
+				const serialized = JSON.stringify(partial);
+				if (serialized === lastPartial) continue;
+				lastPartial = serialized;
+				await partialQueue.push(partial as Partial<T>);
 			}
 			const source = generationSource(lastMessage ?? new AIMessageChunk({content: raw}), Date.now());
 			resolveTelemetry(source);
