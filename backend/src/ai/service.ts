@@ -313,6 +313,7 @@ function sanitizeQuestionFeedback(
 ): LearningActivityFeedbackResult["questionFeedback"] {
 	return questionFeedback.map((item) => ({
 		...item,
+		feedback: item.feedback ? sanitizeSimpleFeedbackHtml(item.feedback) : undefined,
 		expectedAnswer:
 			item.expectedAnswer ?
 				sanitizeSimpleFeedbackHtml(item.expectedAnswer)
@@ -321,6 +322,8 @@ function sanitizeQuestionFeedback(
 			item.improvementReason ?
 				sanitizeSimpleFeedbackHtml(item.improvementReason)
 			:	undefined,
+		strengths: item.strengths.map((value) => sanitizeSimpleFeedbackHtml(value)),
+		improvements: item.improvements.map((value) => sanitizeSimpleFeedbackHtml(value)),
 	}));
 }
 
@@ -1599,9 +1602,9 @@ export class GatewayAiService implements AiService {
 				prompt,
 				telemetry,
 				score: result.object.score,
-				feedback: result.object.feedback,
-				strengths: result.object.strengths,
-				improvements: result.object.improvements,
+				feedback: sanitizeSimpleFeedbackHtml(result.object.feedback),
+				strengths: result.object.strengths.map((value) => sanitizeSimpleFeedbackHtml(value)),
+				improvements: result.object.improvements.map((value) => sanitizeSimpleFeedbackHtml(value)),
 				questionFeedback,
 			};
 		} catch (error) {
