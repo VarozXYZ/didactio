@@ -49,6 +49,51 @@ export function normalizeHtmlForStorage(html: string): string {
 	return html.replace(/\u00a0/g, " ").trim();
 }
 
+const FEEDBACK_ALLOWED_TAGS = new Set([
+	"P",
+	"UL",
+	"OL",
+	"LI",
+	"BR",
+	"STRONG",
+	"EM",
+	"U",
+	"MARK",
+	"CODE",
+]);
+
+const FEEDBACK_REMOVE_ENTIRELY_TAGS = new Set([
+	"SCRIPT",
+	"STYLE",
+	"IFRAME",
+	"OBJECT",
+	"EMBED",
+	"FORM",
+]);
+
+/** Sanitizes legacy feedback before it reaches a dangerouslySetInnerHTML sink. */
+export function sanitizeFeedbackHtml(rawHtml: string): string {
+	const document = new DOMParser().parseFromString(rawHtml, "text/html");
+
+	for (const element of Array.from(document.body.querySelectorAll("*"))) {
+		if (FEEDBACK_REMOVE_ENTIRELY_TAGS.has(element.tagName)) {
+			element.remove();
+			continue;
+		}
+
+		if (!FEEDBACK_ALLOWED_TAGS.has(element.tagName)) {
+			element.replaceWith(...Array.from(element.childNodes));
+			continue;
+		}
+
+		for (const attribute of Array.from(element.attributes)) {
+			element.removeAttribute(attribute.name);
+		}
+	}
+
+	return document.body.innerHTML.trim();
+}
+
 export function htmlToPlainText(html: string | null | undefined): string {
 	const parser = new DOMParser();
 	const document = parser.parseFromString(html ?? "", "text/html");

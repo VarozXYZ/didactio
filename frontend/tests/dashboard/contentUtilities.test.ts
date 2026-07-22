@@ -5,6 +5,7 @@ import {
 	extractHtmlBlocks,
 	htmlToPlainText,
 	normalizeHtmlForStorage,
+	sanitizeFeedbackHtml,
 	splitParagraphHtmlAtTextOffset,
 } from "@/dashboard/utils/htmlContent";
 import {
@@ -33,6 +34,14 @@ import {
 } from "@/dashboard/utils/unitDisplayMetadata";
 
 describe("HTML and markdown content utilities", () => {
+	it("sanitizes legacy feedback HTML and removes executable content", () => {
+		expect(
+			sanitizeFeedbackHtml(
+				'<p>Keep <strong>this</strong></p><script>alert(1)</script><img src=x onerror=bad>',
+			),
+		).toBe("<p>Keep <strong>this</strong></p>");
+	});
+
 	it("extracts paragraphs, headings, lists, and merges ordinary code blocks", () => {
 		const blocks = extractHtmlBlocks(
 			"<h2>Heading</h2><p>Hello <strong>world</strong></p>" +
