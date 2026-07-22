@@ -17,8 +17,6 @@ export class MongoSessionStore implements SessionStore {
 
 	constructor(database: Db) {
 		this.collection = database.collection<SessionDocument>("authSessions");
-		void this.collection.createIndex({userId: 1});
-		void this.collection.createIndex({refreshTokenHash: 1});
 	}
 
 	async createSession(input: {

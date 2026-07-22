@@ -39,12 +39,6 @@ export class MongoUserStore implements UserStore {
 
 	constructor(database: Db) {
 		this.collection = database.collection<AuthUserDocument>("users");
-		void this.collection.createIndex(
-			{provider: 1, providerUserId: 1},
-			{unique: true},
-		);
-		void this.collection.createIndex({email: 1});
-		void this.collection.createIndex({"billing.stripeCustomerId": 1});
 	}
 
 	async findByProviderAccount(
