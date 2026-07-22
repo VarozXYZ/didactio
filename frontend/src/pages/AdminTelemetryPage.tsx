@@ -29,8 +29,6 @@ export default function AdminTelemetryPage() {
 		if (user?.role !== "admin") return;
 
 		let active = true;
-		setIsLoading(true);
-		setError(null);
 		void dashboardApi
 			.getAdminTelemetrySummary(50)
 			.then((nextSummary) => {
