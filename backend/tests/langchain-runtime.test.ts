@@ -35,7 +35,7 @@ describe("LangChain runtime adapter", () => {
 		expect(result.usage).toEqual({inputTokens: 2, outputTokens: 3, totalTokens: 5});
 		expect(model.invoke).toHaveBeenCalledWith(
 			expect.any(Array),
-			expect.objectContaining({response_format: {type: "json_object"}}),
+			expect.not.objectContaining({response_format: expect.anything()}),
 		);
 	});
 
