@@ -6,6 +6,7 @@ import {
 	htmlToPlainText,
 	normalizeHtmlForStorage,
 	sanitizeFeedbackHtml,
+	sanitizeRenderedHtml,
 	splitParagraphHtmlAtTextOffset,
 } from "@/dashboard/utils/htmlContent";
 import {
@@ -40,6 +41,14 @@ describe("HTML and markdown content utilities", () => {
 				'<p>Keep <strong>this</strong></p><script>alert(1)</script><img src=x onerror=bad>',
 			),
 		).toBe("<p>Keep <strong>this</strong></p>");
+	});
+
+	it("sanitizes stored chapter markup while preserving safe formatting", () => {
+		expect(
+			sanitizeRenderedHtml(
+				'<h2 id="safe">Title</h2><a href="javascript:bad">bad</a><script>bad()</script>',
+			),
+		).toBe('<h2 id="safe">Title</h2><a>bad</a>');
 	});
 
 	it("extracts paragraphs, headings, lists, and merges ordinary code blocks", () => {

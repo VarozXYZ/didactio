@@ -71,6 +71,34 @@ const FEEDBACK_REMOVE_ENTIRELY_TAGS = new Set([
 	"FORM",
 ]);
 
+const RENDERED_HTML_ALLOWED_TAGS = new Set([
+	"H2",
+	"H3",
+	"H4",
+	"P",
+	"UL",
+	"OL",
+	"LI",
+	"BLOCKQUOTE",
+	"PRE",
+	"CODE",
+	"TABLE",
+	"THEAD",
+	"TBODY",
+	"TR",
+	"TH",
+	"TD",
+	"HR",
+	"BR",
+	"STRONG",
+	"EM",
+	"U",
+	"A",
+	"SUB",
+	"SUP",
+	"MARK",
+]);
+
 /** Sanitizes legacy feedback before it reaches a dangerouslySetInnerHTML sink. */
 export function sanitizeFeedbackHtml(rawHtml: string): string {
 	const document = new DOMParser().parseFromString(rawHtml, "text/html");
@@ -88,6 +116,51 @@ export function sanitizeFeedbackHtml(rawHtml: string): string {
 
 		for (const attribute of Array.from(element.attributes)) {
 			element.removeAttribute(attribute.name);
+		}
+	}
+
+	return document.body.innerHTML.trim();
+}
+
+/** Sanitizes stored chapter HTML before it is rendered or exported. */
+export function sanitizeRenderedHtml(rawHtml: string): string {
+	const document = new DOMParser().parseFromString(rawHtml, "text/html");
+
+	for (const element of Array.from(document.body.querySelectorAll("*"))) {
+		if (FEEDBACK_REMOVE_ENTIRELY_TAGS.has(element.tagName)) {
+			element.remove();
+			continue;
+		}
+
+		if (!RENDERED_HTML_ALLOWED_TAGS.has(element.tagName)) {
+			element.replaceWith(...Array.from(element.childNodes));
+			continue;
+		}
+
+		for (const attribute of Array.from(element.attributes)) {
+			const name = attribute.name.toLowerCase();
+			const value = attribute.value.trim();
+			const allowed =
+				(element.tagName === "A" && ["href", "title"].includes(name)) ||
+				(["H2", "H3", "H4"].includes(element.tagName) && name === "id") ||
+				(element.tagName === "CODE" && name === "class") ||
+				(["TH", "TD"].includes(element.tagName) &&
+					["scope", "colspan", "rowspan"].includes(name));
+
+			if (!allowed) {
+				element.removeAttribute(attribute.name);
+				continue;
+			}
+
+			if (name === "href" && !/^(#|https?:|mailto:)/i.test(value)) {
+				element.removeAttribute(attribute.name);
+			}
+			if (name === "id" && !/^[a-z0-9][a-z0-9-]*$/i.test(value)) {
+				element.removeAttribute(attribute.name);
+			}
+			if (name === "class" && !/^language-[a-z0-9+#-]+$/i.test(value)) {
+				element.removeAttribute(attribute.name);
+			}
 		}
 	}
 
