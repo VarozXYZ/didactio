@@ -1242,6 +1242,8 @@ function CodePracticeEditor({
 				editorViewRef.current = null;
 			}
 		};
+	// The editor is created once per configuration; code changes are synchronized by the effect below.
+	// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [codeAccentColor, codeBackground, codeBorderColor, darkDisplay, language]);
 
 	useEffect(() => {

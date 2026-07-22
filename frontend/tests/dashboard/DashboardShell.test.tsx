@@ -10,7 +10,7 @@ import DashboardShell from "@/components/dashboard/DashboardShell";
 vi.mock("@/hooks/use-toast", () => ({toastError: vi.fn()}));
 vi.mock("motion/react", () => ({
 	motion: {
-		aside: ({children, initial: _initial, animate: _animate, transition: _transition, ...props}: React.HTMLAttributes<HTMLElement> & Record<string, unknown>) => <aside {...props}>{children}</aside>,
+		aside: ({children, ...props}: React.HTMLAttributes<HTMLElement> & Record<string, unknown>) => <aside {...withoutMotionProps(props)}>{children}</aside>,
 	},
 }));
 vi.mock("recharts", () => ({
@@ -22,6 +22,15 @@ vi.mock("recharts", () => ({
 	XAxis: () => <div />,
 	YAxis: () => <div />,
 }));
+
+function withoutMotionProps<TProps extends Record<string, unknown>>(props: TProps) {
+	const {animate, exit, initial, transition, ...domProps} = props;
+	void animate;
+	void exit;
+	void initial;
+	void transition;
+	return domProps;
+}
 
 const folder = {id: "folder", name: "General", slug: "general", icon: "book-open", color: "#16a34a", kind: "default" as const, unitCount: 1};
 const summary = {
