@@ -15,6 +15,7 @@ const RegisterPage = lazy(() => import("./pages/RegisterPage"));
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
 const AuthCallbackPage = lazy(() => import("./pages/AuthCallbackPage"));
 const OnboardingPage = lazy(() => import("./pages/OnboardingPage"));
+const AdminTelemetryPage = lazy(() => import("./pages/AdminTelemetryPage"));
 
 function RouteFallback() {
 	return (
@@ -81,6 +82,14 @@ function App() {
 							element={
 								<RequireAuth skipOnboardingCheck>
 									<OnboardingPage />
+								</RequireAuth>
+							}
+						/>
+						<Route
+							path="/dashboard/admin/telemetry"
+							element={
+								<RequireAuth>
+									<AdminTelemetryPage />
 								</RequireAuth>
 							}
 						/>

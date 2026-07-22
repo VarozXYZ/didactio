@@ -14,6 +14,7 @@ import {MongoLearningActivityStore} from "./learning-activities/mongo-learning-a
 import {createLogger} from "./logging/logger.js";
 import {connectMongo, getMongoHealthStatus} from "./mongo/mongo-connection.js";
 import {connectRedisRateLimiter} from "./http/rate-limit.js";
+import {createLangSmithTelemetryService} from "./observability/langsmith-telemetry.js";
 
 loadEnv();
 
@@ -26,6 +27,12 @@ const logger = createLogger({
 const authConfig = loadAuthConfigFromEnv();
 const mongoConnection = await connectMongo(env);
 const redisConnection = await connectRedisRateLimiter(env, logger);
+const langSmithTelemetry = createLangSmithTelemetryService({
+	apiKey: env.langSmithApiKey,
+	project: env.langSmithProject,
+	endpoint: env.langSmithEndpoint,
+	tracing: env.langSmithTracing,
+});
 
 if (process.env.NODE_ENV === "production" && !redisConnection) {
 	throw new Error("REDIS_URL must be configured in production.");
@@ -75,6 +82,7 @@ const app = createApp({
 	mongoHealth: getMongoHealthStatus(mongoConnection),
 	apiRateLimiter: redisConnection?.limiter,
 	apiRateLimitPerMinute: env.apiRateLimitPerMinute,
+	langSmithTelemetry,
 	logger,
 });
 

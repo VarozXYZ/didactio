@@ -38,6 +38,7 @@ import {
 } from "../../src/folders/folder-store.js";
 import type {MongoHealthStatus} from "../../src/mongo/mongo-connection.js";
 import {createMockAiService} from "./mock-ai-service.js";
+import type {LangSmithTelemetryService} from "../../src/observability/langsmith-telemetry.js";
 
 export function buildTestAuthConfig(): AuthConfig {
 	return {
@@ -77,6 +78,7 @@ interface CreateTestAppOptions {
 	billingConfig?: BillingConfig;
 	billingEventStore?: BillingEventStore;
 	stripeClient?: StripeClientLike | null;
+	langSmithTelemetry?: LangSmithTelemetryService;
 	disableAuthBypass?: boolean;
 }
 
@@ -118,6 +120,7 @@ export function createTestApp(options: CreateTestAppOptions = {}) {
 		billingEventStore:
 			options.billingEventStore ?? new InMemoryBillingEventStore(),
 		stripeClient: options.stripeClient,
+		langSmithTelemetry: options.langSmithTelemetry,
 		userStore,
 		sessionStore: new InMemorySessionStore(),
 		creditTransactionStore: new InMemoryCreditTransactionStore(),
