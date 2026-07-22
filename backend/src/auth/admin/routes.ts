@@ -3,6 +3,7 @@ import {AuthError} from "../core/errors.js";
 import type {AuthService} from "../core/service.js";
 import type {CreditCoinType, CreditDirection, UserRole} from "../core/types.js";
 import {authErrorHandler} from "../http/middleware.js";
+import type {LangSmithTelemetryService} from "../../observability/langsmith-telemetry.js";
 
 function parseRole(body: unknown): UserRole {
 	if (!body || typeof body !== "object") {
@@ -84,7 +85,19 @@ function parseCreditAdjustment(body: unknown): {
 	};
 }
 
-export function createAdminRouter(authService: AuthService): Router {
+function parseTelemetryLimit(value: unknown): number | undefined {
+	if (typeof value !== "string" || !value.trim()) {
+		return undefined;
+	}
+
+	const parsed = Number.parseInt(value, 10);
+	return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+export function createAdminRouter(
+	authService: AuthService,
+	telemetryService?: LangSmithTelemetryService,
+): Router {
 	const router = Router();
 
 	router.get("/users", async (_request, response, next) => {
@@ -93,6 +106,35 @@ export function createAdminRouter(authService: AuthService): Router {
 			response.json({
 				users: users.map((user) => authService.toPublicUser(user)),
 			});
+		} catch (error) {
+			next(error);
+		}
+	});
+
+	router.get("/telemetry/summary", async (request, response, next) => {
+		try {
+			if (!telemetryService) {
+				response.json({
+					configured: false,
+					project: "didactio",
+					generatedAt: new Date().toISOString(),
+					totalRuns: 0,
+					completedRuns: 0,
+					failedRuns: 0,
+					activeRuns: 0,
+					totalTokens: 0,
+					averageDurationMs: null,
+					byRunType: {},
+					latestRuns: [],
+				});
+				return;
+			}
+
+			response.json(
+				await telemetryService.getSummary(
+					parseTelemetryLimit(request.query.limit),
+				),
+			);
 		} catch (error) {
 			next(error);
 		}

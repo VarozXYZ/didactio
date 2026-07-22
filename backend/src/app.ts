@@ -84,6 +84,7 @@ import {
   type MongoHealthStatus,
 } from "./mongo/mongo-connection.js";
 import { SYSTEM_DEFAULT_THEME } from "./presentation-theme/types.js";
+import type {LangSmithTelemetryService} from "./observability/langsmith-telemetry.js";
 
 export interface CreateAppOptions {
   didacticUnitStore: DidacticUnitStore;
@@ -105,6 +106,7 @@ export interface CreateAppOptions {
   testPrincipal?: AuthenticatedPrincipal;
   apiRateLimiter?: ApiRateLimiter;
   apiRateLimitPerMinute?: number;
+  langSmithTelemetry?: LangSmithTelemetryService;
 }
 
 export function createApp(options: CreateAppOptions) {
@@ -405,7 +407,11 @@ export function createApp(options: CreateAppOptions) {
       failClosed: process.env.NODE_ENV === "production",
     }),
   );
-  app.use("/api/admin", requireAdmin, createAdminRouter(authService));
+  app.use(
+    "/api/admin",
+    requireAdmin,
+    createAdminRouter(authService, options.langSmithTelemetry),
+  );
   app.use("/api/billing", createBillingRouter(billingService));
 
   const productRouteDependencies: ProductRouteDependencies = {
