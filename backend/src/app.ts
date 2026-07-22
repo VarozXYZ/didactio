@@ -303,8 +303,9 @@ export function createApp(options: CreateAppOptions) {
       origin(origin, callback) {
         if (
           !origin ||
-          authConfig.corsAllowedOrigins.length === 0 ||
-          authConfig.corsAllowedOrigins.includes(origin)
+          authConfig.corsAllowedOrigins.includes(origin) ||
+          (process.env.NODE_ENV !== "production" &&
+            authConfig.corsAllowedOrigins.length === 0)
         ) {
           callback(null, true);
           return;
@@ -316,15 +317,6 @@ export function createApp(options: CreateAppOptions) {
     }),
   );
   app.use(helmet());
-  app.post(
-    "/api/billing/webhook",
-    express.raw({ type: "application/json" }),
-    createBillingWebhookHandler(billingService),
-  );
-  app.use(express.json());
-  app.use(express.urlencoded({ extended: true }));
-  app.use(cookieParser());
-  app.use(passport.initialize());
   app.use((request, response, next) => {
     const requestId = randomUUID();
     const startedAt = Date.now();
@@ -349,6 +341,21 @@ export function createApp(options: CreateAppOptions) {
 
     next();
   });
+  app.post(
+    "/api/billing/webhook",
+    express.raw({ type: "application/json" }),
+    createBillingWebhookHandler(billingService),
+  );
+  app.use(express.json({limit: "1mb", strict: true}));
+  app.use(
+    express.urlencoded({
+      extended: true,
+      limit: "100kb",
+      parameterLimit: 100,
+    }),
+  );
+  app.use(cookieParser());
+  app.use(passport.initialize());
 
   app.locals.authService = authService;
   app.locals.authConfig = authConfig;
