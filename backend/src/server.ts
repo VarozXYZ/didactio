@@ -13,6 +13,7 @@ import {MongoGenerationRunStore} from "./generation-runs/mongo-generation-run-st
 import {MongoLearningActivityStore} from "./learning-activities/mongo-learning-activity-store.js";
 import {createLogger} from "./logging/logger.js";
 import {connectMongo, getMongoHealthStatus} from "./mongo/mongo-connection.js";
+import {connectRedisRateLimiter} from "./http/rate-limit.js";
 
 loadEnv();
 
@@ -24,6 +25,11 @@ const logger = createLogger({
 });
 const authConfig = loadAuthConfigFromEnv();
 const mongoConnection = await connectMongo(env);
+const redisConnection = await connectRedisRateLimiter(env, logger);
+
+if (process.env.NODE_ENV === "production" && !redisConnection) {
+	throw new Error("REDIS_URL must be configured in production.");
+}
 
 const didacticUnitStore = new MongoDidacticUnitStore(mongoConnection.database);
 const generationRunStore = new MongoGenerationRunStore(
@@ -67,6 +73,8 @@ const app = createApp({
 		},
 	},
 	mongoHealth: getMongoHealthStatus(mongoConnection),
+	apiRateLimiter: redisConnection?.limiter,
+	apiRateLimitPerMinute: env.apiRateLimitPerMinute,
 	logger,
 });
 
@@ -90,11 +98,12 @@ if (httpServer && typeof httpServer.close === "function") {
 		isShuttingDown = true;
 		logger.info("Backend shutdown requested", {signal});
 
-		httpServer.close(async (error) => {
+			httpServer.close(async (error) => {
 			if (error) {
 				logger.error("Backend shutdown failed", {error});
 				process.exitCode = 1;
 			}
+			await redisConnection?.close();
 			await mongoConnection.client.close();
 		});
 	};
