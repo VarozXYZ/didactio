@@ -178,7 +178,6 @@ function invokeOptions(options: BaseGenerationOptions) {
 	return {
 		maxTokens: options.maxOutputTokens,
 		signal: options.abortSignal,
-		response_format: {type: "json_object" as const},
 	};
 }
 
