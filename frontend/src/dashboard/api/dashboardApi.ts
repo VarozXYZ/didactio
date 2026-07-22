@@ -77,6 +77,34 @@ export interface BillingSummaryDto {
 	};
 }
 
+export interface LangSmithTelemetryRunSummaryDto {
+	id: string;
+	name: string;
+	runType: string;
+	status: "completed" | "error" | "running";
+	startedAt: string | null;
+	endedAt: string | null;
+	durationMs: number | null;
+	promptTokens: number;
+	completionTokens: number;
+	totalTokens: number;
+	hasError: boolean;
+}
+
+export interface LangSmithTelemetrySummaryDto {
+	configured: boolean;
+	project: string;
+	generatedAt: string;
+	totalRuns: number;
+	completedRuns: number;
+	failedRuns: number;
+	activeRuns: number;
+	totalTokens: number;
+	averageDurationMs: number | null;
+	byRunType: Record<string, number>;
+	latestRuns: LangSmithTelemetryRunSummaryDto[];
+}
+
 export type UsageAnalyticsPeriodDto = "7d" | "30d" | "6m" | "12m";
 
 export interface UsageAnalyticsDto {
@@ -669,6 +697,11 @@ export const dashboardApi = {
 	getUsageAnalytics(period: UsageAnalyticsPeriodDto) {
 		return requestJson<UsageAnalyticsDto>(
 			`/api/analytics/usage?period=${encodeURIComponent(period)}`,
+		);
+	},
+	getAdminTelemetrySummary(limit = 50) {
+		return requestJson<LangSmithTelemetrySummaryDto>(
+			`/api/admin/telemetry/summary?limit=${encodeURIComponent(String(limit))}`,
 		);
 	},
 	createBillingCheckoutSession(productId: string) {

@@ -1,5 +1,6 @@
 import {
 	BarChart3,
+	Activity,
 	ChevronDown,
 	ChevronRight,
 	CreditCard,
@@ -18,6 +19,7 @@ import {
 } from "lucide-react";
 import {motion} from "motion/react";
 import {useState, type Dispatch, type SetStateAction} from "react";
+import {useLocation, useNavigate} from "react-router-dom";
 import type {FolderDto} from "@/dashboard/api/dashboardApi";
 import {FolderFormModal} from "./FolderFormModal";
 import {
@@ -99,6 +101,8 @@ export function Sidebar({
 	items,
 }: SidebarProps) {
 	const {user, logout} = useAuth();
+	const navigate = useNavigate();
+	const location = useLocation();
 	const [folderModal, setFolderModal] = useState<
 		| {open: false}
 		| {
@@ -508,6 +512,16 @@ export function Sidebar({
 								)}
 							</button>
 						))}
+						{user?.role === "admin" && (
+							<button
+								type="button"
+								onClick={() => navigate("/dashboard/admin/telemetry")}
+								className={`flex w-full items-center gap-3 rounded-[10px] px-3 py-2.5 text-left transition-all ${location.pathname === "/dashboard/admin/telemetry" ? "bg-[#F5F5F7] text-[#1D1D1F]" : "text-[#86868B] hover:bg-[#F5F5F7]/50 hover:text-[#1D1D1F]"}`}
+							>
+								<Activity size={18} />
+								{isSidebarOpen && <span className="text-[15px] font-medium">AI telemetry</span>}
+							</button>
+						)}
 					</div>
 				</div>
 
