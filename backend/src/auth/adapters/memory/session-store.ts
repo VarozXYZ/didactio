@@ -1,4 +1,4 @@
-import type {SessionRecord, SessionStore} from "../../core/types.js";
+import type {SessionContext, SessionRecord, SessionStore} from "../../core/types.js";
 
 export class InMemorySessionStore implements SessionStore {
 	private readonly sessions = new Map<string, SessionRecord>();
@@ -47,6 +47,7 @@ export class InMemorySessionStore implements SessionStore {
 		sessionId: string,
 		nextRefreshTokenHash: string,
 		nextExpiresAt: Date,
+		context: SessionContext = {},
 	): Promise<SessionRecord | null> {
 		const session = this.sessions.get(sessionId);
 		if (!session || session.revokedAt) {
@@ -60,6 +61,12 @@ export class InMemorySessionStore implements SessionStore {
 		session.refreshTokenHash = nextRefreshTokenHash;
 		session.expiresAt = nextExpiresAt;
 		session.updatedAt = new Date();
+		if (context.ipAddress) {
+			session.ipAddress = context.ipAddress;
+		}
+		if (context.userAgent) {
+			session.userAgent = context.userAgent;
+		}
 		this.sessions.set(session.id, session);
 
 		return session;

@@ -1,5 +1,6 @@
 import {Db, MongoClient} from "mongodb";
 import type {AppEnv} from "../config/env.js";
+import {ensureMongoIndexes} from "./ensure-indexes.js";
 
 export interface MongoHealthStatus {
 	configured: boolean;
@@ -29,6 +30,7 @@ export async function connectMongo(env: AppEnv): Promise<MongoConnection> {
 	await client.connect();
 	const database = client.db(env.mongoDbName);
 	await database.command({ping: 1});
+	await ensureMongoIndexes(database);
 
 	return {
 		client,

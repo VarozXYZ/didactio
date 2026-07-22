@@ -39,12 +39,6 @@ export class MongoUserStore implements UserStore {
 
 	constructor(database: Db) {
 		this.collection = database.collection<AuthUserDocument>("users");
-		void this.collection.createIndex(
-			{provider: 1, providerUserId: 1},
-			{unique: true},
-		);
-		void this.collection.createIndex({email: 1});
-		void this.collection.createIndex({"billing.stripeCustomerId": 1});
 	}
 
 	async findByProviderAccount(
@@ -81,54 +75,43 @@ export class MongoUserStore implements UserStore {
 		role: UserRole,
 	): Promise<AuthUser> {
 		const now = new Date();
-		const existing = await this.findByProviderAccount(
-			profile.provider,
-			profile.providerUserId,
+		const result = await this.collection.findOneAndUpdate(
+			{
+				provider: profile.provider,
+				providerUserId: profile.providerUserId,
+			},
+			{
+				$set: {
+					email: profile.email,
+					emailVerified: profile.emailVerified,
+					displayName: profile.displayName,
+					firstName: profile.firstName,
+					lastName: profile.lastName,
+					pictureUrl: profile.pictureUrl,
+					locale: profile.locale,
+					role,
+					updatedAt: now,
+					lastLoginAt: now,
+				},
+				$setOnInsert: {
+					id: crypto.randomUUID(),
+					provider: profile.provider,
+					providerUserId: profile.providerUserId,
+					status: "active",
+					credits: createEmptyCredits(),
+					defaultPresentationTheme: SYSTEM_DEFAULT_THEME,
+					createdAt: now,
+				},
+			},
+			{upsert: true, returnDocument: "after"},
 		);
 
-		if (existing) {
-			const updated: AuthUser = {
-				...existing,
-				email: profile.email,
-				emailVerified: profile.emailVerified,
-				displayName: profile.displayName,
-				firstName: profile.firstName,
-				lastName: profile.lastName,
-				pictureUrl: profile.pictureUrl,
-				locale: profile.locale,
-				role,
-				defaultPresentationTheme:
-					existing.defaultPresentationTheme ?? SYSTEM_DEFAULT_THEME,
-				updatedAt: now,
-				lastLoginAt: now,
-			};
-
-			await this.collection.updateOne({id: updated.id}, {$set: updated});
-			return updated;
+		const user = stripMongoId(result);
+		if (!user) {
+			throw new Error("Google user could not be persisted.");
 		}
 
-		const created: AuthUser = {
-			id: crypto.randomUUID(),
-			provider: "google",
-			providerUserId: profile.providerUserId,
-			email: profile.email,
-			emailVerified: profile.emailVerified,
-			displayName: profile.displayName,
-			firstName: profile.firstName,
-			lastName: profile.lastName,
-			pictureUrl: profile.pictureUrl,
-			locale: profile.locale,
-			role,
-			status: "active",
-			credits: createEmptyCredits(),
-			defaultPresentationTheme: SYSTEM_DEFAULT_THEME,
-			createdAt: now,
-			updatedAt: now,
-			lastLoginAt: now,
-		};
-
-		await this.collection.insertOne(created);
-		return created;
+		return user;
 	}
 
 	async updateRole(id: string, role: UserRole): Promise<AuthUser | null> {

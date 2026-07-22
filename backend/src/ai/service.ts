@@ -32,6 +32,11 @@ import {
 	syllabusSchema,
 } from "./schemas.js";
 import {
+	repairLearningActivityFeedbackJsonText as repairLearningActivityFeedbackJsonTextFromModule,
+	repairLearningActivityJsonText as repairLearningActivityJsonTextFromModule,
+	repairModerationJsonText as repairModerationJsonTextFromModule,
+} from "./json-repair.js";
+import {
 	collectAiCallTelemetry,
 	enrichAiCallTelemetryWithGatewayInfo,
 	summarizeAiCallTelemetry,
@@ -52,6 +57,14 @@ interface ModelSelection {
 	model: string;
 	modelId: string;
 }
+
+// Keep the historical service exports stable while the repair implementation
+// lives in its own pure module.
+export {
+	repairLearningActivityFeedbackJsonTextFromModule as repairLearningActivityFeedbackJsonText,
+	repairLearningActivityJsonTextFromModule as repairLearningActivityJsonText,
+	repairModerationJsonTextFromModule as repairModerationJsonText,
+};
 
 const MODERATION_MODEL_SELECTION: ModelSelection = {
 	provider: "openai",
@@ -81,200 +94,6 @@ class SyllabusModuleCountError extends Error {
 			`Syllabus generation returned ${actual} modules; expected exactly ${expected}.`,
 		);
 	}
-}
-
-function extractBalancedJsonObjects(text: string): string[] {
-	const candidates: string[] = [];
-
-	for (let start = 0; start < text.length; start += 1) {
-		if (text[start] !== "{") {
-			continue;
-		}
-
-		let depth = 0;
-		let inString = false;
-		let escaped = false;
-
-		for (let index = start; index < text.length; index += 1) {
-			const char = text[index];
-
-			if (inString) {
-				if (escaped) {
-					escaped = false;
-				} else if (char === "\\") {
-					escaped = true;
-				} else if (char === "\"") {
-					inString = false;
-				}
-				continue;
-			}
-
-			if (char === "\"") {
-				inString = true;
-				continue;
-			}
-
-			if (char === "{") {
-				depth += 1;
-			} else if (char === "}") {
-				depth -= 1;
-
-				if (depth === 0) {
-					candidates.push(text.slice(start, index + 1));
-					break;
-				}
-			}
-		}
-	}
-
-	return candidates;
-}
-
-export function repairLearningActivityJsonText(text: string): string | null {
-	const normalized = text.replace(/<｜end▁of▁thinking｜>/g, "");
-
-	for (const candidate of extractBalancedJsonObjects(normalized)) {
-		try {
-			const parsed = JSON.parse(candidate);
-			const validation = learningActivitySchema.safeParse(parsed);
-
-			if (validation.success) {
-				return JSON.stringify(validation.data);
-			}
-		} catch {
-		}
-	}
-
-	return null;
-}
-
-export function repairLearningActivityFeedbackJsonText(text: string): string | null {
-	const normalized = text.replace(/<｜end▁of▁thinking｜>/g, "");
-
-	for (const candidate of extractBalancedJsonObjects(normalized)) {
-		try {
-			const parsed = JSON.parse(candidate);
-			const validation = learningActivityFeedbackSchema.safeParse(parsed);
-
-			if (validation.success) {
-				return JSON.stringify(validation.data);
-			}
-		} catch {
-		}
-	}
-
-	return null;
-}
-
-function completeJsonObjectPrefix(text: string): string | null {
-	const start = text.indexOf("{");
-	if (start === -1) {
-		return null;
-	}
-
-	const stack: string[] = [];
-	let inString = false;
-	let escaped = false;
-	let output = "";
-
-	for (let index = start; index < text.length; index += 1) {
-		const char = text[index];
-
-		if (inString) {
-			if (escaped) {
-				output += char;
-				escaped = false;
-				continue;
-			}
-
-			if (char === "\\") {
-				output += char;
-				escaped = true;
-				continue;
-			}
-
-			if (char === "\"") {
-				output += char;
-				inString = false;
-				continue;
-			}
-
-			output += char === "\n" || char === "\r" ? " " : char;
-			continue;
-		}
-
-		if (char === "\"") {
-			output += char;
-			inString = true;
-			continue;
-		}
-
-		if (char === "{") {
-			stack.push("}");
-			output += char;
-			continue;
-		}
-
-		if (char === "[") {
-			stack.push("]");
-			output += char;
-			continue;
-		}
-
-		if (char === "}" || char === "]") {
-			if (stack.at(-1) !== char) {
-				break;
-			}
-
-			stack.pop();
-			output += char;
-			if (stack.length === 0) {
-				return output;
-			}
-			continue;
-		}
-
-		output += char;
-	}
-
-	if (!output || stack.length === 0) {
-		return null;
-	}
-
-	return `${output}${inString ? "\"" : ""}${stack.reverse().join("")}`;
-}
-
-export function repairModerationJsonText(text: string): string | null {
-	const normalized = text.replace(/<ï½œendâ–ofâ–thinkingï½œ>/g, "");
-	const candidates = [
-		...extractBalancedJsonObjects(normalized),
-		completeJsonObjectPrefix(normalized),
-	].filter((candidate): candidate is string => Boolean(candidate));
-
-	for (const candidate of candidates) {
-		try {
-			const parsed = JSON.parse(candidate) as Record<string, unknown>;
-			for (const key of [
-				"notes",
-				"folderName",
-				"folderReasoning",
-				"normalizedTopic",
-				"normalizedTopicTitle",
-			]) {
-				if (typeof parsed[key] === "string" && !parsed[key].trim()) {
-					delete parsed[key];
-				}
-			}
-			const validation = moderationSchema.safeParse(parsed);
-
-			if (validation.success) {
-				return JSON.stringify(validation.data);
-			}
-		} catch {
-		}
-	}
-
-	return null;
 }
 
 function normalizeLearningActivityContent(
@@ -908,7 +727,7 @@ export class GatewayAiService implements AiService {
 				maxOutputTokens: resolveStageMaxOutputTokens("moderation"),
 				abortSignal: input.abortSignal,
 				experimental_repairText: async ({text}) =>
-					repairModerationJsonText(text),
+					repairModerationJsonTextFromModule(text),
 			});
 			const telemetry = await this.enrichAiCallTelemetry(
 				await collectAiCallTelemetry(result, Date.now() - startedAt),
@@ -991,7 +810,7 @@ export class GatewayAiService implements AiService {
 				maxOutputTokens: resolveStageMaxOutputTokens("moderation"),
 				abortSignal: input.abortSignal,
 				experimental_repairText: async ({text}) =>
-					repairModerationJsonText(text),
+					repairModerationJsonTextFromModule(text),
 			});
 
 			for await (const partial of result.partialObjectStream) {
@@ -1512,7 +1331,7 @@ export class GatewayAiService implements AiService {
 				maxOutputTokens,
 				abortSignal: input.abortSignal,
 				experimental_repairText: async ({text}) =>
-					repairLearningActivityJsonText(text),
+					repairLearningActivityJsonTextFromModule(text),
 			});
 			const telemetry = await this.enrichAiCallTelemetry(
 				await collectAiCallTelemetry(result, Date.now() - startedAt),
@@ -1583,7 +1402,7 @@ export class GatewayAiService implements AiService {
 				maxOutputTokens,
 				abortSignal: input.abortSignal,
 				experimental_repairText: async ({text}) =>
-					repairLearningActivityFeedbackJsonText(text),
+					repairLearningActivityFeedbackJsonTextFromModule(text),
 			});
 			const telemetry = await this.enrichAiCallTelemetry(
 				await collectAiCallTelemetry(result, Date.now() - startedAt),

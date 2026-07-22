@@ -23,7 +23,6 @@ export class MongoCreditTransactionStore implements CreditTransactionStore {
 	constructor(database: Db) {
 		this.collection =
 			database.collection<CreditTransactionDocument>("creditTransactions");
-		void this.collection.createIndex({userId: 1, createdAt: -1});
 	}
 
 	async create(transaction: CreditTransaction): Promise<void> {

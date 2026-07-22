@@ -67,13 +67,24 @@ describe("Mongo auth stores", () => {
 	it("looks up, lists, creates, and updates users", async () => {
 		const users = collection([existingUser()]);
 		const store = new MongoUserStore(database({users}));
+		users.findOneAndUpdate.mockImplementation(async (_filter, update) => ({
+			...existingUser(),
+			...update.$set,
+		}));
 		expect(await store.findByProviderAccount("google", "google-1")).toMatchObject({id: "user"});
 		expect(await store.findById("user")).toMatchObject({id: "user"});
 		expect(await store.findByStripeCustomerId("cus")).toMatchObject({id: "user"});
 		expect(await store.list()).toHaveLength(1);
-		expect(await store.upsertFromGoogleProfile(profile, "admin")).toMatchObject({role: "admin", defaultPresentationTheme: SYSTEM_DEFAULT_THEME});
-
-		users.findOne.mockResolvedValueOnce(null);
+		expect(await store.upsertFromGoogleProfile(profile, "admin")).toMatchObject({role: "admin"});
+		expect(users.findOneAndUpdate).toHaveBeenCalledWith(
+			{provider: "google", providerUserId: "google-1"},
+			expect.objectContaining({$setOnInsert: expect.any(Object)}),
+			{upsert: true, returnDocument: "after"},
+		);
+		users.findOneAndUpdate.mockImplementationOnce(async (_filter, update) => ({
+			...update.$setOnInsert,
+			...update.$set,
+		}));
 		expect(await store.upsertFromGoogleProfile({...profile, providerUserId: "new"}, "user")).toMatchObject({
 			providerUserId: "new",
 			credits: {bronze: 0, silver: 0, gold: 0, dark: 0},
@@ -88,7 +99,6 @@ describe("Mongo auth stores", () => {
 		await store.markDefaultDidacticUnitTemplateProvisioned("user", "template", new Date());
 		await store.applyCreditDelta({id: "user", coinType: "silver", delta: -1, requireSufficientBalance: true});
 		expect(users.findOneAndUpdate).toHaveBeenCalled();
-		expect(users.updateOne).toHaveBeenCalled();
 	});
 
 	it("creates, rotates, revokes, and finds sessions and transactions", async () => {
@@ -106,7 +116,20 @@ describe("Mongo auth stores", () => {
 		const sessionStore = new MongoSessionStore(database({authSessions: sessions}));
 		await sessionStore.createSession({id: "new", userId: "user", refreshTokenHash: "hash", expiresAt: new Date()});
 		expect(await sessionStore.findByRefreshTokenHash("old")).toMatchObject({id: "session"});
-		expect(await sessionStore.rotateSession("session", "new", new Date())).toMatchObject({id: "session"});
+		expect(await sessionStore.rotateSession("session", "new", new Date(), {
+			ipAddress: "127.0.0.1",
+			userAgent: "test-agent",
+		})).toMatchObject({id: "session"});
+		expect(sessions.findOneAndUpdate).toHaveBeenCalledWith(
+			{id: "session", revokedAt: {$exists: false}},
+			expect.objectContaining({
+				$set: expect.objectContaining({
+					ipAddress: "127.0.0.1",
+					userAgent: "test-agent",
+				}),
+			}),
+			expect.any(Object),
+		);
 		await sessionStore.revokeSession("session");
 		await sessionStore.revokeAllForUser("user");
 		sessions.findOne.mockResolvedValueOnce({...sessionDoc, revokedAt: new Date()});
