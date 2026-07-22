@@ -1,4 +1,4 @@
-import {act, cleanup, fireEvent, render, screen, waitFor} from "@testing-library/react";
+import {cleanup, fireEvent, render, screen, waitFor} from "@testing-library/react";
 import {afterEach, beforeEach, describe, expect, it, vi} from "vitest";
 import {LearningActivityRenderer} from "@/components/dashboard/activities/LearningActivityRenderer";
 import {AppearanceContext} from "@/theme/appearanceContext";
@@ -156,7 +156,7 @@ describe("LearningActivityRenderer", () => {
 		fireEvent.click(screen.getByText("Check answer"));
 		caseView.unmount();
 
-		const project = display(activity("guided_project", {
+		display(activity("guided_project", {
 			goal: "Build",
 			brief: "A deliverable",
 			steps: ["1. Start", "2. Finish"],

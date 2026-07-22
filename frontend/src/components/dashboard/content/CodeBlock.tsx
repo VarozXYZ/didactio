@@ -207,7 +207,6 @@ export function CodeBlock({
 	useEffect(() => {
 		let cancelled = false;
 		// Clear stale highlighting while the async highlighter recomputes.
-		// eslint-disable-next-line react-hooks/set-state-in-effect
 		setHighlightedHtml(null);
 
 		const normalizedLanguage = language?.toLowerCase().trim() ?? "";

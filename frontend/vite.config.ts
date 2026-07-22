@@ -6,7 +6,11 @@ import path from 'path'
 export default defineConfig({
   test: {
     environment: 'jsdom',
-    maxWorkers: 4,
+    pool: 'threads',
+    maxWorkers: 2,
+    minWorkers: 1,
+    fileParallelism: false,
+    teardownTimeout: 5000,
     coverage: {
       provider: 'v8',
       all: true,

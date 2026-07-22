@@ -10,7 +10,7 @@ import DashboardShell from "@/components/dashboard/DashboardShell";
 vi.mock("@/hooks/use-toast", () => ({toastError: vi.fn()}));
 vi.mock("motion/react", () => ({
 	motion: {
-		aside: ({children, initial: _initial, animate: _animate, transition: _transition, ...props}: React.HTMLAttributes<HTMLElement> & Record<string, unknown>) => <aside {...props}>{children}</aside>,
+		aside: ({children, ...props}: React.HTMLAttributes<HTMLElement> & Record<string, unknown>) => <aside {...props}>{children}</aside>,
 	},
 }));
 vi.mock("recharts", () => ({

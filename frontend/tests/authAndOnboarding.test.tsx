@@ -16,6 +16,7 @@ import LoginPage from "@/pages/LoginPage";
 import OnboardingPage from "@/pages/OnboardingPage";
 import RegisterPage from "@/pages/RegisterPage";
 import {AppearanceContext} from "@/theme/appearanceContext";
+import type {AuthContextValue} from "@/auth/authContext";
 
 vi.mock("@/dashboard/api/dashboardApi", () => ({
 	dashboardApi: {
@@ -57,7 +58,7 @@ const authValue = {
 
 function renderWithProviders(
 	ui: ReactNode,
-	{route = "/", auth = authValue}: {route?: string; auth?: any} = {},
+	{route = "/", auth = authValue}: {route?: string; auth?: AuthContextValue} = {},
 ) {
 	return render(
 		<MemoryRouter initialEntries={[route]}>
