@@ -72,6 +72,53 @@ describe("LangChain runtime adapter", () => {
 		expect(stream).toHaveBeenCalled();
 	});
 
+	it("emits incremental structured objects before the closing brace", async () => {
+		const gateway = createLangChainGateway({
+			apiKey: "test-key",
+			baseURL: "https://example.test/v1",
+		});
+		const model = gateway("mock/model");
+		vi.spyOn(model, "stream").mockResolvedValue(
+			(async function* () {
+				yield new AIMessageChunk({content: '{"approved":'});
+				yield new AIMessageChunk({content: "true,\"notes\":\""});
+				yield new AIMessageChunk({content: "Still"});
+				yield new AIMessageChunk({content: " working"});
+				yield new AIMessageChunk({content: '\",\"normalizedTopic\":\"Testing\"}'});
+			})(),
+		);
+
+		const result = streamObject({
+			model,
+			prompt: "Return a moderation result.",
+			schema: z.object({
+				approved: z.boolean(),
+				notes: z.string(),
+				normalizedTopic: z.string(),
+			}),
+		});
+		const partials: Array<Partial<{approved: boolean; notes: string; normalizedTopic: string}>> = [];
+		for await (const partial of result.partialObjectStream) {
+			partials.push(partial);
+		}
+
+		expect(partials.length).toBeGreaterThan(2);
+		expect(partials[0]).toMatchObject({});
+		expect(partials.some((partial) => partial.approved === true)).toBe(true);
+		expect(partials.some((partial) => partial.notes === "Still")).toBe(true);
+		expect(partials.some((partial) => partial.notes === "Still working")).toBe(true);
+		expect(partials.at(-1)).toMatchObject({
+			approved: true,
+			notes: "Still working",
+			normalizedTopic: "Testing",
+		});
+		expect(await result.object).toEqual({
+			approved: true,
+			notes: "Still working",
+			normalizedTopic: "Testing",
+		});
+	});
+
 	it("keeps LangSmith opt-in when no credentials are configured", () => {
 		expect(
 		createLangSmithTracer({
