@@ -208,7 +208,7 @@ Didactio includes a credit-based generation model. Credits make AI usage explici
 didactio/
 |-- backend/
 |   |-- src/
-|   |   |-- ai/                  # Model catalog, prompt builders, schemas, streaming, and telemetry
+|   |   |-- ai/                  # LangChain/LangGraph runtime, prompts, schemas, streaming, and telemetry
 |   |   |-- analytics/           # Usage analytics and reporting routes
 |   |   |-- auth/                # Core auth, Google OAuth, cookies, sessions, users, and admin routes
 |   |   |-- billing/             # Stripe pricing, checkout, webhooks, and billing event storage
@@ -219,10 +219,11 @@ didactio/
 |   |   |-- folders/             # Folder defaults, persistence, and organization routes
 |   |   |-- generation-runs/     # Long-running generation state and persistence
 |   |   |-- html/                # Sanitization, hashing, continuity, and content block extraction
-|   |   |-- http/                # API helpers, route dependencies, auth helpers, and health checks
+|   |   |-- http/                # API helpers, rate limiting, route dependencies, and health checks
 |   |   |-- learning-activities/ # Activity models, stores, and routes
 |   |   |-- logging/             # Application logger
 |   |   |-- mongo/               # MongoDB connection lifecycle
+|   |   |-- observability/       # Safe LangSmith summaries for administrators
 |   |   |-- presentation-theme/  # Presentation theme types and validation
 |   |   |-- providers/           # Syllabus and chapter generation providers
 |   |   |-- utils/               # Shared backend utilities
@@ -280,10 +281,11 @@ The editor is not isolated from the rest of the product. Generated chapters are 
 | --- | --- | --- |
 | HTTP server | Node.js, Express 5, TypeScript, tsx | API routes, auth routes, health checks, local watch mode, and compiled production output. |
 | Persistence | MongoDB driver 7 | Users, sessions, units, folders, notes, learning activities, generation runs, credit transactions, and billing events. |
-| Configuration | dotenv, typed environment parsing | Runtime configuration for MongoDB, AI providers, auth secrets, cookies, CORS, Stripe, and public app URLs. |
+| Configuration | dotenv, typed environment parsing | Runtime configuration for MongoDB, Redis, AI providers, LangSmith, auth secrets, cookies, CORS, Stripe, and public app URLs. |
 | Validation | Zod | Runtime validation for API payloads, AI contracts, presentation theme data, and feature boundaries. |
 | HTML processing | parse5, sanitize-html | Parsing, extracting, normalizing, hashing, and sanitizing generated or edited HTML before it is reused. |
 | Security middleware | Helmet, CORS, cookie-parser, jsonwebtoken | HTTP hardening, origin control, signed/parsed cookies, access tokens, and refresh-token session flows. |
+| API protection | Redis 7, fixed-window limiter | Shared per-identity API rate limiting across backend replicas, with an in-memory fallback for local tests. |
 
 The backend is organized by domain rather than by generic MVC folders. Units, chapters, notes, folders, activities, credits, billing, analytics, generation runs, and auth each have their own route/store/service boundaries, with Mongo-backed implementations where persistence is needed.
 
@@ -291,11 +293,11 @@ The backend is organized by domain rather than by generic MVC folders. Units, ch
 
 | Area | Stack | How it is used |
 | --- | --- | --- |
-| AI runtime | Vercel AI SDK (`ai`) | Provider-agnostic generation calls and model integration. |
+| AI runtime | LangChain, LangGraph, `@langchain/openai` | Provider-agnostic generation adapters, structured output, streaming, and explicit workflow state boundaries. |
 | Model strategy | Model configuration through environment variables and frontend | Lets the product route different generation tasks through different cost/quality profiles. |
 | Streaming | NDJSON generation routes | Long-running generation can stream progress and partial results instead of blocking the UI. |
 | Contracts | Shared AI types, backend schemas, prompt builders | Keeps generated syllabi, chapters, activities, and continuation flows closer to expected shapes. |
-| Telemetry | Generation telemetry and run stores | Tracks generation behavior, costs, and long-running operation state. |
+| Telemetry | LangSmith, generic usage telemetry, and run stores | Opt-in tracing for AI workflows plus persisted generation-run state; the admin UI exposes aggregate metrics only. |
 
 The AI layer is separated from the HTTP layer. Routes receive requests and resolve users; prompt builders and providers shape the generation task; schemas validate the result; generation runs preserve state; credits account for cost. That separation keeps AI behavior inspectable instead of burying it inside controller code.
 
@@ -352,6 +354,17 @@ In another terminal:
 npm run dev:frontend
 ```
 
+For a production-like local stack with MongoDB and Redis, copy the production
+environment template and start the containers instead:
+
+```bash
+cp backend/.env.production.example backend/.env.production
+docker compose up --build
+```
+
+The compose stack exposes the frontend at `http://localhost:8080`, keeps MongoDB
+and Redis on private container networks, and requires `REDIS_URL` in production.
+
 Defaults:
 
 - Frontend: `http://localhost:5173`
@@ -369,6 +382,15 @@ Defaults:
 | `npm run test` | Runs frontend and backend tests. |
 | `npm run test:coverage` | Runs tests with coverage. |
 | `npm run lint` | Runs ESLint where available. |
+
+### Production configuration
+
+Production values belong in the deployment environment, never in Git. The
+complete templates live in [`backend/.env.example`](backend/.env.example) and
+[`backend/.env.production.example`](backend/.env.production.example). Set
+`LANGSMITH_TRACING=true` together with `LANGSMITH_API_KEY` only when tracing is
+intended. The backend never sends prompts or model outputs to the browser's
+admin telemetry endpoint.
 
 ---
 

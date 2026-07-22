@@ -8,6 +8,13 @@ export interface AppEnv {
 	logFilePath: string | null;
 	aiGatewayApiKey: string | null;
 	aiGatewayBaseUrl: string;
+	langSmithApiKey: string | null;
+	langSmithProject: string;
+	langSmithEndpoint: string;
+	langSmithTracing: boolean;
+	redisUrl: string | null;
+	redisKeyPrefix: string;
+	apiRateLimitPerMinute: number;
 	aiCheapProvider: string;
 	aiCheapModel: string;
 	aiPremiumProvider: string;
@@ -41,9 +48,31 @@ function parsePort(value: string | undefined): number {
 	return parsedPort;
 }
 
+function parsePositiveInteger(value: string | undefined, fallback: number): number {
+	if (!value) return fallback;
+	const parsed = Number.parseInt(value, 10);
+	return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 function parseOptionalString(value: string | undefined): string | null {
 	const parsedValue = value?.trim();
 	return parsedValue ? parsedValue : null;
+}
+
+function parseBoolean(value: string | undefined, fallback: boolean): boolean {
+	if (value === undefined) {
+		return fallback;
+	}
+
+	const normalized = value.trim().toLowerCase();
+	if (normalized === "true" || normalized === "1" || normalized === "yes") {
+		return true;
+	}
+	if (normalized === "false" || normalized === "0" || normalized === "no") {
+		return false;
+	}
+
+	return fallback;
 }
 
 function parseLogLevel(
@@ -80,7 +109,24 @@ export function getAppEnv(): AppEnv {
 		aiGatewayApiKey: parseOptionalString(process.env.AI_GATEWAY_API_KEY),
 		aiGatewayBaseUrl:
 			parseOptionalString(process.env.AI_GATEWAY_BASE_URL) ??
-			"https://ai-gateway.vercel.sh/v1/ai",
+			"https://ai-gateway.vercel.sh/v1",
+		langSmithApiKey: parseOptionalString(process.env.LANGSMITH_API_KEY),
+		langSmithProject:
+			parseOptionalString(process.env.LANGSMITH_PROJECT) ?? "didactio",
+		langSmithEndpoint:
+			parseOptionalString(process.env.LANGSMITH_ENDPOINT) ??
+			"https://api.smith.langchain.com",
+		langSmithTracing: parseBoolean(
+			process.env.LANGSMITH_TRACING ?? process.env.LANGCHAIN_TRACING_V2,
+			false,
+		),
+		redisUrl: parseOptionalString(process.env.REDIS_URL),
+		redisKeyPrefix:
+			parseOptionalString(process.env.REDIS_KEY_PREFIX) ?? "didactio:ratelimit",
+		apiRateLimitPerMinute: parsePositiveInteger(
+			process.env.API_RATE_LIMIT_PER_MINUTE,
+			120,
+		),
 		aiCheapProvider:
 			parseOptionalString(process.env.AI_CHEAP_PROVIDER) ?? "deepseek",
 		aiCheapModel:

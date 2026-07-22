@@ -67,6 +67,11 @@ import {
 } from "./http/api-helpers.js";
 import { buildFolderDescription } from "./didactic-unit/http/responses.js";
 import { createHealthRouter } from "./http/health-routes.js";
+import {
+  createApiRateLimitMiddleware,
+  InMemoryRateLimiter,
+  type ApiRateLimiter,
+} from "./http/rate-limit.js";
 import type { ProductRouteDependencies } from "./http/route-dependencies.js";
 import {
   InMemoryLearningActivityStore,
@@ -79,6 +84,7 @@ import {
   type MongoHealthStatus,
 } from "./mongo/mongo-connection.js";
 import { SYSTEM_DEFAULT_THEME } from "./presentation-theme/types.js";
+import type {LangSmithTelemetryService} from "./observability/langsmith-telemetry.js";
 
 export interface CreateAppOptions {
   didacticUnitStore: DidacticUnitStore;
@@ -98,6 +104,9 @@ export interface CreateAppOptions {
   billingConfig?: BillingConfig;
   stripeClient?: StripeClientLike | null;
   testPrincipal?: AuthenticatedPrincipal;
+  apiRateLimiter?: ApiRateLimiter;
+  apiRateLimitPerMinute?: number;
+  langSmithTelemetry?: LangSmithTelemetryService;
 }
 
 export function createApp(options: CreateAppOptions) {
@@ -127,6 +136,7 @@ export function createApp(options: CreateAppOptions) {
     options.creditTransactionStore ?? new InMemoryCreditTransactionStore();
   const billingEventStore =
     options.billingEventStore ?? new InMemoryBillingEventStore();
+  const apiRateLimiter = options.apiRateLimiter ?? new InMemoryRateLimiter();
   const billingConfig = options.billingConfig ?? {
     stripeSecretKey: null,
     stripeWebhookSecret: null,
@@ -303,8 +313,9 @@ export function createApp(options: CreateAppOptions) {
       origin(origin, callback) {
         if (
           !origin ||
-          authConfig.corsAllowedOrigins.length === 0 ||
-          authConfig.corsAllowedOrigins.includes(origin)
+          authConfig.corsAllowedOrigins.includes(origin) ||
+          (process.env.NODE_ENV !== "production" &&
+            authConfig.corsAllowedOrigins.length === 0)
         ) {
           callback(null, true);
           return;
@@ -316,15 +327,6 @@ export function createApp(options: CreateAppOptions) {
     }),
   );
   app.use(helmet());
-  app.post(
-    "/api/billing/webhook",
-    express.raw({ type: "application/json" }),
-    createBillingWebhookHandler(billingService),
-  );
-  app.use(express.json());
-  app.use(express.urlencoded({ extended: true }));
-  app.use(cookieParser());
-  app.use(passport.initialize());
   app.use((request, response, next) => {
     const requestId = randomUUID();
     const startedAt = Date.now();
@@ -349,6 +351,21 @@ export function createApp(options: CreateAppOptions) {
 
     next();
   });
+  app.post(
+    "/api/billing/webhook",
+    express.raw({ type: "application/json" }),
+    createBillingWebhookHandler(billingService),
+  );
+  app.use(express.json({limit: "1mb", strict: true}));
+  app.use(
+    express.urlencoded({
+      extended: true,
+      limit: "100kb",
+      parameterLimit: 100,
+    }),
+  );
+  app.use(cookieParser());
+  app.use(passport.initialize());
 
   app.locals.authService = authService;
   app.locals.authConfig = authConfig;
@@ -381,7 +398,20 @@ export function createApp(options: CreateAppOptions) {
 
     requireAuth(request, response, next);
   });
-  app.use("/api/admin", requireAdmin, createAdminRouter(authService));
+  app.use(
+    "/api",
+    createApiRateLimitMiddleware({
+      limiter: apiRateLimiter,
+      limitPerMinute: options.apiRateLimitPerMinute ?? 120,
+      logger: appLogger,
+      failClosed: process.env.NODE_ENV === "production",
+    }),
+  );
+  app.use(
+    "/api/admin",
+    requireAdmin,
+    createAdminRouter(authService, options.langSmithTelemetry),
+  );
   app.use("/api/billing", createBillingRouter(billingService));
 
   const productRouteDependencies: ProductRouteDependencies = {

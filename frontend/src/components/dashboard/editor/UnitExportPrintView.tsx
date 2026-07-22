@@ -1,5 +1,6 @@
 import type {CSSProperties} from "react";
 import type {UnitExportSnapshot} from "@/dashboard/export/unitExport";
+import {sanitizeRenderedHtml} from "@/dashboard/utils/htmlContent";
 
 type UnitExportPrintViewProps = {
 	snapshot: UnitExportSnapshot;
@@ -373,7 +374,7 @@ export function UnitExportPrintView({
 						</header>
 						<div
 							className="unit-print-content unit-page-scope"
-							dangerouslySetInnerHTML={{__html: module.html}}
+							dangerouslySetInnerHTML={{__html: sanitizeRenderedHtml(module.html)}}
 						/>
 					</section>
 				))}

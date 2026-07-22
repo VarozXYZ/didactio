@@ -41,24 +41,6 @@ export class MongoLearningActivityStore implements LearningActivityStore {
 				"learningActivityProgress",
 			);
 
-		void this.activities.createIndex({
-			ownerId: 1,
-			didacticUnitId: 1,
-			chapterIndex: 1,
-			createdAt: 1,
-		});
-		void this.activities.createIndex({
-			ownerId: 1,
-			didacticUnitId: 1,
-			type: 1,
-			"content.visibleModuleIndexes": 1,
-		});
-		void this.attempts.createIndex({
-			ownerId: 1,
-			activityId: 1,
-			completedAt: 1,
-		});
-		void this.progress.createIndex({ownerId: 1, activityId: 1}, {unique: true});
 	}
 
 	async saveActivity(activity: LearningActivity): Promise<void> {

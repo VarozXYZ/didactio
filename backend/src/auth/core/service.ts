@@ -207,6 +207,7 @@ export class AuthService {
 			session.id,
 			nextRefreshTokenHash,
 			nextExpiresAt,
+			context,
 		);
 		if (!rotatedSession) {
 			throw new AuthError(
@@ -214,13 +215,6 @@ export class AuthService {
 				401,
 				"Could not rotate session.",
 			);
-		}
-
-		if (context.ipAddress) {
-			rotatedSession.ipAddress = context.ipAddress;
-		}
-		if (context.userAgent) {
-			rotatedSession.userAgent = context.userAgent;
 		}
 
 		const principal = this.buildPrincipal(
