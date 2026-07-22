@@ -12,6 +12,9 @@ export interface AppEnv {
 	langSmithProject: string;
 	langSmithEndpoint: string;
 	langSmithTracing: boolean;
+	redisUrl: string | null;
+	redisKeyPrefix: string;
+	apiRateLimitPerMinute: number;
 	aiCheapProvider: string;
 	aiCheapModel: string;
 	aiPremiumProvider: string;
@@ -43,6 +46,12 @@ function parsePort(value: string | undefined): number {
 	}
 
 	return parsedPort;
+}
+
+function parsePositiveInteger(value: string | undefined, fallback: number): number {
+	if (!value) return fallback;
+	const parsed = Number.parseInt(value, 10);
+	return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 function parseOptionalString(value: string | undefined): string | null {
@@ -110,6 +119,13 @@ export function getAppEnv(): AppEnv {
 		langSmithTracing: parseBoolean(
 			process.env.LANGSMITH_TRACING ?? process.env.LANGCHAIN_TRACING_V2,
 			false,
+		),
+		redisUrl: parseOptionalString(process.env.REDIS_URL),
+		redisKeyPrefix:
+			parseOptionalString(process.env.REDIS_KEY_PREFIX) ?? "didactio:ratelimit",
+		apiRateLimitPerMinute: parsePositiveInteger(
+			process.env.API_RATE_LIMIT_PER_MINUTE,
+			120,
 		),
 		aiCheapProvider:
 			parseOptionalString(process.env.AI_CHEAP_PROVIDER) ?? "deepseek",

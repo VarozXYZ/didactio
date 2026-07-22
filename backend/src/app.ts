@@ -67,6 +67,11 @@ import {
 } from "./http/api-helpers.js";
 import { buildFolderDescription } from "./didactic-unit/http/responses.js";
 import { createHealthRouter } from "./http/health-routes.js";
+import {
+  createApiRateLimitMiddleware,
+  InMemoryRateLimiter,
+  type ApiRateLimiter,
+} from "./http/rate-limit.js";
 import type { ProductRouteDependencies } from "./http/route-dependencies.js";
 import {
   InMemoryLearningActivityStore,
@@ -98,6 +103,8 @@ export interface CreateAppOptions {
   billingConfig?: BillingConfig;
   stripeClient?: StripeClientLike | null;
   testPrincipal?: AuthenticatedPrincipal;
+  apiRateLimiter?: ApiRateLimiter;
+  apiRateLimitPerMinute?: number;
 }
 
 export function createApp(options: CreateAppOptions) {
@@ -127,6 +134,7 @@ export function createApp(options: CreateAppOptions) {
     options.creditTransactionStore ?? new InMemoryCreditTransactionStore();
   const billingEventStore =
     options.billingEventStore ?? new InMemoryBillingEventStore();
+  const apiRateLimiter = options.apiRateLimiter ?? new InMemoryRateLimiter();
   const billingConfig = options.billingConfig ?? {
     stripeSecretKey: null,
     stripeWebhookSecret: null,
@@ -388,6 +396,15 @@ export function createApp(options: CreateAppOptions) {
 
     requireAuth(request, response, next);
   });
+  app.use(
+    "/api",
+    createApiRateLimitMiddleware({
+      limiter: apiRateLimiter,
+      limitPerMinute: options.apiRateLimitPerMinute ?? 120,
+      logger: appLogger,
+      failClosed: process.env.NODE_ENV === "production",
+    }),
+  );
   app.use("/api/admin", requireAdmin, createAdminRouter(authService));
   app.use("/api/billing", createBillingRouter(billingService));
 
