@@ -8,12 +8,10 @@ export default defineConfig({
     environment: 'jsdom',
     pool: 'threads',
     maxWorkers: 2,
-    minWorkers: 1,
     fileParallelism: false,
     teardownTimeout: 5000,
     coverage: {
       provider: 'v8',
-      all: true,
       include: ['src/**/*.{ts,tsx}'],
       reporter: ['text', 'json-summary'],
     },
