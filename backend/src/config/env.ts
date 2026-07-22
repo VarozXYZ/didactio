@@ -107,7 +107,10 @@ export function getAppEnv(): AppEnv {
 		langSmithEndpoint:
 			parseOptionalString(process.env.LANGSMITH_ENDPOINT) ??
 			"https://api.smith.langchain.com",
-		langSmithTracing: parseBoolean(process.env.LANGSMITH_TRACING, false),
+		langSmithTracing: parseBoolean(
+			process.env.LANGSMITH_TRACING ?? process.env.LANGCHAIN_TRACING_V2,
+			false,
+		),
 		aiCheapProvider:
 			parseOptionalString(process.env.AI_CHEAP_PROVIDER) ?? "deepseek",
 		aiCheapModel:

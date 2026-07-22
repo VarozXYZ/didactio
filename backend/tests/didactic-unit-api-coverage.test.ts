@@ -432,7 +432,6 @@ describe("didactic-unit API coverage", () => {
 				response: {
 					id: "mock-response-id",
 				},
-				gatewayGenerationId: "mock-generation-id",
 			},
 		});
 	});

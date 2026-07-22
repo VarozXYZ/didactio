@@ -50,23 +50,6 @@ export interface AiUsageTelemetry {
 	raw?: unknown;
 }
 
-export interface AiGatewayGenerationTelemetry {
-	id?: string;
-	totalCost?: number;
-	upstreamInferenceCost?: number;
-	usageCost?: number;
-	createdAt?: string;
-	model?: string;
-	providerName?: string;
-	streamed?: boolean;
-	isByok?: boolean;
-	inputTokens?: number;
-	outputTokens?: number;
-	cachedInputTokens?: number;
-	cacheCreationInputTokens?: number;
-	reasoningTokens?: number;
-}
-
 export interface AiRequestTelemetry {
 	body?: unknown;
 }
@@ -89,25 +72,6 @@ export interface AiCallTelemetry {
 	request?: AiRequestTelemetry;
 	response?: AiResponseTelemetry;
 	providerMetadata?: unknown;
-	gatewayGenerationId?: string;
-	gateway?: AiGatewayGenerationTelemetry;
-}
-
-interface GatewayGenerationInfoLike {
-	id: string;
-	totalCost: number;
-	upstreamInferenceCost: number;
-	usage: number;
-	createdAt: string;
-	model: string;
-	isByok: boolean;
-	providerName: string;
-	streamed: boolean;
-	inputTokens?: number;
-	outputTokens?: number;
-	cachedInputTokens?: number;
-	cacheCreationInputTokens?: number;
-	reasoningTokens?: number;
 }
 
 type TelemetrySource = {
@@ -184,26 +148,6 @@ function normalizeResponse(
 	});
 }
 
-function extractGatewayGenerationId(
-	providerMetadata: unknown,
-): string | undefined {
-	if (!providerMetadata || typeof providerMetadata !== "object") {
-		return undefined;
-	}
-
-	const gatewayValue = (providerMetadata as {gateway?: unknown}).gateway;
-
-	if (!gatewayValue || typeof gatewayValue !== "object") {
-		return undefined;
-	}
-
-	const generationId = (gatewayValue as {generationId?: unknown})
-		.generationId;
-	return typeof generationId === "string" && generationId.trim() ?
-			generationId
-		:	undefined;
-}
-
 export async function collectAiCallTelemetry(
 	source: TelemetrySource,
 	durationMs?: number,
@@ -241,9 +185,6 @@ export async function collectAiCallTelemetry(
 		request: normalizeRequest(request),
 		response: normalizeResponse(response),
 		providerMetadata: serializedProviderMetadata,
-		gatewayGenerationId: extractGatewayGenerationId(
-			serializedProviderMetadata,
-		),
 	});
 }
 
@@ -260,73 +201,8 @@ export function summarizeAiCallTelemetry(
 			telemetry.totalUsage?.outputTokens ?? telemetry.usage?.outputTokens,
 		totalTokens:
 			telemetry.totalUsage?.totalTokens ?? telemetry.usage?.totalTokens,
-		totalCost: telemetry.gateway?.totalCost,
-		usageCost: telemetry.gateway?.usageCost,
 		warningCount: telemetry.warnings?.length,
 		responseId: telemetry.response?.id,
 		responseModelId: telemetry.response?.modelId,
-		gatewayGenerationId: telemetry.gatewayGenerationId,
 	});
-}
-
-function createGatewayUsageTelemetry(
-	usage: AiUsageTelemetry | undefined,
-	gateway: AiGatewayGenerationTelemetry,
-): AiUsageTelemetry | undefined {
-	const inputTokens = usage?.inputTokens ?? gateway.inputTokens;
-	const outputTokens = usage?.outputTokens ?? gateway.outputTokens;
-	const totalTokens =
-		usage?.totalTokens ??
-		(typeof inputTokens === "number" && typeof outputTokens === "number" ?
-			inputTokens + outputTokens
-		:	undefined);
-
-	const merged = compactRecord({
-		...usage,
-		inputTokens,
-		outputTokens,
-		totalTokens,
-		reasoningTokens: usage?.reasoningTokens ?? gateway.reasoningTokens,
-		cachedInputTokens:
-			usage?.cachedInputTokens ?? gateway.cachedInputTokens,
-	});
-
-	return Object.keys(merged).length > 0 ?
-			(merged as AiUsageTelemetry)
-		:	undefined;
-}
-
-export function enrichAiCallTelemetryWithGatewayInfo(
-	telemetry: AiCallTelemetry,
-	gatewayInfo: GatewayGenerationInfoLike,
-): AiCallTelemetry {
-	const gateway = compactRecord({
-		id: gatewayInfo.id,
-		totalCost: gatewayInfo.totalCost,
-		upstreamInferenceCost: gatewayInfo.upstreamInferenceCost,
-		usageCost: gatewayInfo.usage,
-		createdAt: gatewayInfo.createdAt,
-		model: gatewayInfo.model,
-		providerName: gatewayInfo.providerName,
-		streamed: gatewayInfo.streamed,
-		isByok: gatewayInfo.isByok,
-		inputTokens: gatewayInfo.inputTokens,
-		outputTokens: gatewayInfo.outputTokens,
-		cachedInputTokens: gatewayInfo.cachedInputTokens,
-		cacheCreationInputTokens: gatewayInfo.cacheCreationInputTokens,
-		reasoningTokens: gatewayInfo.reasoningTokens,
-	}) as AiGatewayGenerationTelemetry;
-
-	const usage = createGatewayUsageTelemetry(telemetry.usage, gateway);
-	const totalUsage = createGatewayUsageTelemetry(
-		telemetry.totalUsage,
-		gateway,
-	);
-
-	return compactRecord({
-		...telemetry,
-		usage,
-		totalUsage,
-		gateway,
-	}) as AiCallTelemetry;
 }
