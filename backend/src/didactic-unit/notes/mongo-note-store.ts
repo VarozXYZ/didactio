@@ -20,11 +20,6 @@ export class MongoDidacticUnitNoteStore implements DidacticUnitNoteStore {
   constructor(database: Db) {
     this.collection =
       database.collection<DidacticUnitNoteDocument>("didacticUnitNotes");
-    void this.collection.createIndex({
-      ownerId: 1,
-      didacticUnitId: 1,
-      chapterIndex: 1,
-    });
   }
 
   async save(note: DidacticUnitNote): Promise<void> {

@@ -13,6 +13,8 @@ import {MongoGenerationRunStore} from "./generation-runs/mongo-generation-run-st
 import {MongoLearningActivityStore} from "./learning-activities/mongo-learning-activity-store.js";
 import {createLogger} from "./logging/logger.js";
 import {connectMongo, getMongoHealthStatus} from "./mongo/mongo-connection.js";
+import {connectRedisRateLimiter} from "./http/rate-limit.js";
+import {createLangSmithTelemetryService} from "./observability/langsmith-telemetry.js";
 
 loadEnv();
 
@@ -24,6 +26,17 @@ const logger = createLogger({
 });
 const authConfig = loadAuthConfigFromEnv();
 const mongoConnection = await connectMongo(env);
+const redisConnection = await connectRedisRateLimiter(env, logger);
+const langSmithTelemetry = createLangSmithTelemetryService({
+	apiKey: env.langSmithApiKey,
+	project: env.langSmithProject,
+	endpoint: env.langSmithEndpoint,
+	tracing: env.langSmithTracing,
+});
+
+if (process.env.NODE_ENV === "production" && !redisConnection) {
+	throw new Error("REDIS_URL must be configured in production.");
+}
 
 const didacticUnitStore = new MongoDidacticUnitStore(mongoConnection.database);
 const generationRunStore = new MongoGenerationRunStore(
@@ -67,12 +80,42 @@ const app = createApp({
 		},
 	},
 	mongoHealth: getMongoHealthStatus(mongoConnection),
+	apiRateLimiter: redisConnection?.limiter,
+	apiRateLimitPerMinute: env.apiRateLimitPerMinute,
+	langSmithTelemetry,
 	logger,
 });
 
-app.listen(env.port, () => {
+const httpServer = app.listen(env.port, () => {
 	logger.info("Backend server listening", {
 		port: env.port,
 		url: `http://localhost:${env.port}`,
 	});
 });
+
+if (httpServer && typeof httpServer.close === "function") {
+	httpServer.requestTimeout = 120_000;
+	httpServer.headersTimeout = 125_000;
+	httpServer.keepAliveTimeout = 65_000;
+
+	let isShuttingDown = false;
+	const shutdown = (signal: string) => {
+		if (isShuttingDown) {
+			return;
+		}
+		isShuttingDown = true;
+		logger.info("Backend shutdown requested", {signal});
+
+			httpServer.close(async (error) => {
+			if (error) {
+				logger.error("Backend shutdown failed", {error});
+				process.exitCode = 1;
+			}
+			await redisConnection?.close();
+			await mongoConnection.client.close();
+		});
+	};
+
+	process.once("SIGTERM", () => shutdown("SIGTERM"));
+	process.once("SIGINT", () => shutdown("SIGINT"));
+}

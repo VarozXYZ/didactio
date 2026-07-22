@@ -61,6 +61,7 @@ import {
 } from "lucide-react";
 import {cn} from "@/lib/utils";
 import {dashboardApi} from "@/dashboard/api/dashboardApi";
+import {sanitizeFeedbackHtml} from "@/dashboard/utils/htmlContent";
 import type {
 	LearningActivityDto,
 	LearningActivityAttemptDto,
@@ -445,7 +446,7 @@ function FeedbackHtml({
 				"[&_code]:rounded [&_code]:bg-black/[0.06] [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_em]:italic [&_li]:ml-4 [&_mark]:rounded [&_mark]:bg-[#FEF3C7] [&_mark]:px-1 [&_ol]:list-decimal [&_p+ p]:mt-2 [&_strong]:font-bold [&_ul]:list-disc",
 				className,
 			)}
-			dangerouslySetInnerHTML={{__html: html}}
+			dangerouslySetInnerHTML={{__html: sanitizeFeedbackHtml(html)}}
 		/>
 	);
 }

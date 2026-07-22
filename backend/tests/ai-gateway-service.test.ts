@@ -6,14 +6,14 @@ import {
 } from "../src/ai/service.js";
 
 const sdk = vi.hoisted(() => ({
-	createGateway: vi.fn(),
+	createLangChainGateway: vi.fn(),
 	generateObject: vi.fn(),
 	generateText: vi.fn(),
 	streamObject: vi.fn(),
 	streamText: vi.fn(),
 }));
 
-vi.mock("ai", () => sdk);
+vi.mock("../src/ai/langchain-runtime.js", () => sdk);
 
 const config: AiConfig = {
 	silver: {provider: "mock", model: "quick"},
@@ -28,7 +28,6 @@ const telemetrySource = {
 	totalUsage: {inputTokens: 2, outputTokens: 3, totalTokens: 5},
 	request: {body: {prompt: "input"}},
 	response: {id: "response", modelId: "mock/model", timestamp: new Date("2026-01-01T00:00:00Z")},
-	providerMetadata: {gateway: {generationId: "generation"}},
 };
 
 const moderation = {
@@ -100,23 +99,7 @@ function service() {
 describe("GatewayAiService", () => {
 	beforeEach(() => {
 		process.env.AI_GATEWAY_API_KEY = "gateway-key";
-		sdk.createGateway.mockReturnValue(
-			Object.assign(vi.fn((modelId: string) => modelId), {
-				getGenerationInfo: vi.fn().mockResolvedValue({
-					id: "generation",
-					totalCost: 0.1,
-					upstreamInferenceCost: 0.05,
-					usage: 0.09,
-					createdAt: "2026-01-01T00:00:00Z",
-					model: "mock/quick",
-					providerName: "mock",
-					streamed: false,
-					isByok: false,
-					inputTokens: 2,
-					outputTokens: 3,
-				}),
-			}),
-		);
+		sdk.createLangChainGateway.mockReturnValue(vi.fn((modelId: string) => modelId));
 	});
 
 	afterEach(() => {
@@ -147,7 +130,7 @@ describe("GatewayAiService", () => {
 		});
 
 		expect(classified).toMatchObject({folderName: "General", stylePreset: "plain"});
-		expect(classified.telemetry.gateway?.totalCost).toBe(0.1);
+		expect(classified.telemetry.gateway).toBeUndefined();
 		expect(moderated).toMatchObject({approved: true, normalizedTopic: "Testing"});
 		expect(logger.info).toHaveBeenCalled();
 	});
@@ -232,9 +215,9 @@ describe("GatewayAiService", () => {
 			.mockResolvedValueOnce(objectResult({title: "Questions", instructions: "Answer", dedupeSummary: "prompts", content: {prompts}}))
 			.mockResolvedValueOnce(objectResult({
 				score: 70,
-				feedback: "Review.",
-				strengths: ["Clear"],
-				improvements: ["Detail"],
+				feedback: "<p>Review <script>remove</script></p>",
+				strengths: ["<strong>Clear</strong>"],
+				improvements: ["<img src=x onerror=bad>Detail"],
 				questionFeedback: [{
 					id: "one",
 					simplifiedScore: "Good",
@@ -280,6 +263,9 @@ describe("GatewayAiService", () => {
 
 		expect((flashcards.content.cards as unknown[])).toHaveLength(15);
 		expect((answers.content.prompts as unknown[])).toHaveLength(3);
+		expect(feedback.feedback).toBe("<p>Review </p>");
+		expect(feedback.strengths[0]).toBe("<strong>Clear</strong>");
+		expect(feedback.improvements[0]).toBe("Detail");
 		expect(feedback.questionFeedback[0]?.expectedAnswer).not.toContain("script");
 		expect(note.content).toBe("<p>Keep <strong>this</strong>.</p>");
 	});

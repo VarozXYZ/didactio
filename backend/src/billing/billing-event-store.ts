@@ -30,7 +30,6 @@ export class MongoBillingEventStore implements BillingEventStore {
 
 	constructor(database: Db) {
 		this.collection = database.collection<BillingEventDocument>("billingEvents");
-		void this.collection.createIndex({id: 1}, {unique: true});
 	}
 
 	async hasProcessed(id: string): Promise<boolean> {

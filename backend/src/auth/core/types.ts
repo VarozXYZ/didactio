@@ -235,6 +235,7 @@ export interface SessionStore {
 		sessionId: string,
 		nextRefreshTokenHash: string,
 		nextExpiresAt: Date,
+		context?: SessionContext,
 	): Promise<SessionRecord | null>;
 	revokeSession(sessionId: string): Promise<void>;
 	revokeAllForUser(userId: string): Promise<void>;

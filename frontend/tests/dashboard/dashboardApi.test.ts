@@ -35,6 +35,7 @@ describe("dashboard API", () => {
 			dashboardApi.getBillingPricing(),
 			dashboardApi.getBillingSummary(),
 			dashboardApi.getUsageAnalytics("30d"),
+			dashboardApi.getAdminTelemetrySummary(25),
 			dashboardApi.createBillingCheckoutSession("prod"),
 			dashboardApi.createBillingPortalSession(),
 			dashboardApi.createFolder({name: "Math", icon: "atom", color: "#123456"}),
@@ -84,6 +85,7 @@ describe("dashboard API", () => {
 		const requestedPaths = authorizedFetch.mock.calls.map(([path]) => path);
 		expect(requestedPaths).toContain("/api/folders");
 		expect(requestedPaths).toContain("/api/analytics/usage?period=30d");
+		expect(requestedPaths).toContain("/api/admin/telemetry/summary?limit=25");
 		expect(requestedPaths).toContain("/api/didactic-unit/unit/modules/0/reading-progress");
 		expect(requestedPaths).toContain("/api/generation-runs/run/cancel");
 		expect(authorizedFetch.mock.calls.find(([path]) => path === "/api/folders/folder")?.[1]).toMatchObject({
