@@ -70,9 +70,35 @@ const app = createApp({
 	logger,
 });
 
-app.listen(env.port, () => {
+const httpServer = app.listen(env.port, () => {
 	logger.info("Backend server listening", {
 		port: env.port,
 		url: `http://localhost:${env.port}`,
 	});
 });
+
+if (httpServer && typeof httpServer.close === "function") {
+	httpServer.requestTimeout = 120_000;
+	httpServer.headersTimeout = 125_000;
+	httpServer.keepAliveTimeout = 65_000;
+
+	let isShuttingDown = false;
+	const shutdown = (signal: string) => {
+		if (isShuttingDown) {
+			return;
+		}
+		isShuttingDown = true;
+		logger.info("Backend shutdown requested", {signal});
+
+		httpServer.close(async (error) => {
+			if (error) {
+				logger.error("Backend shutdown failed", {error});
+				process.exitCode = 1;
+			}
+			await mongoConnection.client.close();
+		});
+	};
+
+	process.once("SIGTERM", () => shutdown("SIGTERM"));
+	process.once("SIGINT", () => shutdown("SIGINT"));
+}

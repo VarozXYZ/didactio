@@ -71,6 +71,7 @@ export function authErrorHandler(
 
 	response.status(500).json({
 		error: "internal_server_error",
-		message: error instanceof Error ? error.message : "Unexpected error.",
+		message: "Unexpected error.",
+		requestId: response.getHeader("X-Request-Id") ?? undefined,
 	});
 }

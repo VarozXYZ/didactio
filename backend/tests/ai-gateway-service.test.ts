@@ -232,9 +232,9 @@ describe("GatewayAiService", () => {
 			.mockResolvedValueOnce(objectResult({title: "Questions", instructions: "Answer", dedupeSummary: "prompts", content: {prompts}}))
 			.mockResolvedValueOnce(objectResult({
 				score: 70,
-				feedback: "Review.",
-				strengths: ["Clear"],
-				improvements: ["Detail"],
+				feedback: "<p>Review <script>remove</script></p>",
+				strengths: ["<strong>Clear</strong>"],
+				improvements: ["<img src=x onerror=bad>Detail"],
 				questionFeedback: [{
 					id: "one",
 					simplifiedScore: "Good",
@@ -280,6 +280,9 @@ describe("GatewayAiService", () => {
 
 		expect((flashcards.content.cards as unknown[])).toHaveLength(15);
 		expect((answers.content.prompts as unknown[])).toHaveLength(3);
+		expect(feedback.feedback).toBe("<p>Review </p>");
+		expect(feedback.strengths[0]).toBe("<strong>Clear</strong>");
+		expect(feedback.improvements[0]).toBe("Detail");
 		expect(feedback.questionFeedback[0]?.expectedAnswer).not.toContain("script");
 		expect(note.content).toBe("<p>Keep <strong>this</strong>.</p>");
 	});
