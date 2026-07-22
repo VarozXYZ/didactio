@@ -1,4 +1,4 @@
-import {createGateway, generateObject, generateText, streamObject, streamText} from "ai";
+import {generateObject, generateText, streamObject, streamText, createLangChainGateway} from "./langchain-runtime.js";
 import {z} from "zod";
 import {getAppEnv} from "../config/env.js";
 import type {DidacticUnitGeneratedChapter} from "../didactic-unit/chapter.js";
@@ -38,7 +38,6 @@ import {
 } from "./json-repair.js";
 import {
 	collectAiCallTelemetry,
-	enrichAiCallTelemetryWithGatewayInfo,
 	summarizeAiCallTelemetry,
 	type AiCallTelemetry,
 } from "./telemetry.js";
@@ -505,15 +504,22 @@ export class GatewayAiService implements AiService {
 			);
 		}
 
-		this.gateway = createGateway({
-			apiKey: env.aiGatewayApiKey,
-			baseURL: env.aiGatewayBaseUrl,
-		});
 		this.logger =
 			options.logger?.child({component: "ai-service"}) ??
 			createLogger({
 				name: "didactio-backend",
 			}).child({component: "ai-service"});
+		this.gateway = createLangChainGateway({
+			apiKey: env.aiGatewayApiKey,
+			baseURL: env.aiGatewayBaseUrl,
+			langSmith: {
+				apiKey: env.langSmithApiKey,
+				project: env.langSmithProject,
+				endpoint: env.langSmithEndpoint,
+				tracing: env.langSmithTracing,
+			},
+			logger: this.logger,
+		});
 	}
 
 	private selectModel(tier: AiModelTier, config: AiConfig): ModelSelection {
@@ -596,24 +602,7 @@ export class GatewayAiService implements AiService {
 	private async enrichAiCallTelemetry(
 		telemetry: AiCallTelemetry,
 	): Promise<AiCallTelemetry> {
-		if (!telemetry.gatewayGenerationId) {
-			return telemetry;
-		}
-
-		try {
-			const gatewayInfo = await this.gateway.getGenerationInfo({
-				id: telemetry.gatewayGenerationId,
-			});
-
-			return enrichAiCallTelemetryWithGatewayInfo(telemetry, gatewayInfo);
-		} catch (error) {
-			this.logger.warn("AI gateway generation info lookup failed", {
-				generationId: telemetry.gatewayGenerationId,
-				error,
-			});
-
-			return telemetry;
-		}
+		return telemetry;
 	}
 
 	async classifyFolder(input: {

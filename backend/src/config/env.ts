@@ -8,6 +8,10 @@ export interface AppEnv {
 	logFilePath: string | null;
 	aiGatewayApiKey: string | null;
 	aiGatewayBaseUrl: string;
+	langSmithApiKey: string | null;
+	langSmithProject: string;
+	langSmithEndpoint: string;
+	langSmithTracing: boolean;
 	aiCheapProvider: string;
 	aiCheapModel: string;
 	aiPremiumProvider: string;
@@ -46,6 +50,22 @@ function parseOptionalString(value: string | undefined): string | null {
 	return parsedValue ? parsedValue : null;
 }
 
+function parseBoolean(value: string | undefined, fallback: boolean): boolean {
+	if (value === undefined) {
+		return fallback;
+	}
+
+	const normalized = value.trim().toLowerCase();
+	if (normalized === "true" || normalized === "1" || normalized === "yes") {
+		return true;
+	}
+	if (normalized === "false" || normalized === "0" || normalized === "no") {
+		return false;
+	}
+
+	return fallback;
+}
+
 function parseLogLevel(
 	value: string | undefined,
 ): "debug" | "info" | "warn" | "error" {
@@ -80,7 +100,14 @@ export function getAppEnv(): AppEnv {
 		aiGatewayApiKey: parseOptionalString(process.env.AI_GATEWAY_API_KEY),
 		aiGatewayBaseUrl:
 			parseOptionalString(process.env.AI_GATEWAY_BASE_URL) ??
-			"https://ai-gateway.vercel.sh/v1/ai",
+			"https://ai-gateway.vercel.sh/v1",
+		langSmithApiKey: parseOptionalString(process.env.LANGSMITH_API_KEY),
+		langSmithProject:
+			parseOptionalString(process.env.LANGSMITH_PROJECT) ?? "didactio",
+		langSmithEndpoint:
+			parseOptionalString(process.env.LANGSMITH_ENDPOINT) ??
+			"https://api.smith.langchain.com",
+		langSmithTracing: parseBoolean(process.env.LANGSMITH_TRACING, false),
 		aiCheapProvider:
 			parseOptionalString(process.env.AI_CHEAP_PROVIDER) ?? "deepseek",
 		aiCheapModel:
