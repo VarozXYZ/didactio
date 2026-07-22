@@ -4,6 +4,7 @@ import {RequireAuth} from "@/components/auth/RequireAuth";
 import Header from "@/components/marketing/Header";
 import Footer from "@/components/marketing/Footer";
 import {useAppearance} from "@/theme/useAppearance";
+import {AppErrorBoundary} from "@/components/shared/AppErrorBoundary";
 
 const HomePage = lazy(() => import("./pages/HomePage"));
 const PricingPage = lazy(() => import("./pages/PricingPage"));
@@ -66,8 +67,9 @@ function App() {
 					)
 				}
 			>
-				<Suspense fallback={<RouteFallback />}>
-					<Routes>
+				<AppErrorBoundary>
+					<Suspense fallback={<RouteFallback />}>
+						<Routes>
 						<Route path="/" element={<HomePage />} />
 						<Route path="/pricing" element={<PricingPage />} />
 						<Route path="/contact" element={<ContactPage />} />
@@ -102,8 +104,9 @@ function App() {
 							}
 						/>
 						<Route path="*" element={<HomePage />} />
-					</Routes>
-				</Suspense>
+						</Routes>
+					</Suspense>
+				</AppErrorBoundary>
 			</main>
 			{!hideMainChrome && <Footer />}
 		</div>
